@@ -1,0 +1,200 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Engine bench: D-37 star engine (issue #93 W1)</title>
+<!--
+  Issue #93 W1, the D-37 star engine, this tree (/src) against the copy in /.bench-ref/stars/ (the older commit):
+    what=compile&src=cur|ref  cold compile of a globe engine (run.js gives each page a fresh profile): how long the
+                              constructor blocks the main thread, the time until the star draws, and the longest gap
+                              between main-thread timer callbacks meanwhile (a frozen page is one long gap).
+    what=shots                both engines, the same stars and views, adaptive quality pinned (window.__sxPin): the
+                              composited picture (surface, then the overlays screened over it, as the page does) of
+                              each, the count of differing bytes, and the frame cost (median of `frames` steps, each
+                              step followed by a 1-pixel read of every GL canvas so the GPU work is inside the time).
+  Stars: Procyon, eps Eri, Barnard's Star from their card values (cardToStar). Views: whole star in the Observatory
+  view after a fired flare, whole star in true colour, the surface close-up (src=cur uses `surface: true`), and the
+  flare close-up. `png=1` keeps the pictures in __out.png.
+-->
+<body style="margin: 0; background: #000">
+  <div id="host" style="position: relative; width: 800px; height: 500px"></div>
+  <script type="module">
+    const out = { png: {} };
+    window.__out = out;
+    const Q = new URLSearchParams(location.search);
+    const W = 800,
+      H = 500;
+    const tv = (value) => ({ value, tag: 'measured', source: 'bench' });
+    const CARDS = {
+      procyon: {
+        id: 'simbad-alf-cmi',
+        name: 'Procyon',
+        type: 'star',
+        teff_K: tv(6530),
+        radius_rsun: tv(2.05),
+      },
+      epseri: {
+        id: 'simbad-eps-eri',
+        name: 'eps Eri',
+        type: 'star',
+        teff_K: tv(5084),
+        radius_rsun: tv(0.735),
+        rot_period_h: tv(11.2 * 24),
+      },
+      barnard: {
+        id: 'simbad-name-barnard-s-star',
+        name: "Barnard's Star",
+        type: 'star',
+        teff_K: tv(3243),
+        radius_rsun: tv(0.2022),
+      },
+    };
+    const host = document.getElementById('host');
+    const mod = async (src) =>
+      src === 'ref'
+        ? import('/.bench-ref/stars/StarEngine.ts')
+        : import('/src/engine/stars/StarEngine.ts');
+    const presetOf = async (name) => {
+      const { cardToStar } = await import('/src/engine/stars/cardToStar.ts');
+      const r = cardToStar(CARDS[name]);
+      if (!r.ok) throw new Error('refused ' + name);
+      return r.preset;
+    };
+    const syncAll = (e) => {
+      for (const c of e.layers) {
+        const gl = c.getContext('webgl2');
+        if (gl) gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(4));
+      }
+    };
+    const composite = (e) => {
+      const c2 = document.createElement('canvas');
+      c2.width = W;
+      c2.height = H;
+      const x = c2.getContext('2d');
+      x.fillStyle = '#000';
+      x.fillRect(0, 0, W, H);
+      e.layers.forEach((c, i) => {
+        x.globalCompositeOperation = i === 0 ? 'source-over' : 'screen';
+        if (c.width && c.height) x.drawImage(c, 0, 0, W, H);
+      });
+      return x.getImageData(0, 0, W, H).data;
+    };
+    const diff = (a, b) => {
+      let n = 0,
+        mx = 0;
+      for (let i = 0; i < a.length; i++)
+        if (a[i] !== b[i]) {
+          n++;
+          mx = Math.max(mx, Math.abs(a[i] - b[i]));
+        }
+      return { differing: n, of: a.length, max: mx };
+    };
+    const toPng = (rgba) => {
+      const c2 = document.createElement('canvas');
+      c2.width = W;
+      c2.height = H;
+      c2.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(rgba), W, H), 0, 0);
+      return c2.toDataURL('image/png');
+    };
+    const ready = async (e) => {
+      if (typeof e.whenReady === 'function') await e.whenReady();
+    };
+    try {
+      const what = Q.get('what') || 'shots';
+      out.what = what;
+      if (what === 'compile') {
+        const src = Q.get('src') || 'cur';
+        out.src = src;
+        const { StarEngine } = await mod(src);
+        let last = performance.now(),
+          maxGap = 0,
+          ticking = true;
+        const beat = () => {
+          const now = performance.now();
+          maxGap = Math.max(maxGap, now - last);
+          last = now;
+          if (ticking) setTimeout(beat, 4);
+        };
+        setTimeout(beat, 4);
+        await new Promise((r) => setTimeout(r, 50));
+        const t0 = performance.now();
+        const e = new StarEngine(host, { mode: Q.get('mode') || 'globe', reducedMotion: true });
+        out.construct_ms = +(performance.now() - t0).toFixed(1);
+        await ready(e);
+        e.draw();
+        syncAll(e);
+        out.ready_ms = +(performance.now() - t0).toFixed(0);
+        await new Promise((r) => setTimeout(r, 100));
+        ticking = false;
+        out.max_main_thread_gap_ms = +maxGap.toFixed(1);
+        out.ready = e.ready;
+        e.dispose();
+      } else {
+        window.__sxPin = true;
+        const frames = +(Q.get('frames') || 60);
+        const VIEWS = (Q.get('views') || 'obs,true,surface,flare').split(',');
+        const STARS = (Q.get('stars') || 'procyon,epseri,barnard').split(',');
+        const engines = { ref: (await mod('ref')).StarEngine, cur: (await mod('cur')).StarEngine };
+        out.cases = [];
+        for (const name of STARS) {
+          const preset = await presetOf(name);
+          for (const view of VIEWS) {
+            const pics = {};
+            const ms = {};
+            for (const src of ['ref', 'cur']) {
+              const opts = {
+                mode: view === 'flare' ? 'closeup' : 'globe',
+                reducedMotion: true,
+                light: view === 'true' ? 0 : 3,
+              };
+              if (view === 'surface' && src === 'cur') opts.surface = true;
+              const e = new engines[src](host, opts);
+              await ready(e);
+              e.setStar(preset);
+              const pose = () => {
+                if (view === 'obs') e.parity({ view: 'big', filter: 3, fire: true, steps: 90 });
+                else if (view === 'true') e.parity({ view: 'big', filter: 0, steps: 90 });
+                else if (view === 'surface') e.parity({ view: 'close', filter: 2, steps: 30 });
+                else e.parity({ flare: ['open', 'x', 0.4] });
+                e.draw();
+              };
+              pose();
+              pose(); // twice: the first draw after a size change can differ in the scaler's bookkeeping
+              pics[src] = composite(e);
+              // Frame cost: the engine's own step (playing), then a read of every GL canvas.
+              e.setPaused(false);
+              for (let i = 0; i < 5; i++) e.tick(1 / 60);
+              syncAll(e);
+              const ts = [];
+              for (let i = 0; i < frames; i++) {
+                const t0 = performance.now();
+                e.tick(1 / 60);
+                syncAll(e);
+                ts.push(performance.now() - t0);
+                if (i % 10 === 9) await new Promise((r) => setTimeout(r, 0));
+              }
+              ts.sort((a, b) => a - b);
+              ms[src] = +ts[Math.floor(frames / 2)].toFixed(2);
+              ms[src + '_contexts'] = e.layers.filter((c) => c.getContext('webgl2')).length;
+              e.dispose();
+            }
+            out.cases.push({
+              star: name,
+              view,
+              ...diff(pics.ref, pics.cur),
+              ms_ref: ms.ref,
+              ms_cur: ms.cur,
+              gl_ref: ms.ref_contexts,
+              gl_cur: ms.cur_contexts,
+            });
+            if (Q.get('png')) {
+              out.png[`${name}-${view}-ref`] = toPng(pics.ref);
+              out.png[`${name}-${view}-cur`] = toPng(pics.cur);
+            }
+          }
+        }
+      }
+    } catch (e) {
+      out.err = String(e && e.stack ? e.stack : e);
+    }
+    out.done = true;
+  </script>
+</body>
