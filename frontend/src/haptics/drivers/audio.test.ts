@@ -20,7 +20,7 @@ import {
   NOISE_DECAY_S,
   MAX_AUDIO_VOICES,
 } from '../tuning';
-import { AudioDriver, audioGain, patternOnsetsMs, selectTimbre } from './audio';
+import { AudioDriver, audioGain, clampTrainRate, patternOnsetsMs, selectTimbre } from './audio';
 
 function setup(options: ConstructorParameters<typeof FakeAudioContext>[0] = {}) {
   const ctx = new FakeAudioContext(options);
@@ -108,7 +108,7 @@ describe('timbre (R8.9, D-12, Q-72)', () => {
     expect(b.ctx.sources()).toHaveLength(1);
   });
 
-  it('strength 0 (the lowest vibrate level) is still heard, at the floor gain', () => {
+  it('strength 0 is still heard, at the floor gain', () => {
     const { ctx, driver } = setup();
     driver.emit(ev({ strength: 0 }));
     const [osc] = ctx.sources();
@@ -303,5 +303,17 @@ describe('resources (review P4, P5, S2)', () => {
     const { ctx, driver } = setup();
     driver.emit(ev({ kind: 'pulseTrain', rateHz }));
     expect(ctx.sources().length).toBeLessThanOrEqual(11);
+  });
+});
+
+describe('clampTrainRate (R8.3, moved from the vibrate driver by D-39)', () => {
+  it('clamps to the train range and refuses missing or bad rates', () => {
+    expect(clampTrainRate(undefined)).toBeNull();
+    expect(clampTrainRate(0)).toBeNull();
+    expect(clampTrainRate(-3)).toBeNull();
+    expect(clampTrainRate(NaN)).toBeNull();
+    expect(clampTrainRate(0.01)).toBe(0.25);
+    expect(clampTrainRate(10)).toBe(10);
+    expect(clampTrainRate(1000)).toBe(40);
   });
 });

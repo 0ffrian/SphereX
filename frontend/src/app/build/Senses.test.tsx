@@ -1,11 +1,9 @@
-// Issue #71 stream U: the build pane's Feel and Hear it panels never fake a result.
+// Issue #71 stream U: the build pane's Hear it panel never fakes a result (Feel cut, D-39).
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { initialAppData, useAppStore, initialSkyState } from '@/state/store';
 import {
-  FeelPanel,
-  FEEL_UNAVAILABLE,
   HEAR_NOTE_LOADING,
   HEAR_NOTE_NONE,
   HearPanel,
@@ -30,17 +28,6 @@ afterEach(async () => {
 });
 
 const q = (id: string) => host.querySelector<HTMLElement>(`[data-testid="${id}"]`);
-
-describe('Feel it', () => {
-  it('has the mock-up heading and sentence, and says it is not available yet', async () => {
-    await act(async () => root.render(<FeelPanel />));
-    expect(host.textContent).toContain('Feel it');
-    expect(host.textContent).toContain('Bumps buzz and smooth ground stays quiet.');
-    expect(q('feel-unavailable')!.textContent).toBe(FEEL_UNAVAILABLE);
-    // No fake vibration reading: the meter shows a dash, not "0 Hz".
-    expect(host.textContent).not.toMatch(/\d+ Hz/);
-  });
-});
 
 describe('Hear it', () => {
   it('without an object there is nothing to play', async () => {

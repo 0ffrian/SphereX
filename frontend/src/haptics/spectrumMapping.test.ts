@@ -1,7 +1,7 @@
 // R8.6: the shared spectrum → sample mapping (normalisation, quiet, noisy, interpolation) and the
 // pitch mapping it uses.
 import { describe, expect, it } from 'vitest';
-import { latitudeToPitch, pitchToHz, wavelengthToPitch } from './pitch';
+import { pitchToHz, wavelengthToPitch } from './pitch';
 import { buildSpectrumMapping, type SpectrumMappingPoint } from './spectrumMapping';
 import { PITCH_MIN_HZ, PITCH_OCTAVES } from './tuning';
 
@@ -91,13 +91,10 @@ describe('pitch (R8.9)', () => {
     expect(pitchToHz(undefined)).toBeCloseTo(pitchToHz(0.5));
   });
 
-  it('maps λ over the SPHEREx band and latitude over ±90°', () => {
+  it('maps λ over the SPHEREx band', () => {
     expect(wavelengthToPitch(0.75)).toBe(0);
     expect(wavelengthToPitch(5)).toBe(1);
     expect(wavelengthToPitch(10)).toBe(1);
     expect(wavelengthToPitch(2, 2, 2)).toBe(0.5);
-    expect(latitudeToPitch(-90)).toBe(0);
-    expect(latitudeToPitch(0)).toBe(0.5);
-    expect(latitudeToPitch(90)).toBe(1);
   });
 });

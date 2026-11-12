@@ -1,8 +1,8 @@
-// R8.7: settings persistence (one key, corrupt storage → defaults), platform defaults,
-// bindEngine, the shared AudioContext unlock, and applyCalibration's offset sign (R8.9).
+// R8.7 / R13.9: settings persistence (one key, corrupt storage → defaults, old haptic fields
+// ignored), bindEngine and the shared AudioContext unlock.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FakeAudioContext } from '@/test/fakeAudio';
-import { FakeClock, fakeVibrate } from '@/test/fakeHaptics';
+import { FakeClock } from '@/test/fakeHaptics';
 import {
   getAudioContext,
   getUnlockState,
@@ -10,11 +10,8 @@ import {
   subscribeUnlockState,
   unlockAudio,
 } from './audioContext';
-import { applyCalibration, levelsToVibrate, type Calibration } from './calibration';
 import { AudioDriver } from './drivers/audio';
-import { WebVibrateDriver } from './drivers/webVibrate';
-import { HapticEngine, createHaptics, type HapticOutputs } from './haptics';
-import { defaultOutputs, deviceVibrates } from './platform';
+import { HapticEngine, createHaptics, type SoundOutputs } from './haptics';
 import {
   SETTINGS_STORAGE_KEY,
   bindEngine,
@@ -28,55 +25,22 @@ import {
   loadHapticSettings,
   useHapticSettings,
 } from './settings';
-import { WHISPER_PATTERN } from './tuning';
 
-function outputs(): HapticOutputs & { ctx: FakeAudioContext } {
+function outputs(): SoundOutputs & { ctx: FakeAudioContext } {
   const clock = new FakeClock();
   const ctx = new FakeAudioContext();
-  const vibrate = new WebVibrateDriver({ vibrate: fakeVibrate().fn });
   const audio = new AudioDriver({ context: () => ctx.asAudioContext(), supported: true });
-  const engine = new HapticEngine([vibrate, audio], {
+  const engine = new HapticEngine([audio], {
     clock: clock.clock,
     timers: clock,
     debugTarget: null,
   });
-  return { engine, vibrate, audio, ctx };
+  return { engine, audio, ctx };
 }
 
 function resetStore() {
-  useHapticSettings.setState({
-    ...defaultSettings({ hapticsOn: false, soundOn: true }),
-    loaded: false,
-  });
+  useHapticSettings.setState({ ...defaultSettings(), loaded: false });
 }
-
-describe('platform defaults (R8.7, D-08)', () => {
-  it.each([
-    [true, true, { hapticsOn: true, soundOn: true }],
-    [true, false, { hapticsOn: false, soundOn: true }],
-    [false, true, { hapticsOn: false, soundOn: true }],
-    [false, false, { hapticsOn: false, soundOn: true }],
-  ])('android %s, coarse pointer %s → %o', (android, coarsePointer, expected) => {
-    expect(defaultOutputs({ android, coarsePointer })).toEqual(expected);
-  });
-
-  it('jsdom (desktop) defaults to sound only', () => {
-    expect(defaultOutputs()).toEqual({ hapticsOn: false, soundOn: true });
-  });
-
-  it.each([
-    [true, true, true, true],
-    [true, true, false, false], // Android without a touch screen
-    [true, false, true, false], // desktop Chrome: navigator.vibrate exists, no motor
-    [false, true, true, false],
-  ])('deviceVibrates(supported %s, android %s, coarse %s) → %s', (sup, android, coarse, out) => {
-    expect(deviceVibrates(sup, { android, coarsePointer: coarse })).toBe(out);
-  });
-
-  it('desktop (jsdom) never vibrates, even with navigator.vibrate', () => {
-    expect(deviceVibrates(true)).toBe(false);
-  });
-});
 
 describe('settings store (R8.7)', () => {
   beforeEach(() => {
@@ -97,15 +61,14 @@ describe('settings store (R8.7)', () => {
 
   it('update() before any read loads first, so it cannot save over the stored settings', () => {
     localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify({ soundOn: false, volume: 0.2 }));
-    useHapticSettings.getState().update({ strengthMultiplier: 1.2 }); // getState() loads
+    useHapticSettings.getState().update({}); // getState() loads
     resetStore(); // and an update straight from the store object, without a read before it
     const { update } = useHapticSettings.getInitialState();
-    update({ strengthMultiplier: 1.3 });
+    update({});
     flushHapticSettings();
     expect(JSON.parse(localStorage.getItem(SETTINGS_STORAGE_KEY)!)).toMatchObject({
       soundOn: false,
       volume: 0.2,
-      strengthMultiplier: 1.3,
     });
   });
 
@@ -149,16 +112,10 @@ describe('settings store (R8.7)', () => {
   });
 
   it('saves under one key, clamped, and loads back', () => {
-    useHapticSettings.getState().update({ volume: 2, strengthMultiplier: 0.1, hapticsOn: true });
+    useHapticSettings.getState().update({ volume: 2 });
     flushHapticSettings();
     const saved = JSON.parse(localStorage.getItem(SETTINGS_STORAGE_KEY)!);
-    expect(saved).toEqual({
-      hapticsOn: true,
-      soundOn: true,
-      volume: 1,
-      strengthMultiplier: 0.5,
-      showChannelLabels: true,
-    });
+    expect(saved).toEqual({ soundOn: true, volume: 1 });
     expect(Object.keys(localStorage)).toEqual([SETTINGS_STORAGE_KEY]);
     expect(loadHapticSettings()).toEqual(saved);
   });
@@ -185,6 +142,23 @@ describe('settings store (R8.7)', () => {
     set.mockRestore();
   });
 
+  it('a pre-D-39 save loads: its volume and sound switch stay, the haptic fields are dropped', () => {
+    localStorage.setItem(
+      SETTINGS_STORAGE_KEY,
+      JSON.stringify({
+        hapticsOn: true,
+        soundOn: false,
+        volume: 0.4,
+        strengthMultiplier: 1.4,
+        showChannelLabels: false,
+      }),
+    );
+    const s = loadHapticSettings();
+    expect(s).toEqual({ ...defaultSettings(), soundOn: false, volume: 0.4 });
+    expect(s).not.toHaveProperty('hapticsOn');
+    expect(s).not.toHaveProperty('strengthMultiplier');
+  });
+
   it('reset clears the key and restores the defaults', () => {
     useHapticSettings.getState().update({ volume: 0.2 });
     useHapticSettings.getState().reset();
@@ -203,52 +177,14 @@ describe('bindEngine', () => {
   it('applies the settings now and on every change, until unsubscribed', () => {
     const o = outputs();
     const unbind = bindEngine(o);
-    // jsdom: sound only by default.
-    expect(o.engine.isDriverEnabled(o.vibrate)).toBe(false);
     expect(o.engine.isDriverEnabled(o.audio)).toBe(true);
-    useHapticSettings
-      .getState()
-      .update({ hapticsOn: true, soundOn: false, volume: 0.25, strengthMultiplier: 1.2 });
-    expect(o.engine.isDriverEnabled(o.vibrate)).toBe(true);
+    useHapticSettings.getState().update({ soundOn: false, volume: 0.25 });
     expect(o.engine.isDriverEnabled(o.audio)).toBe(false);
     expect(o.audio.volume).toBe(0.25);
-    expect(o.engine.strengthMultiplier).toBe(1.2);
+    expect(o.engine.strengthMultiplier).toBe(1);
     unbind();
     useHapticSettings.getState().update({ soundOn: true });
     expect(o.engine.isDriverEnabled(o.audio)).toBe(false);
-  });
-});
-
-describe('applyCalibration (R8.7, R8.9 offset rule)', () => {
-  const cal = (
-    avOffsetMs: number,
-    levels: Calibration['levels'] = ['soft', 'medium', 'firm'],
-  ): Calibration => ({
-    version: 1,
-    minMs: 10,
-    levels,
-    avOffsetMs,
-  });
-
-  it('vibration felt later (positive offset) delays the audio', () => {
-    const o = outputs();
-    applyCalibration(o, cal(80));
-    expect(o.audio.offsetMs).toBe(80);
-    expect(o.vibrate.delayMs).toBe(0);
-  });
-
-  it('sound heard later (negative offset) delays the vibration', () => {
-    const o = outputs();
-    applyCalibration(o, cal(-60));
-    expect(o.audio.offsetMs).toBe(0);
-    expect(o.vibrate.delayMs).toBe(60);
-  });
-
-  it('sets the levels, soft = minMs, whisper as its pattern', () => {
-    const o = outputs();
-    applyCalibration(o, cal(0, ['whisper', 'soft', 'medium', 'firm']));
-    expect(o.vibrate.levels).toEqual([[...WHISPER_PATTERN], 10, 15, 25]);
-    expect(levelsToVibrate(cal(0))).toEqual([10, 15, 25]);
   });
 });
 
@@ -290,7 +226,7 @@ describe('audio-only outputs and stopWhenHidden (Q-132, R8.8)', () => {
     resetStore();
   });
 
-  it('bindEngine takes an engine without a vibrate driver and applies sound and volume', () => {
+  it('bindEngine takes the audio-only engine and applies sound and volume', () => {
     const ctx = new FakeAudioContext();
     setAudioContextFactory(() => ctx.asAudioContext());
     const o = createHaptics({ debugTarget: null });

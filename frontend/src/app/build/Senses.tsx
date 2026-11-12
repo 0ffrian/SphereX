@@ -1,8 +1,6 @@
-// Issue #71 stream U (Q-294, Q-296): the build pane's "Feel it" and "Hear it" panels, laid out as the
-// mock-up's `#popFeel` and `#popHear` (heading, plain sentence, one control). Never a fake:
-//   Feel: the touch haptics (src/haptics/profiles.ts) are not wired to the 3D view until the phone
-//   build (M5, see the TODO that was in BuildPane), so the panel says so and the vibration meter
-//   stays empty. Nothing buzzes and nothing is drawn as if it did.
+// Issue #71 stream U (Q-294, Q-296): the build pane's "Hear it" panel, laid out as the mock-up's
+// `#popHear` (heading, plain sentence, one control). Never a fake. The Feel panel went with the
+// haptics (D-39).
 //   Hear it: the existing Listen sweep (src/haptics/sound/listenSweep.ts) over the object's own
 //   SPHEREx spectrum (measured), under the honesty level (D-21). No spectrum, no sound.
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -14,30 +12,6 @@ import { getHapticSettings } from '@/haptics/settings';
 import { effectiveHonesty } from '@/viewer/honesty';
 import { epochsWithQ } from '@/viewer/renderers/Comet';
 import { defaultContext } from '@/viewer/renderPlan';
-
-export const FEEL_TEXT =
-  'Bumps buzz and smooth ground stays quiet. On a phone it vibrates. Here you also hear it.';
-export const FEEL_UNAVAILABLE =
-  'Not available yet: the touch feedback is not switched on in this build, so nothing is felt or heard here.';
-
-export function FeelPanel() {
-  return (
-    <>
-      <div className="sx-pop-h">
-        <b>Feel it</b>
-        <span>Not available yet</span>
-      </div>
-      <p>{FEEL_TEXT}</p>
-      <p className="sx-pop-note" data-testid="feel-unavailable">
-        {FEEL_UNAVAILABLE}
-      </p>
-      <div className="sx-bw-head" aria-hidden="true">
-        <span>Vibration</span>
-        <b>&mdash;</b>
-      </div>
-    </>
-  );
-}
 
 export const HEAR_NOTE_LOADING = 'Loading the spectrum of this object…';
 export const HEAR_NOTE_NONE =

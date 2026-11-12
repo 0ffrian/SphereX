@@ -1,26 +1,23 @@
-// R8.7 haptics and sound settings: their own Zustand store (not state/store.ts), saved to
+// R8.7 / R13.9 sound settings (haptics cut, D-39): their own Zustand store (not state/store.ts), saved to
 // localStorage under one key. Loading is lazy: the first read of the store (`getState()`, the hook,
 // `bindEngine`) loads it, so no consumer ever sees the unloaded defaults, and importing this module
 // touches no browser storage. Corrupt or missing storage gives the defaults.
 import { useStore } from 'zustand';
 import { createStore, type StoreApi } from 'zustand/vanilla';
-import type { WebVibrateDriver } from './drivers/webVibrate';
 import type { SoundOutputs } from './haptics';
 import { clamp01 } from './pitch';
-import { defaultOutputs, type OutputDefaults } from './platform';
-import { DEFAULT_VOLUME, STRENGTH_MULTIPLIER_MAX, STRENGTH_MULTIPLIER_MIN } from './tuning';
+import { DEFAULT_VOLUME } from './tuning';
 
 export const SETTINGS_STORAGE_KEY = 'sx.haptics.settings';
 
+/**
+ * The key is the pre-D-39 one, kept so saved volumes survive; the old `hapticsOn`,
+ * `strengthMultiplier` and `showChannelLabels` fields are ignored when read and dropped on save.
+ */
 export interface HapticSettings {
-  hapticsOn: boolean;
   soundOn: boolean;
   /** 0–1. */
   volume: number;
-  /** R8.7: 0.5–1.5. */
-  strengthMultiplier: number;
-  /** R8.7 "texture-vs-data labels shown in the legend". */
-  showChannelLabels: boolean;
 }
 
 export interface HapticSettingsState extends HapticSettings {
@@ -28,22 +25,12 @@ export interface HapticSettingsState extends HapticSettings {
   loaded: boolean;
   /** Change settings; values are clamped and saved (debounced, flushed when the page hides). Loads first if needed. */
   update(changes: Partial<HapticSettings>): void;
-  /** Back to the platform defaults; clears the saved settings. */
+  /** Back to the defaults; clears the saved settings. */
   reset(): void;
 }
 
-export function defaultSettings(outputs: OutputDefaults = defaultOutputs()): HapticSettings {
-  return {
-    hapticsOn: outputs.hapticsOn,
-    soundOn: outputs.soundOn,
-    volume: DEFAULT_VOLUME,
-    strengthMultiplier: 1,
-    showChannelLabels: true,
-  };
-}
-
-function clampMultiplier(m: number): number {
-  return Math.min(STRENGTH_MULTIPLIER_MAX, Math.max(STRENGTH_MULTIPLIER_MIN, m));
+export function defaultSettings(): HapticSettings {
+  return { soundOn: true, volume: DEFAULT_VOLUME };
 }
 
 /** Keep only valid fields of `raw` over `base`. Anything malformed is ignored. */
@@ -51,13 +38,8 @@ export function sanitizeSettings(raw: unknown, base: HapticSettings): HapticSett
   const out = { ...base };
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return out;
   const r = raw as Record<string, unknown>;
-  if (typeof r.hapticsOn === 'boolean') out.hapticsOn = r.hapticsOn;
   if (typeof r.soundOn === 'boolean') out.soundOn = r.soundOn;
-  if (typeof r.showChannelLabels === 'boolean') out.showChannelLabels = r.showChannelLabels;
   if (typeof r.volume === 'number' && Number.isFinite(r.volume)) out.volume = clamp01(r.volume);
-  if (typeof r.strengthMultiplier === 'number' && Number.isFinite(r.strengthMultiplier)) {
-    out.strengthMultiplier = clampMultiplier(r.strengthMultiplier);
-  }
   return out;
 }
 
@@ -69,7 +51,7 @@ function storage(): Storage | null {
   }
 }
 
-/** Saved settings over the platform defaults. Never throws. */
+/** Saved settings over the defaults. Never throws. */
 export function loadHapticSettings(): HapticSettings {
   const base = defaultSettings();
   try {
@@ -124,18 +106,12 @@ function scheduleSave(s: HapticSettings): void {
 }
 
 function pick(s: HapticSettings): HapticSettings {
-  const { hapticsOn, soundOn, volume, strengthMultiplier, showChannelLabels } = s;
-  return { hapticsOn, soundOn, volume, strengthMultiplier, showChannelLabels };
+  const { soundOn, volume } = s;
+  return { soundOn, volume };
 }
 
-// Static initial values: the platform and storage are read on first use, not at import.
-const INITIAL: HapticSettings = {
-  hapticsOn: false,
-  soundOn: true,
-  volume: DEFAULT_VOLUME,
-  strengthMultiplier: 1,
-  showChannelLabels: true,
-};
+// Static initial values: storage is read on first use, not at import.
+const INITIAL: HapticSettings = defaultSettings();
 
 const store = createStore<HapticSettingsState>()((set) => ({
   ...INITIAL,
@@ -189,23 +165,17 @@ export function ensureLoaded(): void {
   store.getState();
 }
 
-/** Push settings into the engine and drivers. */
-export function applySettings(
-  outputs: SoundOutputs & { vibrate?: WebVibrateDriver },
-  s: HapticSettings,
-): void {
-  // The event engine has no vibrate driver (Q-132); one is present only after the event.
-  if (outputs.vibrate) outputs.engine.setDriverEnabled(outputs.vibrate, s.hapticsOn);
+/** Push settings into the engine and the audio driver. */
+export function applySettings(outputs: SoundOutputs, s: HapticSettings): void {
   outputs.engine.setDriverEnabled(outputs.audio, s.soundOn);
   outputs.audio.setVolume(s.volume);
-  outputs.engine.setStrengthMultiplier(s.strengthMultiplier);
 }
 
 /**
  * Keep an engine in step with the settings: loads them, applies them now and on every change.
  * Returns the unsubscribe function.
  */
-export function bindEngine(outputs: SoundOutputs & { vibrate?: WebVibrateDriver }): () => void {
+export function bindEngine(outputs: SoundOutputs): () => void {
   ensureLoaded();
   applySettings(outputs, useHapticSettings.getState());
   const unsubscribe = useHapticSettings.subscribe((s) => applySettings(outputs, s));

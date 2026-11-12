@@ -39,7 +39,7 @@ export function useSound(): AppSound {
   return s;
 }
 
-/** The sound status (unlocked, muted, volume, strength, listening), live. */
+/** The sound status (unlocked, muted, volume, listening), live. */
 export function useSoundStatus(): SoundStatus {
   const s = useSound();
   return useSyncExternalStore(s.subscribe, s.getStatus);
