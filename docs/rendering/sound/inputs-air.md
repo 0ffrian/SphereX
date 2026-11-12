@@ -79,7 +79,7 @@ The listener is at height `z` km above the drawn ground (`engine.fly.alt`). For 
 - `T(z) = max(T0 − gamK·z, 0.6·T0)`. `gamK` is in K/km and the floor stops a negative temperature.
 - `ρ(z) = P(z) M / (R T(z))`; `c(z) = √(γ R T(z)/M)`; `Z(z) = ρ(z) c(z)`.
 - **Silence ceiling:** if `P(z) < P_FLOOR` (1 Pa), nothing is heard at all. [PA Q7]: classical absorption alone removes 1 kHz within about 1 m below about 1.9 Pa.
-  - Caption: "Too high: the air here is too thin to carry sound."
+  - Caption: "Too high: the air here is too thin to carry sound. Fly below about N km to hear it." The first sentence is the spec text; the second is [Q-447](../../decisions/sound-ambience.md): `N = H · ln(P0 / P_FLOOR)` (this isothermal profile, tag `derived`), rounded to 2 significant figures (Earth ≈ 97 km). With no usable height (`P0 ≤ P_FLOOR`, which the "No air here" refusal covers) the first sentence stands alone. The caption shows as soon as the place is above the ceiling, also while the beds still bake.
   - Examples: Earth ≈ 97 km; Mars ≈ 70 km; Jupiter (H ≈ 27 km from 0.1 bar) ≈ 250 km. The floor is a constant; the heights follow from it.
 
 #### 4.2 γ by class [PA Q4]
