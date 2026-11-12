@@ -66,7 +66,7 @@ The run steps for 14 to 15 Nov, gathered from D-24, D-25, Q-112, Q-137, Q-366, Q
 - [ ] For every world, open the Surface view and wait until it has formed. For every star, open the close-ups. Open a rock.
 - [ ] Quit Chrome and relaunch it with the same shortcut. A Surface view must be ready in under 1 s. If it is not, keep Chrome open for the whole event.
 
-**7. Check:** `GET /v1/health` answers `{status: "ok", offline: true, data_release: "spherex_qr2"}`; open Eros in Track and one demo object in the flipbook.
+**7. Check:** `uv run python -m scripts.preflight --wait-warm 900` (in `backend/`) passes: `GET /v1/health` reports `offline: true`, `data_release: "spherex_qr2"` and the warm start `finished`, and every demo row and Eros answers resolve, card, render-params, a texture, frames, spectrum and a cutout (`frames = false` exoplanets skip the last three) (issue #103, Q-454; [backend README](../../backend/README.md#before-going-on-stage)). It is the go/no-go check; where it and `smoke_offline` disagree, it counts. Then open Eros in Track and one demo object in the flipbook.
 
 **8. Measure once on the A15:** the cold and warm `FLY_FS` compile and the time a world takes to form. They must sit well inside the 60 s globe and 180 s fly ready timeouts and the 90 s form clock ([R5.9](../rendering/engines.md#r59-prototype-engines-d-37), R12 #55).
 
