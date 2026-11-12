@@ -66,8 +66,10 @@ DEDUPE_EPOCH_MJD = wise.EPOCH_MJD
 # Measured 11 Nov 2026 (IRSA TAP COUNT, Eros area cone 0.62083 deg at b ~ -4 deg): Gaia G < 20
 # 32,256 rows, CatWISE W1 < 16.5 32,333 rows. The area cone's row cap, above both.
 STAR_LIST_MAX_ROWS = 50000
-# A17.1 (P3): frames less than visit_gap_h apart form one visit. Track-local copy until P3's
-# ``group_visits`` lands; then this module imports it (Q-403 (8)).
+# A17.1 (P3): frames less than visit_gap_h apart form one visit. Track-local copy of P3's rule
+# (Q-403 (8)).
+# TODO(#95 follow-up): P3 merged (PR #99): swap track_visits for
+# app.core.find.visits.group_visits and add an Eros parity test (2 visits x 8 frames).
 VISIT_GAP_H = 1.0
 GAP_TOLERANCE_S = 1e-3
 # ASSUMPTION (Q-403 (6)): new live visit cones started per catalogue by one /overlays request. The
