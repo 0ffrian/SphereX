@@ -814,25 +814,14 @@ W.gl = new WorldGL(canvas);
 // (#93 3.1) and then sets the world's seed uniforms (WorldGL.seedFor; a no-op once they are set).
 ['cloudStep', 'gasStep', 'draw'].forEach(function (k) { var f = W.gl[k]; W.gl[k] = function () { W.gl.link(k === 'draw' && !!W.fly); W.gl.seedFor(W.p); return f.apply(W.gl, arguments); }; });
 // @deviation (#93 F1) a new terrain also builds its max-height pyramid, and a fly draw first binds it (WorldGL.setPyramid,
-// pyrBind). Dev only: with window.__sxGpuTime set, each draw is timed on the GPU (EXT_disjoint_timer_query_webgl2) and
-// W.gpuMs holds the average (weight 0.1), W.gpuLast the last result and an array W.gpuLog, if the caller set one, every
-// result; a disjoint result is dropped. Off, it costs nothing.
+// pyrBind). GPU timing is the host's (WorldEngine's glTimer.ts, ?gputime=1, around the whole tick): a second timer query
+// here would nest inside it, which the extension does not allow.
 (function () {
-  var st = W.gl.setTerrain, dr = W.gl.draw, gl = canvas.getContext('webgl2'), tx = null, qs = [];
+  var st = W.gl.setTerrain, dr = W.gl.draw;
   W.gl.setTerrain = function (t) { st.call(W.gl, t); W.gl.setPyramid(t); };
   W.gl.draw = function () {
     if (W.fly) { W.gl.link(true); W.gl.pyrBind(); }
-    if (typeof window === 'undefined' || !window.__sxGpuTime) return dr.apply(W.gl, arguments);
-    tx = tx || gl.getExtension('EXT_disjoint_timer_query_webgl2');
-    if (!tx) return dr.apply(W.gl, arguments);
-    while (qs.length && gl.getQueryParameter(qs[0], gl.QUERY_RESULT_AVAILABLE)) {
-      var q = qs.shift();
-      if (!gl.getParameter(tx.GPU_DISJOINT_EXT)) { var ms = gl.getQueryParameter(q, gl.QUERY_RESULT) / 1e6; W.gpuLast = ms; W.gpuMs = W.gpuMs ? W.gpuMs * 0.9 + ms * 0.1 : ms; if (W.gpuLog) W.gpuLog.push(ms); }
-      gl.deleteQuery(q);
-    }
-    if (qs.length > 3) return dr.apply(W.gl, arguments);
-    var qq = gl.createQuery(); gl.beginQuery(tx.TIME_ELAPSED_EXT, qq);
-    try { return dr.apply(W.gl, arguments); } finally { gl.endQuery(tx.TIME_ELAPSED_EXT); qs.push(qq); }
+    return dr.apply(W.gl, arguments);
   };
 })();
 return {
