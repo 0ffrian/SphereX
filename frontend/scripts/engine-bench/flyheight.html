@@ -11,7 +11,7 @@
     repeat, T clamp);
   - renders 64 directions into a 64 x 1 RGBA32F target (HQ, then bilinear) and compares them with the CPU port:
       total  = CPU hKm vs GPU hKm (spec: RMS <= 0.02 km, max <= 0.1 km)
-      filter = CPU grid read at the GPU's uv vs GPU e (bar: max <= 0.01 km)
+      filter = CPU grid read at the GPU's uv vs GPU e (bars, Q-434: RMS <= 0.01 km, max <= 0.05 km)
       uv     = CPU uv vs GPU uv, in texels of the height grid
       noise  = CPU hKm computed from the GPU's e vs GPU hKm (bar: RMS <= 0.005 km, at most 2 of 64 above 0.02 km)
   __out.fixture holds what flyHeight.test.ts replays in CI (non-lava worlds).
