@@ -4,7 +4,13 @@
 import { HARMONIC_MIX_DB } from '@/sound/tuning';
 import { flowOffsetDb, presentOffsetDb } from '@/sound/ambience/levels';
 import { isGroundBed } from '@/sound/ambience/sources';
-import { L_REF, L_TARGET, SILENT_DB, STAGE_HEADROOM_DB, STAGE_WINDOW_DB } from '@/sound/ambience/tuning';
+import {
+  L_REF,
+  L_TARGET,
+  SILENT_DB,
+  STAGE_HEADROOM_DB,
+  STAGE_WINDOW_DB,
+} from '@/sound/ambience/tuning';
 import type { AirModel, MixFrame, SourceId } from '@/sound/ambience/types';
 import './marker';
 
@@ -61,13 +67,17 @@ const LREF_OF: Partial<Record<SourceId, keyof typeof L_REF>> = {
 /** TypeScript lines for the changed constants (empty when nothing changed). */
 export function tuningText(t: TuneState): string {
   const out: string[] = [];
-  if (t.windowDb !== STAGE_WINDOW_DB) out.push(`export const STAGE_WINDOW_DB = ${t.windowDb}; // sound/ambience/tuning.ts`);
+  if (t.windowDb !== STAGE_WINDOW_DB)
+    out.push(`export const STAGE_WINDOW_DB = ${t.windowDb}; // sound/ambience/tuning.ts`);
   if (t.harmonicSendDb !== 0) {
-    out.push(`export const HARMONIC_MIX_DB = ${HARMONIC_MIX_DB + t.harmonicSendDb}; // sound/tuning.ts`);
+    out.push(
+      `export const HARMONIC_MIX_DB = ${HARMONIC_MIX_DB + t.harmonicSendDb}; // sound/tuning.ts`,
+    );
   }
   const lref: Record<string, number> = { ...L_REF };
   let changed = false;
-  for (const k of Object.keys(lref)) if (k !== 'hissRel' && t.trimDb) lref[k] = (lref[k] as number) + t.trimDb;
+  for (const k of Object.keys(lref))
+    if (k !== 'hissRel' && t.trimDb) lref[k] = (lref[k] as number) + t.trimDb;
   for (const [id, d] of Object.entries(t.bedTrimDb)) {
     const k = LREF_OF[id as SourceId];
     if (!k || !d) continue;

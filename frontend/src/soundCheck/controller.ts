@@ -132,7 +132,13 @@ export class SoundCheckController {
     this.analyser.getFloatTimeDomainData(block);
     const peak = peakDb(block);
     this.clipCount += clips(block);
-    return { rms: rmsDb(block), peak, hold: this.hold.update(peak, nowS), clips: this.clipCount, tap: this.tap };
+    return {
+      rms: rmsDb(block),
+      peak,
+      hold: this.hold.update(peak, nowS),
+      clips: this.clipCount,
+      tap: this.tap,
+    };
   }
 
   /** Bake the world's beds (the palette is the app's: worker, priority, budgets). */
@@ -150,7 +156,8 @@ export class SoundCheckController {
 
   private baked(): Set<string> {
     const out = new Set<string>();
-    for (const [k, s] of this.specs) if (!isOneShot(s.id, s.variant) && this.palette?.get(s.id, s.variant)) out.add(k);
+    for (const [k, s] of this.specs)
+      if (!isOneShot(s.id, s.variant) && this.palette?.get(s.id, s.variant)) out.add(k);
     return out;
   }
 
@@ -192,7 +199,13 @@ export class SoundCheckController {
       .filter((s) => s.id === 'thunder' && this.palette?.get('thunder', s.variant))
       .map((s) => s.variant);
     const raw = mixFrame(w.air, w.place, this.baked(), undefined, this.specs);
-    const steps = playlist({ beds: raw.beds, baked: this.baked(), lightning: rule, thunderVariants, chord });
+    const steps = playlist({
+      beds: raw.beds,
+      baked: this.baked(),
+      lightning: rule,
+      thunderVariants,
+      chord,
+    });
     let at = 0;
     for (const s of steps) {
       this.timers.push(setTimeout(() => this.runStep(s), at * 1000));
@@ -224,7 +237,14 @@ export class SoundCheckController {
         s.variants.forEach((v, i) => {
           const d = THUNDER_VARIANT_D_M[v] ?? 1000;
           const ok = this.mixer!.fire(
-            { t0: now, d_m: d, bearing: i % 2 ? -Math.PI / 3 : Math.PI / 3, seed: v, variant: v, flash: false },
+            {
+              t0: now,
+              d_m: d,
+              bearing: i % 2 ? -Math.PI / 3 : Math.PI / 3,
+              seed: v,
+              variant: v,
+              flash: false,
+            },
             w.air,
             this.palette!,
             { nowS: now, z_km: w.place.features.z_km, head: 0 },

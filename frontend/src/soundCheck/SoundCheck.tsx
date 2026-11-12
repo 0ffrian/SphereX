@@ -4,11 +4,19 @@ import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import type { WorldEngine as WorldEngineT } from '@/engine/worlds/WorldEngine';
 import { SoundCheckController, type MeterReading } from './controller';
 import { DEFAULT_TUNE, tuningText, type TuneState } from './tune';
-import { engineWorld, enginePresets, fixtureWorlds, type CheckWorld } from './worlds';
+import {
+  CHECK_ALTS,
+  engineWorld,
+  enginePresets,
+  fixtureWorlds,
+  type CheckAlt,
+  type CheckWorld,
+} from './worlds';
 import { SOUND_CHECK_MARKER } from './marker';
 import type { SourceId } from '@/sound/ambience/types';
 
-const fmt = (x: number | null | undefined, d = 1) => (x === null || x === undefined || !Number.isFinite(x) ? '–' : x.toFixed(d));
+const fmt = (x: number | null | undefined, d = 1) =>
+  x === null || x === undefined || !Number.isFinite(x) ? '–' : x.toFixed(d);
 
 export function SoundCheck() {
   const [, rerender] = useReducer((n: number) => n + 1, 0);
@@ -16,6 +24,8 @@ export function SoundCheck() {
   const ctl = useMemo(() => new SoundCheckController(DEFAULT_TUNE, rerender), []);
   const [meter, setMeter] = useState<MeterReading | null>(null);
   const [mode, setMode] = useState<'fixture' | 'engine'>('fixture');
+  const [alt, setAlt] = useState<CheckAlt>('low');
+  const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string>('');
   const [copied, setCopied] = useState('');
   const engineRef = useRef<WorldEngineT | null>(null);
@@ -55,6 +65,8 @@ export function SoundCheck() {
     ctl.load(w);
   };
   const loadEngine = async (id: string) => {
+    if (busy) return;
+    setBusy(true);
     setNote('Starting the world engine (the fly shader can take 20 to 60 s on a cold cache)…');
     try {
       if (!engineRef.current) {
@@ -67,7 +79,7 @@ export function SoundCheck() {
         engineRef.current = new WorldEngine(cv, { role: 'fly' });
         await engineRef.current.whenReady();
       }
-      const w = engineWorld(engineRef.current, id);
+      const w = await engineWorld(engineRef.current, id, alt, setNote);
       if ('error' in w) setNote(w.error);
       else {
         setNote('');
@@ -75,10 +87,13 @@ export function SoundCheck() {
       }
     } catch (err) {
       setNote(`The world engine is unavailable here (${String(err)}). Use the fixture worlds.`);
+    } finally {
+      setBusy(false);
     }
   };
 
-  const bedTrim = (id: SourceId, v: number) => setTune((t) => ({ ...t, bedTrimDb: { ...t.bedTrimDb, [id]: v } }));
+  const bedTrim = (id: SourceId, v: number) =>
+    setTune((t) => ({ ...t, bedTrimDb: { ...t.bedTrimDb, [id]: v } }));
   const toggleMute = (id: SourceId) =>
     setTune((t) => {
       const m = new Set(t.muted);
@@ -92,8 +107,8 @@ export function SoundCheck() {
     <main data-marker={SOUND_CHECK_MARKER}>
       <h1>Sound check (dev only)</h1>
       <p className="muted">
-        Each world&rsquo;s beds through the app&rsquo;s own chain: bake worker → mixer → ambience bus → 35 Hz high-pass → duck →
-        level → master → limiter. Escape stops everything.
+        Each world&rsquo;s beds through the app&rsquo;s own chain: bake worker → mixer → ambience
+        bus → 35 Hz high-pass → duck → level → master → limiter. Escape stops everything.
       </p>
 
       <section aria-label="Output">
@@ -103,9 +118,15 @@ export function SoundCheck() {
           </button>
         ) : (
           <p>
-            Sample rate {st.sampleRate} Hz · output latency {fmt(st.outputLatency ? st.outputLatency * 1000 : null, 0)} ms · base latency{' '}
+            Sample rate {st.sampleRate} Hz · output latency{' '}
+            {fmt(st.outputLatency ? st.outputLatency * 1000 : null, 0)} ms · base latency{' '}
             {fmt(st.baseLatency ? st.baseLatency * 1000 : null, 0)} ms
-            {st.bluetooth && <strong className="warn"> · High latency: Bluetooth? Use the wired output on stage.</strong>}
+            {st.bluetooth && (
+              <strong className="warn">
+                {' '}
+                · High latency: Bluetooth? Use the wired output on stage.
+              </strong>
+            )}
           </p>
         )}
         <button type="button" className="panic" onClick={() => (ctl.stopAll(), rerender())}>
@@ -126,8 +147,9 @@ export function SoundCheck() {
         <Bar label="RMS" db={meter?.rms ?? -100} />
         <Bar label="Peak" db={meter?.peak ?? -100} hold={meter?.hold} />
         <p>
-          RMS {fmt(meter?.rms)} dBFS · peak {fmt(meter?.peak)} dBFS · hold {fmt(meter?.hold)} · clips {meter?.clips ?? 0} · tap:{' '}
-          {meter?.tap ?? '–'} · targets: beds ≈ −24, data −18, thunder ≤ −10 dBFS peak
+          RMS {fmt(meter?.rms)} dBFS · peak {fmt(meter?.peak)} dBFS · hold {fmt(meter?.hold)} ·
+          clips {meter?.clips ?? 0} · tap: {meter?.tap ?? '–'} · targets: beds ≈ −24, data −18,
+          thunder ≤ −10 dBFS peak
         </p>
         {st.step && <p className="step">Now: {st.step}</p>}
       </section>
@@ -135,21 +157,49 @@ export function SoundCheck() {
       <section aria-label="Worlds">
         <div role="radiogroup" aria-label="World source">
           <label>
-            <input type="radio" checked={mode === 'fixture'} onChange={() => setMode('fixture')} /> Fixtures (no WebGL)
+            <input type="radio" checked={mode === 'fixture'} onChange={() => setMode('fixture')} />{' '}
+            Fixtures (no WebGL)
           </label>
           <label>
-            <input type="radio" checked={mode === 'engine'} onChange={() => setMode('engine')} /> Live engine (one hidden engine)
+            <input type="radio" checked={mode === 'engine'} onChange={() => setMode('engine')} />{' '}
+            Live engine (one hidden engine)
           </label>
         </div>
+        {mode === 'engine' && (
+          <label>
+            Listener height{' '}
+            <select
+              value={alt}
+              disabled={busy}
+              onChange={(e) => setAlt(e.target.value as CheckAlt)}
+            >
+              {CHECK_ALTS.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <div className="worlds">
           {mode === 'fixture'
             ? fixtures.map((w) => (
-                <button key={w.id} type="button" disabled={!st.started} onClick={() => loadFixture(w)}>
+                <button
+                  key={w.id}
+                  type="button"
+                  disabled={!st.started}
+                  onClick={() => loadFixture(w)}
+                >
                   {w.label}
                 </button>
               ))
             : presets.map((p) => (
-                <button key={p.id} type="button" disabled={!st.started} onClick={() => void loadEngine(p.id)}>
+                <button
+                  key={p.id}
+                  type="button"
+                  disabled={!st.started || busy}
+                  onClick={() => void loadEngine(p.id)}
+                >
                   {p.label}
                 </button>
               ))}
@@ -191,7 +241,13 @@ export function SoundCheck() {
                     <tr key={k}>
                       <td>{k}</td>
                       <td>{st.ready.includes(k) ? fmt(st.bakeMs[k], 0) : 'baking…'}</td>
-                      <td>{b ? fmt(b.trueDb) : s.id === 'thunder' || (s.id === 'S8' && s.variant === 1) ? 'event' : '–'}</td>
+                      <td>
+                        {b
+                          ? fmt(b.trueDb)
+                          : s.id === 'thunder' || (s.id === 'S8' && s.variant === 1)
+                            ? 'event'
+                            : '–'}
+                      </td>
                       <td>{b ? fmt(b.gainDb) : '–'}</td>
                       <td>{b ? fmt(b.lowpassHz, 0) : '–'}</td>
                       <td>{b ? fmt(b.pan, 2) : '–'}</td>
@@ -208,7 +264,12 @@ export function SoundCheck() {
                         {fmt(tune.bedTrimDb[s.id] ?? 0)}
                       </td>
                       <td>
-                        <input type="checkbox" checked={tune.muted.has(s.id)} aria-label={`Mute ${k}`} onChange={() => toggleMute(s.id)} />
+                        <input
+                          type="checkbox"
+                          checked={tune.muted.has(s.id)}
+                          aria-label={`Mute ${k}`}
+                          onChange={() => toggleMute(s.id)}
+                        />
                       </td>
                     </tr>
                   );
@@ -232,14 +293,33 @@ export function SoundCheck() {
         <h2>Tuning</h2>
         <label>
           Stage window {tune.windowDb} dB{' '}
-          <input type="range" min={6} max={40} step={1} value={tune.windowDb} onChange={(e) => setTune({ ...tune, windowDb: Number(e.target.value) })} />
+          <input
+            type="range"
+            min={6}
+            max={40}
+            step={1}
+            value={tune.windowDb}
+            onChange={(e) => setTune({ ...tune, windowDb: Number(e.target.value) })}
+          />
         </label>
         <label>
           Global bed trim {tune.trimDb} dB{' '}
-          <input type="range" min={-24} max={12} step={0.5} value={tune.trimDb} onChange={(e) => setTune({ ...tune, trimDb: Number(e.target.value) })} />
+          <input
+            type="range"
+            min={-24}
+            max={12}
+            step={0.5}
+            value={tune.trimDb}
+            onChange={(e) => setTune({ ...tune, trimDb: Number(e.target.value) })}
+          />
         </label>
         <label>
-          <input type="checkbox" checked={tune.harmonicOn} onChange={() => setTune({ ...tune, harmonicOn: !tune.harmonicOn })} /> Harmonic branch
+          <input
+            type="checkbox"
+            checked={tune.harmonicOn}
+            onChange={() => setTune({ ...tune, harmonicOn: !tune.harmonicOn })}
+          />{' '}
+          Harmonic branch
         </label>
         <label>
           Harmonic send {tune.harmonicSendDb} dB{' '}
