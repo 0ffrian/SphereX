@@ -11,7 +11,6 @@ import {
   useCallback,
   useEffect,
   useId,
-  useMemo,
   useRef,
   useState,
   type KeyboardEvent,
@@ -30,7 +29,9 @@ import { isEditableTarget } from '@/app/shell/shortcuts';
 import { useShellStore } from '@/app/shell/shellStore';
 import { useAppStore } from '@/state/store';
 import { useAmbienceStore } from '@/app/sound/ambienceStore';
-import { atmosphereOf } from './hearModel';
+import { useShallow } from 'zustand/react/shallow';
+import { useSound, useSoundStatus } from '@/sound/SoundProvider';
+import { useSoundSettings } from '@/sound/settings';
 import { useSpringResize } from './exploreMotion';
 import { ExploreIcon } from './ExploreIcon';
 import type { MouldPhase } from './useMould';
@@ -157,25 +158,15 @@ export function BuildPane() {
   // anywhere in the page that is not a text field (mock-up: Esc closes the build).
   // Ambience (the wind that outlives the Hear it panel) must always be visible and stoppable (WCAG 1.4.2).
   const ambienceOn = useAmbienceStore((s) => s.ambience && s.playing);
-  // The Atmosphere toggle in the header plays the ambience straight away, without opening Hear it.
-  // Shown only where an atmosphere sound is possible (same refusal rules as the Hear it panel).
-  const atmo = useMemo(() => atmosphereOf(card), [card]);
+  // Q-455: Ambience opens a dropdown (this body's atmosphere and the sound settings, AmbiencePanel).
+  // Its click unlocks audio (Q-73: a user gesture). The icon is crossed out until something can be
+  // heard: before the first click, with Sound off, or with neither the atmosphere nor the fly view's
+  // ambience on.
+  const sound = useSound();
+  const soundStatus = useSoundStatus();
+  const settings = useSoundSettings(useShallow((st) => ({ soundOn: st.soundOn, ambienceOn: st.ambienceOn })));
   const atmoOn = useAmbienceStore((s) => s.ambience && s.playing && s.key === (card?.id ?? ''));
-  // A tap on the dimmed Ambience says why there is nothing to hear (a touch screen shows no title).
-  const [atmoHint, setAtmoHint] = useState(false);
-  useEffect(() => {
-    if (!atmoHint) return;
-    const id = window.setTimeout(() => setAtmoHint(false), 4000);
-    return () => window.clearTimeout(id);
-  }, [atmoHint]);
-  const toggleAtmo = (): void => {
-    if (!atmo.ok) {
-      setAtmoHint(true);
-      return;
-    }
-    if (!card) return;
-    useAmbienceStore.getState().setAmbience(!atmoOn, atmo.model, card.id);
-  };
+  const audible = settings.soundOn && (atmoOn || (soundStatus.unlocked && settings.ambienceOn));
   const renderPop = (b: (typeof POP_BUTTONS)[number]) => (
     <button
       key={b.id}
@@ -317,24 +308,30 @@ export function BuildPane() {
             <p data-testid="build-subtitle">{subtitle}</p>
           </div>
           <div className="sx-bp-tools" role="group" aria-label="Build tools">
-            {/* Moon (12 Nov 2026, Q-450): Accuracy, Ambience, Explore, Details, then close. Ambience is a
-                toggle (off, crossed out, until clicked; local synthesis for now, Q-416) and takes Hear it's
-                place in the header; Hear it opens from a row in Details (PR #107 review). Explore is the split view
-                (the close-up on the left). Where there is no atmosphere to hear, Ambience stays
-                visible but off, and its name says why. */}
+            {/* Moon (12 Nov 2026, Q-450): Accuracy, Ambience, Explore, Details, then close. Ambience
+                opens a dropdown with this body's atmosphere and the sound settings (Q-455; crossed out
+                until something can be heard); Hear it opens from a row in Details (PR #107 review).
+                Explore is the split view (the close-up on the left). */}
             {renderPop(POP_BUTTONS[0]!)}
             {canBuild && (
               <button
+                ref={(el) => {
+                  buttonRefs.current.amb = el;
+                }}
                 type="button"
-                className="sx-bp-tool sx-bp-text sx-bp-toggle"
-                aria-label={atmo.ok ? 'Ambience' : `Ambience. ${atmo.line}`}
-                aria-pressed={atmoOn}
-                aria-disabled={!atmo.ok || undefined}
-                title={atmo.ok ? (atmoOn ? 'Stop the ambience (M)' : 'Play the ambience') : atmo.line}
-                onClick={toggleAtmo}
+                className="sx-bp-tool sx-bp-text"
+                title="Ambience and sound settings"
+                aria-pressed={pop === 'amb'}
+                aria-expanded={pop === 'amb'}
+                aria-controls={BUILD_POP_ID}
+                onClick={() => {
+                  // Synchronously inside the click: browsers only start audio from a user activation.
+                  void sound.unlock();
+                  setPop(pop === 'amb' ? null : 'amb');
+                }}
                 data-testid="build-ambience"
               >
-                <Icon name={atmoOn ? 'hear' : 'hearOff'} className="size-[15px]" />
+                <Icon name={audible ? 'hear' : 'hearOff'} className="size-[15px]" />
                 <span>Ambience</span>
               </button>
             )}
@@ -365,11 +362,6 @@ export function BuildPane() {
             </button>
           </div>
         </header>
-        {atmoHint && !atmo.ok && (
-          <p className="sx-bp-hint" role="status" data-testid="build-ambience-hint">
-            {atmo.line}
-          </p>
-        )}
         {bodyHere?.status === 'loading' ? (
           <div className="sx-bp-msg" data-testid="build-generating">
             <StatePill look={GENERATING_LOOK} word="Generating" />
