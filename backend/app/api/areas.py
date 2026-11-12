@@ -6,7 +6,8 @@ area is 404 ``area_not_found``. Beyond D-16 (Q-146 (6)).
 - ``GET /v1/areas/{area_id}``, ``/known``, ``/dots``, ``/tracks``: the stored replies, byte for
   byte (they were checked against ``shared/schemas/area-*.schema.json`` when stored).
 - ``GET /v1/areas/{area_id}/stamps/{dot_id}.png``: 15 x 15 px, made from the cutout when the
-  area was prepared and stored with it (so it works offline without the cutouts).
+  area was prepared and stored with it as raw pixels (so it works offline without the cutouts);
+  the PNG is encoded when serving.
 - ``GET /v1/areas/{area_id}/export.ecsv``: the A17.7 file.
 
 ``/checks`` is not served: D4 and D5 are cut (Q-203 gate); ``summary.missing`` says
@@ -18,8 +19,10 @@ from __future__ import annotations
 
 import base64
 import json
+import math
 from typing import Annotated, Any, cast
 
+import numpy as np
 from fastapi import APIRouter, Depends, Path, Request
 from fastapi.responses import Response
 
@@ -27,6 +30,7 @@ from app.api.models import ErrorResponse
 from app.context import Context
 from app.core.area.config import AREA_ID
 from app.core.area.store import AreaStore
+from app.core.find.png import encode_png
 from app.errors import ApiError
 
 router = APIRouter(prefix="/v1/areas", tags=["areas"])
@@ -104,6 +108,14 @@ def get_export(
     )
 
 
+def _stamp_png(pixels: bytes) -> bytes:
+    """Encode a stored stamp (square raw uint8 pixels, row 0 at the top) as PNG. Formatting
+    only: the pixels were made at prepare time (A16.2)."""
+    side = math.isqrt(len(pixels))
+    img = np.frombuffer(pixels, dtype=np.uint8).reshape(side, side)
+    return encode_png(np.flipud(img))  # encode_png flips FITS orientation back
+
+
 @router.get(
     "/{area_id}/stamps/{dot_id}.png",
     responses={200: {"content": {"image/png": {}}}, **ERRORS, 503: {"model": ErrorResponse}},
@@ -122,7 +134,7 @@ def get_stamp(
             503, "stamp_unavailable", f"The cutout of dot '{dot_id}' could not be stamped."
         )
     return Response(
-        content=base64.b64decode(stamp),
+        content=_stamp_png(base64.b64decode(stamp)),
         media_type="image/png",
         headers={"Cache-Control": "public, max-age=86400"},
     )

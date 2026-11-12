@@ -539,7 +539,9 @@ def export_ecsv(replies: Mapping[str, Mapping[str, Any]], params: str) -> bytes:
 
 
 def _stamps(dots_reply: Mapping[str, Any], cutouts: Mapping[str, bytes]) -> dict[str, str]:
-    """Internal stage for ``/stamps``: every dot's 15 x 15 px PNG (base64), made from the cutout
+    """Internal stage for ``/stamps``: every dot's 15 x 15 px raw uint8 pixels (base64, row 0 at
+    the top; the API encodes the PNG when serving, so the stored bytes do not depend on the zlib
+    build), made from the cutout
     at prepare time, so the pack serves stamps under ``SX_OFFLINE=1`` without the cutouts. A dot
     whose cutout is absent or cannot be stretched has no entry (503 ``stamp_unavailable``)."""
     images: dict[str, StretchedCutout | None] = {}
@@ -555,8 +557,8 @@ def _stamps(dots_reply: Mapping[str, Any], cutouts: Mapping[str, bytes]) -> dict
                     images[fid] = None
             img = images[fid]
             if img is not None:
-                png = img.stamp(float(d["x"]), float(d["y"]))
-                out[str(d["dot_id"])] = base64.b64encode(png).decode("ascii")
+                pixels = img.stamp(float(d["x"]), float(d["y"]))
+                out[str(d["dot_id"])] = base64.b64encode(pixels).decode("ascii")
     return out
 
 
