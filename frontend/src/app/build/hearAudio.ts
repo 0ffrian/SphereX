@@ -7,6 +7,7 @@
 import { getAudioContext, unlockAudio } from '@/sound/audioContext';
 import { getBus as getSoundBus, holdDuck, type DuckHold } from '@/sound/audioGraph';
 import { getSoundSettings, useSoundSettings, type SoundSettingsValues } from '@/sound/settings';
+import { claimSpectrumSound, type SpectrumClaim } from '@/sound/spectrumExclusive';
 import { DUCK_SAFETY_S } from '@/sound/tuning';
 import { cutoffHz, freqAt, howlHz, loudness, SPEC_POINTS, SPEC_SECONDS, type AtmosphereModel } from './hearModel';
 
@@ -177,10 +178,18 @@ export interface SpectrumHandle {
   position(): { pos: number; done: boolean };
 }
 
-/** Triangle plus a quieter sine octave sweeping 880 to 110 Hz over the rest of SPEC_SECONDS; gain from flux. */
+/**
+ * Triangle plus a quieter sine an octave up (timbre only), the pitch from `pitch.ts` (Q-446: 1158 Hz at
+ * 0.75 µm down to 220 Hz at 5 µm, as the chord and the Listen sweep), over the rest of SPEC_SECONDS;
+ * gain from flux. It takes the one spectrum-sound slot (Q-446): the chord or the Listen sweep stops.
+ */
 export function startSpectrum(values: readonly (number | null)[], from: number): SpectrumHandle | null {
   const b = getBus();
   if (!b) return null;
+  // Q-446: one spectrum sound at a time. Claimed before anything is scheduled, so the chord or the
+  // Listen sweep stops first; `letGo` gives the slot back.
+  let stopMe: () => void = () => {};
+  let claim: SpectrumClaim | null = claimSpectrumSound(() => stopMe());
   const { ctx, master } = b;
   let pos = from;
   let rest = (1 - pos) * SPEC_SECONDS;
@@ -227,6 +236,8 @@ export function startSpectrum(values: readonly (number | null)[], from: number):
   const letGo = () => {
     duck?.release();
     duck = null;
+    claim?.release();
+    claim = null;
   };
   o1.onended = letGo;
   const handle: SpectrumHandle = {
@@ -254,5 +265,6 @@ export function startSpectrum(values: readonly (number | null)[], from: number):
     },
   };
   liveSpectrum = handle;
+  stopMe = handle.stop;
   return handle;
 }
