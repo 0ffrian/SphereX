@@ -9,8 +9,9 @@ Eros (the Track object, group ``fixture``), it calls ``/v1/resolve``, ``/card``,
 each call. ``/frames`` is called because it gives the cutout URL (and the app calls it too).
 
 Exit code 1 on any non-200 answer (a 503 ``offline_cache_miss`` is the usual one), a connection
-error, or a cutout that is not a PNG. A row with no frames (a moving object outside SPHEREx's
-windows, a catalogue-only exoplanet) is not a failure; its cutout is reported as skipped.
+error, or a cutout that is not a PNG. A card or params answer still ``measuring`` is a warning.
+A row with no frames (a moving object outside SPHEREx's windows, a catalogue-only exoplanet) is
+not a failure; its cutout is reported as skipped.
 
 ``--wait-warm`` polls ``/v1/health`` until the start-up warm cache reports ``finished`` (or the
 time runs out, which fails) before the rows are checked. It talks HTTP only, so it never reads
@@ -96,7 +97,12 @@ def check_row(client: httpx.Client, row: Row) -> list[Call]:
         return calls
     base = f"/v1/objects/{r.json()['id']}"
     for label in ("card", "render-params"):
-        calls.append(_get(client, label, f"{base}/{label}")[0])
+        call, resp = _get(client, label, f"{base}/{label}")
+        # Issue #41: a 200 that is not the final answer yet (warm start not done for this
+        # object). Reported, not failed: the app shows it and improves it when the job ends.
+        if resp is not None and resp.status_code == 200 and "X-SX-Measuring" in resp.headers:
+            call.note = f"warning: still measuring ({resp.headers['X-SX-Measuring']})"
+        calls.append(call)
     call, fr = _get(client, "frames", f"{base}/frames")
     calls.append(call)
     calls.append(_get(client, "spectrum", f"{base}/spectrum")[0])
