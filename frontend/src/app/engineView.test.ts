@@ -44,8 +44,11 @@ describe('resolveViewControls', () => {
     expect(vc.zoomOff).toBeNull();
     vc.zoom('in');
     expect(apply).toHaveBeenLastCalledWith({ zoom: 2.5 });
+    // The surface follows the arrow (issue #93): a larger yaw turns it left on screen, a larger pitch moves it up.
     vc.rotate('right');
-    expect(apply.mock.calls.at(-1)![0].yaw).toBeGreaterThan(0);
+    expect(apply.mock.calls.at(-1)![0].yaw).toBeLessThan(0);
+    vc.rotate('down');
+    expect(apply.mock.calls.at(-1)![0].pitch).toBeLessThan(0);
     vc.reset();
     expect(apply).toHaveBeenLastCalledWith({ zoom: 1, yaw: 0, pitch: 0 });
     useWorldStore.setState({ globe: null });

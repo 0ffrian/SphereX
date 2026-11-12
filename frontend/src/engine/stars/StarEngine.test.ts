@@ -72,6 +72,19 @@ describe('cardToStar', () => {
     expect(pro.preset.P).not.toBe(PROTOTYPE_PRESETS.f!.P);
     expect(Object.keys(PROTOTYPE_PRESETS)).toEqual(['rg', 'm', 'k', 'g', 'f', 'a', 'b']);
   });
+  it('a card star carries its own seed and noise offset; the Sun and the type rows do not (#93 2.3)', () => {
+    const a = cardToStar(card({ id: 'simbad-a', teff_K: tv(5000) }));
+    const b = cardToStar(card({ id: 'simbad-b', teff_K: tv(5000) }));
+    if (!a.ok || !b.ok) throw new Error('refused');
+    expect(a.preset.so).toHaveLength(3);
+    expect(a.preset.seed).not.toBe(b.preset.seed);
+    expect(a.preset.so).not.toEqual(b.preset.so);
+    const sun = cardToStar(card({ id: 'ref-sun', teff_K: tv(5772) }));
+    if (!sun.ok) throw new Error('refused');
+    expect(sun.preset.seed).toBeUndefined();
+    expect(sun.preset.so).toBeUndefined();
+    for (const p of Object.values(PROTOTYPE_PRESETS)) expect(p.seed ?? p.so).toBeUndefined();
+  });
   it('treats a giant as not a dwarf, with a typical giant mass', () => {
     const r = cardToStar(card({ teff_K: tv(4286), radius_rsun: tv(25.4) }));
     if (!r.ok) throw new Error('refused');
@@ -106,8 +119,9 @@ describe('StarEngine (no WebGL in jsdom: the prototype logic still runs)', () =>
     };
     const a = run();
     expect(a).toEqual(run());
-    expect(a.r.find((x) => x.label === 'Rossby number')?.value).toBe('1.76');
-    expect(a.r.find((x) => x.label === 'Average magnetic field')?.value).toMatch(/^9\d G$/);
+    // #93 3.4: Ro_sun = 25.4 / 12.3 d (Reiners et al. 2022 turnover time; was 1.76 with the Wright fit), field 80 G.
+    expect(a.r.find((x) => x.label === 'Rossby number')?.value).toBe('2.07');
+    expect(a.r.find((x) => x.label === 'Average magnetic field')?.value).toMatch(/^8\d G$/);
     expect(a.f).toMatch(/^Class [CMX]/);
     // X10 rate recalibrated to GOES (about one per 800-1,000 days on the Sun): 900 days.
     expect(a.r.find((x) => x.label === 'X10 flare, about every')?.value).toBe('900 days');

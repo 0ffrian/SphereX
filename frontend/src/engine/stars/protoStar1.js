@@ -5,7 +5,9 @@
 // Source: .claude/worktrees/sculptor-reference/sculptor-preview-next.html, lines 357-662 (Planck colour, star shader FS, star model, tauC, drawStar).
 // Not yet imported by the app: it still needs the TypeScript host (DOM removed, `cardToStar`). Do not edit here;
 // re-run the slicing instead so the body stays byte-identical to the prototype.
-// Deliberate deviations from the prototype (PR #89 review, Atish's call), declared as the last four @rename pairs:
+// Deliberate deviations from the prototype: PR #89 review (Atish's call) as 1 to 3 below (@rename pairs 3 to 6); issue #93 as deviations 4 to 6 (pairs 7 to 22);
+// issue #93 W1 as deviation 7 (protoStar3.js, its pairs 23 and 24) and deviation 8 below (pairs 25 to 29, the second
+// @rename line).
 //  1. Limb darkening: the prototype's T^4 ~ 0.4 + 0.6 mu pinned the disc centre at Teff (the star drawn as if at
 //     0.946 Teff). Now the Eddington approximation T^4 = 3/4 Teff^4 (mu + 2/3), so T = Teff at mu = 2/3 and the
 //     centre is 1.25^(1/4) = 1.0574 Teff; the brightness pow(tl/uTeff, beta) is divided by 1.0574^beta so the
@@ -18,10 +20,37 @@
 //     the fit coefficients are [verify].
 //  3. X10 flare readout: the prototype's "about every 300 f_sun/f days" is 2.5 to 3 times too frequent for the
 //     Sun (GOES since 1976: about one flare >= X10 per 800 to 1,000 days). Now 900 f_sun/f days. inferred_from_analog.
+//  6. (#93 3.4; deviation 6, @rename pairs 20 to 22) Convective turnover time: the prototype's tauC(M) is the Wright et al. 2011 mass fit, but the field
+//     law it feeds (199 Ro^-1.26, 2050 Ro^-0.11) is Reiners et al. 2022 (A&A 662, A41), whose Rossby number uses
+//     tau = 12.3 d (L/Lsun)^-1/2. tauC now takes the star (tauC(p.M) => tauC(p)) and returns 12.3 / sqrt(L), with
+//     L = R^2 (T / 5772 K)^4 (Stefan-Boltzmann, IAU 2015 B3 nominal solar Teff); the old body is left unreachable.
+//     The solar anchor B_SUN uses the same tau (12.3 d, so Ro_sun = 25.4 / 12.3 = 2.07, field 80 G; was 1.76 and
+//     98 G); spot coverage is relative to B_SUN, so the Sun's coverage is unchanged. Barnard's Star from its card
+//     (R 0.2022 Rsun Gaia FLAME, T 3243 K, so L = 0.0041 Lsun): tau about 193 d (was 101 d); the card's own FLAME
+//     luminosity is not read (#93 A9). Same law as physics/stellar.ts turnoverTimeDays. model_dependent.
 // Not changed but labelled: the granulation contrast (+-12 % in temperature, `(gran-.5)*.24`) is 2 to 3 times the
 // observed one, exaggerated so the cells show at this scale: artistic.
+// Issue #93 1.9 (deviation 4, @rename pairs 7 to 11): on ANGLE D3D11 (Chrome's default on Windows) fxc unrolls
+// every loop with a constant bound, and the star shader FS took 3.2 to 4.6 s to compile on a cold cache, freezing the
+// page. Each constant bound N becomes N+uZ0, with uZ0 a uniform that is never set (always 0): the loops run exactly as
+// before, but stay loops. Measured with frontend/scripts/engine-bench (engines.html).
+// Issue #93 3 (2.3; deviation 5, @rename pairs 12 to 19 and the uSO declaration added to pair 7): every star shared
+// one surface: boil(), the granulation filter, the supergranulation and the close-up filters read the sphere
+// direction with no seed, and the spots used rng(1729). A card star now passes `so` (three integers in [0, 256),
+// engine/seed.ts) as the vec3 uSO added to those noise coordinates, and `seed` (its 32-bit hash) to the spot RNG as
+// rng(1729 ^ seed). The prototype presets (and the Sun) have neither: uSO = 0 and rng(1729), as before. The first
+// three spot groups keep their fixed longitudes (they face the viewer); their latitudes, sizes and the rest move.
+// @deviation (#93 W1 B7; deviation 8, @rename pairs 25 to 29 on the second @rename line) the star program compiled
+// synchronously here: compileShader, then COMPILE_STATUS and LINK_STATUS, which wait for the driver (1.2 to 1.7 s on a
+// cold ANGLE D3D11 cache, the page frozen meanwhile). The shaders are now only submitted; poll() says when the driver
+// has finished (KHR_parallel_shader_compile's COMPLETION_STATUS_KHR; without the extension it links at once, which
+// waits as the prototype did) and then reads the status, throwing the compile or link log as before, and reads the
+// uniforms. pending() is true while the driver is still compiling (the host must not call loseContext() then: it
+// would wait for the compile). draw() draws nothing until poll() is true, so the host shows its loader meanwhile.
+// The program, its uniforms and the picture are unchanged.
 // @verbatim L358-L663
-// @rename m.best=>(CLOSE_AT||m.best) (ema=>(!window.__sxPin&&ema pow(.4+.6*mu,.25)=>pow(.75*mu+.5,.25) pow(tl/uTeff,uBeta)=>pow(tl/uTeff/1.0574,uBeta) tt=mix(1.,.885+.05*fil,mpn);tt=mix(tt,.68,um);=>tt=mix(1.,1.-clamp(350.+.6*(uTeff-3300.),200.,2000.)/uTeff*(.36-.16*fil),mpn);tt=mix(tt,1.-clamp(350.+.6*(uTeff-3300.),200.,2000.)/uTeff,um); m.f;=>m.f*3;
+// @rename m.best=>(CLOSE_AT||m.best) (ema=>(!window.__sxPin&&ema pow(.4+.6*mu,.25)=>pow(.75*mu+.5,.25) pow(tl/uTeff,uBeta)=>pow(tl/uTeff/1.0574,uBeta) tt=mix(1.,.885+.05*fil,mpn);tt=mix(tt,.68,um);=>tt=mix(1.,1.-clamp(350.+.6*(uTeff-3300.),200.,2000.)/uTeff*(.36-.16*fil),mpn);tt=mix(tt,1.-clamp(350.+.6*(uTeff-3300.),200.,2000.)/uTeff,um); m.f;=>m.f*3; precision highp float;=>precision highp float;uniform int uZ0;uniform vec3 uSO; i<4;=>i<4+uZ0; k<=1;=>k<=1+uZ0; j<=1;=>j<=1+uZ0; i<=1;=>i<=1+uZ0; p=s*uFreq;=>p=s*uFreq+uSO; s*mf+=>s*mf+uSO+ 2.2)+vec3(t*.012)=>2.2)+uSO+vec3(t*.012) s*F+=>s*F+uSO+ s*hf+=>s*hf+uSO+ rng(1729)=>rng(1729^(ST.p.seed|0)) 'uLut',=>'uLut','uSO', gl.uniform1i(U.uN,=>gl.uniform3fv(U.uSO,ST.p.so||[0,0,0]);gl.uniform1i(U.uN, tauC(p.M)=>tauC(p) Math.log10(M);=>0;return(12.3/Math.sqrt(M.R*M.R*Math.pow(M.T/5772,4))); 1.16),=>1.16)*Math.pow(10,1.16)/12.3,
+// @rename if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(s));=>SHS.push(s); var p=gl.createProgram();=>var SHS=[],pex=gl.getExtension('KHR_parallel_shader_compile'),linked=false,linkErr=null;var p=gl.createProgram(); if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(p));gl.useProgram(p);gl.bindVertexArray(=>gl.bindVertexArray( var U={};=>var U={};this.poll=function(){if(linkErr)throw linkErr;if(linked)return true;if(pex&&!gl.getProgramParameter(p,pex.COMPLETION_STATUS_KHR))return false;try{SHS.forEach(function(s){if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(s));});if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(p));}catch(e){linkErr=e;throw e;}linked=true;gl.useProgram(p); gl.uniform1i(U.uLut,0);var scale=1,ema=16,last=0;this.draw=function(o){=>gl.uniform1i(U.uLut,0);return true;};this.pending=function(){return !linked&&!linkErr&&!!pex&&!gl.getProgramParameter(p,pex.COMPLETION_STATUS_KHR);};var scale=1,ema=16,last=0,self=this;this.draw=function(o){try{if(!self.poll())return;}catch(e){return;}
 /* ---------- Planck spectrum to colour ---------- */
 function g(l, m, s1, s2) {
   var s = l < m ? s1 : s2,
@@ -82,7 +111,7 @@ function hex(c) {
 var VS =
   '#version 300 es\nvoid main(){vec2 p=vec2((gl_VertexID<<1)&2,gl_VertexID&2);gl_Position=vec4(p*2.-1.,0.,1.);}';
 var FS = `#version 300 es
-precision highp float;
+precision highp float;uniform int uZ0;uniform vec3 uSO;
 uniform vec2 uRes,uOff;
 uniform float uTime,uTeff,uFreq,uConv,uHalf,uRot,uTilt,uBeta,uFilter;
 uniform vec4 uSpots[48];
@@ -94,13 +123,13 @@ vec3 h33(vec3 p){p=fract(p*vec3(.1031,.1030,.0973));p+=dot(p,p.yxz+33.33);return
 float vn(vec3 x){vec3 i=floor(x),f=fract(x);f=f*f*(3.-2.*f);
  return mix(mix(mix(h33(i).x,h33(i+vec3(1,0,0)).x,f.x),mix(h33(i+vec3(0,1,0)).x,h33(i+vec3(1,1,0)).x,f.x),f.y),
             mix(mix(h33(i+vec3(0,0,1)).x,h33(i+vec3(1,0,1)).x,f.x),mix(h33(i+vec3(0,1,1)).x,h33(i+vec3(1,1,1)).x,f.x),f.y),f.z);}
-float fbm(vec3 p){float a=.5,s=0.;for(int i=0;i<4;i++){s+=a*vn(p);p=p*2.03+vec3(7.1,3.3,1.7);a*=.5;}return s/.9375;}
-float ridged(vec3 p){float a=.5,s=0.;for(int i=0;i<4;i++){s+=a*(1.-abs(2.*vn(p)-1.));p=p*2.1+vec3(3.1,9.3,4.7);a*=.5;}return s/.9375;}
+float fbm(vec3 p){float a=.5,s=0.;for(int i=0;i<4+uZ0;i++){s+=a*vn(p);p=p*2.03+vec3(7.1,3.3,1.7);a*=.5;}return s/.9375;}
+float ridged(vec3 p){float a=.5,s=0.;for(int i=0;i<4+uZ0;i++){s+=a*(1.-abs(2.*vn(p)-1.));p=p*2.1+vec3(3.1,9.3,4.7);a*=.5;}return s/.9375;}
 vec3 lut(float T){return texture(uLut,vec2((log(T)-LMIN)/(LMAX-LMIN),.5)).rgb;}
 /* A cell is born small, grows, shows a dark core as it splits, then shrinks while its neighbours fill in. */
 float boil(vec3 p,float t){
  vec3 ip=floor(p),fp=fract(p);float f1=9.,f2=9.,pf=0.;
- for(int k=-1;k<=1;k++)for(int j=-1;j<=1;j++)for(int i=-1;i<=1;i++){
+ for(int k=-1;k<=1+uZ0;k++)for(int j=-1;j<=1+uZ0;j++)for(int i=-1;i<=1+uZ0;i++){
   vec3 g=vec3(i,j,k),c=ip+g,h=h33(c);
   float ph=t*(.7+.6*h.x)+h.y*7.,ep=floor(ph),fr=ph-ep;
   vec3 o=h33(c+ep*vec3(13.1,7.7,3.3));
@@ -133,14 +162,14 @@ void main(){
   float vis=1.-smoothstep(.2,.55,foot);
   float gran=.55;
   if(vis>.002&&uConv>.01&&uFilter<2.5){
-   vec3 p=s*uFreq;
+   vec3 p=s*uFreq+uSO;
    vec3 w=vec3(vn(p*.35+t*.06),vn(p*.35+vec3(17.)-t*.05),vn(p*.35+vec3(31.)+t*.04))-.5;
    gran=boil(p+w*1.15,t);
   }
   float mf=uFreq*.2;
   float mvis=1.-smoothstep(.25,.7,px*mf/max(mu,.15));
-  float meso=mvis>.002?fbm(s*mf+vec3(0.,t*.03,0.)):.5;
-  float sup=ridged(s*max(uFreq/26.,2.2)+vec3(t*.012));
+  float meso=mvis>.002?fbm(s*mf+uSO+vec3(0.,t*.03,0.)):.5;
+  float sup=ridged(s*max(uFreq/26.,2.2)+uSO+vec3(t*.012));
   float tf=1.,mp=0.,fac=0.,pl=0.;
   for(int i=0;i<uN;i++){
    vec4 c=uSpots[i];float d=dot(s,c.xyz);
@@ -162,7 +191,7 @@ void main(){
   fac*=1.-mp;
   if(uFilter>2.5){
    float F=clamp(6.5/uHalf,5.,90.);
-   vec3 sp=s*F+vec3(0.,t*.07,t*.03);
+   vec3 sp=s*F+uSO+vec3(0.,t*.07,t*.03);
    vec3 wr=vec3(vn(sp*.8),vn(sp*.8+vec3(9.)),vn(sp*.8+vec3(21.)))-.5;
    float v1=fbm(sp+wr*2.2);
    float v2=ridged(sp*2.6+wr*3.4);
@@ -189,7 +218,7 @@ void main(){
    }
   }else{
    float hf=clamp(uFreq*.2,16.,240.);
-   vec3 sp=s*hf+vec3(0.,t*.05,0.);
+   vec3 sp=s*hf+uSO+vec3(0.,t*.05,0.);
    vec3 wr=vec3(fbm(sp*.7),fbm(sp*.7+9.),fbm(sp*.7+21.))-.5;
    float fib=ridged(sp+wr*2.6);
    float v=.20+.66*pow(fib,1.7)+.30*(sup-.5)+.1*(gran-.5)*vis*uConv;
@@ -235,15 +264,14 @@ function StarGL(canvas) {
     var s = gl.createShader(type);
     gl.shaderSource(s, src);
     gl.compileShader(s);
-    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+    SHS.push(s);
     return s;
   }
+  var SHS = [], pex = gl.getExtension('KHR_parallel_shader_compile'), linked = false, linkErr = null;
   var p = gl.createProgram();
   gl.attachShader(p, sh(gl.VERTEX_SHADER, VS));
   gl.attachShader(p, sh(gl.FRAGMENT_SHADER, FS));
   gl.linkProgram(p);
-  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
-  gl.useProgram(p);
   gl.bindVertexArray(gl.createVertexArray());
   var tex = gl.createTexture();
   gl.bindTexture(gl.TEXTURE_2D, tex);
@@ -253,6 +281,21 @@ function StarGL(canvas) {
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
   var U = {};
+  this.poll = function () {
+    if (linkErr) throw linkErr;
+    if (linked) return true;
+    if (pex && !gl.getProgramParameter(p, pex.COMPLETION_STATUS_KHR)) return false;
+    try {
+      SHS.forEach(function (s) {
+        if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+      });
+      if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+    } catch (e) {
+      linkErr = e;
+      throw e;
+    }
+    linked = true;
+    gl.useProgram(p);
   [
     'uRes',
     'uOff',
@@ -268,14 +311,26 @@ function StarGL(canvas) {
     'uSpots',
     'uN',
     'uLut',
+    'uSO',
   ].forEach(function (n) {
     U[n] = gl.getUniformLocation(p, n);
   });
   gl.uniform1i(U.uLut, 0);
+    return true;
+  };
+  this.pending = function () {
+    return !linked && !linkErr && !!pex && !gl.getProgramParameter(p, pex.COMPLETION_STATUS_KHR);
+  };
   var scale = 1,
     ema = 16,
-    last = 0;
+    last = 0,
+    self = this;
   this.draw = function (o) {
+    try {
+      if (!self.poll()) return;
+    } catch (e) {
+      return;
+    }
     var now = performance.now();
     if (last) {
       ema = ema * 0.92 + (now - last) * 0.08;
@@ -307,6 +362,7 @@ function StarGL(canvas) {
     gl.uniform1f(U.uBeta, clamp(26180 / o.T, 1, 9));
     gl.uniform1f(U.uFilter, o.filter);
     gl.uniform4fv(U.uSpots, o.spots);
+    gl.uniform3fv(U.uSO, ST.p.so || [0, 0, 0]);
     gl.uniform1i(U.uN, o.n);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   };
@@ -332,11 +388,11 @@ var BIG = 30,
   };
 var ROT_MIN = Math.log(0.3),
   ROT_MAX = Math.log(600);
-var B_SUN = 199 * Math.pow(25.4 / Math.pow(10, 1.16), -1.26),
+var B_SUN = 199 * Math.pow(25.4 / Math.pow(10, 1.16)*Math.pow(10,1.16)/12.3, -1.26),
   F_SUN = 0.0015,
   MEAN_A = 7.5e-5 * Math.exp(0.5);
 function tauC(M) {
-  var l = Math.log10(M);
+  var l = 0;return(12.3/Math.sqrt(M.R*M.R*Math.pow(M.T/5772,4)));
   return Math.pow(10, 1.16 - 1.49 * l - 0.54 * l * l);
 }
 function model() {
@@ -351,14 +407,14 @@ function model() {
     B = null,
     f = 0;
   if (p.dwarf && conv > 0.05) {
-    Ro = ST.P / tauC(p.M);
+    Ro = ST.P / tauC(p);
     B = Ro < 0.13 ? 2050 * Math.pow(Ro, -0.11) : 199 * Math.pow(Ro, -1.26);
     f = Math.min(0.25, F_SUN * Math.pow(B / B_SUN, 1.6)) * conv;
   }
   var nReal = f / MEAN_A,
     nG = Math.min(12, Math.round(nReal)),
     k = nG ? f / (nG * MEAN_A) : 1;
-  var r = rng(1729),
+  var r = rng(1729 ^ (ST.p.seed | 0)),
     sp = new Float32Array(48 * 4),
     n = 0,
     best = null,

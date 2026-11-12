@@ -73,6 +73,8 @@ vi.mock('@/viewer/ViewerApp', async (importOriginal) => {
 
 // Imported after the mock is registered (vi.mock is hoisted).
 import { ageFromLog, IR_JETS_HINT, ViewerPanel } from './ViewerPanel';
+import { useCloseUpStore } from './closeUpStore';
+import { ENGINES_KEY } from './enginesSwitch';
 
 let container: HTMLDivElement;
 let root: Root;
@@ -140,6 +142,29 @@ describe('ViewerPanel', () => {
     expect(fake.setEngineOwned).toHaveBeenLastCalledWith(false);
   });
 
+  it('?engines=0 keeps the three.js viewer at + Artistic: no engine stage, nothing published to the close-up (#93 C4)', async () => {
+    const { card, params } = fixture('star');
+    engine.pane = true;
+    engine.star = {
+      preset: { id: card.id, label: card.name, T: 5772, R: 1, M: 1, P: 25.4, dwarf: true },
+    };
+    window.history.replaceState(null, '', '/?engines=0');
+    try {
+      useAppStore.getState().setObject(card, params);
+      useAppStore.getState().setHonesty('artistic');
+      await act(async () => {
+        root.render(<ViewerPanel pane={{ seq: 0, animate: false, seedOffset: 0 }} />);
+      });
+      await act(async () => {});
+      expect(container.querySelector('[data-testid="star-engine-stub"]')).toBeNull();
+      expect(fake.setEngineOwned).not.toHaveBeenCalledWith(true);
+      expect(useCloseUpStore.getState().engineStar).toBeNull();
+    } finally {
+      window.history.replaceState(null, '', '/');
+      localStorage.removeItem(ENGINES_KEY);
+    }
+  });
+
   it('announces a governor tier drop in plain words, but not a manual tier change', async () => {
     await mount();
     const handler = fake.setQualityChangeHandler.mock.calls.at(-1)?.[0] as
@@ -186,6 +211,53 @@ describe('ViewerPanel', () => {
     expect(container.querySelector('[data-testid="star-readouts"]')?.textContent).toMatch(
       /Surface gravity/,
     );
+  });
+
+  it('lists a planet’s eclipse and phase-curve values with their band and tag at every level (#93 A10, D-21)', async () => {
+    const { card, params } = fixture('gas_giant');
+    const c = card as unknown as Record<string, unknown>;
+    c.dayside_temp_K = {
+      value: 1192,
+      err: 9,
+      tag: 'measured',
+      source: 'literature: Knutson et al. 2012, dayside brightness temperature at 4.5 um',
+    };
+    c.hotspot_offset_deg = {
+      value: 20.1,
+      err: 5.5,
+      tag: 'derived',
+      formula: 'hours x 360 / (P x 24)',
+      source: 'literature: Knutson et al. 2012, flux maximum 2.98 h before eclipse at 4.5 um',
+    };
+    for (const level of ['measured', 'derived', 'artistic'] as const) {
+      useAppStore.getState().setObject(card, params);
+      useAppStore.getState().setHonesty(level);
+      await mount();
+      const dl = container.querySelector('[data-testid="planet-measured"]');
+      expect(dl, level).not.toBeNull();
+      const t = dl!.textContent ?? '';
+      expect(t).toContain('Day side (brightness temperature)');
+      expect(t).toContain('1192 ± 9 K at 4.5 µm');
+      expect(t).not.toMatch(/, measured/);
+      // The derived offset follows the honesty level: hidden at "Measured only", shown from "+ Estimated" up.
+      const shown = level === 'measured' ? 1 : 2;
+      if (shown === 2) {
+        expect(t).toContain('Hottest point');
+        expect(t).toContain('20.1 ± 5.5° east of noon at 4.5 µm');
+      } else {
+        expect(t).not.toContain('Hottest point');
+      }
+      expect(dl!.querySelectorAll('dd').length).toBe(shown);
+      // Each value carries its tag badge (the badge, not the label, says how it is known).
+      expect(dl!.querySelectorAll('[data-testid="provenance-badge"]').length).toBe(shown);
+    }
+  });
+
+  it('shows no planet readouts when the card has none', async () => {
+    const { card, params } = fixture('star');
+    useAppStore.getState().setObject(card, params);
+    await mount();
+    expect(container.querySelector('[data-testid="planet-measured"]')).toBeNull();
   });
 
   it('shows no note for a process whose layer is not drawn (Measured only)', async () => {

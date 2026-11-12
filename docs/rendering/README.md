@@ -16,6 +16,7 @@ The original single file (`docs/CONTEXT-rendering-haptics.md`) was split into th
 | [type-selection.md](type-selection.md) | R3.3 | backend type selection (stage 3): SBDB, SIMBAD otypes, exoplanet thresholds |
 | [display-rules.md](display-rules.md) | R4, R5, R5.1–R5.7 | working on the viewer: display levels, lighting, view modes, honesty toggle, scale bar, performance budget and event target, interaction (Feel and Touch modes), motion, quality levels |
 | [engines.md](engines.md) | R5.9 | the D-37 prototype engines (world, star, rock) on raw WebGL2: when they draw (+ Artistic only), the three.js fallback, the determinism exemption, copied code and deviations, the unmeasured A15 frame rate |
+| [engines-performance.md](engines-performance.md) | R5.9.1 | the issue #93 performance waves: star, rock and fly compile and lifecycle, caches, the fly view's static G-buffer, the shared simulation (in a worker by default), the three.js viewer's resolution and bloom, the dev switches and bench pages |
 | [build-mould.md](build-mould.md) | R5.8 | the Build split view, the moulding steps, New seed and honesty while building |
 | [surface-generation.md](surface-generation.md) | R6, R6.1–R6.7 | baking height/normal/albedo maps (asteroids and brown dwarf bands): card→params rules, seed, noise, craters, Sobel normals, Gemini/depth paths, caching |
 | [renderers/asteroid.md](renderers/asteroid.md) | R7 (intro), R7.1, R7.2 | rendering `asteroid_shape` (433 Eros, the demo body) or `asteroid_procedural` (also holds the R7 intro rule on refused layers) |
@@ -24,6 +25,7 @@ The original single file (`docs/CONTEXT-rendering-haptics.md`) was split into th
 | [renderers/stars.md](renderers/stars.md) | R7.5, R7.5.1–R7.5.5 | rendering `star`, `star_mira`, `star_ttauri`, and the star surface (spots, flares) |
 | [renderers/candidate.md](renderers/candidate.md) | R7.6 | handling `candidate` (no 3D) |
 | [renderers/shader-kinds.md](renderers/shader-kinds.md) | R7.7 | planets, gas giants (the shared CPU field), nebulae and novae (volumes, no haptics, Q-103) |
+| [renderers/world-engine.md](renderers/world-engine.md) | R7.7.1 | the D-37 world engine's values for planets and gas giants: card against preset, albedo, lava worlds, clouds, CO₂, giants and rings, and the issue #93 physics (critical points, saturation pressure, tides, runaway greenhouse) |
 | [haptics/platform-encoding.md](haptics/platform-encoding.md) | R8, R8.1–R8.3 | what each platform does (event: sound only on the A15), texture vs data haptics and the honesty rule for sounds, vibration patterns (after the event) |
 | [haptics/sources.md](haptics/sources.md) | R8.4 | implementing a source: height map, mesh, field, terrain, flow, band, data pulse, light curve; what feeds the body tone |
 | [haptics/profiles.md](haptics/profiles.md) | R8.5, R8.6 | mapping an object type to its texture/data haptics, or doing spectrum haptics |
@@ -64,6 +66,7 @@ The original single file (`docs/CONTEXT-rendering-haptics.md`) was split into th
 | R5.7 | Motion and time-lapse | [display-rules.md#r57-motion-and-time-lapse](display-rules.md#r57-motion-and-time-lapse) |
 | R5.8 | Build split view and moulding | [build-mould.md#r58-build-split-view-and-moulding](build-mould.md#r58-build-split-view-and-moulding) |
 | R5.9 | Prototype engines (D-37) | [engines.md#r59-prototype-engines-d-37](engines.md#r59-prototype-engines-d-37) |
+| R5.9.1 | Engine and viewer performance (issue #93 waves) | [engines-performance.md#r591-engine-and-viewer-performance-issue-93-waves](engines-performance.md#r591-engine-and-viewer-performance-issue-93-waves) |
 | R6 | Surface generation (backend, CPU) | [surface-generation.md#r6-surface-generation-backend-cpu](surface-generation.md#r6-surface-generation-backend-cpu) |
 | R6.1 | Strategy: height first, colour second | [surface-generation.md#r61-strategy-height-first-colour-second](surface-generation.md#r61-strategy-height-first-colour-second) |
 | R6.2 | Card → generator parameters (deterministic rules) | [surface-generation.md#r62-card--generator-parameters-deterministic-rules](surface-generation.md#r62-card--generator-parameters-deterministic-rules) |
@@ -85,6 +88,7 @@ The original single file (`docs/CONTEXT-rendering-haptics.md`) was split into th
 | R7.5.5 | Flares and prominences | [renderers/stars.md#r755-flares-and-prominences](renderers/stars.md#r755-flares-and-prominences) |
 | R7.6 | `candidate` | [renderers/candidate.md#r76-candidate](renderers/candidate.md#r76-candidate) |
 | R7.7 | Shader-generated kinds: `planet_rocky`, `planet_water`, `gas_giant`, `nebula`, `nova` | [renderers/shader-kinds.md#r77-shader-generated-kinds-planet_rocky-planet_water-gas_giant-nebula-nova](renderers/shader-kinds.md#r77-shader-generated-kinds-planet_rocky-planet_water-gas_giant-nebula-nova) |
+| R7.7.1 | World engine values | [renderers/world-engine.md#r771-world-engine-values](renderers/world-engine.md#r771-world-engine-values) |
 | R8 | Haptics | [haptics/platform-encoding.md#r8-haptics](haptics/platform-encoding.md#r8-haptics) |
 | R8.1 | Platform reality | [haptics/platform-encoding.md#r81-platform-reality](haptics/platform-encoding.md#r81-platform-reality) |
 | R8.2 | Two kinds of haptics (both labelled in the UI) | [haptics/platform-encoding.md#r82-two-kinds-of-haptics-both-labelled-in-the-ui](haptics/platform-encoding.md#r82-two-kinds-of-haptics-both-labelled-in-the-ui) |

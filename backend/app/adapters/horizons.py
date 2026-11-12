@@ -141,9 +141,12 @@ def ephemeris(
         return resp
 
     served = ctx.cache.fetch(key, live, refresh=refresh)
-    rows = parse(served.entry.body)
-    points = [EphemPoint(_parse_horizons_time(t), ra, dec) for t, ra, dec in rows]
-    return points, served
+    return range_points(served.entry.body), served
+
+
+def range_points(body: bytes) -> list[EphemPoint]:
+    """The samples of a range answer body. Raises ``ValueError`` without an ephemeris block."""
+    return [EphemPoint(_parse_horizons_time(t), ra, dec) for t, ra, dec in parse(body)]
 
 
 # --- Lighting geometry (R5.1): phase angle and Sun direction --------------------------------
