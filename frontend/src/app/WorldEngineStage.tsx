@@ -30,6 +30,8 @@ import {
   readyOrTimeout,
 } from './engineWatchdog';
 import { drawReady, GLOBE_KEYS, globeTurn, globeTurnBy, useWorldStore } from './worldStore';
+import { engineHostCap } from '@/viewer/render/quality';
+import { gpuTimingFlags } from '@/viewer/render/gpuTiming';
 import { FLY_NOTE, WORLD_HONESTY, WORLD_NOTE_LINES } from './worldNotes.generated';
 
 /** The engine's world for the shown card, or null: not a planet, refused, or no WebGL 2 (old path). */
@@ -102,6 +104,14 @@ function reducedMotion(): boolean {
 
 type Role = 'globe' | 'fly';
 
+/** Roadmap 0.1, dev only: `?gputime=1` times each engine tick on the GPU (`__sxWorld_<role>.gpuMs()`). */
+function devGpuTiming(): boolean {
+  return gpuTimingFlags(
+    typeof location === 'undefined' ? '' : location.search,
+    import.meta.env.DEV || import.meta.env.MODE === 'fixtures',
+  ).timing;
+}
+
 /**
  * Builds one engine on a canvas of its own inside `host`, drives its clock (the artifact's loop, with its pause) and
  * keeps React in step with it. The canvas is made here, in the effect, so a remount gets a fresh GL context.
@@ -110,14 +120,27 @@ type Role = 'globe' | 'fly';
  * ENGINE_READY_TIMEOUT_MS, a world that has not formed after ENGINE_FORM_TIMEOUT_MS on screen, and any error while it
  * starts or steps (which used to stop the frame loop for good) all call `onFail`, so the three.js path draws instead.
  * `onFormed` is called once the world has formed (the build steps wait for it).
+ *
+ * Render-performance roadmap: the loop is capped at 60 Hz (0.2, `engineHostCap`; at a 60 Hz display
+ * every frame still draws), and `paused` (0.7: the fly view kept mounted while the close-up is
+ * closed) stops the tick, the draws and the frame loop until it is lifted.
  */
 function useWorldEngine(
   role: Role,
   world: CardToWorldOk,
   onFail: (() => void) | undefined,
   onFormed?: () => void,
+  paused = false,
 ) {
   const hostRef = useRef<HTMLDivElement>(null);
+  const pausedRef = useRef(paused);
+  /** Restarts the frame loop after a pause (set once the engine runs). */
+  const wakeRef = useRef<(() => void) | null>(null);
+  useEffect(() => {
+    const was = pausedRef.current;
+    pausedRef.current = paused;
+    if (was && !paused) wakeRef.current?.();
+  }, [paused]);
   const [engine, setEngine] = useState<WorldEngine | null>(null);
   const [failed, setFailed] = useState(false);
   const [rev, bump] = useReducer((n: number) => n + 1, 0);
@@ -148,6 +171,7 @@ function useWorldEngine(
       console.warn('[world engine] could not start', err);
       cancelReady();
       cancelAnimationFrame(raf);
+      raf = 0;
       window.clearInterval(id);
       canvas?.remove();
       setFailed(true);
@@ -186,8 +210,20 @@ function useWorldEngine(
       let shown = true;
       let last = performance.now();
       const clock = new FormClock();
+      const cap = engineHostCap();
       const frame = (now: number) => {
         if (dead || broken) return;
+        if (pausedRef.current) {
+          // Roadmap 0.7: closed close-up. No tick, no draw, no loop until `wakeRef` restarts it.
+          raf = 0;
+          return;
+        }
+        // Roadmap 0.2: 60 Hz cap. The step is measured from the last DRAWN frame, so the world still
+        // moves in real time; the skipped display frames cost nothing.
+        if (!cap.shouldDraw(now)) {
+          raf = requestAnimationFrame(frame);
+          return;
+        }
         const dtMs = now - last;
         last = now;
         try {
@@ -212,7 +248,20 @@ function useWorldEngine(
         }
         raf = requestAnimationFrame(frame);
       };
-      raf = requestAnimationFrame(frame);
+      wakeRef.current = () => {
+        if (dead || broken || raf !== 0) return;
+        // The pause is not a frame: the next step starts from now, and the fly view catches up to
+        // the globe's turn as it does when it scrolls back into view.
+        last = performance.now();
+        cap.reset();
+        if (role === 'fly' && released) {
+          const g = useWorldStore.getState().globe;
+          if (g) en.syncSpin(g);
+        }
+        if (drawReady(en)) en.draw();
+        raf = requestAnimationFrame(frame);
+      };
+      raf = pausedRef.current ? 0 : requestAnimationFrame(frame);
       io =
         typeof IntersectionObserver === 'undefined'
           ? null
@@ -233,14 +282,17 @@ function useWorldEngine(
         typeof ResizeObserver === 'undefined'
           ? null
           : new ResizeObserver(() => {
-              if (drawReady(en)) en.draw();
+              if (!pausedRef.current && drawReady(en)) en.draw();
             });
       if (canvas) ro?.observe(canvas);
-      // React reads the readouts a few times a second while the world moves or forms, and not at all when it is paused and settled.
+      // React reads the readouts a few times a second while the world moves or forms, and not at all when it is paused
+      // and settled. Roadmap 0.10: the fly view shows no readout that changes with the clock (its height and Fly button
+      // re-render on input), so it re-renders on this timer only while it forms (the progress bar).
       let wasForming = true;
       id = window.setInterval(() => {
         const forming = en.spinup > 0;
-        if (shown && (en.playing || forming || wasForming)) bump();
+        const moving = role === 'globe' && en.playing;
+        if (shown && !pausedRef.current && (moving || forming || wasForming)) bump();
         wasForming = forming;
       }, 400);
     };
@@ -257,7 +309,7 @@ function useWorldEngine(
       let en: WorldEngine;
       try {
         // Issue #93: the globe engine never compiles the fly shader; the fly engine skips the hidden globe.
-        en = new WorldEngine(cv, { role });
+        en = new WorldEngine(cv, { role, gpuTiming: devGpuTiming() });
       } catch (err) {
         fail(err);
         return;
@@ -280,6 +332,7 @@ function useWorldEngine(
       window.clearTimeout(boot);
       dead = true;
       cancelReady();
+      wakeRef.current = null;
       if (canvas && onLost) canvas.removeEventListener('webglcontextlost', onLost);
       cancelAnimationFrame(raf);
       window.clearInterval(id);
@@ -687,7 +740,9 @@ export function WorldGlobeStage({
       const clicked = drag !== null && !drag.moved && e.type === 'pointerup';
       drag = null;
       canvas.style.cursor = 'grab';
-      if (clicked && useWorldStore.getState().fly) {
+      // Roadmap 0.7: the fly engine outlives a closed close-up (paused); a click picks a place only while it is open.
+      const st = useWorldStore.getState();
+      if (clicked && st.fly && !st.flyPaused) {
         const p = engine.globePick(...px(e));
         if (p) useWorldStore.getState().pick(p.lon, p.lat);
       }
@@ -743,12 +798,28 @@ export function WorldFlyStage({
   world,
   reduced,
   onFail,
+  paused = false,
 }: {
   world: CardToWorldOk;
   reduced: boolean;
   onFail?: () => void;
+  /**
+   * Roadmap 0.7: the close-up is closed. The stage stays mounted (no new GL context, no fly-shader
+   * compile, no 900-step spin-up on reopening) but neither ticks nor draws.
+   */
+  paused?: boolean;
 }) {
-  const { hostRef, engine, bump, failed, progress } = useWorldEngine('fly', world, onFail);
+  const { hostRef, engine, bump, failed, progress } = useWorldEngine(
+    'fly',
+    world,
+    onFail,
+    undefined,
+    paused,
+  );
+  useEffect(() => {
+    useWorldStore.getState().setFlyPaused(paused);
+    return () => useWorldStore.getState().setFlyPaused(false);
+  }, [paused]);
   const target = useWorldStore((s) => s.target);
   const [entered, setEntered] = useState(false);
   const settled = !!engine && engine.spinup === 0;
@@ -781,7 +852,7 @@ export function WorldFlyStage({
   useEffect(() => {
     if (!engine || !entered || !target) return;
     engine.setFlyPlace(target.lon, target.lat);
-    if (drawReady(engine)) engine.draw();
+    if (!useWorldStore.getState().flyPaused && drawReady(engine)) engine.draw();
     redo();
   }, [engine, entered, target]);
 
