@@ -19,7 +19,7 @@ describe('shader loop bounds (issue #93 1.1)', () => {
   const constLoop = /for\(int [ijk]=-?\d+;[ijk]<=?\d+;/;
   it('every loop in WORLD_FS and FLY_FS has a uniform bound, declared once', () => {
     for (const [fs, n] of [
-      [FLY_FS, 13], // 11, plus the two cube-face loops of #93 2.5
+      [FLY_FS, 14], // 11, plus the two cube-face loops of #93 2.5 and the pyramid step of #93 F1
       [WORLD_FS, 3],
     ] as const) {
       expect(fs.match(/\+uZ0;/g)?.length).toBe(n);
@@ -68,7 +68,8 @@ describe('background compile (issue #93 1.2, 1.3)', () => {
       if (c[0] === 'getProgramParameter' && c[1] === 'COMPLETION_STATUS_KHR') lastCompletion = i;
     });
     expect(firstLink).toBeGreaterThan(lastCompletion);
-    expect(statusReads().filter((c) => c[1] === 'LINK_STATUS')).toHaveLength(4);
+    // the fly engine links ADV_FS, GAS_FS and FLY_FS: it never draws the globe, so it has no WORLD_FS (#93 F1)
+    expect(statusReads().filter((c) => c[1] === 'LINK_STATUS')).toHaveLength(3);
   });
 
   it('WorldEngine.whenReady resolves after a late completion, without blocking', async () => {
@@ -145,10 +146,10 @@ describe('background compile (issue #93 1.2, 1.3)', () => {
     expect(e.pollReady()).toBe(true);
   });
 
-  it('the globe creates 3 programs (no fly shader); the fly engine and the prototype page 4', () => {
+  it('the globe and the fly engine create 3 programs (no fly shader, no globe shader); the prototype page 4', () => {
     for (const [role, n] of [
       ['globe', 3],
-      ['fly', 4],
+      ['fly', 3],
       ['both', 4],
     ] as const) {
       const { gl, progs } = stubGL();
@@ -156,6 +157,7 @@ describe('background compile (issue #93 1.2, 1.3)', () => {
       expect(progs).toHaveLength(n);
       expect(e.programCount()).toBe(n);
       expect(progs.some((p) => p.fs === FLY_FS)).toBe(role !== 'globe');
+      expect(progs.some((p) => p.fs === WORLD_FS)).toBe(role !== 'fly');
     }
   });
 
@@ -204,6 +206,44 @@ describe('drawing (issue #93 1.4, 1.6, 1.7)', () => {
     }
   });
 
+  it('the scaler steps rarely and FLY_FS follows the eased pixel (#93 B9)', async () => {
+    const { gl, calls } = stubGL();
+    const c = stubCanvas(gl, 1000, 400);
+    const e = new WorldEngine(c, { role: 'fly' });
+    await e.whenReady();
+    e.setPreset(preset('jup'));
+    e.setFly(true);
+    const g = globalThis as unknown as { __sxPin?: boolean };
+    const pin = g.__sxPin;
+    g.__sxPin = false;
+    let now = 1e6;
+    const spy = vi.spyOn(performance, 'now').mockImplementation(() => now);
+    try {
+      // slow frames (60 ms) for 3 s: the scale steps down by 0.8 at most once a second
+      const widths: number[] = [];
+      for (let i = 0; i < 50; i++) {
+        now += 60;
+        e.draw();
+        widths.push(c.width);
+      }
+      const steps = widths.filter((w, i) => i > 0 && w !== widths[i - 1]).length;
+      expect(steps).toBeGreaterThanOrEqual(2);
+      expect(steps).toBeLessThanOrEqual(3);
+      expect(c.width).toBe(Math.round(1000 * 0.8 ** steps));
+      // after a step, uScale (scale / eased scale) eases back to 1: FLY_FS's footprint is the real pixel
+      for (let i = 0; i < 40; i++) {
+        now += 20;
+        e.draw();
+      }
+      const us = calls.filter((x) => x[0] === 'uniform1f' && x[1] === 'uScale').map((x) => x[2]);
+      expect(us.some((v) => (v as number) < 0.99)).toBe(true);
+      expect(us[us.length - 1]).toBeCloseTo(1, 2);
+    } finally {
+      spy.mockRestore();
+      g.__sxPin = pin;
+    }
+  });
+
   it('caps the pixel ratio at 1.0 for the fly engine and 1.25 for the globe', async () => {
     const g = globalThis as unknown as { devicePixelRatio: number };
     const dpr = g.devicePixelRatio;
@@ -243,6 +283,70 @@ describe('drawing (issue #93 1.4, 1.6, 1.7)', () => {
     expect(e.spinup).toBe(0);
     expect(e.view()).not.toBeNull();
   }, 30000);
+});
+
+describe('fly view static G-buffer (issue #93 F3)', () => {
+  const lastGB = (calls: unknown[][]) =>
+    calls.filter((c) => c[0] === 'uniform1f' && (c[1] === 'uGB' || c[1] === 'uGBsh')).slice(-2);
+
+  it('FLY_FS writes the geometry targets and reads them back only with uGB = 2', () => {
+    expect(FLY_FS).toContain('layout(location=3) out vec4 O3;');
+    expect(FLY_FS).toContain('else if(uGB>1.5){hit=GB1.x;p=ro+rd*hit;}');
+    expect(FLY_FS).toContain('O1=GW1;O2=GW2;O3=GW3;');
+    expect(FLY_FS).toContain('if(uGBsh>.5)sh=GB2.w;else if(dot(n,uLb)>0.)');
+    // the height and gas reads take no derivatives, so fxc keeps the branches around them (textureLod at level 0: no texture
+    // has mipmaps); the other reads keep texture() (every one as textureLod compiles slower, Q-337)
+    expect(FLY_FS.match(/textureLod\(/g)?.length).toBe(14);
+    expect(FLY_FS).toContain('vec4 v=textureLod(uVel,uvOf(dd),0.);');
+    expect(FLY_FS).toContain('float e=HQ?crs(uHt,uv).r:textureLod(uHt,uv,0.).r');
+  });
+
+  it(
+    'a moving camera draws as before, a still one reads the G-buffer, a moved Sun redraws the shadow, a gas giant draws as before',
+    { timeout: 30000 },
+    async () => {
+      const { gl, calls } = stubGL();
+      const e = new WorldEngine(stubCanvas(gl, 1000, 400), { role: 'fly' });
+      await e.whenReady();
+      const core = (e as unknown as { core: { W: Record<string, unknown> & { spinup: number } } })
+        .core;
+      e.setPreset(preset('t1e'));
+      core.W.spinup = 0;
+      e.setFly(true);
+      // the first frame of a camera draws straight to the canvas (it may be moving)
+      e.draw();
+      expect(lastGB(calls)[0]).toEqual(['uniform1f', 'uGB', 0]);
+      // the camera has stopped: one full pass that fills the G-buffer, then read-backs
+      e.draw();
+      expect(lastGB(calls)).toEqual([
+        ['uniform1f', 'uGB', 1],
+        ['uniform1f', 'uGBsh', 0],
+      ]);
+      e.draw();
+      expect(lastGB(calls)).toEqual([
+        ['uniform1f', 'uGB', 2],
+        ['uniform1f', 'uGBsh', 1],
+      ]);
+      // the camera turns: straight to the canvas, then the full pass, then read-backs
+      core.W.flyHead = (core.W.flyHead as number) + 0.01;
+      e.draw();
+      expect(lastGB(calls)[0]).toEqual(['uniform1f', 'uGB', 0]);
+      e.draw();
+      expect(lastGB(calls)[0]).toEqual(['uniform1f', 'uGB', 1]);
+      e.draw();
+      expect(lastGB(calls)[0]).toEqual(['uniform1f', 'uGB', 2]);
+      // the Sun moves (the view turns the light; t1e is locked): geometry kept, the shadow is redrawn
+      core.W.yaw = (core.W.yaw as number) + 0.1;
+      e.draw();
+      expect(lastGB(calls)).toEqual([
+        ['uniform1f', 'uGB', 2],
+        ['uniform1f', 'uGBsh', 0],
+      ]);
+      e.setPreset(preset('jup'));
+      e.draw();
+      expect(lastGB(calls)[0]).toEqual(['uniform1f', 'uGB', 0]);
+    },
+  );
 });
 
 describe('gas solver cap (issue #93 1.8)', () => {
