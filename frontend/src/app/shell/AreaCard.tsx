@@ -13,12 +13,15 @@ import { fitCamera, flyToView, centreRect, safeRect } from '@/app/sky/areaDraw';
 import { formatAreaDims, useAreaStore } from './areaStore';
 import { useShellStore } from './shellStore';
 
-const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+const reducedMotion = () =>
+  window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
 
 /** Flies the sky to fit the whole area (and refits at once when the window is resized). */
 function useFitSquare(): void {
   const fitSeq = useAreaStore((s) => s.fitSeq);
-  const windowOn = useAreaStore((s) => s.screen === 'eros' || s.screen === 'disc' || s.screen === 'mover');
+  const windowOn = useAreaStore(
+    (s) => s.screen === 'eros' || s.screen === 'disc' || s.screen === 'mover',
+  );
   useEffect(() => {
     if (fitSeq === 0) return;
     // After the card is laid out, so its left edge is known.
@@ -70,7 +73,8 @@ function useReportAreaBox(): void {
     const el = find();
     if (el) {
       mo.observe(el, { childList: true, subtree: true, characterData: true, attributes: true });
-      if (el.parentElement) mo.observe(el.parentElement, { attributes: true, attributeFilter: ['style'] });
+      if (el.parentElement)
+        mo.observe(el.parentElement, { attributes: true, attributeFilter: ['style'] });
       el.addEventListener('load', soon, true);
     }
     window.addEventListener('resize', soon);
@@ -135,7 +139,15 @@ function DrawCard() {
       // Typing in a field keeps Enter; so does any button except the dock tool that started this
       // (focus is still on it right after the click, and Enter must work from there).
       const dockTool = !!t?.closest('[data-testid="tool-known"], [data-testid="tool-area"]');
-      if (t && !dockTool && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'BUTTON' || t.isContentEditable)) return;
+      if (
+        t &&
+        !dockTool &&
+        (t.tagName === 'INPUT' ||
+          t.tagName === 'TEXTAREA' ||
+          t.tagName === 'BUTTON' ||
+          t.isContentEditable)
+      )
+        return;
       if (dockTool) e.preventDefault(); // not a second click on the tool
       const b = centreRect();
       if (b) useAreaStore.getState().setBox(b);
@@ -151,7 +163,9 @@ function DrawCard() {
       <span role="status">
         {flow === 'known' ? 'Known objects' : 'Discovery'}: drag an area on the sky
       </span>
-      <span className="sx-area-hint-keys" aria-hidden="true">Enter for the middle · Esc to cancel</span>
+      <span className="sx-area-hint-keys" aria-hidden="true">
+        Enter for the middle · Esc to cancel
+      </span>
     </div>
   );
 }

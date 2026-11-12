@@ -62,7 +62,13 @@ function PlayIcon({ playing }: { playing: boolean }) {
   );
 }
 
-function drawScope(cv: HTMLCanvasElement | null, cssHeight: number, active: boolean, gain: number, buf: Float32Array<ArrayBuffer> | null): void {
+function drawScope(
+  cv: HTMLCanvasElement | null,
+  cssHeight: number,
+  active: boolean,
+  gain: number,
+  buf: Float32Array<ArrayBuffer> | null,
+): void {
   if (!cv) return;
   const d = fit(cv, cssHeight);
   if (!d) return;
@@ -287,7 +293,9 @@ export function HearPanel({ active, name }: { active: boolean; name: string | un
     redrawIdle();
   }, [redrawIdle, pos, atmo.ok, curve]);
   useEffect(() => {
-    const els = [atmoCv.current, specCv.current, scopeCv.current].filter((e): e is HTMLCanvasElement => !!e);
+    const els = [atmoCv.current, specCv.current, scopeCv.current].filter(
+      (e): e is HTMLCanvasElement => !!e,
+    );
     if (typeof ResizeObserver === 'undefined') return;
     const ro = new ResizeObserver(() => redrawIdle());
     els.forEach((e) => ro.observe(e));
@@ -343,7 +351,8 @@ export function HearPanel({ active, name }: { active: boolean; name: string | un
 
   const label = displayName(name);
   const spectrumLoading =
-    !curve && (spectrum.status === 'idle' || spectrum.status === 'waiting' || spectrum.status === 'loading');
+    !curve &&
+    (spectrum.status === 'idle' || spectrum.status === 'waiting' || spectrum.status === 'loading');
 
   return (
     <>
@@ -352,14 +361,26 @@ export function HearPanel({ active, name }: { active: boolean; name: string | un
         <span>{label}</span>
       </div>
       <div className="sx-hr">
-        <ToggleGroup<Mode> label="Sound" hideLabel options={MODE_OPTIONS} value={mode} onChange={setMode} testId="hear-mode" />
+        <ToggleGroup<Mode>
+          label="Sound"
+          hideLabel
+          options={MODE_OPTIONS}
+          value={mode}
+          onChange={setMode}
+          testId="hear-mode"
+        />
 
         <div hidden={mode !== 'atmo'} className="sx-hr-pane" data-testid="hear-atmo">
           {atmo.ok ? (
             <>
               <div className="sx-hr-viz">
                 <span className="sx-hr-cap">Wind at the surface</span>
-                <canvas ref={atmoCv} role="img" aria-label="Live waveform of the wind sound" data-testid="hear-atmo-canvas" />
+                <canvas
+                  ref={atmoCv}
+                  role="img"
+                  aria-label="Live waveform of the wind sound"
+                  data-testid="hear-atmo-canvas"
+                />
               </div>
               <div className="sx-hr-player">
                 <button
@@ -385,7 +406,12 @@ export function HearPanel({ active, name }: { active: boolean; name: string | un
                   />
                 </div>
               </div>
-              <SwitchRow label="Ambience" checked={ambience} onChange={toggleAmbience} testId="hear-ambience" />
+              <SwitchRow
+                label="Ambience"
+                checked={ambience}
+                onChange={toggleAmbience}
+                testId="hear-ambience"
+              />
               {ambience && (
                 <p className="sx-hr-hint" data-testid="hear-ambience-note">
                   Keeps playing when this panel is closed
@@ -397,7 +423,9 @@ export function HearPanel({ active, name }: { active: boolean; name: string | un
                   <span>Pressure</span>
                   <b>{formatPressure(atmo.model.P)}</b>
                 </div>
-                <div title={`Dominant gas (${atmo.model.gasTag}); surface temperature (${atmo.model.tTag})`}>
+                <div
+                  title={`Dominant gas (${atmo.model.gasTag}); surface temperature (${atmo.model.tTag})`}
+                >
                   <span>Air</span>
                   <b>
                     {atmo.model.gasLabel}, {Math.round(atmo.model.T)} K
@@ -411,7 +439,10 @@ export function HearPanel({ active, name }: { active: boolean; name: string | un
               <div className="sx-hr-reach">
                 <div className="sx-hr-reach-h">
                   <span className="sx-eyebrow">Highest pitch that carries</span>
-                  <span className="sx-hr-imag" title="The sound is an artist's impression (artistic)">
+                  <span
+                    className="sx-hr-imag"
+                    title="The sound is an artist's impression (artistic)"
+                  >
                     Default
                   </span>
                 </div>

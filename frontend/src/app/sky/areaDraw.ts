@@ -60,7 +60,12 @@ export function centreRect(): AreaBox | null {
   const m = Math.min(width, height);
   const hw = m * 0.3;
   const hh = m * 0.18;
-  return boxFromPixels({ x0: width / 2 - hw, y0: height / 2 - hh, x1: width / 2 + hw, y1: height / 2 + hh });
+  return boxFromPixels({
+    x0: width / 2 - hw,
+    y0: height / 2 - hh,
+    x1: width / 2 + hw,
+    y1: height / 2 + hh,
+  });
 }
 
 /** The set area's screen corners now (it follows the view), or null when a corner is behind. */

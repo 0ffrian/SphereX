@@ -4533,7 +4533,9 @@ body {
   position: absolute;
   left: 1px;
   top: -20px;
-  font: 500 11px ui-monospace, monospace;
+  font:
+    500 11px ui-monospace,
+    monospace;
   color: #4ade80;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;

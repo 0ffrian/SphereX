@@ -1,5 +1,12 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { boxFromPixels, boxToPixels, centreRect, fitCamera, rectOf, registerAreaView } from './areaDraw';
+import {
+  boxFromPixels,
+  boxToPixels,
+  centreRect,
+  fitCamera,
+  rectOf,
+  registerAreaView,
+} from './areaDraw';
 import type { SkyCamera } from '@/viewer/sky/skyMath';
 
 let cam: SkyCamera = { ra: 100, dec: 10, fovDeg: 4 };
@@ -20,7 +27,12 @@ describe('areaDraw', () => {
   it('without a view there is no box, centre or fit', () => {
     expect(centreRect()).toBeNull();
     expect(boxFromPixels({ x0: 0, y0: 0, x1: 10, y1: 10 })).toBeNull();
-    expect(fitCamera({ a: { ra: 1, dec: 1 }, b: { ra: 2, dec: 0 }, widthDeg: 1, heightDeg: 1 }, { l: 0, t: 0, r: 500, b: 300 })).toBeNull();
+    expect(
+      fitCamera(
+        { a: { ra: 1, dec: 1 }, b: { ra: 2, dec: 0 }, widthDeg: 1, heightDeg: 1 },
+        { l: 0, t: 0, r: 500, b: 300 },
+      ),
+    ).toBeNull();
   });
   it('centreRect is a wide box around the view centre', () => {
     cam = { ra: 100, dec: 10, fovDeg: 4 };
@@ -46,7 +58,10 @@ describe('areaDraw', () => {
     const fit = fitCamera(b, safe)!;
     cam = fit;
     const px = boxToPixels(b)!;
-    for (const [x, y] of [[px.x0, px.y0], [px.x1, px.y1]] as const) {
+    for (const [x, y] of [
+      [px.x0, px.y0],
+      [px.x1, px.y1],
+    ] as const) {
       expect(x).toBeGreaterThan(safe.l - 2);
       expect(x).toBeLessThan(safe.r + 2);
       expect(y).toBeGreaterThan(safe.t - 2);

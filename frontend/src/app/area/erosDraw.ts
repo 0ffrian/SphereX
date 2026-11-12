@@ -82,7 +82,14 @@ export function drawCutout(
   };
   const drawPlane = (img: HTMLImageElement, alpha: number) => {
     g.save();
-    g.setTransform(dpr * s * M[0][0], dpr * s * M[1][0], dpr * s * M[0][1], dpr * s * M[1][1], dpr * mid, dpr * mid);
+    g.setTransform(
+      dpr * s * M[0][0],
+      dpr * s * M[1][0],
+      dpr * s * M[0][1],
+      dpr * s * M[1][1],
+      dpr * mid,
+      dpr * mid,
+    );
     g.translate(-(cx + 0.5), -(cy + 0.5));
     g.imageSmoothingEnabled = false;
     g.globalAlpha = alpha;
@@ -139,7 +146,12 @@ export function drawCutout(
     g.arc(x, y, r, 0, 7);
     g.stroke();
     g.beginPath();
-    for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+    for (const [a, b] of [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1],
+    ] as const) {
       g.moveTo(x + a * (r + 3), y + b * (r + 3));
       g.lineTo(x + a * (r + 10), y + b * (r + 10));
     }
@@ -175,7 +187,14 @@ export interface TrackState {
   disc: DiscoveryResult | null;
 }
 
-const label = (g: CanvasRenderingContext2D, text: string, x: number, y: number, colour: string, font: string) => {
+const label = (
+  g: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+  colour: string,
+  font: string,
+) => {
   g.font = font;
   g.textAlign = 'center';
   const w = g.measureText(text).width + 8;
@@ -239,7 +258,8 @@ export function drawTrackWindow(
       g.fillStyle = fg;
       g.globalAlpha = 0.55;
       for (const dot of d.dots) {
-        if (dot.k === 'glitch' ? st.step >= 1 : dot.k === 'star' ? st.step >= 2 : st.step >= 3) continue;
+        if (dot.k === 'glitch' ? st.step >= 1 : dot.k === 'star' ? st.step >= 2 : st.step >= 3)
+          continue;
         const [x, y] = P(dot.p);
         g.beginPath();
         g.arc(x, y, 1.9, 0, 7);
@@ -283,7 +303,13 @@ export function drawTrackWindow(
             g.stroke();
             g.globalAlpha = 1;
           }
-          const lab = m.known ? (st.step >= 4 ? `${m.id} · ${m.known}` : m.id) : m.pts.length < 2 ? `${m.id} · seen once` : m.id;
+          const lab = m.known
+            ? st.step >= 4
+              ? `${m.id} · ${m.known}`
+              : m.id
+            : m.pts.length < 2
+              ? `${m.id} · seen once`
+              : m.id;
           const mx = sp.reduce((a, q) => a + q[0], 0) / sp.length;
           const my = sp.reduce((a, q) => a + q[1], 0) / sp.length;
           label(g, lab, mx, my, line === muted ? fg : line, small);
