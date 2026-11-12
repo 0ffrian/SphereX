@@ -55,7 +55,10 @@ export function chordSummary(plan: ChordPlan, mode: ChordMode): string {
   const silent = 12 - sounding;
   const noisy = plan.bins.filter((b) => b.noisy && !quiet(b.index)).length;
   let s = `${sounding} of 12 notes sound.`;
-  if (silent > 0) s += ` ${silent} silent: under 20% of the peak, or no data.`;
+  const noData = plan.bins.filter((b) => b.points === 0).length;
+  const faint = silent - noData;
+  if (faint > 0) s += ` ${faint} too faint: under 20% of the peak.`;
+  if (noData > 0) s += ` ${noData} with no data.`;
   if (noisy > 0) s += ` ${noisy} wobble (marked ~): noisy data.`;
   return s;
 }
@@ -179,7 +182,8 @@ export function ChordPlayer({
         {plan.bins.map((bin, i) => {
           const v = levels[i]!;
           const other = mode === 'smooth' ? bin.levelDb : bin.smoothLevelDb;
-          const marked = bin.abDiffDb !== null && bin.abDiffDb >= AB_MARK_DB;
+          // D-21: the tick sits at Smooth's (derived) level, so it is drawn only where derived is shown.
+          const marked = smoothShown && bin.abDiffDb !== null && bin.abDiffDb >= AB_MARK_DB;
           return (
             <span key={i} className="sx-chord-note" data-changed={marked} data-noisy={bin.noisy}>
               <span className="sx-chord-bar">
@@ -207,7 +211,8 @@ export function ChordPlayer({
         <span>5 µm</span>
       </div>
       <p className="sx-hr-hint" aria-live="polite" data-testid={`${testId}-summary`}>
-        {chordSummary(plan, mode)} {abSummary(plan)}
+        {chordSummary(plan, mode)}
+        {smoothShown ? ` ${abSummary(plan)}` : null}
       </p>
       <p className="sx-hr-hint" data-testid={`${testId}-mapping`}>
         {CHORD_MAPPING}

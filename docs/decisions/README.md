@@ -37,7 +37,7 @@ The log is split by topic so a task loads only what it needs. **Load this index 
 | [exoplanet-looks.md](exoplanet-looks.md) | the climate scenarios and locked-planet temperature map, starlight colour, scenario looks and presets, and the exoplanet mould steps | 0 D, 5 Q, 15 KB |
 | [catalogue-values.md](catalogue-values.md) | name resolution for the demo exoplanets, star Teff, radius and Mira periods, the literature registry, binary brown dwarf components, the issue #68 backend fixes and the slope unit, Gaia MSC (Q-220), Procyon's radius (Q-336) | 0 D, 8 Q, 16 KB |
 | [demo-pack.md](demo-pack.md) | the demo search list and aliases, the 67P and Bennu shape products, the WRL reader, and the pre-built demo pack | 0 D, 6 Q, 19 KB |
-| [sound-ambience.md](sound-ambience.md) | the haptics cut and the move to `frontend/src/sound/` (D-39), pitch polarity (Q-430), the flyover soundscape, weather, buses and stage audibility, the spectrum chord (Q-431 to Q-446) | 1 D, 17 Q, 13 KB |
+| [sound-ambience.md](sound-ambience.md) | the haptics cut and the move to `frontend/src/sound/` (D-39), pitch polarity (Q-430), the flyover soundscape, weather, buses and stage audibility, the spectrum chord (Q-431 to Q-446) | 1 D, 17 Q, 12 KB |
 
 Agenda of the 11 Nov 2026 decision session: [session-2026-11-11.md](session-2026-11-11.md). It holds no entries and is removed once the outcomes are recorded.
 
@@ -389,7 +389,7 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | Q-413 | The island's loader pulses at rest | Open | [shell-surfaces](shell-surfaces.md) |
 | Q-414 | Known objects and Discovery demo answers only inside the Eros area | Open | [shell-surfaces](shell-surfaces.md) |
 | Q-415 | Moulding animation is the mock-up's generic body (amends Q-113 item 3) | Open | [shell-surfaces](shell-surfaces.md) |
-| Q-416 | Hear it: Atmosphere and the spectrum sweep (amends Q-295) | Open (Atish to wire after merge) | [shell-surfaces](shell-surfaces.md) |
+| Q-416 | Hear it: Atmosphere and the spectrum sweep (amends Q-295); amended by Q-446 (sweep on `pitch.ts`) | Open (Atish to wire after merge) | [shell-surfaces](shell-surfaces.md) |
 | Q-417 | The browser tab reads "Odysseus" | Decided (Moon, tab title only) | [shell-surfaces](shell-surfaces.md) |
 | Q-430 | Pitch polarity: long wavelength = low pitch (amends Q-70, Q-134) | Decided (built #111) | [sound-ambience](sound-ambience.md) |
 | Q-431 | Listener model: quasi-static, no Doppler | Decided | [sound-ambience](sound-ambience.md) |
@@ -404,8 +404,8 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | Q-440 | Ambience level model and presentation offset | Decided | [sound-ambience](sound-ambience.md) |
 | Q-441 | Stage audibility, buses and ducking | Decided (buses built #111) | [sound-ambience](sound-ambience.md) |
 | Q-442 | Sound UI, captions, "What you hear" | Decided (Sound popover built #111) | [sound-ambience](sound-ambience.md) |
-| Q-443 | Spectrum chord | Decided | [sound-ambience](sound-ambience.md) |
+| Q-443 | Spectrum chord; amended by Q-446 | Decided | [sound-ambience](sound-ambience.md) |
 | Q-444 | Determinism for sound: one JavaScript engine | Decided | [sound-ambience](sound-ambience.md) |
 | Q-445 | Bake engine deviations from R13 (PR #119, #113) | Decided (as built) | [sound-ambience](sound-ambience.md) |
-| Q-446 | Spectrum chord as built: the Hear it sweep on `pitch.ts`, Smooth = running median, empty bins silent, tutorial cut, one normalisation (#115) | Decided (as built) | [sound-ambience](sound-ambience.md) |
+| Q-446 | Spectrum chord as built (amends Q-443, Q-416): the Hear it sweep on `pitch.ts`, Smooth = running median, empty bins silent, tutorial cut, one normalisation (#115) | Decided (as built) | [sound-ambience](sound-ambience.md) |
 | B-01 to B-04 | Post-event backlog | Backlog | [scope-process](scope-process.md#post-event-backlog) |

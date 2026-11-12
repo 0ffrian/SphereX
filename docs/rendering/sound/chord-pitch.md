@@ -18,7 +18,7 @@
    - Master about −18 dBFS RMS, then the limiter.
 5. **Equal loudness:** ISO 226 weights at 60 phon, capped at +6 dB at 220 Hz, labelled "loudness-corrected", checked on the A15 speakers.
 6. **Noise (σ/flux > 0.3):** amplitude beating at `2 + 4·clamp(σ/flux, 0, 1)` Hz, capped at 6 Hz. **Not a cents detune:** a fixed detune inside a chord is inaudible [SP §2].
-7. **Listening aids:**
+7. **Listening aids** (as built, Q-446: "Smooth" is smoothed data, not a continuum; the tutorial is cut):
    - an **A/B toggle** between "Smooth (continuum)" and "Data", so absorption dips become audible;
    - a 3-example tutorial before first use;
    - the caption "Data mapping, not a recording".

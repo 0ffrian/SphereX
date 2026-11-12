@@ -55,7 +55,7 @@ classDiagram
     listen(reply) ListenOutcome
     stopListen()
     chordPlan(reply) ChordPlan
-    chord(reply, owner, mode) ChordOutcome
+    chord(reply, {owner, mode}) ChordOutcome
     setChordMode(mode) bool
     stopChord(owner)
     bind(honesty) unbind
@@ -109,6 +109,11 @@ classDiagram
   SpectrumChord ..> pitch
   SpectrumChord ..> spectrumExclusive : one spectrum sound
   ListenSweep ..> spectrumExclusive : one spectrum sound
+  class hearAudio {
+    <<app/build/hearAudio.ts>>
+    startSpectrum(values, from) SpectrumHandle
+  }
+  hearAudio ..> spectrumExclusive : one spectrum sound (Hear it sweep)
   AppSound ..> SoundSettingsStore : bindEngine, ambience level
   SoundSettings ..> AppSound : useSound().unlock()
   SoundSettings ..> SoundSettingsStore : update
