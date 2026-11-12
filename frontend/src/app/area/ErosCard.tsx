@@ -2,7 +2,9 @@
 // tabs over it (name, minimise, close; a back chevron from Discovery), the date with a wavelength
 // dot and n / N, the Wavelength and Taken rows, the four layer checkboxes, the brightness against
 // wavelength chart and a collapsed Detectors row. The top-left player drives the exposure
-// (shell/Transport.tsx). DEMO DATA: see areaService.ts. MoverDemoCard is the same layout for the
+// (shell/Transport.tsx). Issue #130: for a known object the frame list, the counts and the sky path
+// are the backend's (`/frames`, `/path`); the cutouts, masks and brightness stay DEMO DATA (Demo tag),
+// see areaService.ts. MoverDemoCard is the same layout for the
 // made-up movers, with no frames.
 import { useEffect, useRef, type ReactNode } from 'react';
 import { Icon } from '@/app/shell/icons';
@@ -12,7 +14,7 @@ import { useShellStore } from '@/app/shell/shellStore';
 import { wavelengthColor } from '@/app/flipbook/wavelengthColor';
 import type { ErosDemo, ErosHop } from './areaService';
 import { ProvenanceBadge } from '@/app/Badge';
-import { DemoTag } from './DemoTag';
+import { DEMO_CUTOUT_NOTE, DemoTag } from './DemoTag';
 import { drawCutout } from './erosDraw';
 import { DETECTORS, detectorIndex, detectorsWithFrames, mjdDay, mjdHM, mjdYear } from './erosModel';
 
@@ -96,7 +98,8 @@ function Chart({ eros, cur }: { eros: ErosDemo; cur: ErosHop }) {
   const B = 22;
   const x0 = 0.75;
   const x1 = 5;
-  const all = eros.hops;
+  // A real frame the demo has no brightness for has no dot (flux NaN).
+  const all = eros.hops.filter((h) => Number.isFinite(h.flux));
   const fmax = Math.max(...all.map((h) => h.flux + (h.flux_err ?? 0))) * 1.08;
   const fmin = Math.min(0, ...all.map((h) => h.flux - (h.flux_err ?? 0)));
   const X = (l: number) => L + ((l - x0) / (x1 - x0)) * (W - L - R);
@@ -202,11 +205,12 @@ function CheckGroup({ disabled }: { disabled?: boolean }) {
 function Shell({ title, children }: { title: string; children: (close: () => void) => ReactNode }) {
   const closePanel = useShellStore((s) => s.closePanel);
   const flow = useAreaStore((s) => s.flow);
+  const kind = useAreaStore((s) => s.focus?.kind ?? 'asteroid');
   return (
     <PanelCard
       bare
       title={title}
-      subtitle="Known object · asteroid"
+      subtitle={`Known object · ${kind}`}
       icon="area"
       onClose={closePanel}
       returnFocusTo={flow === 'known' ? '[data-testid="tool-known"]' : '[data-testid="tool-area"]'}
@@ -217,7 +221,11 @@ function Shell({ title, children }: { title: string; children: (close: () => voi
   );
 }
 
-export function ErosCard({ title = '433 Eros', back }: { title?: string; back?: () => void }) {
+export function ErosCard({ title: given, back }: { title?: string; back?: () => void }) {
+  const focus = useAreaStore((s) => s.focus);
+  const real = useAreaStore((s) => s.trackSource === 'real');
+  const hasPath = useAreaStore((s) => s.trackPath);
+  const title = given ?? (focus ? `${focus.id} ${focus.name}`.trim() : '433 Eros');
   const eros = useAreaStore((s) => s.eros);
   const failed = useAreaStore((s) => s.erosFailed);
   const hop = useAreaStore((s) => currentHop(s));
@@ -230,10 +238,21 @@ export function ErosCard({ title = '433 Eros', back }: { title?: string; back?: 
         <div data-testid="eros-card">
           <div className="fb-view" data-testid="frame-viewer">
             <Tabs title={title} back={back} />
-            {hop && <Cutout hop={hop} />}
+            {hop && !hop.no_cutout && <Cutout hop={hop} />}
+            {hop?.no_cutout && (
+              <p className="sx-kn-demo" role="status" data-testid="eros-no-cutout">
+                No cutout for this frame in the demo
+              </p>
+            )}
             {!hop && (
-              <p className="sx-kn-demo" role="status">
-                {failed ? 'The demo frames could not be loaded.' : 'Loading the demo frames…'}
+              <p className="sx-kn-demo" role="status" data-testid="eros-card-status">
+                {failed
+                  ? focus
+                    ? 'The frames of this object could not be loaded.'
+                    : 'The demo frames could not be loaded.'
+                  : focus
+                    ? 'Loading the frames…'
+                    : 'Loading the demo frames…'}
               </p>
             )}
             {hop && (
@@ -263,6 +282,17 @@ export function ErosCard({ title = '433 Eros', back }: { title?: string; back?: 
                 {hop ? `${mjdDay(hop.mjd_avg)} ${mjdHM(hop.mjd_avg)} UTC · exposure ${hop.exposure} of 4` : '-'}
               </dd>
             </dl>
+            {real && (
+              <p className="fb-muted sx-kn-real" data-testid="eros-real">
+                <ProvenanceBadge
+                  tag="model_dependent"
+                  tooltip="Estimated: the path is a JPL Horizons prediction seen from SPHEREx, not a measurement."
+                  srText
+                  variant="tag"
+                />
+                {` ${n} frames from the backend${hasPath ? ', path from Horizons' : ', no path for this object'}`}
+              </p>
+            )}
             {known && (
               <div className="sx-kn-leg" aria-hidden="true">
                 <span><i />path so far</span>
@@ -291,7 +321,11 @@ export function ErosCard({ title = '433 Eros', back }: { title?: string; back?: 
             </div>
             {eros && <Detectors eros={eros} />}
             <div className="sx-kn-foot">
-              <DemoTag />
+              {real ? (
+                <DemoTag label="Demo cutouts" note={DEMO_CUTOUT_NOTE} testId="demo-tag" />
+              ) : (
+                <DemoTag />
+              )}
             </div>
           </div>
         </div>

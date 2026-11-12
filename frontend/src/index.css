@@ -4067,6 +4067,31 @@ body {
   pointer-events: none;
 }
 
+/* Known positions on the sky (A18.2, issue #130): diamonds and a thin line, Estimated. */
+.sx-area-pos {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 6;
+  pointer-events: none;
+  overflow: visible;
+}
+.sx-area-pos-line {
+  fill: none;
+  stroke: var(--p-phys);
+  stroke-width: 1;
+  stroke-opacity: 0.8;
+}
+.sx-area-pos-dot {
+  fill: var(--p-phys);
+  stroke: var(--bg);
+  stroke-width: 0.75;
+}
+.sx-area-pos-tag {
+  top: 40px;
+}
+
 /* MouldAnimation (build stage): the globe that takes shape while the body is generated, and its hand-over. */
 .sx-mould {
   position: absolute;
@@ -4434,6 +4459,18 @@ body {
   display: block;
   font-size: 12px;
   color: var(--muted);
+}
+.sx-lk-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin-top: 3px;
+}
+.sx-lk-notes {
+  margin: 0;
+  padding: 0 0 0 16px;
+  font-size: 12px;
 }
 .sx-chip {
   font-size: 11px;

@@ -203,7 +203,7 @@ export function drawTrackWindow(
   const y0 = Math.min(r.y0, r.y1);
   const w = Math.abs(r.x1 - r.x0);
   const h = Math.abs(r.y1 - r.y0);
-  if (!(w > 2 && h > 2)) return;
+  if (!(w > 2 && h > 2) || !(eros.wide.w > 0 && eros.wide.h > 0)) return;
   const sc = Math.min(w / eros.wide.w, h / eros.wide.h);
   const cx = x0 + w / 2;
   const cy = y0 + h / 2;
@@ -222,8 +222,8 @@ export function drawTrackWindow(
   g.clip();
   g.fillStyle = '#000';
   g.fillRect(x0, y0, w, h);
-  const sky = getImage(eros.wide.png, redraw);
-  if (sky.complete && sky.naturalWidth) {
+  const sky = eros.wide.png ? getImage(eros.wide.png, redraw) : null;
+  if (sky && sky.complete && sky.naturalWidth) {
     const [ix, iy] = P([0, 0]);
     const [jx, jy] = P([eros.wide.w, eros.wide.h]);
     g.globalAlpha = 0.92;
