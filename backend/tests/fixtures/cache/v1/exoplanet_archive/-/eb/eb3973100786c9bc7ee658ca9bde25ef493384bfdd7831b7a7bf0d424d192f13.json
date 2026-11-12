@@ -1,0 +1,16 @@
+{
+ "body_sha256": "e86e470d1118fe85e7d7acf875f564cf5b7b7df80101cd99793faabde74c309c",
+ "body_size": 3081,
+ "content_type": "application/json",
+ "fetched_at": "2026-11-12T02:12:40.820Z",
+ "key": {
+  "query": {
+   "cols": "4",
+   "pl_name": "trappist-1f|trappist-1 f"
+  },
+  "release": "-",
+  "source": "exoplanet_archive"
+ },
+ "status": 200,
+ "url": "https://exoplanetarchive.ipac.caltech.edu/TAP/sync?query=SELECT+pl_name%2C+hostname%2C+pl_rade%2C+pl_radeerr1%2C+pl_radeerr2%2C+pl_radj%2C+pl_radjerr1%2C+pl_radjerr2%2C+pl_bmasse%2C+pl_bmasseerr1%2C+pl_bmasseerr2%2C+pl_bmassj%2C+pl_bmassprov%2C+pl_dens%2C+pl_eqt%2C+pl_orbsmax%2C+pl_orbsmaxerr1%2C+pl_orbsmaxerr2%2C+pl_orbper%2C+pl_orbpererr1%2C+pl_orbpererr2%2C+pl_orbeccen%2C+pl_orbeccenerr1%2C+pl_orbeccenerr2%2C+pl_orbeccenlim%2C+pl_insol%2C+pl_insolerr1%2C+pl_insolerr2%2C+st_teff%2C+st_tefferr1%2C+st_tefferr2%2C+st_rad%2C+st_raderr1%2C+st_raderr2%2C+st_mass%2C+st_masserr1%2C+st_masserr2%2C+st_age%2C+st_ageerr1%2C+st_ageerr2%2C+st_lum%2C+st_lumerr1%2C+st_lumerr2%2C+sy_dist%2C+pl_rade_reflink%2C+pl_radj_reflink%2C+pl_bmasse_reflink%2C+pl_eqt_reflink%2C+pl_orbsmax_reflink%2C+pl_orbper_reflink%2C+pl_orbeccen_reflink%2C+pl_insol_reflink%2C+st_teff_reflink%2C+st_rad_reflink%2C+st_mass_reflink%2C+st_age_reflink%2C+st_lum_reflink+FROM+pscomppars+WHERE+lower%28pl_name%29+IN+%28%27trappist-1f%27%2C+%27trappist-1+f%27%29&format=json"
+}

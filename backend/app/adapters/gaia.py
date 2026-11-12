@@ -162,6 +162,12 @@ ASTRO_COLUMNS = (
     "teff_msc1_lower",
     "teff_msc1_upper",
 )
+# Issue #93 A4: the IRSA CSV writes lum_flame with 3 decimals, so Barnard's Star (0.0034 L_sun) came
+# back as 0.003 with its 16th and 84th percentiles rounded to the same number, and any star below
+# 0.0005 L_sun as 0 (refused). The query selects these columns times LUM_FLAME_SCALE (micro solar
+# luminosities, 3 decimals = 1e-9 L_sun) and parse_astro divides it back out.
+LUM_FLAME_SCALE = 1_000_000
+LUM_FLAME_COLUMNS = frozenset({"lum_flame", "lum_flame_lower", "lum_flame_upper"})
 
 
 @dataclass(frozen=True)
@@ -195,11 +201,21 @@ def astro_key(ra: float, dec: float) -> CacheKey:
         # The column set changed (Q-220: teff_msc1; issue #93 B: lum_flame, mass_flame), so an
         # older cached body is never read for it. Changing this re-keys every star: re-warm the
         # A15 cache (A10).
-        cols="msc1-flame2",
+        # "msc1-flame3": lum_flame and its percentiles are selected scaled by 1e6 (#93 A4).
+        cols="msc1-flame3",
         ra=norm_ra(ra),
         dec=norm_dec(dec),
         radius=norm_float(STAR_MATCH_RADIUS_ARCSEC / 3600.0, 5),
     )
+
+
+def _lum(r: dict[str, str], column: str) -> float | None:
+    """A ``lum_flame`` column back in L_sun. A scaled value of 0 is below the CSV precision floor
+    (1e-9 L_sun): unknown, not zero."""
+    v = tap.opt_float(r[column])
+    if v is None or v == 0:
+        return None
+    return v / LUM_FLAME_SCALE
 
 
 def parse_astro(body: bytes) -> list[GaiaAstro]:
@@ -220,9 +236,9 @@ def parse_astro(body: bytes) -> list[GaiaAstro]:
                 teff_msc1_k=tap.opt_float(r["teff_msc1"]),
                 teff_msc1_lower_k=tap.opt_float(r["teff_msc1_lower"]),
                 teff_msc1_upper_k=tap.opt_float(r["teff_msc1_upper"]),
-                lum_flame_lsun=tap.opt_float(r["lum_flame"]),
-                lum_flame_lower_lsun=tap.opt_float(r["lum_flame_lower"]),
-                lum_flame_upper_lsun=tap.opt_float(r["lum_flame_upper"]),
+                lum_flame_lsun=_lum(r, "lum_flame"),
+                lum_flame_lower_lsun=_lum(r, "lum_flame_lower"),
+                lum_flame_upper_lsun=_lum(r, "lum_flame_upper"),
                 mass_flame_msun=tap.opt_float(r["mass_flame"]),
                 mass_flame_lower_msun=tap.opt_float(r["mass_flame_lower"]),
                 mass_flame_upper_msun=tap.opt_float(r["mass_flame_upper"]),
@@ -234,7 +250,11 @@ def parse_astro(body: bytes) -> list[GaiaAstro]:
 def astro_adql(source_table: str, ra: str, dec: str, radius_deg: str) -> str:
     astro = ASTRO_TABLE[source_table]
     cols = ", ".join(
-        f"s.{c}" if c in ("source_id", "ra", "dec", "phot_g_mean_mag") else f"a.{c}"
+        f"s.{c}"
+        if c in ("source_id", "ra", "dec", "phot_g_mean_mag")
+        else f"a.{c}*{LUM_FLAME_SCALE} AS {c}"
+        if c in LUM_FLAME_COLUMNS
+        else f"a.{c}"
         for c in ASTRO_COLUMNS
     )
     return (

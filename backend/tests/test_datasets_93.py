@@ -24,6 +24,7 @@ def test_archive_query_asks_for_the_new_columns() -> None:
         "pl_orbeccen",
         "pl_orbeccenerr1",
         "pl_orbeccenerr2",
+        "pl_orbeccenlim",
         "pl_orbeccen_reflink",
         "pl_insol",
         "pl_insol_reflink",
@@ -34,7 +35,7 @@ def test_archive_query_asks_for_the_new_columns() -> None:
     ):
         assert c in ea.COLUMNS
     # The cache key carries the column version, so an older reply is never served (Q-150).
-    assert ea.archive_key(["x"]).query == (("cols", "3"), ("pl_name", "x"))
+    assert ea.archive_key(["x"]).query == (("cols", "4"), ("pl_name", "x"))
 
 
 def test_eccentricity_measured_zero_and_refused() -> None:
@@ -51,6 +52,23 @@ def test_eccentricity_measured_zero_and_refused() -> None:
     # e = 0 with no uncertainty: a circular orbit assumed in the fit, not a measurement.
     zero = build._eccentricity({"pl_orbeccen": 0.0, "pl_orbeccen_reflink": REF})
     assert zero["value"] == 0.0 and zero["tag"] == "model_dependent" and zero["assumption"]
+    # #93 A6: a nonzero limit flag (51 Peg b 1, Kepler-186 f -1) is a limit, never measured.
+    for flag in (1, -1, "1"):
+        lim = build._eccentricity(
+            {"pl_orbeccen": 0.013, "pl_orbeccenlim": flag, "pl_orbeccen_reflink": REF}
+        )
+        assert lim["value"] == 0.013 and lim["tag"] == "model_dependent"
+        assert (
+            lim["assumption"] == build.ARCHIVE_ECC_LIMIT_ASSUMPTION
+            and "pl_orbeccenlim" in lim["source"]
+        )
+    flag0 = {
+        "pl_orbeccen": 0.05,
+        "pl_orbeccenerr1": 0.03,
+        "pl_orbeccenlim": 0,
+        "pl_orbeccen_reflink": REF,
+    }
+    assert build._eccentricity(flag0)["tag"] == "measured"
     calc = build._eccentricity({"pl_orbeccen": 0.1, "pl_orbeccen_reflink": CALC})
     assert calc["tag"] == "model_dependent"
     for bad in (None, 1.0, -0.1, "nan"):
@@ -137,8 +155,31 @@ def test_flame_luminosity_and_mass_follow_the_radius_rule() -> None:
 def test_gaia_astro_query_and_key_carry_the_flame_columns() -> None:
     for c in ("lum_flame", "lum_flame_lower", "mass_flame", "mass_flame_upper"):
         assert c in gaia.ASTRO_COLUMNS
-    assert "a.lum_flame" in gaia.astro_adql("gaia_dr3_source", "1", "2", "0.001")
-    assert dict(gaia.astro_key(1.0, 2.0).query)["cols"] == "msc1-flame2"
+    adql = gaia.astro_adql("gaia_dr3_source", "1", "2", "0.001")
+    for c in ("lum_flame", "lum_flame_lower", "lum_flame_upper"):
+        assert f"a.{c}*1000000 AS {c}" in adql  # #93 A4: past the CSV's 3 decimals
+    assert "a.mass_flame," in adql
+    assert dict(gaia.astro_key(1.0, 2.0).query)["cols"] == "msc1-flame3"
+
+
+def test_gaia_lum_flame_comes_back_in_lsun_with_its_precision() -> None:
+    """#93 A4: the scaled CSV value is divided back out, so Barnard's Star keeps 0.003398 L_sun
+    and a real percentile range; a scaled 0 is below the floor and unknown, not zero."""
+    header = ",".join(gaia.ASTRO_COLUMNS)
+    vals = dict.fromkeys(gaia.ASTRO_COLUMNS, "")
+    vals.update(source_id="1", ra="1.0", dec="2.0")
+    vals.update(lum_flame="3398.123", lum_flame_lower="3380.5", lum_flame_upper="3416.0")
+    row = ",".join(vals[c] for c in gaia.ASTRO_COLUMNS)
+    (g,) = gaia.parse_astro(f"{header}\n{row}\n".encode())
+    assert g.lum_flame_lsun == pytest.approx(0.003398123)
+    assert g.lum_flame_lower_lsun == pytest.approx(0.0033805)
+    lum = stars.luminosity_field(stars.StarCatalogue(gaia=g))
+    assert lum["value"] == pytest.approx(0.003398123) and lum["err"] == pytest.approx(1.7877e-5)
+    vals.update(lum_flame="0", lum_flame_lower="0", lum_flame_upper="0")
+    row = ",".join(vals[c] for c in gaia.ASTRO_COLUMNS)
+    (z,) = gaia.parse_astro(f"{header}\n{row}\n".encode())
+    assert z.lum_flame_lsun is None
+    assert stars.luminosity_field(stars.StarCatalogue(gaia=z))["value"] is None
 
 
 @pytest.mark.parametrize(
@@ -150,11 +191,9 @@ def test_gaia_astro_query_and_key_carry_the_flame_columns() -> None:
         ("simbad-trappist-1", "flare_rate_per_d", 0.26, None),
         ("simbad-hd-189733b", "dayside_temp_K", 1192.0, 9.0),
         ("simbad-hd-189733b", "nightside_temp_K", 928.0, 33.0),
-        ("simbad-hd-189733b", "hotspot_offset_deg", 33.7, 2.5),
         ("simbad-wasp-39b", "dayside_temp_K", 1055.0, 65.0),
         ("simbad-rho01-cnc-e", "dayside_temp_K", 2700.0, 270.0),
         ("simbad-rho01-cnc-e", "nightside_temp_K", 1380.0, 400.0),
-        ("simbad-rho01-cnc-e", "hotspot_offset_deg", 41.0, 12.0),
     ],
 )
 def test_registry_rows_load_measured_with_band_and_citation(
@@ -165,6 +204,36 @@ def test_registry_rows_load_measured_with_band_and_citation(
     assert tv["tag"] == "measured" and tv["source"].startswith("literature: ")
     if field.endswith("_K") or field == "hotspot_offset_deg":
         assert "4.5 um" in tv["source"]  # a brightness temperature names its band
+
+
+def test_hd189733b_hotspot_is_knutson_2012_converted_from_hours() -> None:
+    """#93 A3: Knutson et al. 2012's 4.5 um peak time, 2.98 +/- 0.82 h before eclipse, with
+    P = 2.21857 d, is 20.1 +/- 5.5 deg east. Bell et al. 2021's tighter 33.7 deg is not used (their
+    own model scatter for this planet is about 21 times the fitted error)."""
+    tv = lit.load_literature(ASSETS / "literature.toml", "simbad-hd-189733b").tv(
+        "hotspot_offset_deg"
+    )
+    assert tv is not None and tv["tag"] == "derived" and "360" in tv["formula"]
+    assert tv["value"] == pytest.approx(2.98 * 360 / (2.21857 * 24), abs=0.05)
+    assert tv["err"] == pytest.approx(0.82 * 360 / (2.21857 * 24), abs=0.05)
+    assert "Knutson et al. 2012" in tv["source"] and "4.5 um" in tv["source"]
+    assert "21 times" in tv["source"]
+
+
+def test_55cnce_hotspot_refused_and_notes_carry_the_reanalysis() -> None:
+    """#93 A2: two analyses of the same Spitzer data disagree, so no hotspot offset; the day and
+    night rows name Mercier et al. 2022 and the variable JWST dayside, and the dayside row is the
+    hot-spot hemisphere."""
+    cnc = lit.load_literature(ASSETS / "literature.toml", "simbad-rho01-cnc-e")
+    assert "hotspot_offset_deg" not in cnc.values
+    reason = cnc.refusals["hotspot_offset_deg"]
+    assert "Demory" in reason and "Mercier" in reason and "AJ 164, 204" in reason
+    for field in ("dayside_temp_K", "nightside_temp_K"):
+        src = cnc.tv(field)["source"]  # type: ignore[index]
+        assert (
+            "Mercier et al. 2022" in src and "Hu et al. 2024" in src and "Patel et al. 2024" in src
+        )
+    assert "hot-spot hemisphere" in cnc.tv("dayside_temp_K")["source"]  # type: ignore[index]
 
 
 def test_registry_refusals_keep_missing_values_refused() -> None:
