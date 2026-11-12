@@ -60,4 +60,37 @@ any ──(engine failed / WebGL2 missing)──► Idle; caption "Sound needs t
 | Fly view frame rate | no measurable drop with ambience on (A/B, 60 s flight, median frame time within 0.5 ms) | `gpuMs()` plus the rAF log |
 | Audio glitches | none in a 5-minute flight | Chrome `chrome://media-internals` underruns |
 
+### As built in #116 ([Q-448](../../decisions/sound-ambience.md))
+
+- **Chip placement:** the Sound chip (`sound/ambience/ui/SoundChip.tsx`) sits in `WorldFlyStage`'s own control group (`data-testid="world-fly-sound"`). It shows whatever `SHOW_FLY_BAR` is, whenever the fly view is entered and live at "+ Artistic".
+- **Chip contents:**
+  - **Label:** "Imagined sound", with the Artistic tag.
+  - **Mute** (`aria-pressed`) writes the `ambienceOn` setting, so the chip and the Sound popover share one switch.
+  - **"What you hear"** (`aria-expanded`, `aria-controls`) opens the panel.
+  - **When the sound cannot play:** a locked or paused context offers "Click to hear" or "Resume sound", which unlocks it (Q-73). Sound off offers "Turn sound on".
+- **Caption:**
+  - The caption is 18 px with high contrast, at most one change every 3 s.
+  - The visible caption is not a live region. When "Read changes aloud" is on, an always-present sr-only polite region mirrors it.
+- **Panel** (`ui/WhatYouHear.tsx`) shows:
+  - **Heard now:** true levels relative to the loudest bed.
+  - **"Preparing sounds (n of m)".**
+  - **Not heard here:** hidden while the world forms (R12).
+  - **Weather:** `weatherRows`, shared with #117's "What is drawn".
+  - **Air here:** derived values.
+  - **From the world:** the inputs with their tags.
+  - **Text:** the legend and "How this works", exact copy.
+  - **"Read changes aloud".**
+  - **Escape** closes the panel (consumed) and returns focus.
+- **Lifecycle** (`ambienceState.ts`):
+  - **States:** `idle`, `waiting`, `baking`, `playing`, `fading`, `noSurface`, `error`. Playing (partial) is merged into `playing`. A rebake is a world-key change handled by the mixer crossfade.
+  - **Gate events:** visibility, `pagehide`, the paused prop, settings, honesty, the unlock or suspension of the context, and unmount all reach the loop at once, so a fade never waits for a tick.
+  - **Unmount:** a world change remounts the stage, which fades out and keeps the beds for 2 minutes.
+- **Kill switch:** `?sx-noambience` or `localStorage sx.ambience.kill=1` mounts nothing.
+- **Weather bus** (`sound/ambience/weatherBus.ts`, for #117):
+  - **API:** `publishWeather`, `publishStrike`, `getWeather`, `subscribeWeather`, `onStrike`, `useWeatherSnapshot`, `weatherRows`.
+  - **Snapshot:** `{ frame, windDirDeg, U10, head, lightning, tS }`.
+  - **When it publishes:** at 10 Hz whenever the fly view is live, with sound off, muted or still locked. It publishes `null` when nothing should be drawn.
+  - **Strikes** reach `onStrike` at least 150 ms before `t0`, on the `performance.now()/1000` clock.
+- **Not measured yet:** the frame-rate A/B and the 5-minute glitch check have to be done on the A15.
+
 > **Appendix D R12:** fields that are not ready yet (the engine still baking its climate or hydro) mean "waiting", not a refusal. The state is re-evaluated every tick, and no "Not heard here" reason is shown while waiting.

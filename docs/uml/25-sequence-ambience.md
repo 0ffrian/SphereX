@@ -1,6 +1,6 @@
-# 25 Sequence: the ambience tick (planned)
+# 25 Sequence: the ambience tick (built in #116)
 
-The flyover soundscape's live loop as R13.8 and R13.10 specify it ([R13](../rendering/sound/overview.md)). Planned for tickets #112 to #117. Only the audio graph at the end (`getBus('ambience')`, the duck, the level) is built (issue #111). Decisions: Q-431 to Q-442 in [sound-ambience.md](../decisions/sound-ambience.md).
+The flyover soundscape's live loop as R13.8 and R13.10 specify it ([R13](../rendering/sound/overview.md)). Built by tickets #111 to #116: `useAmbience` runs `ambienceLoop.tick()` at 10 Hz. The weather snapshot goes to `weatherBus` for #117's overlay, with or without sound. Gate events (close, hide, honesty, mute) fade at once on the audio clock without waiting for a tick (Q-448). Decisions: Q-431 to Q-442 in [sound-ambience.md](../decisions/sound-ambience.md).
 
 ```mermaid
 sequenceDiagram
@@ -11,6 +11,7 @@ sequenceDiagram
   participant P as place.ts / wind.ts
   participant W as palette.ts + bake.worker
   participant M as mixer.ts
+  participant B as weatherBus (#117 overlay)
   participant G as audioGraph (built)
   F->>H: mount (close-up open, fly entered, sound unlocked, ambienceOn)
   H->>E: cpuFields(), weatherFields(), groundKm(), flyCameraBasis()
@@ -19,6 +20,7 @@ sequenceDiagram
   loop every 100 ms
     H->>P: placeFeatures(samples, weather, model), windAt(...)
     P-->>H: features, wind (tags kept)
+    H->>B: publishWeather(snapshot), publishStrike(strike) 0.3 s ahead
     H->>M: per-bed gains, filters, pan (levels.ts)
     M->>G: setTargetAtTime on bed gains into getBus(ctx, 'ambience')
   end
