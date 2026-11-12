@@ -62,7 +62,8 @@ export const TEFF_SUN_K = 5772;
 /**
  * Convective turnover time at one solar luminosity, days: Reiners et al. 2022 (A&A 662, A41, sect. 4) define the
  * Rossby number of their field law with tau = 12.3 d (L / Lsun)^-1/2. #93 3.4: replaces the Wright et al. 2011
- * mass fit, which belongs to a different Rossby scale (it gave Barnard's Star 101 d against 208 d here).
+ * mass fit, which belongs to a different Rossby scale (it gave Barnard's Star 101 d against about 193 d here, from
+ * the card's R 0.2022 Rsun and T 3243 K).
  * [verify] the 12.3 d coefficient against the paper (quoted in issue #93, not re-opened in this session).
  */
 export const TAU_SUN_REINERS_D = 12.3;

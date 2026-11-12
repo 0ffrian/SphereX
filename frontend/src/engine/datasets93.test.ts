@@ -65,27 +65,75 @@ describe('cardToWorld (issue #93)', () => {
     expect(r.preset.Rs).toBe(0.932);
   });
 
+  it('prefers the insolation over L / a^2 and lists a disagreement over 5 % (#93 A5)', () => {
+    const both = { ...WASP, insolation_searth: tv(316.269, 'derived'), host_lum_lsun: tv(0.7449) };
+    const w = cardToWorld(card(both));
+    if (!w.ok) throw new Error('refused');
+    expect(w.preset.Rs).toBeCloseTo(Math.sqrt(316.269 * 0.04828 ** 2) * (5772 / 5485) ** 2, 10);
+    // 0.7449 / 0.04828^2 = 319.6 S_earth: within 5 %, no line.
+    expect(w.mismatches).toEqual([]);
+    const off = cardToWorld(card({ ...both, host_lum_lsun: tv(0.9) }));
+    if (!off.ok) throw new Error('refused');
+    expect(off.preset.Rs).toBeCloseTo(w.preset.Rs, 12);
+    expect(off.mismatches).toHaveLength(1);
+    expect(off.mismatches[0]).toMatch(
+      /insolation_searth = 316\.3 .*host_lum_lsun \/ orbit_au\^2 = 386\.1/,
+    );
+  });
+
+  it('lists a model-dependent eccentricity (an archive limit) among the filled-in values (#93 A6)', () => {
+    const lim = {
+      ...tv(0.0063, 'model_dependent'),
+      assumption: 'archive limit flag: an upper or lower limit, not a measured value',
+    };
+    const w = cardToWorld(card({ ...WASP, orbit_ecc: lim }));
+    if (!w.ok) throw new Error('refused');
+    expect(w.preset.ob?.e).toBe(0.0063);
+    expect(w.tags['ob.e']).toBe('model_dependent');
+    const a = w.assumptions.find((x) => x.field === 'ob.e');
+    expect(a?.tag).toBe('model_dependent');
+    expect(a?.note).toMatch(/archive limit flag/);
+  });
+
   it('a model-dependent luminosity makes the radius model-dependent too (D-32)', () => {
     const w = cardToWorld(card({ ...WASP, host_lum_lsun: tv(0.7, 'model_dependent') }));
     if (!w.ok) throw new Error('refused');
     expect(w.tags.Rs).toBe('model_dependent');
   });
 
-  it('shows measured day, night and hotspot values as readouts, and skips nulls', () => {
+  it('shows day, night and hotspot values as readouts with their band, and skips nulls', () => {
     const c = card({
       ...WASP,
       dayside_temp_K: tv(1192, 'measured', 9),
       nightside_temp_K: tv(null),
-      hotspot_offset_deg: tv(33.7, 'measured', 2.5),
+      hotspot_offset_deg: tv(20.1, 'derived', 5.5),
     });
     const rows = measuredReadouts(c);
     expect(rows.map((r) => r.field)).toEqual(['dayside_temp_K', 'hotspot_offset_deg']);
-    expect(rows[0]!.value).toBe('1192 ± 9 K');
-    expect(rows[1]!.value).toBe('33.7 ± 2.5° east of noon');
-    expect(rows.every((r) => r.tag === 'measured' && r.source.includes('4.5 um'))).toBe(true);
+    expect(rows[0]!.label).toBe('Day side (brightness temperature)');
+    expect(rows[0]!.value).toBe('1192 ± 9 K at 4.5 µm');
+    expect(rows[1]!.label).toBe('Hottest point');
+    expect(rows[1]!.value).toBe('20.1 ± 5.5° east of noon at 4.5 µm');
+    expect(rows.map((r) => r.tag)).toEqual(['measured', 'derived']);
+    // The tag badge says how a value is known; the label never claims it (#93 A10).
+    expect(rows.some((r) => /measured/i.test(r.label))).toBe(false);
     const w = cardToWorld(c);
     if (!w.ok) throw new Error('refused');
     expect(w.measured).toHaveLength(2);
+  });
+
+  it("labels 55 Cnc e's dayside as the hot-spot hemisphere, from its registry note (#93 A10)", () => {
+    const day = {
+      ...tv(2700, 'measured', 270),
+      source:
+        'literature: Demory et al. 2016, Abstract: warmest hemisphere 2700 +/- 270 K at 4.5 um. This is the hot-spot hemisphere (the hemisphere centred on the hot spot)',
+    };
+    const night = { ...tv(1380, 'measured', 400), source: 'literature: Demory et al. 2016' };
+    const rows = measuredReadouts(card({ ...WASP, dayside_temp_K: day, nightside_temp_K: night }));
+    expect(rows[0]!.label).toBe('Hot-spot hemisphere (brightness temperature)');
+    expect(rows[0]!.value).toBe('2700 ± 270 K at 4.5 µm');
+    expect(rows[1]!.label).toBe('Night side (brightness temperature)');
+    expect(rows[1]!.value).toBe('1380 ± 400 K'); // no band in the source: none invented
   });
 });
 
@@ -97,24 +145,18 @@ describe('cardToStar (issue #93)', () => {
     teff_K: tv(5076, 'derived'),
     radius_rsun: tv(0.7761, 'model_dependent'),
   };
-  it("uses the card's FLAME mass and luminosity when present", () => {
-    const s = cardToStar(
-      card({
-        ...EPS,
-        mass_msun: tv(0.8112, 'model_dependent'),
-        lum_lsun: tv(0.34, 'model_dependent'),
-      }),
-    );
+  it("uses the card's FLAME mass when present", () => {
+    const s = cardToStar(card({ ...EPS, mass_msun: tv(0.8112, 'model_dependent') }));
     if (!s.ok) throw new Error('refused');
     expect(s.mass.value).toBe(0.8112);
     expect(s.preset.M).toBe(0.8112);
-    expect(s.luminosity).toMatchObject({ value: 0.34, tag: 'model_dependent' });
   });
-  it('derives the luminosity from R and T otherwise, no stronger than its inputs', () => {
-    const s = cardToStar(card(EPS));
-    if (!s.ok) throw new Error('refused');
-    expect(s.luminosity.value).toBeCloseTo(0.7761 ** 2 * (5076 / 5772) ** 4, 12);
-    expect(s.luminosity.tag).toBe('model_dependent');
+  it('the FLAME luminosity is not an engine input: the turnover time uses R and T (#93 A9)', () => {
+    const a = cardToStar(card(EPS));
+    const b = cardToStar(card({ ...EPS, lum_lsun: tv(0.34, 'model_dependent') }));
+    if (!a.ok || !b.ok) throw new Error('refused');
+    expect(b.preset).toEqual(a.preset);
+    expect('luminosity' in b).toBe(false);
   });
   it('uses a measured rotation period from the card', () => {
     const s = cardToStar(card({ ...EPS, rot_period_h: tv(278.88, 'measured', 3.6) }));

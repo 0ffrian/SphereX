@@ -214,6 +214,47 @@ describe('ViewerPanel', () => {
     );
   });
 
+  it('lists a planet’s eclipse and phase-curve values with their band and tag at every level (#93 A10, D-21)', async () => {
+    const { card, params } = fixture('gas_giant');
+    const c = card as unknown as Record<string, unknown>;
+    c.dayside_temp_K = {
+      value: 1192,
+      err: 9,
+      tag: 'measured',
+      source: 'literature: Knutson et al. 2012, dayside brightness temperature at 4.5 um',
+    };
+    c.hotspot_offset_deg = {
+      value: 20.1,
+      err: 5.5,
+      tag: 'derived',
+      formula: 'hours x 360 / (P x 24)',
+      source: 'literature: Knutson et al. 2012, flux maximum 2.98 h before eclipse at 4.5 um',
+    };
+    for (const level of ['measured', 'derived', 'artistic'] as const) {
+      useAppStore.getState().setObject(card, params);
+      useAppStore.getState().setHonesty(level);
+      await mount();
+      const dl = container.querySelector('[data-testid="planet-measured"]');
+      expect(dl, level).not.toBeNull();
+      const t = dl!.textContent ?? '';
+      expect(t).toContain('Day side (brightness temperature)');
+      expect(t).toContain('1192 ± 9 K at 4.5 µm');
+      expect(t).toContain('Hottest point');
+      expect(t).toContain('20.1 ± 5.5° east of noon at 4.5 µm');
+      expect(t).not.toMatch(/, measured/);
+      expect(dl!.querySelectorAll('dd').length).toBe(2);
+      // Each value carries its tag badge (the badge, not the label, says how it is known).
+      expect(dl!.querySelectorAll('[data-testid="provenance-badge"]').length).toBe(2);
+    }
+  });
+
+  it('shows no planet readouts when the card has none', async () => {
+    const { card, params } = fixture('star');
+    useAppStore.getState().setObject(card, params);
+    await mount();
+    expect(container.querySelector('[data-testid="planet-measured"]')).toBeNull();
+  });
+
   it('shows no note for a process whose layer is not drawn (Measured only)', async () => {
     const { card, params } = fixture('star');
     useAppStore.getState().setObject(card, params);
