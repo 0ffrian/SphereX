@@ -15,8 +15,9 @@ npx vite --port 5199 --strictPort --host 127.0.0.1
 `run.js` drives Playwright's Chromium (`@playwright/test`, already a dev dependency; `npx playwright install chromium`
 once) on the real GPU and prints one JSON line per page. Options: `--base URL` (default `http://127.0.0.1:5199`, or
 `SX_BENCH_BASE`), `--angle d3d11|vulkan|gl` (default `d3d11`), `--profile DIR` (share one browser profile: a warm
-shader cache; without it every page gets a fresh, empty profile, which is what a first open costs) and
-`--timeout S` (default 900).
+shader cache; without it every page gets a fresh, empty profile, which is what a first open costs),
+`--timeout S` (default 900) and `--save DIR` (writes the PNG data URLs a page leaves in `__out.png` to `DIR/<name>.png`
+and leaves them out of the printed line).
 
 ## Pages
 
@@ -26,6 +27,17 @@ shader cache; without it every page gets a fresh, empty profile, which is what a
 | `async.html?role=fly`           | A `WorldEngine` waiting for `whenReady()`: time to ready, programs submitted (3 for `role=globe`), and the longest main-thread gap meanwhile.                                                                                                                                                                                                                                                                      |
 | `engines.html?which=star-globe` | Cold compile of every program the star engine (`star-globe`, `star-closeup`) or the rock engine (`rock`) builds, timed from `compileShader` to the return of the `LINK_STATUS` read.                                                                                                                                                                                                                               |
 | `fly.html?id=t1f&alt=3`         | The fly view from a fixed camera: frame time, and `scale_corr`, the picture at resolution scale 1 against the picture after the resolution scaler shrank to about 0.5 (upsampled; `all` = luminance, `detail` = its high-pass part). With `ref=<module folder>` it also draws with a second copy of the engine and reports the pixel difference (`mean_level`, `over8_pct` of channels off by more than 8 levels). |
+
+Issue #93 W1 (the star, before and after; needs `.bench-ref/stars` for the engine and `.bench-ref/viewer` for the
+three.js star, see the comments at the top of each page):
+
+- `star-engine.html?what=compile&src=cur` (or `src=ref`): cold compile of a star engine: how long the constructor
+  blocks the main thread, the time until the star draws, and the longest main-thread gap.
+- `star-engine.html?what=shots&png=1`: this engine against `/.bench-ref/stars/` for Procyon, eps Eri and Barnard's
+  Star in four views (Observatory after a flare, true colour, the surface close-up, the flare close-up): differing
+  bytes of the composited picture, the median frame cost and the GL contexts used.
+- `tsl-star.html?what=shader&png=1`: the three.js star surface shader against `/.bench-ref/viewer/` (raw half-float
+  read-back, so any difference counts); `what=still` draws the star close-up directly and through `StillStarCache`.
 
 Issue #93 phase 2 (repeating patterns):
 
@@ -40,6 +52,20 @@ Issue #93 phase 2 (repeating patterns):
 - `flypath.html?id=t1f&alt=3&ref=/.bench-ref/worlds/`: the fly camera steps sideways (`step` km, `n` frames); for each
   pair of frames, 32 x 32 ground tiles are matched within +-8 px. A planet-fixed texture moves rigidly and matches
   well (`mean`, `p10` of the best matches); keep `step` so the ground moves fewer than 8 px a frame.
+
+Issue #93 wave 1 (rocks):
+
+- `rocks.html?body=proc|eros|comet`: one rock body from the shared fixture cards (`asteroid_procedural`,
+  `asteroid_shape` with the Eros model, `comet`). Reports the main-thread build, the `attach()` call, the time until
+  the programs are linked, the longest main-thread task from attach to the first picture, the frame time (median of 40
+  draws each followed by a 1-pixel read), the GPU time of a draw (`EXT_disjoint_timer_query_webgl2`, both contexts
+  with `two=1`), a draw right after a new height map (`rebake_ms`), and a Surface age sweep (20 changes 16 ms apart:
+  longest task, blocked time, settle time). Keeps the canvas in `__out.png` (and `png2`). Switches: `impl=<folder>`
+  (an older copy, e.g. `/.bench-ref/before/engine/rocks/` with `seed.ts` one level up), `bake=0` (the prototype's
+  per-pixel `ROCK_FS`), `bakeN=<texels>`, `cull=0`, `two=1` (a second canvas, the close-up pane), `share=0` (each
+  canvas draws), `w`/`h` (CSS px; run at device scale 1). The Eros model is read from `/.bench-ref/eros.glb` (copy
+  `backend/assets/shapes/eros-gaskell.glb`) and the cards from `/.bench-ref/<kind>.json` (copy
+  `shared/fixtures/cards/`).
 
 Issue #93 regression fix (mountain heights):
 

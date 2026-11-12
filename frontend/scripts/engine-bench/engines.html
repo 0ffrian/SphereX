@@ -63,6 +63,8 @@
           reducedMotion: true,
         });
         e.setStar(PROTOTYPE_PRESETS.k);
+        // Issue #93 W1: the star program links in the background; its LINK_STATUS is read once it is done.
+        if (typeof e.whenReady === 'function') await e.whenReady();
         out.ready = e.ready;
       } else if (which === 'rock') {
         const { RockView } = await import('/src/engine/rocks/RockView.ts');

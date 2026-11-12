@@ -13,6 +13,8 @@
 //   Issue #93 2.8: a card body (seed3, seedHash from cardToRock) gets a vec3 noise offset, its full 32-bit seed for
 //   the crater RNG, per-crater ellipticity, rim height and rim wave, and 0 to 2 boulders a cell; the artifact's own
 //   bodies have neither field and draw exactly as before.
+//   Issue #93 wave 1 (PATCHES_93W1, DEV93W1_TAIL; each marked @deviation): background compile (B7), loops kept as
+//   loops (B7), comet jets in the vertex shader (1.7), the fine relief, normal and albedo baked into cube maps (2.1).
 //   1268-1268  clamp          (shared helper)
 //   1273-1273  rng            (shared helper)
 //   1292-1297  compile, unis  (shared helpers)
@@ -135,14 +137,36 @@ void main(){
  c=1.-exp(-c*1.5);
  O=vec4(pow(c,vec3(1./2.2)),1.);
 }`;
+// @deviation (#93 1.7) JET_VS works out each jet particle from its fixed data (aQ: its four random numbers; aB: its
+// source direction) and the frame (uM, uL, uT = clock * 0.14 mod 1, uSc), as the prototype's draw() did on the CPU,
+// then places it as the prototype's JET_VS did. A particle on the night side (nl < 0.06) is put outside the clip
+// volume, so it draws nothing, as the prototype skipped it.
 var JET_VS = `#version 300 es
-layout(location=0) in vec4 aP;uniform float uAsp,uPx;out float vA;void main(){gl_Position=vec4(aP.x/uAsp,aP.y,aP.z*.3,1.);gl_PointSize=uPx*(1.2+2.2*(1.-aP.w));vA=aP.w;}`;
+layout(location=0) in vec4 aQ;layout(location=1) in vec3 aB;uniform float uAsp,uPx,uT,uSc;uniform mat3 uM;uniform vec3 uAx,uL;out float vA;
+float rad(vec3 d){float r=1./sqrt(dot(d/uAx,d/uAx));return r*(.72+.62*d.x*d.x+.1*d.x);}
+void main(){float rs=rad(aB);vec3 wv=uM*aB*rs;float nl=max(0.,dot(wv,uL)/rs);
+ if(nl<.06){gl_Position=vec4(2.,2.,2.,1.);gl_PointSize=1.;vA=0.;return;}
+ float age=fract(uT+aQ.y*7.+aQ.z),spd=.5+.8*aQ.w,far=age*spd*2.4,push=age*age*2.1;
+ vec3 q=(wv+wv/rs*far-uL*push)*uSc;vec4 aP=vec4(q.x,q.y,-q.z,(1.-age)*pow(nl,.6));
+ gl_Position=vec4(aP.x/uAsp,aP.y,aP.z*.3,1.);gl_PointSize=uPx*(1.2+2.2*(1.-aP.w));vA=aP.w;}`;
+// @end-deviation
 var JET_FS = `#version 300 es
 precision highp float;in float vA;out vec4 O;void main(){vec2 c=gl_PointCoord*2.-1.;float g=exp(-dot(c,c)*2.6);vec3 col=mix(vec3(.55,.68,.92),vec3(.9,.85,.72),vA);O=vec4(col*g*.2*vA,1.);}`;
 function RockGL(canvas) {
   var gl = canvas.getContext('webgl2', { antialias: true, alpha: false, powerPreference: 'high-performance' });
   if (!gl) throw new Error('no webgl2');
-  var p = compile(gl, ROCK_VS, ROCK_FS), u = unis(gl, p), pj = compile(gl, JET_VS, JET_FS), uj = unis(gl, pj);
+// @deviation (#93 B7) the prototype compiled both programs here with compile(), which waits for the driver (1.3 to
+// 3.7 s for ROCK_FS on a cold ANGLE D3D11 cache, the page frozen meanwhile). They are now only submitted (compileStart,
+// as the world engine's #93 1.2): poll() says when the driver has finished (KHR_parallel_shader_compile) and link()
+// reads the result, throwing the compile or link log as compile() did. draw() calls link() first, so a host that draws
+// before poll() is true still works (it then waits, as before). With the bake (#93 2.1) ROCK_FS_BAKED draws the body
+// and BAKE_FS fills its cube maps; without float render targets (EXT_color_buffer_float) the prototype's ROCK_FS draws.
+  var pex = gl.getExtension('KHR_parallel_shader_compile'), bakeOK = rockBake.on && !!gl.getExtension('EXT_color_buffer_float'), p, u, pj, uj, bake = null, upGen = 0, jm = new Float32Array(9);
+  var jobs = bakeOK ? { R: compileStart(gl, ROCK_VS, ROCK_FS_BAKED), B: compileStart(gl, BAKE_VS, BAKE_FS), J: compileStart(gl, JET_VS, JET_FS) } : { R: compileStart(gl, ROCK_VS, ROCK_FS), J: compileStart(gl, JET_VS, JET_FS) };
+  function link() { if (p) return; var a = compileEnd(gl, jobs.R), b = compileEnd(gl, jobs.J), c = jobs.B ? compileEnd(gl, jobs.B) : null; u = unis(gl, a); uj = unis(gl, b); pj = b; if (c) bake = rockBaker(gl, c); p = a; }
+  this.poll = function () { for (var k in jobs) if (!compileDone(gl, jobs[k], pex)) return false; link(); return true; };
+  this.baked = bakeOK;
+// @end-deviation
   var NX = 520, NY = 300, v = new Float32Array((NX + 1) * (NY + 1) * 2), idx = new Uint32Array(NX * NY * 6), i, j, k = 0;
   for (j = 0; j <= NY; j++) for (i = 0; i <= NX; i++) { v[k++] = i / NX; v[k++] = j / NY; }
   k = 0; for (j = 0; j < NY; j++) for (i = 0; i < NX; i++) { var a = j * (NX + 1) + i, b = a + 1, c = a + NX + 1, d = c + 1; idx[k++] = a; idx[k++] = c; idx[k++] = b; idx[k++] = b; idx[k++] = c; idx[k++] = d; }
@@ -154,10 +178,22 @@ function RockGL(canvas) {
   var tex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, tex); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
   var jd = new Float32Array(16000), L = (function () { var q = [-0.72, 0.3, 0.62], l = Math.hypot(q[0], q[1], q[2]); return [q[0] / l, q[1] / l, q[2] / l]; })(), jr = rng(404), jetD = [];
   for (i = 0; i < 4000; i++) jetD.push([jr(), jr(), jr(), jr()]);
-  this.upload = function (b) { gl.bindTexture(gl.TEXTURE_2D, tex); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RG16F, b.w, b.h, 0, gl.RG, gl.FLOAT, b.data); };
+// @deviation (#93 1.7) the jets' fixed part, once: each particle's four random numbers and its source direction (one of
+// six, from rng(1000 + source), jittered and normalised), which the prototype's draw() worked out again every frame.
+// JET_VS does the rest, so a frame creates no JavaScript objects (about 12,000 before) and uploads nothing.
+  (function () { var a = new Float32Array(4000 * 7), n, o; for (n = 0; n < 4000; n++) { var q = jetD[n], src = Math.floor(q[0] * 6), r2 = rng(1000 + src), z = r2() * 2 - 1, an = r2() * 6.2832, c2 = Math.sqrt(1 - z * z), bx = c2 * Math.cos(an) + (q[1] - 0.5) * 0.28, by = z + (q[2] - 0.5) * 0.28, bz = c2 * Math.sin(an) + (q[3] - 0.5) * 0.28, l2 = Math.hypot(bx, by, bz); o = n * 7; a[o] = q[0]; a[o + 1] = q[1]; a[o + 2] = q[2]; a[o + 3] = q[3]; a[o + 4] = bx / l2; a[o + 5] = by / l2; a[o + 6] = bz / l2; }
+    gl.bindVertexArray(jv); gl.bindBuffer(gl.ARRAY_BUFFER, bj); gl.bufferData(gl.ARRAY_BUFFER, a, gl.STATIC_DRAW); gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 4, gl.FLOAT, false, 28, 0); gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 28, 16); gl.bindVertexArray(null); })();
+// @end-deviation
+// @deviation (#93 2.1) upGen counts the height-map uploads, so the bake runs again after each (a new body, the age).
+  this.upload = function (b) { upGen++; gl.bindTexture(gl.TEXTURE_2D, tex); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RG16F, b.w, b.h, 0, gl.RG, gl.FLOAT, b.data); };
+// @end-deviation
   this.draw = function (m) {
     var dp = Math.min(devicePixelRatio || 1, 1.5), w = Math.round(canvas.clientWidth * dp), h = Math.round(canvas.clientHeight * dp); if (!w || !h) return;
     if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+// @deviation (#93 B7, 2.1) the programs are linked before the first draw (waiting for the driver only when poll() was
+// not yet true), then the bake runs if the height map or a shading input changed since the last one.
+    link(); if (bake) bake.run(m, tex, upGen);
+// @end-deviation
     var cy = Math.cos(R.yaw + R.spin), sy = Math.sin(R.yaw + R.spin), cp = Math.cos(R.pitch), sp = Math.sin(R.pitch);
     var M = [cy, sp * sy, -cp * sy, 0, cp, sp, sy, -sp * cy, cp * cy];
     var asp = w / h, sc = (R.p.ab > 4 ? 1.35 : 0.9) / R.built.ext * (R.p.comet ? 0.9 : 1), mt = function (v2) { return [M[0] * v2[0] + M[3] * v2[1] + M[6] * v2[2], M[1] * v2[0] + M[4] * v2[1] + M[7] * v2[2], M[2] * v2[0] + M[5] * v2[1] + M[8] * v2[2]]; };
@@ -168,24 +204,107 @@ function RockGL(canvas) {
     gl.uniformMatrix3fv(u.uM, false, new Float32Array([M[0], M[3], M[6], M[1], M[4], M[7], M[2], M[5], M[8]]));
     gl.uniform1f(u.uScale, sc); gl.uniform1f(u.uAsp, asp); gl.uniform3fv(u.uAx, m.ax); gl.uniform1f(u.uComet, R.p.comet ? 1 : 0); gl.uniform3fv(u.uLo, Lo); gl.uniform3fv(u.uVo, Vo); gl.uniform3fv(u.uTint, R.p.tint);
     gl.uniform1f(u.uFine, R.mode === 'smooth' ? 0.25 : 1); gl.uniform1f(u.uBld, m.bld); gl.uniform1f(u.uBright, clamp(0.12 + 1.6 * R.p.A, 0.12, 0.8) * 3.6); gl.uniform1f(u.uSeed, R.p.seed); gl.uniform3fv(u.uSeed3, R.p.seed3 || [R.p.seed, R.p.seed, R.p.seed]); gl.uniform1f(u.uBldV, R.p.seed3 ? 1 : 0);
+// @deviation (#93 2.1) ROCK_FS_BAKED reads the baked normal, albedo factor and height from the cube maps.
+    if (bake) bake.bind(u);
+// @end-deviation
     gl.drawElements(gl.TRIANGLES, idx.length, gl.UNSIGNED_INT, 0);
+// @deviation (#93 1.7) the jets move in the vertex shader (JET_VS): the same particles, ages, speeds and sunlit-side cut
+// as the loop the prototype ran here every frame (about 12,000 short-lived objects and a 64 KB upload a frame), in
+// float32 instead of float64. Reduced motion draws the first 2,400, as before.
     if (R.p.comet) {
-      var rf = radialFn(m.ax, true), t = R.clock, N = reduced ? 2400 : 4000, k2 = 0, n2;
-      for (n2 = 0; n2 < N; n2++) {
-        var q = jetD[n2], src = Math.floor(q[0] * 6), r2 = rng(1000 + src), z = r2() * 2 - 1, an = r2() * 6.2832, c2 = Math.sqrt(1 - z * z), bx = c2 * Math.cos(an) + (q[1] - 0.5) * 0.28, by = z + (q[2] - 0.5) * 0.28, bz = c2 * Math.sin(an) + (q[3] - 0.5) * 0.28, l2 = Math.hypot(bx, by, bz); bx /= l2; by /= l2; bz /= l2;
-        var rs = rf(bx, by, bz), wv = [(M[0] * bx + M[1] * by + M[2] * bz) * rs, (M[3] * bx + M[4] * by + M[5] * bz) * rs, (M[6] * bx + M[7] * by + M[8] * bz) * rs];
-        var nl = Math.max(0, (wv[0] * L[0] + wv[1] * L[1] + wv[2] * L[2]) / rs); if (nl < 0.06) continue;
-        var age = (t * 0.14 + q[1] * 7 + q[2]) % 1, spd = 0.5 + 0.8 * q[3], far = age * spd * 2.4, push = age * age * 2.1;
-        jd[k2++] = (wv[0] + wv[0] / rs * far - L[0] * push) * sc; jd[k2++] = (wv[1] + wv[1] / rs * far - L[1] * push) * sc; jd[k2++] = -(wv[2] + wv[2] / rs * far - L[2] * push) * sc; jd[k2++] = (1 - age) * Math.pow(nl, 0.6);
-      }
-      gl.useProgram(pj); gl.bindVertexArray(jv); gl.bindBuffer(gl.ARRAY_BUFFER, bj); gl.bufferSubData(gl.ARRAY_BUFFER, 0, jd.subarray(0, k2));
+      jm[0] = M[0]; jm[1] = M[3]; jm[2] = M[6]; jm[3] = M[1]; jm[4] = M[4]; jm[5] = M[7]; jm[6] = M[2]; jm[7] = M[5]; jm[8] = M[8];
+      gl.useProgram(pj); gl.bindVertexArray(jv);
+      gl.uniformMatrix3fv(uj.uM, false, jm); gl.uniform3fv(uj.uAx, m.ax); gl.uniform3fv(uj.uL, L); gl.uniform1f(uj.uT, (R.clock * 0.14) % 1); gl.uniform1f(uj.uSc, sc);
       gl.uniform1f(uj.uAsp, asp); gl.uniform1f(uj.uPx, Math.max(2, h / 200)); gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE); gl.depthMask(false);
-      gl.drawArrays(gl.POINTS, 0, k2 / 4); gl.depthMask(true); gl.disable(gl.BLEND);
+      gl.drawArrays(gl.POINTS, 0, reduced ? 2400 : 4000); gl.depthMask(true); gl.disable(gl.BLEND);
     }
+// @end-deviation
     gl.bindVertexArray(null);
   };
 }
 // @end-verbatim
+// @deviation (#93 B7) compileStart / compileDone / compileEnd, as worlds/helpers.js (#93 1.2): submit a program (compile,
+// attach, link, no status read), poll KHR_parallel_shader_compile's COMPLETION_STATUS_KHR (without the extension it
+// reports done at once, so the next read waits as compile() did), then read the result, throwing the shader or link
+// log exactly as compile() did.
+function compileStart(gl, vs, fs) {
+  var p = gl.createProgram(), sv = gl.createShader(gl.VERTEX_SHADER), sf = gl.createShader(gl.FRAGMENT_SHADER);
+  gl.shaderSource(sv, vs); gl.compileShader(sv); gl.shaderSource(sf, fs); gl.compileShader(sf);
+  gl.attachShader(p, sv); gl.attachShader(p, sf); gl.linkProgram(p);
+  return { p: p, vs: sv, fs: sf };
+}
+function compileDone(gl, job, ext) { return !ext || !!gl.getProgramParameter(job.p, ext.COMPLETION_STATUS_KHR); }
+function compileEnd(gl, job) {
+  if (!gl.getProgramParameter(job.p, gl.LINK_STATUS)) {
+    var s = [job.vs, job.fs].filter(function (o) { return !gl.getShaderParameter(o, gl.COMPILE_STATUS); })[0];
+    throw new Error(s ? gl.getShaderInfoLog(s) : gl.getProgramInfoLog(job.p));
+  }
+  return job.p;
+}
+// @end-deviation
+// @deviation (#93 B7) as the world engine's noUnroll (#93 1.1, Q-337): ANGLE D3D11's fxc unrolls every loop with a
+// constant bound. Each constant bound in ROCK_FS (NOISE's fbm and ridge, the three nested 3-step boulder loops, the
+// 26-step shadow march) becomes N+uZ0, with uZ0 a uniform that is never set (always 0): the loops run exactly as before,
+// but fxc keeps them as loops. BAKE_FS and ROCK_FS_BAKED below are cut from this ROCK_FS, so they inherit it.
+function noUnroll(src) {
+  return src.replace('precision highp float;', 'precision highp float;\nuniform int uZ0;')
+    .replace(/(for\(int [ijk]=-?\d+;[ijk])(<=?)(\d+|n);/g, function (m, a, op, b) { return a + op + b + '+uZ0;'; });
+}
+ROCK_FS = noUnroll(ROCK_FS);
+// @end-deviation
+// @deviation (#93 2.1) the bake. ROCK_FS works out the fine relief (ridge and fbm noise, two boulder layers: about 386
+// hashes a pixel), the normal from three of those and the albedo noise again on every frame, although none of it moves
+// with the camera or the light. BAKE_FS runs ROCK_FS's own code once per texel of two cube maps (rockBake.n texels a
+// side; texel directions follow the GL cube-map face table) and keeps the normal and the albedo factor (RGBA16F) and the
+// height (R16F); ROCK_FS_BAKED is ROCK_FS with those lines replaced by three cube-map reads, so the light, the cast
+// shadow march, the fresh-crater brightening, the phase and the tone curve are the prototype's. The bake runs again when
+// the height map is uploaded or a shading input changes (rockBaker.run's key). A GPU bake is not byte-identical across
+// GPUs, like the engine itself (R5.9). setRockBake(false) before a RockGL is made draws the prototype's ROCK_FS
+// (the pixel comparison in scripts/engine-bench/rocks.html).
+var rockBake = { on: true, n: 1024 };
+function setRockBake(on, n) { rockBake.on = !!on; if (n) rockBake.n = n; }
+function rockShaderEdit(src, edits) { edits.forEach(function (e) { if (src.split(e[0]).length !== 2) throw new Error('ROCK_FS changed, update the bake: ' + e[0]); src = src.replace(e[0], e[1]); }); return src; }
+var BAKE_VS = '#version 300 es\nvoid main(){vec2 p=vec2((gl_VertexID<<1)&2,gl_VertexID&2);gl_Position=vec4(p*2.-1.,0.,1.);}';
+var BAKE_FS = rockShaderEdit(ROCK_FS.slice(0, ROCK_FS.indexOf('void main(){')), [['in vec3 vD;', ''], ['out vec4 O;', 'layout(location=0) out vec4 O;layout(location=1) out vec4 O2;']]) + `uniform int uFace;uniform float uN;
+vec3 faceDir(vec2 s){if(uFace==0)return vec3(1.,-s.y,-s.x);if(uFace==1)return vec3(-1.,-s.y,s.x);if(uFace==2)return vec3(s.x,1.,s.y);
+ if(uFace==3)return vec3(s.x,-1.,-s.y);if(uFace==4)return vec3(s.x,-s.y,1.);return vec3(-s.x,-s.y,-1.);}
+void main(){
+ vec3 d=normalize(faceDir(gl_FragCoord.xy/uN*2.-1.));float h=hf(d),e=.0035;
+ vec3 tA=normalize(cross(d,vec3(.13,1.,.31))),tB=cross(d,tA),dA=normalize(d+tA*e),dB=normalize(d+tB*e);
+ vec3 p0=P(d,h),n=normalize(cross(P(dA,hf(dA))-p0,P(dB,hf(dB))-p0));if(dot(n,d)<0.)n=-n;
+ float pat=fbm(p0*3.+uSeed3,4),grain=fbm(p0*44.+uSeed3,3);
+ O=vec4(n,(.58+.8*pat)*(.8+.42*grain));O2=vec4(h,0.,0.,1.);
+}`;
+var ROCK_FS_BAKED = rockShaderEdit(ROCK_FS, [
+  ['out vec4 O;', 'uniform samplerCube uBN,uBH;out vec4 O;'],
+  ['vec3 d=normalize(vD);float h=hf(d),e=.0035;', 'vec3 d=normalize(vD);vec4 bk=texture(uBN,d);float h=texture(uBH,d).r;'],
+  [' vec3 tA=normalize(cross(d,vec3(.13,1.,.31))),tB=cross(d,tA),dA=normalize(d+tA*e),dB=normalize(d+tB*e);\n', ''],
+  ['vec3 p0=P(d,h),n=normalize(cross(P(dA,hf(dA))-p0,P(dB,hf(dB))-p0));if(dot(n,d)<0.)n=-n;', 'vec3 p0=P(d,h),n=normalize(bk.xyz);'],
+  ['float fresh=texture(uH,uv).g,pat=fbm(p0*3.+uSeed3,4),grain=fbm(p0*44.+uSeed3,3);', 'float fresh=texture(uH,uv).g;'],
+  ['vec3 alb=uTint*(.58+.8*pat)*(.8+.42*grain);', 'vec3 alb=uTint*bk.w;']
+]);
+function rockBaker(gl, prog) {
+  var ub = unis(gl, prog), N = rockBake.n, fb = gl.createFramebuffer(), key = null;
+  function cube(f) { var t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_CUBE_MAP, t); gl.texStorage2D(gl.TEXTURE_CUBE_MAP, 1, f, N, N); gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MAG_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE); return t; }
+  var tN = cube(gl.RGBA16F), tH = cube(gl.R16F);
+  return {
+    run: function (m, tex, gen) {
+      var s3 = R.p.seed3 || [R.p.seed, R.p.seed, R.p.seed], fine = R.mode === 'smooth' ? 0.25 : 1, comet = R.p.comet ? 1 : 0, bv = R.p.seed3 ? 1 : 0;
+      var k = [gen, m.ax[0], m.ax[1], m.ax[2], comet, fine, m.bld, s3[0], s3[1], s3[2], bv].join();
+      if (k === key) return;
+      key = k;
+      var cull = gl.isEnabled(gl.CULL_FACE), f;
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fb); gl.viewport(0, 0, N, N); gl.disable(gl.DEPTH_TEST); gl.disable(gl.BLEND); gl.disable(gl.CULL_FACE);
+      gl.useProgram(prog); gl.bindVertexArray(null); gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, tex); gl.uniform1i(ub.uH, 0);
+      gl.uniform3fv(ub.uAx, m.ax); gl.uniform1f(ub.uComet, comet); gl.uniform1f(ub.uFine, fine); gl.uniform1f(ub.uBld, m.bld); gl.uniform3fv(ub.uSeed3, s3); gl.uniform1f(ub.uBldV, bv); gl.uniform1f(ub.uN, N);
+      gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1]);
+      for (f = 0; f < 6; f++) { gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_CUBE_MAP_POSITIVE_X + f, tN, 0); gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT1, gl.TEXTURE_CUBE_MAP_POSITIVE_X + f, tH, 0); gl.uniform1i(ub.uFace, f); gl.drawArrays(gl.TRIANGLES, 0, 3); }
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null); if (cull) gl.enable(gl.CULL_FACE);
+    },
+    bind: function (u) { gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_CUBE_MAP, tN); gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_CUBE_MAP, tH); gl.activeTexture(gl.TEXTURE0); gl.uniform1i(u.uBN, 1); gl.uniform1i(u.uBH, 2); }
+  };
+}
+// @end-deviation
 
-export { R, RP, radialFn, rockModel, buildRock, RockGL, ROCK_VS, ROCK_FS, JET_VS, JET_FS, rng, clamp };
+export { R, RP, radialFn, rockModel, buildRock, RockGL, ROCK_VS, ROCK_FS, JET_VS, JET_FS, rng, clamp, BAKE_FS, ROCK_FS_BAKED, setRockBake };
 export function setReducedMotion(v) { reduced = v; }

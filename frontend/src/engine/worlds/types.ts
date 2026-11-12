@@ -85,6 +85,12 @@ export interface EngineOptions {
    * default) is the prototype's page, used by the parity hooks.
    */
   role?: EngineRole;
+  /**
+   * Render-performance roadmap 0.1 (dev only): time each `tick()` on the GPU with
+   * EXT_disjoint_timer_query_webgl2, read with `gpuMs()`. Off by default; no effect where the
+   * extension is missing.
+   */
+  gpuTiming?: boolean;
 }
 
 export type EngineRole = 'globe' | 'fly' | 'both';
