@@ -4691,13 +4691,15 @@ body {
    beside it, as tall as that card, and a popover that reads top-down: what you are looking at, how
    to read it, then the credit and (quietest) the renderer. */
 @media (min-width: 641px) {
+  /* Level with the zoom card: same bottom edge (16 px) as well as the same height. */
   .sx-credit-btn {
     width: 48px;
     height: 48px;
+    bottom: 16px;
     border-radius: 10px;
   }
   .sx-sky-credit {
-    bottom: 84px;
+    bottom: 76px;
     width: 340px;
     max-width: calc(100% - 32px);
     padding: 14px 16px;
