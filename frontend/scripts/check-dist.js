@@ -6,7 +6,8 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const MARKERS = ['SX_FIXTURE_MARKER', 'synthetic_fixture', 'synthetic-mover', 'SYNTHETIC_FLAG'];
-// The dev-only pages (haptics-test.html, gpu-probe.html) and the fixtures-only perf hook (__sxPerf)
+// The dev-only pages (gpu-probe.html; haptics-test.html was deleted by D-39, TODO #116: swap its
+// markers for sound-check.html) and the fixtures-only perf hook (__sxPerf)
 // must never ship.
 const TEST_PAGE_MARKERS = ['hapticsTestPage', '__sxPerf', 'SX_DEV_ONLY_GPU_PROBE'];
 const TEST_PAGE_FILES = ['haptics-test.html', 'gpu-probe.html'];

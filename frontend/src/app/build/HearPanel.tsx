@@ -105,6 +105,9 @@ const SPEC_H = 150;
 const SPEC_SCOPE_H = 44;
 const ATMO_H = 110;
 
+/** Q-430: how the spectrum sounds (long wavelength = low pitch, flux = loudness). */
+export const HEAR_SPEC_MAPPING = 'Short wavelengths sound high, long wavelengths low. Brighter is louder.';
+
 export function HearPanel({ active, name }: { active: boolean; name: string | undefined }) {
   const card = useAppStore((s) => s.card);
   const spectrum = useAppStore((s) => s.sky.spectrum);
@@ -467,6 +470,9 @@ export function HearPanel({ active, name }: { active: boolean; name: string | un
                 />
                 <span className="sx-hr-t">{lamAt(pos).toFixed(2)} &micro;m</span>
               </div>
+              <p className="sx-hr-hint" data-testid="hear-spec-mapping">
+                {HEAR_SPEC_MAPPING}
+              </p>
               <div className="sx-hr-viz">
                 <canvas ref={scopeCv} aria-hidden="true" />
               </div>
