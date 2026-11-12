@@ -290,6 +290,7 @@ classDiagram
     +honesty: HonestyState
     enginesShown = honesty is artistic, Q-287
     engineStar, engineWorld: the adapter result when shown and not failed for this object
+    planetMeasured: card readouts at every level, Q-379
   }
   class EngineStage {
     <<WorldGlobeStage, WorldFlyStage, StarEngineStage, RockStage, RockCloseUp>>
@@ -319,15 +320,18 @@ classDiagram
   }
   class CardToWorld {
     <<cardToWorld.ts>>
-    +cardToWorld(card, overrides) preset, tags, assumptions, missing, mismatches
+    +cardToWorld(card, overrides) preset, tags, assumptions, missing, mismatches, measured
+    +measuredReadouts(card) label, value with band, tag, source
     preset value keeps the card tag within 0.5 percent
+    starlight from insolation first, Q-375
     card seed = 32-bit hash of the id, seed3 = seedVec(seed) (Q-347)
   }
   class CardToStar {
     <<cardToStar.ts>>
     +cardToStar(card) preset, teff, rotation, assumed
     only ref-sun maps to a prototype preset
-    card star gets seed and so (Q-349), FLAME mass and luminosity (Q-363)
+    card star gets seed and so (Q-349), FLAME mass (Q-363)
+    turnover time from R and T, lum_lsun not read (Q-374)
   }
   class CardToRock {
     <<cardToRock.ts>>
@@ -354,6 +358,7 @@ classDiagram
   EngineStage --> StarEngine : stars with a Teff
   EngineStage --> RockView : asteroids, comet nuclei
   WorldEngine ..> CardToWorld : preset from the card
+  ViewerPanel ..> CardToWorld : measuredReadouts, every honesty level
   StarEngine ..> CardToStar : preset from the card
   RockView ..> CardToRock : preset from the card
   CardToWorld ..> Seed : card seeds
@@ -366,6 +371,7 @@ classDiagram
 ## Notes
 
 - D-37 engines (diagram 2): at + Artistic, a card the adapter accepts is drawn by the prototype's own engine on its own WebGL2 canvas, and `ViewerApp.setEngineOwned(true)` makes the three.js viewer build and draw nothing under it. At + Estimated and Measured only (Q-287), and when the adapter refuses the card, the engine fails or loses its context, or WebGL2 is missing, the three.js renderers of diagram 1 draw (`GasWorld`, `RockyWorld`, the orbit view, `ShaderBody`, `Star`, the asteroid and comet renderers). Engine frames are exempt from the byte-identical rule (R5.9). Review fixes: Q-329 to Q-331, Q-334, Q-335.
+- Issue #93 follow-up (diagram 2): `ViewerPanel` lists a planet card's eclipse and phase-curve readouts from `measuredReadouts` at every honesty level, each with its badge, not only in the engine panel at + Artistic (Q-379); `cardToWorld` takes the starlight from the card's insolation first (Q-375); `cardToStar` no longer carries a luminosity, because the turnover time reads the radius and temperature (Q-374).
 - Issue #93 (D-38, diagram 2): a `WorldEngine` is created with a role (`globe`, `fly` or `both`), compiles its shaders in the background and is used after `whenReady()` resolves (Q-338, Q-339); the globe and fly engines of one world share one terrain build (`terrainCache.js`, Q-341); card worlds, stars and rocks take their noise offsets from `engine/seed.ts` (Q-347 to Q-353), the prototype's presets keep their scalar seeds.
 - Render core (issue #39): `ViewerApp` draws through a `RenderChain` (`render/pipeline.ts`); if the chain cannot be built it falls back to plain `renderer.render`. New content is compiled with `RenderChain.compileAsync` before it is swapped in (diagram [10](10-sequence-view-3d.md)). The quality level (low, medium or high, `render/quality.ts`) sets bloom resolution, anti-aliasing (TAAU or SMAA), noise octaves and volume steps. `FrameGovernor` only lowers the quality level; `setQualityTier` picks one by hand. `SimClock` (`render/clock.ts`) holds one sim time per moving process (the spin, and since issue #42 the processes `motion/planMotion.ts` states for stars, gas giants, brown dwarfs and worlds, Q-104) and the pause reasons shown in diagram [15](15-state-interaction.md). `renderStats`, `whenSettled` and `freezeClock` are test and tuning hooks; `timeLapses` lists each process with its shown speed-up. Motion and quality levels follow R5.7 and D-34; the implementation is Q-66 in [decisions](../decisions/README.md).
 - Tier labels (issue #42): the viewer panel (`app/ViewerPanel.tsx`, `tierText`) writes every process speed-up and layer tier as "tier N of 5, <meaning>" (for example "tier 3 of 5, worked out with a typical value"), so the D-32 tier is said in words next to it.

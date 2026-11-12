@@ -5,7 +5,9 @@
 // Source: .claude/worktrees/sculptor-reference/sculptor-preview-next.html, lines 357-662 (Planck colour, star shader FS, star model, tauC, drawStar).
 // Not yet imported by the app: it still needs the TypeScript host (DOM removed, `cardToStar`). Do not edit here;
 // re-run the slicing instead so the body stays byte-identical to the prototype.
-// Deliberate deviations from the prototype: PR #89 review (Atish's call) as 1 to 3 below (@rename pairs 3 to 6); issue #93 as deviations 4 to 6 (pairs 7 to 22).
+// Deliberate deviations from the prototype: PR #89 review (Atish's call) as 1 to 3 below (@rename pairs 3 to 6); issue #93 as deviations 4 to 6 (pairs 7 to 22);
+// issue #93 W1 as deviation 7 (protoStar3.js, its pairs 23 and 24) and deviation 8 below (pairs 25 to 29, the second
+// @rename line).
 //  1. Limb darkening: the prototype's T^4 ~ 0.4 + 0.6 mu pinned the disc centre at Teff (the star drawn as if at
 //     0.946 Teff). Now the Eddington approximation T^4 = 3/4 Teff^4 (mu + 2/3), so T = Teff at mu = 2/3 and the
 //     centre is 1.25^(1/4) = 1.0574 Teff; the brightness pow(tl/uTeff, beta) is divided by 1.0574^beta so the
@@ -38,8 +40,17 @@
 // engine/seed.ts) as the vec3 uSO added to those noise coordinates, and `seed` (its 32-bit hash) to the spot RNG as
 // rng(1729 ^ seed). The prototype presets (and the Sun) have neither: uSO = 0 and rng(1729), as before. The first
 // three spot groups keep their fixed longitudes (they face the viewer); their latitudes, sizes and the rest move.
+// @deviation (#93 W1 B7; deviation 8, @rename pairs 25 to 29 on the second @rename line) the star program compiled
+// synchronously here: compileShader, then COMPILE_STATUS and LINK_STATUS, which wait for the driver (1.2 to 1.7 s on a
+// cold ANGLE D3D11 cache, the page frozen meanwhile). The shaders are now only submitted; poll() says when the driver
+// has finished (KHR_parallel_shader_compile's COMPLETION_STATUS_KHR; without the extension it links at once, which
+// waits as the prototype did) and then reads the status, throwing the compile or link log as before, and reads the
+// uniforms. pending() is true while the driver is still compiling (the host must not call loseContext() then: it
+// would wait for the compile). draw() draws nothing until poll() is true, so the host shows its loader meanwhile.
+// The program, its uniforms and the picture are unchanged.
 // @verbatim L358-L663
 // @rename m.best=>(CLOSE_AT||m.best) (ema=>(!window.__sxPin&&ema pow(.4+.6*mu,.25)=>pow(.75*mu+.5,.25) pow(tl/uTeff,uBeta)=>pow(tl/uTeff/1.0574,uBeta) tt=mix(1.,.885+.05*fil,mpn);tt=mix(tt,.68,um);=>tt=mix(1.,1.-clamp(350.+.6*(uTeff-3300.),200.,2000.)/uTeff*(.36-.16*fil),mpn);tt=mix(tt,1.-clamp(350.+.6*(uTeff-3300.),200.,2000.)/uTeff,um); m.f;=>m.f*3; precision highp float;=>precision highp float;uniform int uZ0;uniform vec3 uSO; i<4;=>i<4+uZ0; k<=1;=>k<=1+uZ0; j<=1;=>j<=1+uZ0; i<=1;=>i<=1+uZ0; p=s*uFreq;=>p=s*uFreq+uSO; s*mf+=>s*mf+uSO+ 2.2)+vec3(t*.012)=>2.2)+uSO+vec3(t*.012) s*F+=>s*F+uSO+ s*hf+=>s*hf+uSO+ rng(1729)=>rng(1729^(ST.p.seed|0)) 'uLut',=>'uLut','uSO', gl.uniform1i(U.uN,=>gl.uniform3fv(U.uSO,ST.p.so||[0,0,0]);gl.uniform1i(U.uN, tauC(p.M)=>tauC(p) Math.log10(M);=>0;return(12.3/Math.sqrt(M.R*M.R*Math.pow(M.T/5772,4))); 1.16),=>1.16)*Math.pow(10,1.16)/12.3,
+// @rename if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(s));=>SHS.push(s); var p=gl.createProgram();=>var SHS=[],pex=gl.getExtension('KHR_parallel_shader_compile'),linked=false,linkErr=null;var p=gl.createProgram(); if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(p));gl.useProgram(p);gl.bindVertexArray(=>gl.bindVertexArray( var U={};=>var U={};this.poll=function(){if(linkErr)throw linkErr;if(linked)return true;if(pex&&!gl.getProgramParameter(p,pex.COMPLETION_STATUS_KHR))return false;try{SHS.forEach(function(s){if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(s));});if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(p));}catch(e){linkErr=e;throw e;}linked=true;gl.useProgram(p); gl.uniform1i(U.uLut,0);var scale=1,ema=16,last=0;this.draw=function(o){=>gl.uniform1i(U.uLut,0);return true;};this.pending=function(){return !linked&&!linkErr&&!!pex&&!gl.getProgramParameter(p,pex.COMPLETION_STATUS_KHR);};var scale=1,ema=16,last=0,self=this;this.draw=function(o){try{if(!self.poll())return;}catch(e){return;}
 /* ---------- Planck spectrum to colour ---------- */
 function g(l, m, s1, s2) {
   var s = l < m ? s1 : s2,
@@ -253,15 +264,14 @@ function StarGL(canvas) {
     var s = gl.createShader(type);
     gl.shaderSource(s, src);
     gl.compileShader(s);
-    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+    SHS.push(s);
     return s;
   }
+  var SHS = [], pex = gl.getExtension('KHR_parallel_shader_compile'), linked = false, linkErr = null;
   var p = gl.createProgram();
   gl.attachShader(p, sh(gl.VERTEX_SHADER, VS));
   gl.attachShader(p, sh(gl.FRAGMENT_SHADER, FS));
   gl.linkProgram(p);
-  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
-  gl.useProgram(p);
   gl.bindVertexArray(gl.createVertexArray());
   var tex = gl.createTexture();
   gl.bindTexture(gl.TEXTURE_2D, tex);
@@ -271,6 +281,21 @@ function StarGL(canvas) {
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
   var U = {};
+  this.poll = function () {
+    if (linkErr) throw linkErr;
+    if (linked) return true;
+    if (pex && !gl.getProgramParameter(p, pex.COMPLETION_STATUS_KHR)) return false;
+    try {
+      SHS.forEach(function (s) {
+        if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+      });
+      if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+    } catch (e) {
+      linkErr = e;
+      throw e;
+    }
+    linked = true;
+    gl.useProgram(p);
   [
     'uRes',
     'uOff',
@@ -291,10 +316,21 @@ function StarGL(canvas) {
     U[n] = gl.getUniformLocation(p, n);
   });
   gl.uniform1i(U.uLut, 0);
+    return true;
+  };
+  this.pending = function () {
+    return !linked && !linkErr && !!pex && !gl.getProgramParameter(p, pex.COMPLETION_STATUS_KHR);
+  };
   var scale = 1,
     ema = 16,
-    last = 0;
+    last = 0,
+    self = this;
   this.draw = function (o) {
+    try {
+      if (!self.poll()) return;
+    } catch (e) {
+      return;
+    }
     var now = performance.now();
     if (last) {
       ema = ema * 0.92 + (now - last) * 0.08;

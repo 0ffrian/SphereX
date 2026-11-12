@@ -8,6 +8,7 @@
 // (or run two WorldEngine instances on two canvases, each with its own context, if it wants separate panes).
 import { createCore, type Core, type CoreGL } from './core.js';
 import { WP, FLUIDS } from './presets.js';
+import { GlGpuTimer } from './glTimer';
 import type {
   EngineOptions,
   EngineOverrides,
@@ -91,6 +92,8 @@ export class WorldEngine {
   private readyP: Promise<void> | null = null;
   private disposed = false;
   private readonly role: EngineRole;
+  /** Roadmap 0.1, dev only: GPU time of each tick (null when off or unsupported). */
+  private readonly gpuTimer: GlGpuTimer | null;
   /** Live fly-camera state. Assigning a field takes effect at the next draw(). */
   readonly fly: FlyState;
 
@@ -108,6 +111,8 @@ export class WorldEngine {
     // Issue #93: the shaders are submitted here and compile in the background (see whenReady).
     this.role = opts.role ?? 'both';
     this.core = createCore(canvas, { role: this.role });
+    // The same context the core made (getContext returns it again); read-only timing around tick().
+    this.gpuTimer = opts.gpuTiming ? GlGpuTimer.create(canvas.getContext('webgl2')) : null;
     const W = this.core.W;
     this.fly = {
       get alt() {
@@ -343,6 +348,29 @@ export class WorldEngine {
    * then, so the frames were never seen (issue #93). The host calls this from requestAnimationFrame while the canvas is visible.
    */
   tick(dt: number): void {
+    const timer = this.gpuTimer;
+    if (!timer) return this.tickNow(dt);
+    timer.begin();
+    try {
+      this.tickNow(dt);
+    } finally {
+      timer.end();
+    }
+  }
+
+  /**
+   * GPU milliseconds per tick (roadmap 0.1, dev only), median and 95th percentile of the last 240,
+   * or null without timing (option off, no EXT_disjoint_timer_query_webgl2, or no sample yet).
+   */
+  gpuMs(): { p50: number; p95: number; samples: number } | null {
+    const s = this.gpuTimer?.stats;
+    const p50 = s?.percentile(0.5);
+    const p95 = s?.percentile(0.95);
+    if (!s || p50 == null || p95 == null) return null;
+    return { p50, p95, samples: s.count };
+  }
+
+  private tickNow(dt: number): void {
     const c = this.core,
       W = c.W;
     dt = Math.min(0.06, dt || 0);
@@ -490,6 +518,11 @@ export class WorldEngine {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    try {
+      this.gpuTimer?.dispose();
+    } catch {
+      /* the context is already gone */
+    }
     const lose = () => {
       const gl = this.canvas.getContext('webgl2');
       gl?.getExtension('WEBGL_lose_context')?.loseContext();

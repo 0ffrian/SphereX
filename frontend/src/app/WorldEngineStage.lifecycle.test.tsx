@@ -9,7 +9,8 @@ import { cardToWorld, type CardToWorldOk } from '@/engine/worlds/cardToWorld';
 import { stubGL, type Call } from '@/engine/worlds/glStub.testutil';
 import { clearTerrainCache } from '@/engine/worlds/terrainCache.js';
 import { ENGINE_READY_TIMEOUT_MS } from './engineWatchdog';
-import { WorldGlobeStage } from './WorldEngineStage';
+import { WorldFlyStage, WorldGlobeStage } from './WorldEngineStage';
+import { WorldEngine } from '@/engine/worlds/WorldEngine';
 import { useWorldStore } from './worldStore';
 
 const CARD = {
@@ -100,5 +101,82 @@ describe('WorldGlobeStage lifecycle (issue #93 C5)', () => {
     await act(async () => root.unmount());
     expect(loseCalls()).toBe(0);
     expect(errors).not.toHaveBeenCalled();
+  });
+});
+
+describe('WorldFlyStage kept mounted while the close-up is closed (roadmap 0.7)', () => {
+  it('paused: no tick and no draw; resumed: ticks again without a new context or compile', async () => {
+    // A compile that finishes at once; the spin-up itself is not run (tick is counted, not executed).
+    const stub = stubGL();
+    vi.mocked(HTMLCanvasElement.prototype.getContext).mockImplementation(
+      () => stub.gl as unknown as RenderingContext,
+    );
+    const ticks = vi.spyOn(WorldEngine.prototype, 'tick').mockImplementation(() => {});
+    const draws = vi.spyOn(WorldEngine.prototype, 'draw');
+    const render = (paused: boolean) =>
+      root.render(<WorldFlyStage world={world} reduced={false} paused={paused} />);
+    await act(async () => render(false));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_000);
+    });
+    const programs = stub.calls.filter((c) => c[0] === 'createProgram').length;
+    expect(programs).toBeGreaterThan(0);
+    expect(ticks.mock.calls.length).toBeGreaterThan(10);
+    expect(useWorldStore.getState().fly).not.toBeNull();
+
+    await act(async () => render(true));
+    expect(useWorldStore.getState().flyPaused).toBe(true);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(50);
+    });
+    const ticksAtPause = ticks.mock.calls.length;
+    const drawsAtPause = draws.mock.calls.length;
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2_000);
+    });
+    expect(ticks.mock.calls.length).toBe(ticksAtPause);
+    // A control change while closed reaches the paused engine but does not redraw it.
+    useWorldStore.getState().redraw();
+    expect(draws.mock.calls.length).toBe(drawsAtPause);
+    expect(useWorldStore.getState().fly).not.toBeNull(); // still mounted
+
+    await act(async () => render(false));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(500);
+    });
+    expect(ticks.mock.calls.length).toBeGreaterThan(ticksAtPause);
+    expect(stub.calls.filter((c) => c[0] === 'createProgram').length).toBe(programs);
+    expect(useWorldStore.getState().flyPaused).toBe(false);
+    await act(async () => root.unmount());
+    expect(useWorldStore.getState().fly).toBeNull();
+  });
+
+  it('the host loop is capped at 60 Hz: a 144 Hz display ticks about 60 times a second', async () => {
+    const stub = stubGL();
+    vi.mocked(HTMLCanvasElement.prototype.getContext).mockImplementation(
+      () => stub.gl as unknown as RenderingContext,
+    );
+    let t = 0;
+    const queue: FrameRequestCallback[] = [];
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => queue.push(cb));
+    vi.stubGlobal('cancelAnimationFrame', () => {});
+    const ticks = vi.spyOn(WorldEngine.prototype, 'tick').mockImplementation(() => {});
+    await act(async () => root.render(<WorldFlyStage world={world} reduced={false} />));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(100); // boot and ready
+    });
+    const start = ticks.mock.calls.length;
+    await act(async () => {
+      for (let i = 0; i < 144 * 2; i++) {
+        t += 1000 / 144;
+        const due = queue.splice(0);
+        for (const cb of due) cb(t);
+      }
+    });
+    const perSecond = (ticks.mock.calls.length - start) / 2;
+    expect(perSecond).toBeGreaterThanOrEqual(58);
+    expect(perSecond).toBeLessThanOrEqual(62);
+    await act(async () => root.unmount());
+    vi.unstubAllGlobals();
   });
 });

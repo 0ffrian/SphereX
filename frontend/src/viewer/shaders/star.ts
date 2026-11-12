@@ -22,6 +22,8 @@ import {
   dot,
   exp,
   float,
+  Fn,
+  If,
   length,
   mix,
   mx_noise_float,
@@ -317,27 +319,41 @@ export function buildStarMaterial(opts: StarShaderOptions): StarMaterial {
       best = select(better, q, best);
       bestC = select(better, c, bestC);
     }
-    // The reference axis is not the pole when the disc is at the pole (cross of parallel vectors is 0, NaN once normalised).
-    const ref = select(abs(bestC.y).greaterThan(0.99), vec3(1, 0, 0), vec3(0, 1, 0));
-    const east = normalize(cross(ref, bestC));
-    const north = cross(bestC, east);
-    const rel = p.sub(bestC);
-    const ang = atan(dot(rel, north), dot(rel, east));
-    // Radial streaks: noise that varies fast with the polar angle and slowly with radius.
-    const fil = mx_noise_float(
-      vec3(cos(ang).mul(7), sin(ang).mul(7), best.mul(0.9).add(so[2] * 0.01)),
-    )
-      .mul(0.5)
-      .add(0.5);
-    const penumbra = mix(PENUMBRA_LO, PENUMBRA_HI, smoothstep(0.45, 1.0, best)).mul(
-      float(0.62).add(fil.mul(0.7)),
-    );
-    let inner: any = mix(float(UMBRA), penumbra, smoothstep(0.38, 0.5, best));
-    // Umbral dots: small bright cells inside the umbra.
-    const dots = float(1).sub(smoothstep(0.1, 0.28, mx_worley_noise_float(p.mul(70).add(seedV))));
-    inner = inner.add(dots.mul(float(1).sub(smoothstep(0.3, 0.42, best))).mul(0.32));
-    const edge = smoothstep(1.0, 0.9, best);
-    col = col.mul(mix(float(1), inner, edge));
+    // Issue #93 W1 (render notes 1.13): the spot detail (a Perlin noise for the filaments and a Worley noise for the
+    // umbral dots, per pixel) runs only inside a spot. Outside (best >= 1) the old expression was
+    // col * mix(1, inner, smoothstep(1.0, 0.9, best)) with the smoothstep exactly 0, so col * 1: the branch keeps that
+    // factor at exactly 1 there and computes the same expression inside, so the picture is unchanged (pixel diff in
+    // the #93 W1 report: identical).
+    const spotFactor = Fn(() => {
+      const factor = float(1).toVar();
+      If(best.lessThan(1.0), () => {
+        // The reference axis is not the pole when the disc is at the pole (cross of parallel vectors is 0, NaN once normalised).
+        const ref = select(abs(bestC.y).greaterThan(0.99), vec3(1, 0, 0), vec3(0, 1, 0));
+        const east = normalize(cross(ref, bestC));
+        const north = cross(bestC, east);
+        const rel = p.sub(bestC);
+        const ang = atan(dot(rel, north), dot(rel, east));
+        // Radial streaks: noise that varies fast with the polar angle and slowly with radius.
+        const fil = mx_noise_float(
+          vec3(cos(ang).mul(7), sin(ang).mul(7), best.mul(0.9).add(so[2] * 0.01)),
+        )
+          .mul(0.5)
+          .add(0.5);
+        const penumbra = mix(PENUMBRA_LO, PENUMBRA_HI, smoothstep(0.45, 1.0, best)).mul(
+          float(0.62).add(fil.mul(0.7)),
+        );
+        let inner: any = mix(float(UMBRA), penumbra, smoothstep(0.38, 0.5, best));
+        // Umbral dots: small bright cells inside the umbra.
+        const dots = float(1).sub(
+          smoothstep(0.1, 0.28, mx_worley_noise_float(p.mul(70).add(seedV))),
+        );
+        inner = inner.add(dots.mul(float(1).sub(smoothstep(0.3, 0.42, best))).mul(0.32));
+        const edge = smoothstep(1.0, 0.9, best);
+        factor.assign(mix(float(1), inner, edge));
+      });
+      return factor;
+    })();
+    col = col.mul(spotFactor);
   }
 
   // Flares ----------------------------------------------------------------------------------------

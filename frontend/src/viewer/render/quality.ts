@@ -18,16 +18,32 @@ export interface QualityTier {
   bloomScale: number;
   aa: AntiAlias;
   targetFps: number;
+  /**
+   * Scene resolution as a fraction of the drawing buffer (render-performance roadmap 1.14). Below 1
+   * only with TAAU, which upscales to the full drawing buffer; SMAA has no upscaler, so the low
+   * level stays at 1. This is the settled (base) scale; dynamic resolution may lower it while the
+   * clock runs (`DynamicResolution`). Display choice.
+   */
+  renderScale: number;
 }
+
+/**
+ * Scene scale of the TAAU levels (roadmap 1.14: about 56% of the scene pixels). Display choice
+ * ('artistic'); the A15 measurement (R12 #43) decides whether it stays. [verify] on the A15.
+ */
+export const TAAU_RENDER_SCALE = 0.75;
 
 export const TIERS: Readonly<Record<TierName, QualityTier>> = {
   high: {
     name: 'high',
     octaves: OCTAVES.high,
     volumeSteps: 96,
-    bloomScale: 1,
+    // Roadmap 1.3 / issue #50: half-resolution bloom on High too. Bloom is a blur, so half
+    // resolution changes its look very little and quarters its cost.
+    bloomScale: 0.5,
     aa: 'taau',
     targetFps: 60,
+    renderScale: TAAU_RENDER_SCALE,
   },
   medium: {
     name: 'medium',
@@ -36,6 +52,7 @@ export const TIERS: Readonly<Record<TierName, QualityTier>> = {
     bloomScale: 0.5,
     aa: 'taau',
     targetFps: 60,
+    renderScale: TAAU_RENDER_SCALE,
   },
   low: {
     name: 'low',
@@ -44,6 +61,7 @@ export const TIERS: Readonly<Record<TierName, QualityTier>> = {
     bloomScale: 0.5,
     aa: 'smaa',
     targetFps: 30,
+    renderScale: 1,
   },
 };
 
@@ -151,12 +169,65 @@ export function qualityFromSearch(search: string): TierName | null {
 export const PHONE_FPS_CAP = 30;
 
 /**
- * The phone frame-rate cap: the low quality level on a coarse pointer (R5.7 names phones and the
- * low level; D-34 names phones). Desktop, including a desktop that starts low on WebGL2, and the
- * medium and high levels draw at the display rate. Null means no cap.
+ * The desktop 60 Hz cap of the render-performance roadmap (0.2). OFF by default: Q-66 and R5.7 say
+ * the medium and high levels, and a desktop on low, draw at the display rate, so the cap is a
+ * setting until a decision replaces that rule (Q-64 is open). Turned on per page with `?fpscap=60`
+ * (any whole number from 30 to 240); `?fpscap=0` or no value keeps the display rate.
  */
-export function capIntervalMs(level: TierName, coarsePointer: boolean): number | null {
-  return level === 'low' && coarsePointer ? 1000 / PHONE_FPS_CAP : null;
+export const DESKTOP_FPS_CAP_DEFAULT: number | null = null;
+
+/** The desktop cap asked for in the page URL (`?fpscap=60`), else the default (off). */
+export function desktopCapFromSearch(search: string): number | null {
+  const raw = new URLSearchParams(search).get('fpscap');
+  if (raw === null) return DESKTOP_FPS_CAP_DEFAULT;
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n === 0) return null;
+  return n >= 30 && n <= 240 ? n : DESKTOP_FPS_CAP_DEFAULT;
+}
+
+/**
+ * The frame-rate cap. The phone cap: the low quality level on a coarse pointer (R5.7 names phones
+ * and the low level; D-34 names phones). Desktop, including a desktop that starts low on WebGL2,
+ * and the medium and high levels draw at the display rate unless the `desktopFps` setting is on
+ * (`desktopCapFromSearch`). Null means no cap. The phone cap wins where both apply (it is lower).
+ */
+export function capIntervalMs(
+  level: TierName,
+  coarsePointer: boolean,
+  desktopFps: number | null = null,
+): number | null {
+  if (level === 'low' && coarsePointer) return 1000 / PHONE_FPS_CAP;
+  return desktopFps !== null && desktopFps > 0 ? 1000 / desktopFps : null;
+}
+
+/**
+ * Engine host loops (D-37 world, star and rock engines on raw WebGL2): roadmap 0.2. Q-66 covers only
+ * the three.js viewer, so the engine hosts cap at 60 Hz by default. At a 60 Hz display it draws every
+ * frame (the cap allows a frame up to half a display frame early). The star engine must not be
+ * capped below about 53 fps or its own resolution scaler sticks low (render-performance guardrail).
+ * `?enginefps=0` turns it off; `?enginefps=N` (30 to 240) sets another rate.
+ */
+export const ENGINE_FPS_CAP = 60;
+
+/** The engine host cap interval (ms) from the page URL, or null when it is turned off. */
+export function engineCapIntervalMs(search: string): number | null {
+  const raw = new URLSearchParams(search).get('enginefps');
+  if (raw === null) return 1000 / ENGINE_FPS_CAP;
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n === 0) return null;
+  return n >= 30 && n <= 240 ? 1000 / n : 1000 / ENGINE_FPS_CAP;
+}
+
+/**
+ * A FrameCap for an engine host loop, read from the page URL once. Shared by the world host
+ * (`WorldEngineStage`); the rock and star hosts can adopt it the same way:
+ * `if (!cap.shouldDraw(now)) { raf = requestAnimationFrame(frame); return; }` before the tick, and
+ * measure the step from the last DRAWN frame so simulation time stays real time.
+ */
+export function engineHostCap(
+  search: string = typeof location === 'undefined' ? '' : location.search,
+): FrameCap {
+  return new FrameCap(engineCapIntervalMs(search));
 }
 
 /**
