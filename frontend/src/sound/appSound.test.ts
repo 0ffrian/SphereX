@@ -7,6 +7,7 @@ import type { SpectrumResponse } from '@/app/api/types';
 import { FakeAudioContext } from '@/test/fakeAudio';
 import { fixtureFetch } from '@/test/fixtureFetch';
 import { setAudioContextFactory } from './audioContext';
+import { duckHolds } from './audioGraph';
 import { createAppSound, type AppSound, type SpectrumReply } from './appSound';
 import { defaultSettings, flushSoundSettings, useSoundSettings } from './settings';
 import { buildSpectrumMapping } from './spectrumMapping';
@@ -89,6 +90,7 @@ describe('createAppSound: audio only (Q-132)', () => {
       muted: false,
       volume: sound.getStatus().volume,
       listening: false,
+      chord: null,
     });
   });
 });
@@ -320,5 +322,82 @@ describe('bind and unbind', () => {
     expect(h.subscribers).toBe(2);
     expect(await sound.listen(wise)).toBe('playing');
     unbind();
+  });
+});
+
+describe('the spectrum chord (R13.12, Q-446)', () => {
+  it('plays from a click with an owner; status, A/B, owner-scoped stop', async () => {
+    const sound = make();
+    const h = honestySource();
+    sound.bind(h);
+    expect(sound.chordPlan(wise)).toBe(sound.chordPlan(wise)); // cached per points array
+    expect(await sound.chord(wise, { owner: 'sky' })).toBe('playing');
+    expect(sound.getStatus().chord).toEqual({ owner: 'sky', mode: 'data' });
+    expect(duckHolds(ctx.asAudioContext())).toBe(1);
+    expect(sound.setChordMode('smooth')).toBe(true);
+    expect(sound.getStatus().chord).toEqual({ owner: 'sky', mode: 'smooth' });
+    h.set('measured'); // Smooth is `derived`: back to Data, the measured data keeps playing
+    expect(sound.getStatus().chord).toEqual({ owner: 'sky', mode: 'data' });
+    sound.stopChord('hear'); // another panel's stop does not touch it
+    expect(sound.getStatus().chord?.owner).toBe('sky');
+    sound.stopChord('sky');
+    expect(sound.getStatus().chord).toBeNull();
+    expect(duckHolds(ctx.asAudioContext())).toBe(0);
+  });
+
+  it('chord and Listen sweep exclude each other both ways', async () => {
+    const sound = make();
+    sound.bind(honestySource());
+    await sound.chord(wise, { owner: 'sky' });
+    expect(await sound.listen(wise)).toBe('playing');
+    expect(sound.getStatus()).toMatchObject({ listening: true, chord: null });
+    expect(await sound.chord(wise, { owner: 'hear' })).toBe('playing');
+    expect(sound.getStatus()).toMatchObject({ listening: false, chord: { owner: 'hear' } });
+  });
+
+  it('nothing to play for an empty spectrum; sound off refuses; unbind stops it', async () => {
+    const sound = make();
+    const unbind = sound.bind(honestySource());
+    expect(await sound.chord(barnard, { owner: 'sky' })).toBe('nothing-to-play');
+    sound.setMuted(true);
+    expect(await sound.chord(wise, { owner: 'sky' })).toBe('sound-off');
+    sound.setMuted(false);
+    expect(await sound.chord(wise, { owner: 'sky' })).toBe('playing');
+    unbind();
+    expect(sound.getStatus().chord).toBeNull();
+    expect(duckHolds(ctx.asAudioContext())).toBe(0);
+  });
+});
+
+describe('the spectrum chord: unlock races (R13.12, Q-446)', () => {
+  it('the last click wins while the first unlock is pending (chord, then sweep)', async () => {
+    const sound = make();
+    sound.bind(honestySource());
+    const a = sound.chord(wise, { owner: 'hear' });
+    const b = sound.listen(wise);
+    expect(await a).toBe('stopped');
+    expect(await b).toBe('playing');
+    expect(sound.getStatus()).toMatchObject({ listening: true, chord: null });
+  });
+
+  it('the last click wins while the first unlock is pending (sweep, then chord)', async () => {
+    const sound = make();
+    sound.bind(honestySource());
+    const a = sound.listen(wise);
+    const b = sound.chord(wise, { owner: 'sky' });
+    expect(await a).toBe('stopped');
+    expect(await b).toBe('playing');
+    expect(sound.getStatus()).toMatchObject({ listening: false, chord: { owner: 'sky' } });
+  });
+
+  it("another panel's stopChord does not cancel a chord waiting for its unlock", async () => {
+    const sound = make();
+    sound.bind(honestySource());
+    const a = sound.chord(wise, { owner: 'sky' });
+    sound.stopChord('hear');
+    expect(await a).toBe('playing');
+    const b = sound.chord(wise, { owner: 'sky' });
+    sound.stopChord('sky');
+    expect(await b).toBe('stopped');
   });
 });

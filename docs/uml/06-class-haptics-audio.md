@@ -54,7 +54,30 @@ classDiagram
     setVolume(v)
     listen(reply) ListenOutcome
     stopListen()
+    chordPlan(reply) ChordPlan
+    chord(reply, {owner, mode}) ChordOutcome
+    setChordMode(mode) bool
+    stopChord(owner)
     bind(honesty) unbind
+  }
+  class SpectrumChord {
+    <<sound/spectrumChord.ts>>
+    start(plan, mode, honesty) bool
+    setMode(mode) bool
+    setHonesty(state)
+    stop()
+    ducking: bool
+  }
+  class ChordPlan {
+    <<planChord(mapping), pure>>
+    bins: ChordBin[12]
+    data: ChordPartial[]
+    smooth: ChordPartial[]
+    missing: string[]
+  }
+  class spectrumExclusive {
+    <<sound/spectrumExclusive.ts>>
+    claimSpectrumSound(stop) SpectrumClaim
   }
   class SoundSettingsStore {
     <<sound/settings.ts, key sx.haptics.settings>>
@@ -81,6 +104,16 @@ classDiagram
   ListenSweep ..> pitch
   AppSound *-- SoundEngine
   AppSound *-- ListenSweep
+  AppSound *-- SpectrumChord
+  SpectrumChord ..> ChordPlan
+  SpectrumChord ..> pitch
+  SpectrumChord ..> spectrumExclusive : one spectrum sound
+  ListenSweep ..> spectrumExclusive : one spectrum sound
+  class hearAudio {
+    <<app/build/hearAudio.ts>>
+    startSpectrum(values, from) SpectrumHandle
+  }
+  hearAudio ..> spectrumExclusive : one spectrum sound (Hear it sweep)
   AppSound ..> SoundSettingsStore : bindEngine, ambience level
   SoundSettings ..> AppSound : useSound().unlock()
   SoundSettings ..> SoundSettingsStore : update
