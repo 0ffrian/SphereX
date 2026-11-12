@@ -97,7 +97,7 @@ Thunder only where lightning has been observed, or where the analog is strong [S
 **The surface.** A transparent `<canvas>` (2D context) stacked over the fly engine canvas in `WorldFlyStage`.
 - `pointer-events: none` and `aria-hidden`, so it never catches input.
 - No engine code changes (`@verbatim` untouched).
-- It is drawn by the same hook as the sound (`useWeather`). The sound and the picture read one `WeatherVisualFrame` (Appendix B), so they always agree.
+- It reads the same `WeatherVisualFrame` (Appendix B) the sound uses, from the weather bus (`weatherBus.ts`, #116), so the two always agree.
 
 **Rain.** Shown when `precipPhase==='rain'`, `rainRate > 0.05`, and the listener is below the cloud base (`z < zc`, or below 5 km if `zc` is null). From above the clouds, rain is not drawn: the cloud deck hides it.
 - **Streak count:** `N = RAIN_STREAKS_MAX · clamp(rainRate/1.5, 0, 1) · (1 + 0.6·cnv)`, capped at 600.
@@ -136,8 +136,12 @@ Thunder only where lightning has been observed, or where the analog is strong [S
   ground point. Both points are clipped to camera depth ≥ 0.1 km.
 - **What is in view:** decided by projecting the bolt, not by `|bearing − head| < fov·aspect/2`, which mixes a
   tangent with an angle.
-- **Cloud deck:** the overlay uses the deck the engine draws, `1 + max(zc, 0.3)·ex/rkm`. Rain shows only below it;
-  above it there is only the in-deck glow. On a gas giant every strike is an in-deck glow, with no bolt.
+- **Cloud deck:** the overlay uses the deck the engine draws, `1 + max(zc, 0.3)·ex/rkm`. With clouds on, the deck is
+  always drawn, at 3.5 km when `zc` is null. Rain needs the frame's rain (the cut at the real cloud base) and a
+  camera below the drawn deck; above the deck there is only the in-deck glow. On a gas giant every strike is an
+  in-deck glow, with no bolt. A near bolt is clipped to the pane, and its cloud glow sits where it enters.
+- **Label:** while weather is drawn, an 18 px caption on the fly view reads "Weather: artist's impression from the
+  simulated climate · colour not from data". The "What is drawn" rows come from `weatherRows` (weather bus).
 - **Reduced motion and Flashes off:** both give §8.5's slow glow (a 1 s raised cosine at 0.15). This replaces §8.3's
   "off" and R13.10's "no flash".
 - **Timing:** strikes come from the weather bus (`onStrike`) ahead of their `t0`, and the first stroke draws at

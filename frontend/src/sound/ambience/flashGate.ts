@@ -126,6 +126,11 @@ export class FlashGate {
     return g;
   }
 
+  /** The overlay was closed: drop the groups, keep the spacing memory (red 5). */
+  clearGroups(): void {
+    this.groups = [];
+  }
+
   /** Reduced motion or Flashes off turned on: every group still showing becomes safe (never the other way). */
   makeSafe(): void {
     for (const g of this.groups) {

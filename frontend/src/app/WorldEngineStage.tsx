@@ -35,7 +35,7 @@ import { engineHostCap } from '@/viewer/render/quality';
 import { gpuTimingFlags } from '@/viewer/render/gpuTiming';
 import { FLY_NOTE, WORLD_HONESTY, WORLD_NOTE_LINES } from './worldNotes.generated';
 import { WeatherOverlay } from '@/sound/ambience/ui/WeatherOverlay';
-import { useWeatherSnapshot } from '@/sound/ambience/weatherBus';
+import { WeatherDrawnRows } from '@/sound/ambience/ui/WeatherDrawnRows';
 
 /** The engine's world for the shown card, or null: not a planet, refused, or no WebGL 2 (old path). */
 export function useEngineWorld(): CardToWorldOk | null {
@@ -802,41 +802,6 @@ export function WorldGlobeStage({
 // layer list lives in Details. Kept behind this flag so the controls can come back.
 const SHOW_FLY_BAR = false as boolean;
 
-/** R13.6 §8.5: the weather layers in "What is drawn", with their tags (#117). */
-export function WeatherDrawnRows() {
-  const snap = useWeatherSnapshot();
-  const light = snap?.lightning ?? null;
-  return (
-    <>
-      <li className="flex flex-wrap items-center gap-2">
-        <ProvenanceBadge tag="model_dependent" />
-        <span>Rain and snow: whether they fall, how hard, how fast and their slant come from the world model.</span>
-      </li>
-      <li className="flex flex-wrap items-center gap-2">
-        <ProvenanceBadge tag="artistic" />
-        <span>Where each raindrop and snowflake is drawn, and their size.</span>
-      </li>
-      {light?.allowed && light.tag && (
-        <li className="flex flex-wrap items-center gap-2">
-          <ProvenanceBadge tag={light.tag} />
-          <span>Lightning here: {light.tag === 'measured' ? 'observed on this world' : 'by analogy with storms on Earth'}.</span>
-        </li>
-      )}
-      {light && !light.allowed && light.reason && (
-        <li className="flex flex-wrap items-center gap-2">
-          <span>{light.reason}</span>
-        </li>
-      )}
-      <li className="flex flex-wrap items-center gap-2">
-        <ProvenanceBadge tag="artistic" />
-        <span>
-          Lightning timing, place and the white-blue bolt colour. The colour is not from data: the card has no gas
-          composition.
-        </span>
-      </li>
-    </>
-  );
-}
 /** The prototype's surface (fly) view with its altitude slider and Fly forward, in the left pane. */
 export function WorldFlyStage({
   world,

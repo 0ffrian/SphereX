@@ -3,20 +3,23 @@
 // (pointer-events none), is hidden from assistive tech (aria-hidden; "What is drawn" lists it), draws at most 30 fps,
 // clears once and stops when there is nothing to draw, and works with the sound muted (the bus publishes regardless).
 // Flash safety lives in flashGate.ts; geometry in weatherDraw.ts.
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSoundSettings } from '@/sound/settings';
 import { FlashGate, groupGlowMax, safeGlow, strokeEnvMax, type FlashGroup } from '../flashGate';
 import {
-  BOLT_CORE_PX, BOLT_GLOW_PX, BOLT_MIN_PX, BOLT_RGB, CLOUD_GLOW_OPACITY, CLOUD_GLOW_R, DECK_GLOW_R, EDGE_GLOW_W,
+  BOLT_CLIP_MARGIN, BOLT_CORE_PX, BOLT_GLOW_PX, BOLT_MIN_PX, BOLT_RGB, CLOUD_GLOW_OPACITY, CLOUD_GLOW_R, DECK_GLOW_R, EDGE_GLOW_W,
   FLASH_OPACITY, OVERLAY_DPR_CAP, OVERLAY_MAX_FPS, OVERLAY_SNAPSHOT_STALE_S, RAIN_ALPHA, RAIN_STREAKS_MAX, RAIN_WIDTH_PX,
   SAFE_GLOW_OPACITY, SNOW_FLAKES_MAX,
 } from '../tuning';
 import type { WeatherSnapshot } from '../weatherBus';
 import { getWeather, onStrike, subscribeWeather } from '../weatherBus';
 import {
-  boltPolyline, buildRain, buildSnow, classifyStrike, clipSegmentNear, deckRadius, edgeSide, focalPx, particleCount,
+  boltPolyline, buildRain, clipToRect, buildSnow, classifyStrike, clipSegmentNear, deckRadius, edgeSide, focalPx, particleCount,
   polylineLength, projectPx, rainLean, smallAreaLimitPx2, strikeWorld, tintCss, type Basis, type StrikeWorld,
 } from '../weatherDraw';
+
+/** The on-screen label while weather is drawn (§8.5 honesty; colour and placement are artistic). */
+export const WEATHER_CAPTION = 'Weather: artist’s impression from the simulated climate · colour not from data';
 
 /** The engine surface the overlay reads (WorldEngine implements it; tests fake it). */
 export interface OverlayEngine {
@@ -72,11 +75,12 @@ export interface DrawState {
   rain: Float32Array;
   snow: Float32Array;
   worlds: Map<FlashGroup, StrikeWorld | null>;
+  bolts: Map<FlashGroup, { key: string; lines: Float32Array[] }>;
 }
 
 export function newDrawState(): DrawState {
   return {
-    W: 0, H: 0, rain: new Float32Array(RAIN_STREAKS_MAX * 4), snow: new Float32Array(SNOW_FLAKES_MAX * 3), worlds: new Map(),
+    W: 0, H: 0, rain: new Float32Array(RAIN_STREAKS_MAX * 4), snow: new Float32Array(SNOW_FLAKES_MAX * 3), worlds: new Map(), bolts: new Map(),
   };
 }
 
@@ -91,16 +95,18 @@ export function drawWeatherFrame(
   ctx.clearRect(0, 0, W, H);
   const groups = gate.active(t);
   for (const g of [...st.worlds.keys()]) if (!groups.includes(g)) st.worlds.delete(g);
+  for (const g of [...st.bolts.keys()]) if (!groups.includes(g)) st.bolts.delete(g);
   const b = engine.flyCameraBasis();
   if (!b || !(W > 0) || !(H > 0)) return groups.length > 0;
   const es = engine.state();
   const fresh = !!snap && t - snap.tS <= OVERLAY_SNAPSHOT_STALE_S && t - snap.tS >= -OVERLAY_SNAPSHOT_STALE_S;
   const frame = fresh ? snap.frame : null;
-  const zc = frame ? frame.zc_km : snap?.frame?.zc_km ?? null;
+  const zc = snap ? snap.frame.zc_km : null;
   const camR = Math.hypot(b.cam[0], b.cam[1], b.cam[2]);
   const deckR = deckRadius(zc, b.ex, b.rkm);
-  // H3 / red M5: the engine draws a deck only with clouds on and a model cloud base.
-  const deckDrawn = es.clouds && zc !== null;
+  // H3 / blue 16: the engine draws the fly deck whenever clouds are on, at max(zc, 0.3) km, or 3.5 km when zc is null
+  // (core.js uCloudKm); deckRadius applies the same default. Rain also needs #116's frame (real-height cut, Q-449).
+  const deckDrawn = es.clouds;
   const aboveDeck = deckDrawn && camR >= deckR;
   const fpx = focalPx(H, b.fov);
   let drew = false;
@@ -110,7 +116,7 @@ export function drawWeatherFrame(
     const N = particleCount(rain.density, rain.snow);
     const seed = 0x5eed ^ 0x117;
     if (!rain.snow) {
-      const lean = rainLean(snap!.windDirDeg, snap!.U10, engine.fly.head, rain.vt);
+      const lean = snap ? rainLean(snap.windDirDeg, snap.U10, engine.fly.head, rain.vt) : 0;
       const counts = buildRain(st.rain, N, seed, Math.floor(t * 60), W, H, fpx, rain.vt, lean);
       let o = 0;
       ctx.lineCap = 'round';
@@ -160,22 +166,31 @@ export function drawWeatherFrame(
     }
     if (cls === 'deck') {
       const p = w ? projectPx(b, W, H, w.deck) : null;
-      if (p && p[0] >= 0 && p[0] <= W && p[1] >= 0 && p[1] <= H) {
-        radial(ctx, p[0], p[1], DECK_GLOW_R * H, BOLT_RGB, g.safe ? glow : glow * FLASH_OPACITY);
-      } else edge(ctx, side, W, H, BOLT_RGB, g.safe ? glow : glow * FLASH_OPACITY);
+      // Red 9: the glow in the deck under the listener; off screen, at the bottom centre.
+      const on = p && p[0] >= 0 && p[0] <= W && p[1] >= 0 && p[1] <= H;
+      radial(ctx, on ? p[0] : W / 2, on ? p[1] : H, DECK_GLOW_R * H, BOLT_RGB, g.safe ? glow : glow * FLASH_OPACITY);
       continue;
     }
     // In view: clip the bolt at the near plane, then project its two ends (H2).
     const seg = clipSegmentNear(b, w!.top, w!.foot);
     const pa = seg ? projectPx(b, W, H, seg[0]) : null;
     const pb = seg ? projectPx(b, W, H, seg[1]) : null;
-    if (!pa || !pb) {
+    // Red 3: keep only the part of the bolt near the pane; the glow sits where the bolt enters it.
+    const cs = pa && pb ? clipToRect(pa[0], pa[1], pb[0], pb[1], W, H, BOLT_CLIP_MARGIN * H) : null;
+    if (!cs) {
       edge(ctx, side, W, H, BOLT_RGB, g.safe ? glow : glow * FLASH_OPACITY);
       continue;
     }
-    radial(ctx, pa[0], pa[1], CLOUD_GLOW_R * H, BOLT_RGB, g.safe ? glow : glow * CLOUD_GLOW_OPACITY);
-    if (g.safe || g.n === 0 || Math.hypot(pb[0] - pa[0], pb[1] - pa[1]) < BOLT_MIN_PX) continue;
-    const lines = boltPolyline(g.strike.seed, pa[0], pa[1], pb[0], pb[1]);
+    radial(ctx, cs[0], cs[1], CLOUD_GLOW_R * H, BOLT_RGB, g.safe ? glow : glow * CLOUD_GLOW_OPACITY);
+    if (g.safe || g.n === 0 || Math.hypot(cs[2] - cs[0], cs[3] - cs[1]) < BOLT_MIN_PX) continue;
+    // Blue 12: one polyline per group while its ends stay on the same whole pixels.
+    const key = cs.map(Math.round).join(',');
+    let cached = st.bolts.get(g);
+    if (!cached || cached.key !== key) {
+      cached = { key, lines: boltPolyline(g.strike.seed, cs[0], cs[1], cs[2], cs[3]) };
+      st.bolts.set(g, cached);
+    }
+    const lines = cached.lines;
     // H4: a bolt at or above the small-area limit never restrikes; it follows the one group pulse.
     const area = polylineLength(lines) * (BOLT_CORE_PX + BOLT_GLOW_PX);
     const a = area < smallAreaLimitPx2(W, H) ? strokeEnvMax(lo, hi, g.n) : groupGlowMax(lo, hi, g.n);
@@ -217,7 +232,9 @@ export function WeatherOverlay({
 }) {
   const ref = useRef<HTMLCanvasElement>(null);
   const reducedRef = useRef(reduced);
+  // Red 5: one gate for the life of the overlay, so a pause and unpause never resets the 2 s spacing.
   const gateRef = useRef<FlashGate | null>(null);
+  const [drawing, setDrawing] = useState(false);
 
   useEffect(() => {
     const cv = ref.current;
@@ -230,6 +247,12 @@ export function WeatherOverlay({
     if (!cv || !got || typeof got.clearRect !== 'function') return;
     const ctx: Ctx2D = got;
     const st = newDrawState();
+    let shownNow = false;
+    const setShown = (v: boolean) => {
+      if (v === shownNow) return;
+      shownNow = v;
+      setDrawing(v);
+    };
     const clear = () => {
       try {
         ctx.clearRect(0, 0, st.W, st.H);
@@ -239,10 +262,10 @@ export function WeatherOverlay({
     };
     if (!engine || !active) {
       clear();
+      gateRef.current?.clearGroups(); // the previous run's cleanup already hid the caption
       return;
     }
-    const gate = new FlashGate();
-    gateRef.current = gate;
+    const gate = (gateRef.current ??= new FlashGate());
     const mq = prefersReducedMotion();
     const isSafe = () => reducedRef.current || !!mq?.matches || !useSoundSettings.getState().flashesOn;
     const onSafe = () => {
@@ -260,6 +283,7 @@ export function WeatherOverlay({
     };
     let raf = 0;
     let last = -Infinity;
+
     let snap: WeatherSnapshot | null = getWeather();
     const loop = () => {
       raf = 0;
@@ -271,7 +295,8 @@ export function WeatherOverlay({
         last = t;
         const t0 = performance.now();
         more = drawWeatherFrame(ctx, st, engine, snap, gate, t, dt);
-        cv.dataset.ms = (performance.now() - t0).toFixed(2);
+        setShown(more);
+        if (import.meta.env.DEV) cv.dataset.ms = (performance.now() - t0).toFixed(2);
         // When nothing is left, drawWeatherFrame has cleared the canvas once; the loop stops until a kick.
       } catch {
         clear();
@@ -283,9 +308,9 @@ export function WeatherOverlay({
     function kick() {
       if (!raf) raf = requestAnimationFrame(loop);
     }
-    const offWeather = subscribeWeather(() => {
-      snap = getWeather();
-      if (snap?.frame?.rain) kick();
+    const offWeather = subscribeWeather((s) => {
+      snap = s;
+      if (s?.frame.rain) kick();
     });
     const offStrike = onStrike((s) => {
       // Red M4: an accepted strike starts the loop itself.
@@ -304,7 +329,8 @@ export function WeatherOverlay({
       offSettings();
       mq?.removeEventListener?.('change', onSafe);
       ro?.disconnect();
-      if (gateRef.current === gate) gateRef.current = null;
+      gate.clearGroups();
+      setShown(false);
       clear();
     };
   }, [engine, active]);
@@ -316,12 +342,30 @@ export function WeatherOverlay({
   }, [reduced]);
 
   return (
-    <canvas
-      ref={ref}
-      aria-hidden="true"
-      data-testid="weather-overlay"
-      className="absolute inset-0 h-full w-full"
-      style={{ pointerEvents: 'none' }}
-    />
+    <>
+      <canvas
+        ref={ref}
+        aria-hidden="true"
+        data-testid="weather-overlay"
+        className="absolute inset-0 h-full w-full"
+        style={{ pointerEvents: 'none' }}
+      />
+      {drawing && active && (
+        // Coordinator ruling 2: the label the stage audience sees while weather is drawn (the panel rows are folded).
+        <p
+          data-testid="weather-caption"
+          className="pointer-events-none absolute left-3 top-3 z-[2] m-0 max-w-[calc(100%-1.5rem)] rounded-lg border px-3 py-1.5"
+          style={{
+            fontSize: 18,
+            lineHeight: 1.35,
+            background: 'var(--s1)',
+            color: 'var(--fg)',
+            borderColor: 'var(--line)',
+          }}
+        >
+          {WEATHER_CAPTION}
+        </p>
+      )}
+    </>
   );
 }

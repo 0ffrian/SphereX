@@ -6,9 +6,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useSoundSettings } from '@/sound/settings';
 import { FlashGate } from '../flashGate';
 import type { Strike, WeatherVisualFrame } from '../types';
-import { publishStrike, publishWeather, resetWeatherBus, type WeatherSnapshot } from '../weatherBus';
+import { getWeather, publishStrike, publishWeather, resetWeatherBus, weatherRows, type WeatherSnapshot } from '../weatherBus';
 import { alphaOf, makeBasis, recordingCtx, type Call } from '../weatherDraw.testutil';
-import { drawWeatherFrame, newDrawState, WeatherOverlay, type OverlayEngine } from './WeatherOverlay';
+import { drawWeatherFrame, newDrawState, WEATHER_CAPTION, WeatherOverlay, type OverlayEngine } from './WeatherOverlay';
+import { WeatherDrawnRows } from './WeatherDrawnRows';
 import { BOLT_CORE_PX, BOLT_GLOW_PX } from '../tuning';
 
 const W = 800, H = 500;
@@ -29,7 +30,7 @@ const rainFrame = (o: Partial<NonNullable<WeatherVisualFrame['rain']>> = {}, zc:
   aboveClouds: false,
   zc_km: zc,
 });
-const snapOf = (frame: WeatherVisualFrame | null, tS: number): WeatherSnapshot => ({
+const snapOf = (frame: WeatherVisualFrame, tS: number): WeatherSnapshot => ({
   frame, windDirDeg: 0, U10: 4, head: 0, lightning: { allowed: true, tag: 'measured', reason: null }, tS,
 });
 const strike = (t0: number, bearing = 0, d_m = 8000, seed = 11): Strike => ({ t0, d_m, bearing, seed, variant: 2, flash: true });
@@ -63,6 +64,21 @@ describe('drawWeatherFrame', () => {
     expect(strokes(frameAt(fakeEngine({ altKm: 4 }), snapOf(rainFrame(), 10)).calls)).toHaveLength(3);
   });
 
+  it('ruling 3: clouds on and zc null: the engine deck at 3.5 km x ex; above it no rain, below it rain', () => {
+    const f = rainFrame({}, null);
+    // 3.5 km x 3 = 10.5 drawn km; the camera's height is not exaggerated.
+    expect(strokes(frameAt(fakeEngine({ altKm: 11 }), snapOf(f, 10)).calls)).toHaveLength(0);
+    expect(strokes(frameAt(fakeEngine({ altKm: 12.5 }), snapOf(f, 10)).calls)).toHaveLength(0);
+    expect(strokes(frameAt(fakeEngine({ altKm: 4 }), snapOf(f, 10)).calls)).toHaveLength(3);
+    // clouds off: no deck drawn, the frame decides
+    expect(strokes(frameAt(fakeEngine({ altKm: 11, clouds: false }), snapOf(f, 10)).calls)).toHaveLength(3);
+  });
+
+  it('red 4: #116 cut the rain at the real cloud base (frame rain null): nothing drawn, even below the drawn deck', () => {
+    const f = { ...rainFrame(), rain: null, aboveClouds: true };
+    expect(strokes(frameAt(fakeEngine({ altKm: 3 }), snapOf(f, 10)).calls)).toHaveLength(0);
+  });
+
   it('blue 16: a stale snapshot is not drawn; idle clears once and reports nothing to do', () => {
     const { calls, more } = frameAt(fakeEngine(), snapOf(rainFrame(), 9));
     expect(more).toBe(false);
@@ -88,38 +104,67 @@ describe('drawWeatherFrame', () => {
     expect(strokes(behind)).toHaveLength(0);
   });
 
-  it('H4: a bolt at or above the small-area limit does not restrike (follows the one group pulse)', () => {
-    // A very near strike makes a long bolt; check the drawn alpha between strokes matches the group glow (1), not the
-    // stroke dip.
+  /** Bolt alpha samples over a group (fine steps), and whether the drawn bolt is over the small-area limit. */
+  const boltTrace = (d_m: number, PW = W, PH = H, seed = 3) => {
     const gate = new FlashGate();
-    const g = gate.offer(strike(10, 0, 1200, 3), 9.85, false)!;
-    expect(g.n).toBeGreaterThanOrEqual(2);
-    const t = 10 + 0.045; // between stroke 1's fade and stroke 2
-    const { calls } = (() => {
+    const g = gate.offer(strike(10, 0, d_m, seed), 9.85, false)!;
+    const alphas: number[] = [];
+    let big: boolean | null = null;
+    for (let t = 10; t < 10.3; t += 0.005) {
       const { ctx, calls } = recordingCtx();
       const st = newDrawState();
-      st.W = W;
-      st.H = H;
-      drawWeatherFrame(ctx as never, st, fakeEngine({ altKm: 0.2 }), null, gate, t, 0.001);
-      return { calls };
-    })();
-    const s = strokes(calls);
-    expect(s.length).toBe(2);
-    // Lit area from the drawn path, then the rule.
-    let len = 0;
-    let last: [number, number] | null = null;
-    for (const c of calls) {
-      if (c.op === 'moveTo') last = c.args as [number, number];
-      else if (c.op === 'lineTo' && last) {
-        const p = c.args as [number, number];
-        len += Math.hypot(p[0] - last[0], p[1] - last[1]);
-        last = p;
-      } else if (c.op === 'stroke') break;
+      st.W = PW;
+      st.H = PH;
+      drawWeatherFrame(ctx as never, st, fakeEngine({ altKm: 0.5 }), null, gate, t, 0.001);
+      const s = strokes(calls);
+      if (s.length !== 2) continue;
+      alphas.push(alphaOf(s[1]!.style));
+      if (big === null) {
+        let len = 0;
+        let last: number[] | null = null;
+        for (const c of calls) {
+          if (c.op === 'moveTo') last = c.args as number[];
+          else if (c.op === 'lineTo' && last) {
+            const p = c.args as number[];
+            len += Math.hypot(p[0]! - last[0]!, p[1]! - last[1]!);
+            last = p;
+          } else if (c.op === 'stroke') break;
+        }
+        big = len * (BOLT_CORE_PX + BOLT_GLOW_PX) >= (21824 * PW * PH) / (1024 * 768);
+      }
     }
-    const big = len * (BOLT_CORE_PX + BOLT_GLOW_PX) >= (21824 * W * H) / (1024 * 768);
-    const a = alphaOf(s[1]!.style);
-    if (big) expect(a).toBeCloseTo(1, 3);
-    else expect(a).toBeLessThan(1);
+    return { alphas, big, n: g.n };
+  };
+
+  it('H4: a small (far) bolt restrikes: its alpha dips between strokes', () => {
+    const r = boltTrace(10000);
+    expect(r.big).toBe(false);
+    expect(r.n).toBeGreaterThanOrEqual(2);
+    const dipThenRise = r.alphas.some((a, i) => a < 0.95 && r.alphas.slice(0, i).some((x) => x > 0.99) && r.alphas.slice(i).some((x) => x > 0.99));
+    expect(dipThenRise).toBe(true);
+  });
+
+  it('H4: a big bolt (narrow pane, so the limit is small) never restrikes: no dip then rise', () => {
+    const r = boltTrace(1500, 300, 500);
+    expect(r.big).toBe(true);
+    const dipThenRise = r.alphas.some((a, i) => a < 0.95 && r.alphas.slice(0, i).some((x) => x > 0.99) && r.alphas.slice(i).some((x) => x > 0.99));
+    expect(dipThenRise).toBe(false);
+  });
+
+  it('red 3: a near bolt is clipped to the pane; its cloud glow is on or near the screen', () => {
+    const gate = new FlashGate();
+    gate.offer(strike(10, 0, 1500), 9.85, false);
+    const { calls } = frameAt(fakeEngine({ altKm: 0.5 }), null, gate, 10.01);
+    const rad = calls.find((c) => c.op === 'radial')!;
+    const [x, y] = rad.args as number[];
+    expect(x!).toBeGreaterThanOrEqual(-0.25 * H - 1e-6);
+    expect(x!).toBeLessThanOrEqual(W + 0.25 * H + 1e-6);
+    expect(y!).toBeGreaterThanOrEqual(-0.25 * H - 1e-6);
+    for (const c of calls.filter((k) => k.op === 'lineTo')) {
+      const [px, py] = c.args as number[];
+      expect(Math.abs(px!)).toBeLessThan(3 * W);
+      expect(Math.abs(py!)).toBeLessThan(3 * H);
+    }
   });
 
   it('gas giants: no bolt, only the in-deck glow', () => {
@@ -230,10 +275,12 @@ describe('WeatherOverlay component', () => {
   it('idle: clears once, then the loop stops', () => {
     mount();
     act(() => publishWeather(snapOf(rainFrame(), now / 1000)));
-    tick(40);
-    act(() => publishWeather(snapOf(null, now / 1000)));
-    tick(40);
+    act(() => tick(40));
+    expect(container.querySelector('[data-testid="weather-caption"]')?.textContent).toBe(WEATHER_CAPTION);
+    act(() => publishWeather(null));
+    act(() => tick(40));
     expect(rafQ.size).toBe(0);
+    expect(container.querySelector('[data-testid="weather-caption"]')).toBeNull();
     const n = rec.calls.length;
     tick(40);
     expect(rec.calls.length).toBe(n);
@@ -277,6 +324,31 @@ describe('WeatherOverlay component', () => {
     act(() => publishWeather(snapOf(rainFrame(), now / 1000)));
     expect(rafQ.size).toBe(0);
     expect(rec.calls.length).toBe(n);
+  });
+
+  it('What is drawn: the rows from weatherRows, the bolt colour tagged artistic', () => {
+    act(() => publishWeather(snapOf(rainFrame(), now / 1000)));
+    act(() => root.render(<ul><WeatherDrawnRows /></ul>));
+    const rows = [...container.querySelectorAll('[data-testid="weather-row"]')].map((r) => r.textContent ?? '');
+    expect(rows.some((r) => /not from data/.test(r))).toBe(true);
+    expect(rows.some((r) => /Rain/.test(r))).toBe(true);
+    // The bolt-colour row carries the artistic tag (weatherRows is #116's; the badge renders it).
+    const bolt = weatherRows(getWeather()).find((r) => /not from data/.test(r.text));
+    expect(bolt?.tag).toBe('artistic');
+  });
+
+  it('a pause and unpause keeps the 2 s glow spacing (red 5)', () => {
+    const engine = fakeEngine();
+    mount(engine, true);
+    act(() => publishStrike(strike(now / 1000 + 0.15, 0, 8000, 1)));
+    for (let i = 0; i < 10; i++) act(() => tick(1000 / 30));
+    mount(engine, false);
+    mount(engine, true);
+    act(() => tick(40));
+    const before = rec.calls.filter((c) => c.op === 'radial').length;
+    act(() => publishStrike(strike(now / 1000 + 0.15, 0, 8000, 2))); // under 2 s after the first
+    for (let i = 0; i < 10; i++) act(() => tick(1000 / 30));
+    expect(rec.calls.filter((c) => c.op === 'radial').length).toBe(before);
   });
 
   it('inactive (close-up closed): nothing runs', () => {

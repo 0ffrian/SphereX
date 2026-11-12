@@ -26,11 +26,12 @@ frontend/src/sound/ambience/
   mixer.ts          §10 graph and per-tick application
   captions.ts       §12 phrases
   useAmbience.ts    §10/13 hook (mounted in WorldFlyStage)
-  useWeather.ts     §8.5 overlay driver (shares the WeatherVisualFrame with the mixer)
+  (useWeather.ts)   not built: the overlay subscribes to weatherBus directly (#117)
   weatherBus.ts     §8.5 the 10 Hz weather snapshot and the strike events (#116 publishes, #117 reads; Q-449)
   flashGate.ts      §8.5 flash safety: the strike gate and the stroke, group and safe envelopes (#117)
   weatherDraw.ts    §8.5 overlay geometry: particles, lean, the drawn deck, near-plane clipping, bolt (#117)
-  ui/SoundChip.tsx, ui/WhatYouHear.tsx, ui/WeatherOverlay.tsx (rain, snow, bolts, glow)
+  ui/SoundChip.tsx, ui/WhatYouHear.tsx, ui/WeatherOverlay.tsx (rain, snow, bolts, glow, the weather caption),
+  ui/WeatherDrawnRows.tsx ("What is drawn" weather rows from weatherRows)
 frontend/sound-check.html + src/soundCheck/   §11.7 dev page (excluded from dist by scripts/check-dist.js)
 engine/worlds/WorldEngine.ts   + weatherFields(), gasField(), groundKm(), flyCameraBasis()   (§3.3)
 engine/worlds/flyHeight.ts     §6.1 hKm port
@@ -309,7 +310,7 @@ export interface WorldEngineLike {
 | `mixer.ts` | `class AmbienceMixer { constructor(ctx, bus); apply(frame: MixFrame, palette); fire(strike: Strike, air, palette); fadeOut(s); dispose() }` |
 | `captions.ts` | `caption(air, place, frame): CaptionModel` |
 | `useAmbience.ts` | the hook (§10, §13) |
-| `useWeather.ts` | the overlay driver (§8.5) |
+| `weatherBus.ts` | the §8.5 weather snapshot, strikes and `weatherRows` (#116); `ui/WeatherOverlay.tsx` subscribes to it directly (#117) |
 
 ### Rulings R1 to R12 and contract amendments 1 to 3 (spec Appendix D; amendment 1 is in the module contract above)
 
