@@ -2,7 +2,7 @@
 // `closeBuild`, `setShifted`). While the body is built the pane fills the screen over the dimmed sky
 // with the body in the middle and the numbered steps under it; when the build ends it slides to the
 // right half and the close-up opens on the left (`shifted`). On a phone it stays a full-height
-// sheet. The header is the mock-up's: "Building <name>", its kind, then Accuracy, Feel, Hear it, and
+// sheet. The header is the mock-up's: "Building <name>", its kind, then Accuracy, Ambience, Explore, Details and
 // the close button. One panel opens under those buttons at a time (`pop`). Details (the honesty
 // level, view controls, what is drawn and not drawn) is the app's one extra button: the mock-up has
 // no counterpart. Focus moves into the pane when it opens and back to the object's marker (or the
@@ -30,6 +30,8 @@ import { useShellStore } from '@/app/shell/shellStore';
 import { useAppStore } from '@/state/store';
 import { useAmbienceStore } from '@/app/sound/ambienceStore';
 import { atmosphereOf } from './hearModel';
+import { useSpringResize } from './exploreMotion';
+import { ExploreIcon } from './ExploreIcon';
 import type { MouldPhase } from './useMould';
 import { closeBuildPane } from './focus';
 import { displayName } from '@/app/displayName';
@@ -43,7 +45,6 @@ export const SHIFT_DELAY_MS = 650;
 /** The header buttons that open a panel, in the mock-up's order (Details is the app's extra). */
 const POP_BUTTONS: { id: PopId; label: string; title: string; icon: IconName }[] = [
   { id: 'acc', label: 'Accuracy', title: 'Accuracy', icon: 'accuracy' },
-  { id: 'hear', label: 'Hear it', title: 'Hear it', icon: 'hear' },
   {
     id: 'details',
     label: 'Details',
@@ -101,6 +102,9 @@ export function BuildPane() {
   // shifted. The flag is per build (`seq`), so a Replay or a New seed starts full width again.
   const [shiftedSeq, setShiftedSeq] = useState(-1);
   const shifted = !build.animate || shiftedSeq === build.seq;
+  const paneRef = useRef<HTMLElement>(null);
+  // Full view or the right half: the pane springs between them (transform only, Q-420).
+  useSpringResize(paneRef, shifted && !closeHidden && closeKind ? 'half' : 'full');
   useEffect(() => {
     if (!build.animate || phase !== 'done') return;
     const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
@@ -156,6 +160,25 @@ export function BuildPane() {
     if (!atmo.ok || !card) return;
     useAmbienceStore.getState().setAmbience(!atmoOn, atmo.model, card.id);
   };
+  const renderPop = (b: (typeof POP_BUTTONS)[number]) => (
+              <button
+                key={b.id}
+                ref={(el) => {
+                  buttonRefs.current[b.id] = el;
+                }}
+                type="button"
+                className="sx-bp-tool sx-bp-text"
+                title={b.title}
+                aria-pressed={pop === b.id}
+                aria-expanded={pop === b.id}
+                aria-controls={BUILD_POP_ID}
+                onClick={() => setPop(pop === b.id ? null : b.id)}
+                data-testid={`build-${b.id === 'acc' ? 'accuracy' : b.id}`}
+              >
+                <Icon name={b.icon} className="size-[15px]" />
+                <span>{b.label}</span>
+              </button>
+            );
   useEffect(() => {
     if (!ambienceOn) return;
     const onM = (e: globalThis.KeyboardEvent) => {
@@ -251,6 +274,7 @@ export function BuildPane() {
       {/* The close-up fills the left half over the sky, as the mock-up's #cuPane (Q-275). */}
       <CloseUpPane />
       <aside
+        ref={paneRef}
         className="sx-bp"
         aria-labelledby={titleId}
         onKeyDown={onKeyDown}
@@ -269,60 +293,41 @@ export function BuildPane() {
             <p data-testid="build-subtitle">{subtitle}</p>
           </div>
           <div className="sx-bp-tools" role="group" aria-label="Build tools">
-            {POP_BUTTONS.map((b) => (
-              <button
-                key={b.id}
-                ref={(el) => {
-                  buttonRefs.current[b.id] = el;
-                }}
-                type="button"
-                className="sx-bp-tool sx-bp-text"
-                title={b.title}
-                aria-label={b.id === 'hear' && ambienceOn ? 'Hear it. Ambience on, open Hear it to stop, or press M.' : undefined}
-                aria-pressed={pop === b.id}
-                aria-expanded={pop === b.id}
-                aria-controls={BUILD_POP_ID}
-                onClick={() => setPop(pop === b.id ? null : b.id)}
-                data-testid={`build-${b.id === 'acc' ? 'accuracy' : b.id}`}
-              >
-                <Icon name={b.icon} className="size-[15px]" />
-                <span>{b.label}</span>
-                {b.id === 'hear' && ambienceOn && <i className="sx-bp-live" aria-hidden="true" data-testid="hear-live" />}
-              </button>
-            ))}
-            {/* Split view and Atmosphere (Moon, 12 Nov 2026, Q-419): icon-only toggles in the header,
-                after Details. Atmosphere is local synthesis for now (Q-416); where there is no
-                atmosphere to hear it stays visible but off, and its name says why. */}
+            {/* Moon (12 Nov 2026, Q-420): Accuracy, Ambience, Explore, Details, then close. Ambience is a
+                toggle (off, crossed out, until clicked; local synthesis for now, Q-416) and replaces
+                Hear it: there is no "listen to the wavelengths" any more. Explore is the split view
+                (the close-up on the left). Where there is no atmosphere to hear, Ambience stays
+                visible but off, and its name says why. */}
+            {renderPop(POP_BUTTONS[0]!)}
             {canBuild && (
-              <>
-                <i className="sx-bp-sep" aria-hidden="true" />
-                {closeKind && (
-                  <button
-                    type="button"
-                    className="sx-bp-tool sx-bp-toggle"
-                    aria-label="Split view"
-                    aria-pressed={!closeHidden}
-                    title={closeHidden ? 'Split view: the close-up on the left' : 'Close the split view'}
-                    onClick={() => useCloseUpStore.getState().setHidden(!closeHidden)}
-                    data-testid="build-split"
-                  >
-                    <Icon name="split" className="size-4" />
-                  </button>
-                )}
-                <button
-                  type="button"
-                  className="sx-bp-tool sx-bp-toggle"
-                  aria-label={atmo.ok ? 'Atmosphere sound' : `Atmosphere sound. ${atmo.line}`}
-                  aria-pressed={atmoOn}
-                  aria-disabled={!atmo.ok || undefined}
-                  title={atmo.ok ? (atmoOn ? 'Stop the atmosphere sound (M)' : 'Play the atmosphere sound') : atmo.line}
-                  onClick={toggleAtmo}
-                  data-testid="build-atmosphere"
-                >
-                  <Icon name="wind" className="size-4" />
-                </button>
-              </>
+              <button
+                type="button"
+                className="sx-bp-tool sx-bp-text sx-bp-toggle"
+                aria-label={atmo.ok ? 'Ambience' : `Ambience. ${atmo.line}`}
+                aria-pressed={atmoOn}
+                aria-disabled={!atmo.ok || undefined}
+                title={atmo.ok ? (atmoOn ? 'Stop the ambience (M)' : 'Play the ambience') : atmo.line}
+                onClick={toggleAtmo}
+                data-testid="build-ambience"
+              >
+                <Icon name={atmoOn ? 'hear' : 'hearOff'} className="size-[15px]" />
+                <span>Ambience</span>
+              </button>
             )}
+            {canBuild && closeKind && (
+              <button
+                type="button"
+                className="sx-bp-tool sx-bp-text sx-bp-toggle"
+                aria-pressed={!closeHidden}
+                title={closeHidden ? 'Explore: the close-up on the left' : 'Close the close-up'}
+                onClick={() => useCloseUpStore.getState().setHidden(!closeHidden)}
+                data-testid="build-explore"
+              >
+                <ExploreIcon on={!closeHidden} className="size-[15px]" />
+                <span>Explore</span>
+              </button>
+            )}
+            {renderPop(POP_BUTTONS[1]!)}
             <i className="sx-bp-sep" aria-hidden="true" />
             <button
               type="button"
