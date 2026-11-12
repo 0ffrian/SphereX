@@ -13,11 +13,7 @@ export function AreaTrackLayer({ view }: { view: SkyView | null }) {
   const ref = useRef<HTMLCanvasElement>(null);
   // The canvas draws demo data (Eros's real frames, made-up dots): it wears the tag too (Q-414).
   const demoOn = useAreaStore(
-    (s) =>
-      (s.screen === 'eros' || s.screen === 'disc' || s.screen === 'mover') &&
-      !!s.box &&
-      !!s.eros &&
-      !s.refusal,
+    (s) => (s.screen === 'eros' || s.screen === 'disc' || s.screen === 'mover') && !!s.box && !!s.eros && !s.refusal,
   );
 
   useEffect(() => {
@@ -53,13 +49,7 @@ export function AreaTrackLayer({ view }: { view: SkyView | null }) {
         g,
         rect,
         s.eros,
-        {
-          mode: s.flow === 'known' ? 'eros' : 'disc',
-          now,
-          step: s.step,
-          sel: s.screen === 'mover' ? s.sel : -1,
-          disc: s.disc,
-        },
+        { mode: s.flow === 'known' ? 'eros' : 'disc', now, step: s.step, sel: s.screen === 'mover' ? s.sel : -1, disc: s.disc },
         () => paint(),
       );
     };

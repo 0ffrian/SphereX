@@ -205,9 +205,7 @@ describe('the popover', () => {
     const host = mount(params(conf({ score: 0.6 })));
     expect(host.querySelector('[data-testid="formula-result"]')!.textContent).toContain('60%');
     expect(warn).toHaveBeenCalled();
-    expect(host.querySelector('[data-testid="formula-disagree"]')!.textContent).toContain(
-      'do not add up',
-    );
+    expect(host.querySelector('[data-testid="formula-disagree"]')!.textContent).toContain('do not add up');
   });
   it('closes on Escape and traps Tab', () => {
     const onClose = vi.fn();

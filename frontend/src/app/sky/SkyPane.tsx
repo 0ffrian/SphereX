@@ -541,12 +541,7 @@ export function SkyPane({ children }: { children?: ReactNode }) {
     const sendReadout = () => {
       readoutFrame = null;
       const cam = view.getView();
-      if (
-        lastCam === null ||
-        cam.ra !== lastCam.ra ||
-        cam.dec !== lastCam.dec ||
-        cam.fovDeg !== lastCam.fovDeg
-      ) {
+      if (lastCam === null || cam.ra !== lastCam.ra || cam.dec !== lastCam.dec || cam.fovDeg !== lastCam.fovDeg) {
         if (lastCam !== null) publishMotion();
         lastCam = { ra: cam.ra, dec: cam.dec, fovDeg: cam.fovDeg };
       }
@@ -634,10 +629,7 @@ export function SkyPane({ children }: { children?: ReactNode }) {
         drawing = null;
         // The tool may have been left mid-drag (Escape): then nothing is set and no search starts.
         const box =
-          areaDrawing() &&
-          e.type === 'pointerup' &&
-          Math.abs(d.x1 - d.x0) >= 12 &&
-          Math.abs(d.y1 - d.y0) >= 12
+          areaDrawing() && e.type === 'pointerup' && Math.abs(d.x1 - d.x0) >= 12 && Math.abs(d.y1 - d.y0) >= 12
             ? boxFromPixels(d)
             : null;
         if (box) useAreaStore.getState().setBox(box);
@@ -749,9 +741,7 @@ export function SkyPane({ children }: { children?: ReactNode }) {
     state.kind === 'ready' || state.kind === 'loading' || state.kind === 'error'
       ? state.survey
       : null;
-  const resolvedLabel = resolved
-    ? displayName(resolved.name) || formatCoords(resolved.ra, resolved.dec)
-    : '';
+  const resolvedLabel = resolved ? (displayName(resolved.name) || formatCoords(resolved.ra, resolved.dec)) : '';
   const showPicked =
     picked !== null &&
     !(
@@ -939,7 +929,10 @@ export function SkyPane({ children }: { children?: ReactNode }) {
         hidden={!creditOpen}
       >
         {survey && (
-          <p className="sx-credit-line pointer-events-auto" data-testid="sky-credit">
+          <p
+            className="sx-credit-line pointer-events-auto"
+            data-testid="sky-credit"
+          >
             <span className="text-sx-fg">{survey.title}</span>
             {survey.tag === 'derived' ? (
               <EstimatedBadge tooltip={survey.formula ?? ''} variant="tag" />

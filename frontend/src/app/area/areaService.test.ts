@@ -27,10 +27,7 @@ const box = (ra: number, dec: number, w = 0.6, h = 0.4): AreaBox => ({
 });
 
 beforeEach(() => {
-  vi.stubGlobal(
-    'fetch',
-    vi.fn(async () => ({ ok: true, json: async () => structuredClone(DEMO) })),
-  );
+  vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => structuredClone(DEMO) })));
 });
 afterEach(() => vi.unstubAllGlobals());
 
@@ -70,10 +67,7 @@ describe('area service', () => {
   });
   it('refuses elsewhere with area:not_prepared', async () => {
     const far = box(200, -30);
-    await expect(knownObjectsIn(far)).rejects.toMatchObject({
-      code: 'area:not_prepared',
-      message: 'No prepared data for this area yet.',
-    });
+    await expect(knownObjectsIn(far)).rejects.toMatchObject({ code: 'area:not_prepared', message: 'No prepared data for this area yet.' });
     await expect(discoverIn(far)).rejects.toBeInstanceOf(AreaRefused);
     await expect(areaSearch(far, 'known')).rejects.toMatchObject({ code: 'area:not_prepared' });
   });

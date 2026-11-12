@@ -58,8 +58,7 @@ export function PanelCard({
   useEffect(() => {
     if (pending) return;
     const a = document.activeElement;
-    if (!a || a === document.body)
-      (bare ? rootEl.current : titleRef.current)?.focus({ preventScroll: true });
+    if (!a || a === document.body) (bare ? rootEl.current : titleRef.current)?.focus({ preventScroll: true });
   }, [pending, bare]);
   const close = () => {
     onClose();
@@ -81,9 +80,7 @@ export function PanelCard({
   return (
     <section
       aria-labelledby={bare ? undefined : titleId}
-      aria-label={
-        bare ? `${title}${typeof subtitle === 'string' ? `: ${subtitle}` : ''}` : undefined
-      }
+      aria-label={bare ? `${title}${typeof subtitle === 'string' ? `: ${subtitle}` : ''}` : undefined}
       tabIndex={bare ? -1 : undefined}
       ref={(el) => {
         rootEl.current = el;
@@ -98,34 +95,34 @@ export function PanelCard({
       data-testid={testId}
     >
       {!bare && (
-        <header className="sx-panel-head">
-          <span
-            className="grid size-9 flex-none place-items-center rounded-xl bg-sx-muted text-sx-green"
-            aria-hidden="true"
-          >
-            <Icon name={icon} />
-          </span>
-          <div className="min-w-0">
-            <h2 id={titleId} ref={titleRef} tabIndex={-1}>
-              {title}
-            </h2>
-            {subtitle && (
-              // A long name is cut with an ellipsis; the tooltip has it in full.
-              <p className="truncate" title={typeof subtitle === 'string' ? subtitle : undefined}>
-                {subtitle}
-              </p>
-            )}
-          </div>
-          <button
-            type="button"
-            className="sx-panel-x"
-            aria-label={`Close ${title}`}
-            title="Close (Esc)"
-            onClick={close}
-          >
-            <Icon name="close" className="size-4" />
-          </button>
-        </header>
+      <header className="sx-panel-head">
+        <span
+          className="grid size-9 flex-none place-items-center rounded-xl bg-sx-muted text-sx-green"
+          aria-hidden="true"
+        >
+          <Icon name={icon} />
+        </span>
+        <div className="min-w-0">
+          <h2 id={titleId} ref={titleRef} tabIndex={-1}>
+            {title}
+          </h2>
+          {subtitle && (
+            // A long name is cut with an ellipsis; the tooltip has it in full.
+            <p className="truncate" title={typeof subtitle === 'string' ? subtitle : undefined}>
+              {subtitle}
+            </p>
+          )}
+        </div>
+        <button
+          type="button"
+          className="sx-panel-x"
+          aria-label={`Close ${title}`}
+          title="Close (Esc)"
+          onClick={close}
+        >
+          <Icon name="close" className="size-4" />
+        </button>
+      </header>
       )}
       <div className="sx-panel-body" ref={bodyRef}>
         {typeof children === 'function' ? children(close) : children}
