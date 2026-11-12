@@ -68,7 +68,8 @@ describe('background compile (issue #93 1.2, 1.3)', () => {
       if (c[0] === 'getProgramParameter' && c[1] === 'COMPLETION_STATUS_KHR') lastCompletion = i;
     });
     expect(firstLink).toBeGreaterThan(lastCompletion);
-    expect(statusReads().filter((c) => c[1] === 'LINK_STATUS')).toHaveLength(4);
+    // the fly engine links ADV_FS, GAS_FS and FLY_FS: it never draws the globe, so it has no WORLD_FS (#93 F1)
+    expect(statusReads().filter((c) => c[1] === 'LINK_STATUS')).toHaveLength(3);
   });
 
   it('WorldEngine.whenReady resolves after a late completion, without blocking', async () => {
@@ -145,10 +146,10 @@ describe('background compile (issue #93 1.2, 1.3)', () => {
     expect(e.pollReady()).toBe(true);
   });
 
-  it('the globe creates 3 programs (no fly shader); the fly engine and the prototype page 4', () => {
+  it('the globe and the fly engine create 3 programs (no fly shader, no globe shader); the prototype page 4', () => {
     for (const [role, n] of [
       ['globe', 3],
-      ['fly', 4],
+      ['fly', 3],
       ['both', 4],
     ] as const) {
       const { gl, progs } = stubGL();
@@ -156,6 +157,7 @@ describe('background compile (issue #93 1.2, 1.3)', () => {
       expect(progs).toHaveLength(n);
       expect(e.programCount()).toBe(n);
       expect(progs.some((p) => p.fs === FLY_FS)).toBe(role !== 'globe');
+      expect(progs.some((p) => p.fs === WORLD_FS)).toBe(role !== 'fly');
     }
   });
 

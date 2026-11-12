@@ -122,9 +122,11 @@ DEV93_COMPILE = r'''// @deviation (#93 1.2, 1.3) the prototype compiled its four
 // compile or link log as compile() did, and then the uniforms. The draw and step methods call link() first (see the
 // end of createCore), so no uniform is read before its program is linked. FLY_FS is compiled only where the fly view
 // can be drawn (role 'fly', or the prototype's 'both'); a globe-only engine submits it the first time it flies.
-  var pex = gl.getExtension('KHR_parallel_shader_compile'), jobs = { A: compileStart(gl, FULL, ADV_FS), G: compileStart(gl, FULL, GAS_FS), W: compileStart(gl, FULL, WORLD_FS), F: role === 'globe' ? null : compileStart(gl, FULL, FLY_FS) }, pA, pG, pW, pF, uA, uG, uW, uF;
+// (#93 F1) The fly engine never draws the globe once it flies (1.6), so it does not compile WORLD_FS either: pW stays
+// null, uW is empty, and a draw before it flies (the entry draw that sets W.view) draws nothing.
+  var pex = gl.getExtension('KHR_parallel_shader_compile'), jobs = { A: compileStart(gl, FULL, ADV_FS), G: compileStart(gl, FULL, GAS_FS), W: role === 'fly' ? null : compileStart(gl, FULL, WORLD_FS), F: role === 'globe' ? null : compileStart(gl, FULL, FLY_FS) }, pA, pG, pW, pF, uA, uG, uW, uF;
   function link() {
-    if (!pA) { var a = compileEnd(gl, jobs.A), g2 = compileEnd(gl, jobs.G), w2 = compileEnd(gl, jobs.W); uA = unis(gl, a); uG = unis(gl, g2); uW = unis(gl, w2); pA = a; pG = g2; pW = w2; }
+    if (!pA) { var a = compileEnd(gl, jobs.A), g2 = compileEnd(gl, jobs.G), w2 = jobs.W ? compileEnd(gl, jobs.W) : null; uA = unis(gl, a); uG = unis(gl, g2); uW = w2 ? unis(gl, w2) : {}; pA = a; pG = g2; pW = w2; }
     if (!pF && jobs.F) { var f2 = compileEnd(gl, jobs.F); uF = unis(gl, f2); pF = f2; }
   }
   this.poll = function () { for (var k in jobs) if (jobs[k] && !compileDone(gl, jobs[k], pex)) return false; link(); return true; };
@@ -145,9 +147,10 @@ DEV93_SCALER = r'''// @deviation (#93 1.7) the resolution scaler aims at 30 fps:
     var d = Math.min(devicePixelRatio || 1, role === 'fly' ? 1 : role === 'globe' ? 1.25 : 1.5) * scale, w = Math.round(canvas.clientWidth * d), h = Math.round(canvas.clientHeight * d); if (!w || !h) return;'''
 DEV93_SKIP_GLOBE = r'''// @deviation (#93 1.6) the fly engine's canvas is 1.67 times its pane wide, so the globe beside the fly view is never
 // seen there and is not ray-marched. W.view (next line) is still set: flyAimPeak, flyAimDefault and globePick read it.
+// (#93 F1) A fly engine has no globe program (pW null) and draws no globe at all.
 // The first rename below (#93 1.4, B9) passes the resolution scale over the eased scale W.fp93 to FLY_FS as uScale; the
 // second is PR #89's.
-    if (!(fly && role === 'fly')) gl.drawArrays(gl.TRIANGLES, 0, 3);'''
+    if (pW && !(fly && role === 'fly')) gl.drawArrays(gl.TRIANGLES, 0, 3);'''
 DEV93_GAS_CAP = r'''// @deviation (#93 1.8) at most 3 gas-solver steps per frame (was 8; GasSim.step costs about 4.5 ms), and a backlog of a
 // whole step or more is dropped, so a slow frame never schedules more work for the next one. A giant that needs more
 // than 3 steps a frame (HD 189733 b about 4.7 at 60 fps) then runs slower than one day per second.
