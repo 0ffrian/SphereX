@@ -12,15 +12,15 @@ import {
   subscribeUnlockState,
   type UnlockState,
 } from './audioContext';
-import { bindHonesty, createHaptics, type HapticEngineOptions, type SoundOutputs } from './haptics';
-import { bindEngine, getHapticSettings, useHapticSettings, type HapticSettings } from './settings';
+import { bindHonesty, createSoundEngine, type SoundEngineOptions, type SoundOutputs } from './engine';
+import { bindEngine, getSoundSettings, useSoundSettings, type SoundSettingsValues } from './settings';
 import {
   DOCUMENT_PAGE,
   ListenSweep,
   planSweep,
   type GasLine,
   type ListenSweepOptions,
-} from './sound/listenSweep';
+} from './listenSweep';
 import { buildSpectrumMapping } from './spectrumMapping';
 
 /** A `/spectrum` reply: its points and its provenance tag (`measured` today; any tag is gated). */
@@ -79,7 +79,7 @@ export interface AppSound {
 }
 
 export interface AppSoundOptions {
-  engine?: HapticEngineOptions;
+  engine?: SoundEngineOptions;
   sweep?: ListenSweepOptions;
 }
 
@@ -95,7 +95,7 @@ function sameStatus(a: SoundStatus, b: SoundStatus): boolean {
 
 export function createAppSound(options: AppSoundOptions = {}): AppSound {
   // Audio only (Q-132, D-39).
-  const outputs = createHaptics(options.engine);
+  const outputs = createSoundEngine(options.engine);
   const { engine } = outputs;
   const sweep = new ListenSweep(options.sweep);
   const page = options.sweep?.page ?? DOCUMENT_PAGE;
@@ -105,7 +105,7 @@ export function createAppSound(options: AppSoundOptions = {}): AppSound {
 
   const compute = (): SoundStatus => {
     const u = getUnlockState();
-    const s = getHapticSettings();
+    const s = getSoundSettings();
     return {
       unlocked: u.unlocked,
       audio: u.audio,
@@ -133,8 +133,8 @@ export function createAppSound(options: AppSoundOptions = {}): AppSound {
     return p;
   };
 
-  const update = (changes: Partial<HapticSettings>) => {
-    useHapticSettings.getState().update(changes);
+  const update = (changes: Partial<SoundSettingsValues>) => {
+    useSoundSettings.getState().update(changes);
     notify();
   };
 
@@ -146,7 +146,7 @@ export function createAppSound(options: AppSoundOptions = {}): AppSound {
       tag: reply.tag,
     });
     if (plan === null) return 'nothing-to-play';
-    if (!getHapticSettings().soundOn) return 'sound-off';
+    if (!getSoundSettings().soundOn) return 'sound-off';
     const honesty = engine.honesty;
     if (!isTagShown(honesty, plan.tag) && plan.chimes.every((c) => !isTagShown(honesty, c.tag))) {
       return 'hidden';
@@ -155,7 +155,7 @@ export function createAppSound(options: AppSoundOptions = {}): AppSound {
     // Synchronously, before any await: the unlock must run inside the click's user activation (Q-73).
     const running = await unlock();
     if (token !== listenRun || page.isHidden()) return 'stopped';
-    if (!getHapticSettings().soundOn) return 'sound-off';
+    if (!getSoundSettings().soundOn) return 'sound-off';
     if (!running || getAudioContext()?.state !== 'running') return 'no-audio';
     if (sweep.play(plan, engine.honesty)) {
       notify();
@@ -188,7 +188,7 @@ export function createAppSound(options: AppSoundOptions = {}): AppSound {
         bindHonesty(engine, honesty.get, honesty.subscribe),
         bindHonesty(sweep, honesty.get, honesty.subscribe),
         subscribeUnlockState(notify),
-        useHapticSettings.subscribe(notify),
+        useSoundSettings.subscribe(notify),
       ];
       notify();
       return () => {

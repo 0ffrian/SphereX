@@ -8,14 +8,14 @@ import {
   type FakeNode,
 } from '@/test/fakeAudio';
 import { fixture } from '@/test/sharedFixtures';
-import { getMasterBus } from '../audioGraph';
-import { pitchToHz, wavelengthToPitch } from '../pitch';
+import { getMasterBus } from './audioGraph';
+import { pitchToHz, wavelengthToPitch } from './pitch';
 import {
   buildSpectrumMapping,
   type SpectrumMapping,
   type SpectrumMappingPoint,
   type SpectrumSample,
-} from '../spectrumMapping';
+} from './spectrumMapping';
 import {
   AUDIO_LOOKAHEAD_S,
   SWEEP_CHIME_GAIN,
@@ -24,7 +24,7 @@ import {
   SWEEP_PEAK_GAIN,
   SWEEP_SAMPLES_PER_POINT,
   SWEEP_STEPS,
-} from '../tuning';
+} from './tuning';
 import {
   GAS_LINES_UM,
   gasLinesForEpoch,

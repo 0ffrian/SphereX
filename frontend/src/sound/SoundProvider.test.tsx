@@ -12,8 +12,8 @@ import { FakeAudioContext, type FakeNode, type FakeSource } from '@/test/fakeAud
 import { fixtureFetch } from '@/test/fixtureFetch';
 import { setAudioContextFactory } from './audioContext';
 import type { AppSound, ListenOutcome } from './appSound';
-import { AudioDriver } from './drivers/audio';
-import { defaultSettings, flushHapticSettings, useHapticSettings } from './settings';
+import { AudioDriver } from './voices';
+import { defaultSettings, flushSoundSettings, useSoundSettings } from './settings';
 import { buildSpectrumMapping } from './spectrumMapping';
 import { SoundProvider, useSound, useSoundStatus } from './SoundProvider';
 
@@ -102,9 +102,9 @@ afterEach(() => {
   host.remove();
   setAudioContextFactory(null);
   vi.restoreAllMocks();
-  flushHapticSettings();
+  flushSoundSettings();
   localStorage.clear();
-  useHapticSettings.setState({
+  useSoundSettings.setState({
     ...defaultSettings(),
     loaded: false,
   });

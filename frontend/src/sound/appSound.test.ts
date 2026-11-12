@@ -8,7 +8,7 @@ import { FakeAudioContext } from '@/test/fakeAudio';
 import { fixtureFetch } from '@/test/fixtureFetch';
 import { setAudioContextFactory } from './audioContext';
 import { createAppSound, type AppSound, type SpectrumReply } from './appSound';
-import { defaultSettings, flushHapticSettings, useHapticSettings } from './settings';
+import { defaultSettings, flushSoundSettings, useSoundSettings } from './settings';
 import { buildSpectrumMapping } from './spectrumMapping';
 import type { HonestyState } from '@/viewer/honesty';
 import { useAppStore } from '@/state/store';
@@ -60,9 +60,9 @@ afterEach(() => {
   for (const s of made.splice(0)) s.outputs.engine.dispose();
   setAudioContextFactory(null);
   vi.restoreAllMocks();
-  flushHapticSettings();
+  flushSoundSettings();
   localStorage.clear();
-  useHapticSettings.setState({
+  useSoundSettings.setState({
     ...defaultSettings(),
     loaded: false,
   });

@@ -2,7 +2,7 @@
 // ignored), bindEngine and the shared AudioContext unlock.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FakeAudioContext } from '@/test/fakeAudio';
-import { FakeClock } from '@/test/fakeHaptics';
+import { FakeClock } from '@/test/fakeSound';
 import {
   getAudioContext,
   getUnlockState,
@@ -10,8 +10,8 @@ import {
   subscribeUnlockState,
   unlockAudio,
 } from './audioContext';
-import { AudioDriver } from './drivers/audio';
-import { HapticEngine, createHaptics, type SoundOutputs } from './haptics';
+import { AudioDriver } from './voices';
+import { SoundEngine, createSoundEngine, type SoundOutputs } from './engine';
 import {
   SETTINGS_STORAGE_KEY,
   bindEngine,
@@ -20,17 +20,17 @@ import {
   bindPageLifecycle,
   stopWhenHidden,
   ensureLoaded,
-  flushHapticSettings,
-  getHapticSettings,
-  loadHapticSettings,
-  useHapticSettings,
+  flushSoundSettings,
+  getSoundSettings,
+  loadSoundSettings,
+  useSoundSettings,
 } from './settings';
 
 function outputs(): SoundOutputs & { ctx: FakeAudioContext } {
   const clock = new FakeClock();
   const ctx = new FakeAudioContext();
   const audio = new AudioDriver({ context: () => ctx.asAudioContext(), supported: true });
-  const engine = new HapticEngine([audio], {
+  const engine = new SoundEngine([audio], {
     clock: clock.clock,
     timers: clock,
     debugTarget: null,
@@ -39,12 +39,12 @@ function outputs(): SoundOutputs & { ctx: FakeAudioContext } {
 }
 
 function resetStore() {
-  useHapticSettings.setState({ ...defaultSettings(), loaded: false });
+  useSoundSettings.setState({ ...defaultSettings(), loaded: false });
 }
 
 describe('settings store (R8.7)', () => {
   beforeEach(() => {
-    flushHapticSettings(); // no debounced save from an earlier test may land in this one
+    flushSoundSettings(); // no debounced save from an earlier test may land in this one
     localStorage.clear();
     resetStore();
   });
@@ -54,18 +54,18 @@ describe('settings store (R8.7)', () => {
     vi.resetModules();
     const fresh = await import('./settings');
     expect(read).not.toHaveBeenCalled();
-    fresh.useHapticSettings.getState();
+    fresh.useSoundSettings.getState();
     expect(read).toHaveBeenCalledTimes(1);
     read.mockRestore();
   });
 
   it('update() before any read loads first, so it cannot save over the stored settings', () => {
     localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify({ soundOn: false, volume: 0.2 }));
-    useHapticSettings.getState().update({}); // getState() loads
+    useSoundSettings.getState().update({}); // getState() loads
     resetStore(); // and an update straight from the store object, without a read before it
-    const { update } = useHapticSettings.getInitialState();
+    const { update } = useSoundSettings.getInitialState();
     update({});
-    flushHapticSettings();
+    flushSoundSettings();
     expect(JSON.parse(localStorage.getItem(SETTINGS_STORAGE_KEY)!)).toMatchObject({
       soundOn: false,
       volume: 0.2,
@@ -75,11 +75,11 @@ describe('settings store (R8.7)', () => {
   it('debounces saves during a drag and flushes when the page hides', () => {
     vi.useFakeTimers();
     const write = vi.spyOn(Storage.prototype, 'setItem');
-    for (let i = 0; i < 30; i++) useHapticSettings.getState().update({ volume: i / 30 });
+    for (let i = 0; i < 30; i++) useSoundSettings.getState().update({ volume: i / 30 });
     expect(write).not.toHaveBeenCalled();
     vi.advanceTimersByTime(SAVE_DEBOUNCE_MS);
     expect(write).toHaveBeenCalledTimes(1);
-    useHapticSettings.getState().update({ volume: 0.9 });
+    useSoundSettings.getState().update({ volume: 0.9 });
     window.dispatchEvent(new Event('pagehide'));
     expect(write).toHaveBeenCalledTimes(2);
     expect(JSON.parse(localStorage.getItem(SETTINGS_STORAGE_KEY)!).volume).toBe(0.9);
@@ -93,38 +93,38 @@ describe('settings store (R8.7)', () => {
     localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify({ volume: 0.1, soundOn: false }));
     const read = vi.spyOn(Storage.prototype, 'getItem');
     expect(read).not.toHaveBeenCalled(); // nothing read until a consumer asks
-    expect(useHapticSettings.getState()).toMatchObject({
+    expect(useSoundSettings.getState()).toMatchObject({
       loaded: true,
       volume: 0.1,
       soundOn: false,
     });
     expect(read).toHaveBeenCalledTimes(1);
-    useHapticSettings.getState();
-    getHapticSettings();
+    useSoundSettings.getState();
+    getSoundSettings();
     ensureLoaded();
     expect(read).toHaveBeenCalledTimes(1); // once only
     read.mockRestore();
   });
 
-  it('getHapticSettings loads too', () => {
+  it('getSoundSettings loads too', () => {
     localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify({ soundOn: false }));
-    expect(getHapticSettings().soundOn).toBe(false);
+    expect(getSoundSettings().soundOn).toBe(false);
   });
 
   it('saves under one key, clamped, and loads back', () => {
-    useHapticSettings.getState().update({ volume: 2 });
-    flushHapticSettings();
+    useSoundSettings.getState().update({ volume: 2 });
+    flushSoundSettings();
     const saved = JSON.parse(localStorage.getItem(SETTINGS_STORAGE_KEY)!);
     expect(saved).toEqual({ soundOn: true, volume: 1 });
     expect(Object.keys(localStorage)).toEqual([SETTINGS_STORAGE_KEY]);
-    expect(loadHapticSettings()).toEqual(saved);
+    expect(loadSoundSettings()).toEqual(saved);
   });
 
   it.each(['{not json', '[1,2]', 'null', '"text"', JSON.stringify({ volume: 'loud', soundOn: 3 })])(
     'corrupt storage %s gives the defaults',
     (text) => {
       localStorage.setItem(SETTINGS_STORAGE_KEY, text);
-      expect(loadHapticSettings()).toEqual(defaultSettings());
+      expect(loadSoundSettings()).toEqual(defaultSettings());
     },
   );
 
@@ -135,9 +135,9 @@ describe('settings store (R8.7)', () => {
     const set = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
       throw new Error('quota');
     });
-    expect(loadHapticSettings()).toEqual(defaultSettings());
-    expect(() => useHapticSettings.getState().update({ volume: 0.3 })).not.toThrow();
-    expect(useHapticSettings.getState().volume).toBe(0.3);
+    expect(loadSoundSettings()).toEqual(defaultSettings());
+    expect(() => useSoundSettings.getState().update({ volume: 0.3 })).not.toThrow();
+    expect(useSoundSettings.getState().volume).toBe(0.3);
     spy.mockRestore();
     set.mockRestore();
   });
@@ -153,23 +153,23 @@ describe('settings store (R8.7)', () => {
         showChannelLabels: false,
       }),
     );
-    const s = loadHapticSettings();
+    const s = loadSoundSettings();
     expect(s).toEqual({ ...defaultSettings(), soundOn: false, volume: 0.4 });
     expect(s).not.toHaveProperty('hapticsOn');
     expect(s).not.toHaveProperty('strengthMultiplier');
   });
 
   it('reset clears the key and restores the defaults', () => {
-    useHapticSettings.getState().update({ volume: 0.2 });
-    useHapticSettings.getState().reset();
+    useSoundSettings.getState().update({ volume: 0.2 });
+    useSoundSettings.getState().reset();
     expect(localStorage.getItem(SETTINGS_STORAGE_KEY)).toBeNull();
-    expect(useHapticSettings.getState().volume).toBe(defaultSettings().volume);
+    expect(useSoundSettings.getState().volume).toBe(defaultSettings().volume);
   });
 });
 
 describe('bindEngine', () => {
   beforeEach(() => {
-    flushHapticSettings(); // no debounced save from an earlier test may land in this one
+    flushSoundSettings(); // no debounced save from an earlier test may land in this one
     localStorage.clear();
     resetStore();
   });
@@ -178,12 +178,12 @@ describe('bindEngine', () => {
     const o = outputs();
     const unbind = bindEngine(o);
     expect(o.engine.isDriverEnabled(o.audio)).toBe(true);
-    useHapticSettings.getState().update({ soundOn: false, volume: 0.25 });
+    useSoundSettings.getState().update({ soundOn: false, volume: 0.25 });
     expect(o.engine.isDriverEnabled(o.audio)).toBe(false);
     expect(o.audio.volume).toBe(0.25);
     expect(o.engine.strengthMultiplier).toBe(1);
     unbind();
-    useHapticSettings.getState().update({ soundOn: true });
+    useSoundSettings.getState().update({ soundOn: true });
     expect(o.engine.isDriverEnabled(o.audio)).toBe(false);
   });
 });
@@ -214,14 +214,14 @@ describe('page lifecycle (P2)', () => {
 
 describe('audio-only outputs and stopWhenHidden (Q-132, R8.8)', () => {
   beforeEach(() => {
-    flushHapticSettings();
+    flushSoundSettings();
     localStorage.clear();
     resetStore();
   });
   afterEach(() => {
     setAudioContextFactory(null);
     vi.restoreAllMocks();
-    flushHapticSettings();
+    flushSoundSettings();
     localStorage.clear();
     resetStore();
   });
@@ -229,13 +229,13 @@ describe('audio-only outputs and stopWhenHidden (Q-132, R8.8)', () => {
   it('bindEngine takes the audio-only engine and applies sound and volume', () => {
     const ctx = new FakeAudioContext();
     setAudioContextFactory(() => ctx.asAudioContext());
-    const o = createHaptics({ debugTarget: null });
+    const o = createSoundEngine({ debugTarget: null });
     const unbind = bindEngine(o);
     expect(o.engine.activeDrivers).toEqual([o.audio]);
-    useHapticSettings.getState().update({ soundOn: false, volume: 0.3 });
+    useSoundSettings.getState().update({ soundOn: false, volume: 0.3 });
     expect(o.engine.activeDrivers).toEqual([]);
     expect(o.audio.volume).toBeCloseTo(0.3);
-    useHapticSettings.getState().update({ soundOn: true });
+    useSoundSettings.getState().update({ soundOn: true });
     expect(o.engine.activeDrivers).toEqual([o.audio]);
     unbind();
     o.engine.dispose();
@@ -323,7 +323,7 @@ describe('shared AudioContext (R8.9)', () => {
     await unlockAudio();
     expect(getUnlockState()).toEqual({ unlocked: true, audio: 'running' });
     expect(seen).toEqual(['running']);
-    const engine = new HapticEngine([], { debugTarget: null });
+    const engine = new SoundEngine([], { debugTarget: null });
     expect(engine.unlocked).toBe(true);
     off();
   });
@@ -331,7 +331,7 @@ describe('shared AudioContext (R8.9)', () => {
   it('engine.unlock uses it', async () => {
     const ctx = new FakeAudioContext({ state: 'suspended' });
     setAudioContextFactory(() => ctx.asAudioContext());
-    const engine = new HapticEngine([], { debugTarget: null });
+    const engine = new SoundEngine([], { debugTarget: null });
     expect(await engine.unlock()).toBe(true);
     expect(ctx.state).toBe('running');
   });

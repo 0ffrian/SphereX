@@ -4,7 +4,7 @@
 // touches no browser storage. Corrupt or missing storage gives the defaults.
 import { useStore } from 'zustand';
 import { createStore, type StoreApi } from 'zustand/vanilla';
-import type { SoundOutputs } from './haptics';
+import type { SoundOutputs } from './engine';
 import { clamp01 } from './pitch';
 import { DEFAULT_VOLUME } from './tuning';
 
@@ -14,27 +14,27 @@ export const SETTINGS_STORAGE_KEY = 'sx.haptics.settings';
  * The key is the pre-D-39 one, kept so saved volumes survive; the old `hapticsOn`,
  * `strengthMultiplier` and `showChannelLabels` fields are ignored when read and dropped on save.
  */
-export interface HapticSettings {
+export interface SoundSettingsValues {
   soundOn: boolean;
   /** 0–1. */
   volume: number;
 }
 
-export interface HapticSettingsState extends HapticSettings {
+export interface SoundSettingsState extends SoundSettingsValues {
   /** True once storage has been read. */
   loaded: boolean;
   /** Change settings; values are clamped and saved (debounced, flushed when the page hides). Loads first if needed. */
-  update(changes: Partial<HapticSettings>): void;
+  update(changes: Partial<SoundSettingsValues>): void;
   /** Back to the defaults; clears the saved settings. */
   reset(): void;
 }
 
-export function defaultSettings(): HapticSettings {
+export function defaultSettings(): SoundSettingsValues {
   return { soundOn: true, volume: DEFAULT_VOLUME };
 }
 
 /** Keep only valid fields of `raw` over `base`. Anything malformed is ignored. */
-export function sanitizeSettings(raw: unknown, base: HapticSettings): HapticSettings {
+export function sanitizeSettings(raw: unknown, base: SoundSettingsValues): SoundSettingsValues {
   const out = { ...base };
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return out;
   const r = raw as Record<string, unknown>;
@@ -52,7 +52,7 @@ function storage(): Storage | null {
 }
 
 /** Saved settings over the defaults. Never throws. */
-export function loadHapticSettings(): HapticSettings {
+export function loadSoundSettings(): SoundSettingsValues {
   const base = defaultSettings();
   try {
     const text = storage()?.getItem(SETTINGS_STORAGE_KEY);
@@ -62,7 +62,7 @@ export function loadHapticSettings(): HapticSettings {
   }
 }
 
-function save(s: HapticSettings): void {
+function save(s: SoundSettingsValues): void {
   try {
     storage()?.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(s));
   } catch {
@@ -72,12 +72,12 @@ function save(s: HapticSettings): void {
 
 /** Saves wait this long after the last change (a slider drag changes the settings 60 times a second). */
 export const SAVE_DEBOUNCE_MS = 200;
-let pendingSave: HapticSettings | null = null;
+let pendingSave: SoundSettingsValues | null = null;
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 let flushOnHideBound = false;
 
 /** Write a pending save now (also run when the page is hidden or unloaded). */
-export function flushHapticSettings(): void {
+export function flushSoundSettings(): void {
   if (saveTimer !== null) clearTimeout(saveTimer);
   saveTimer = null;
   const s = pendingSave;
@@ -91,29 +91,29 @@ function cancelPendingSave(): void {
   pendingSave = null;
 }
 
-function scheduleSave(s: HapticSettings): void {
+function scheduleSave(s: SoundSettingsValues): void {
   pendingSave = s;
   if (saveTimer !== null) clearTimeout(saveTimer);
-  saveTimer = setTimeout(flushHapticSettings, SAVE_DEBOUNCE_MS);
+  saveTimer = setTimeout(flushSoundSettings, SAVE_DEBOUNCE_MS);
   if (!flushOnHideBound && typeof window !== 'undefined' && typeof document !== 'undefined') {
     // Registered on the first change, never at import.
     flushOnHideBound = true;
-    window.addEventListener('pagehide', flushHapticSettings);
+    window.addEventListener('pagehide', flushSoundSettings);
     document.addEventListener('visibilitychange', () => {
-      if (document.hidden) flushHapticSettings();
+      if (document.hidden) flushSoundSettings();
     });
   }
 }
 
-function pick(s: HapticSettings): HapticSettings {
+function pick(s: SoundSettingsValues): SoundSettingsValues {
   const { soundOn, volume } = s;
   return { soundOn, volume };
 }
 
 // Static initial values: storage is read on first use, not at import.
-const INITIAL: HapticSettings = defaultSettings();
+const INITIAL: SoundSettingsValues = defaultSettings();
 
-const store = createStore<HapticSettingsState>()((set) => ({
+const store = createStore<SoundSettingsState>()((set) => ({
   ...INITIAL,
   loaded: false,
   update(changes) {
@@ -139,24 +139,24 @@ const rawGetState = store.getState;
 store.getState = () => {
   const s = rawGetState();
   if (s.loaded) return s;
-  store.setState({ ...loadHapticSettings(), loaded: true });
+  store.setState({ ...loadSoundSettings(), loaded: true });
   return rawGetState();
 };
 
 type SettingsHook = {
-  (): HapticSettingsState;
-  <T>(selector: (s: HapticSettingsState) => T): T;
-} & StoreApi<HapticSettingsState>;
+  (): SoundSettingsState;
+  <T>(selector: (s: SoundSettingsState) => T): T;
+} & StoreApi<SoundSettingsState>;
 
 /** The settings store: a React hook with `getState`, `setState` and `subscribe` (Zustand). */
-export const useHapticSettings: SettingsHook = Object.assign(
-  <T>(selector?: (s: HapticSettingsState) => T) =>
-    useStore(store, selector ?? ((s: HapticSettingsState) => s as unknown as T)),
+export const useSoundSettings: SettingsHook = Object.assign(
+  <T>(selector?: (s: SoundSettingsState) => T) =>
+    useStore(store, selector ?? ((s: SoundSettingsState) => s as unknown as T)),
   store,
 ) as SettingsHook;
 
 /** The current settings, loaded from storage on first use. */
-export function getHapticSettings(): HapticSettingsState {
+export function getSoundSettings(): SoundSettingsState {
   return store.getState();
 }
 
@@ -166,7 +166,7 @@ export function ensureLoaded(): void {
 }
 
 /** Push settings into the engine and the audio driver. */
-export function applySettings(outputs: SoundOutputs, s: HapticSettings): void {
+export function applySettings(outputs: SoundOutputs, s: SoundSettingsValues): void {
   outputs.engine.setDriverEnabled(outputs.audio, s.soundOn);
   outputs.audio.setVolume(s.volume);
 }
@@ -177,8 +177,8 @@ export function applySettings(outputs: SoundOutputs, s: HapticSettings): void {
  */
 export function bindEngine(outputs: SoundOutputs): () => void {
   ensureLoaded();
-  applySettings(outputs, useHapticSettings.getState());
-  const unsubscribe = useHapticSettings.subscribe((s) => applySettings(outputs, s));
+  applySettings(outputs, useSoundSettings.getState());
+  const unsubscribe = useSoundSettings.subscribe((s) => applySettings(outputs, s));
   const unbindPage = bindPageLifecycle(outputs);
   return () => {
     unsubscribe();

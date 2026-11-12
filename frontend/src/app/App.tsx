@@ -28,7 +28,7 @@ import { BuildPane } from './build/BuildPane';
 import { SelectedCard } from './build/SelectedCard';
 import { useSelectedBodyLoader } from './build/selectedBody';
 import { Island } from './island/Island';
-import { SoundProvider } from '@/haptics/SoundProvider';
+import { SoundProvider } from '@/sound/SoundProvider';
 
 /**
  * A new search opens the object panel (unless it is already open at the spectrum), a marker click

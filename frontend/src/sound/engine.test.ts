@@ -7,17 +7,17 @@ import {
   FakeClock,
   FakeDriver,
   PlainDriver,
-} from '@/test/fakeHaptics';
+} from '@/test/fakeSound';
 import { setAudioContextFactory } from './audioContext';
-import { AudioDriver } from './drivers/audio';
+import { AudioDriver } from './voices';
 import {
   HAPTIC_DEBUG_EVENT,
-  HapticEngine,
-  createHaptics,
-  type HapticEngineOptions,
+  SoundEngine,
+  createSoundEngine,
+  type SoundEngineOptions,
   type HapticTimers,
-} from './haptics';
-import { bindEngine, flushHapticSettings, useHapticSettings, defaultSettings } from './settings';
+} from './engine';
+import { bindEngine, flushSoundSettings, useSoundSettings, defaultSettings } from './settings';
 
 const tick = (over: Partial<HapticEvent> = {}): HapticEvent => ({
   kind: 'tick',
@@ -26,7 +26,7 @@ const tick = (over: Partial<HapticEvent> = {}): HapticEvent => ({
   ...over,
 });
 
-function setup(options: HapticEngineOptions = {}, blockMs = 0) {
+function setup(options: SoundEngineOptions = {}, blockMs = 0) {
   const clock = new FakeClock();
   const driver = new FakeDriver(clock.clock, true, blockMs);
   const debug = new EventTarget();
@@ -34,7 +34,7 @@ function setup(options: HapticEngineOptions = {}, blockMs = 0) {
   debug.addEventListener(HAPTIC_DEBUG_EVENT, (e) =>
     seen.push((e as CustomEvent<HapticEvent>).detail),
   );
-  const engine = new HapticEngine([driver], {
+  const engine = new SoundEngine([driver], {
     clock: clock.clock,
     timers: clock,
     debugTarget: debug,
@@ -201,7 +201,7 @@ describe('pulse trains (Q-71)', () => {
       setTimeout: (fn: () => void, ms: number) => clock.setTimeout(fn, ms + 7),
       clearTimeout: (h: unknown) => clock.clearTimeout(h),
     };
-    const engine = new HapticEngine([driver], {
+    const engine = new SoundEngine([driver], {
       clock: clock.clock,
       timers: late,
       debugTarget: null,
@@ -257,7 +257,7 @@ describe('pulse trains (Q-71)', () => {
   it('a non-train driver gets one R8.8 pulseTrain event per window', () => {
     const clock = new FakeClock();
     const plain = new PlainDriver();
-    const engine = new HapticEngine([plain], {
+    const engine = new SoundEngine([plain], {
       clock: clock.clock,
       timers: clock,
       debugTarget: null,
@@ -295,19 +295,19 @@ describe('pulse trains (Q-71)', () => {
   });
 });
 
-describe('createHaptics (Q-132, D-39, R8.8.1 item 1)', () => {
+describe('createSoundEngine (Q-132, D-39, R8.8.1 item 1)', () => {
   afterEach(() => {
     setAudioContextFactory(null);
     vi.restoreAllMocks();
-    flushHapticSettings();
+    flushSoundSettings();
     localStorage.clear();
-    useHapticSettings.setState({ ...defaultSettings(), loaded: false });
+    useSoundSettings.setState({ ...defaultSettings(), loaded: false });
   });
 
   it('builds the audio driver only', () => {
     const fake = new FakeAudioContext();
     setAudioContextFactory(() => fake.asAudioContext());
-    const h = createHaptics({ debugTarget: null });
+    const h = createSoundEngine({ debugTarget: null });
     expect(h.engine.activeDrivers).toEqual([h.audio]);
     expect(h).not.toHaveProperty('vibrate');
     h.engine.dispose();
@@ -316,7 +316,7 @@ describe('createHaptics (Q-132, D-39, R8.8.1 item 1)', () => {
   it('sounds once bound and unlocked', async () => {
     const fake = new FakeAudioContext();
     setAudioContextFactory(() => fake.asAudioContext());
-    const h = createHaptics({ debugTarget: null });
+    const h = createSoundEngine({ debugTarget: null });
     const unbind = bindEngine(h);
     await h.engine.unlock();
     expect(h.engine.emit(tick({ strength: 1 }))).toBe(true);
@@ -332,7 +332,7 @@ function web(timers?: HapticTimers) {
   const t = timers ?? clock;
   const ctx = new FakeAudioContext();
   const audio = new AudioDriver({ context: () => ctx.asAudioContext(), supported: true });
-  const engine = new HapticEngine([audio], {
+  const engine = new SoundEngine([audio], {
     clock: clock.clock,
     timers: t,
     debugTarget: null,
@@ -378,7 +378,7 @@ describe('review fixes', () => {
   it('a timer later than the lead does not shift the phase (finding 5)', () => {
     const clock = new FakeClock();
     const driver = new FakeDriver(clock.clock);
-    const engine = new HapticEngine([driver], {
+    const engine = new SoundEngine([driver], {
       clock: clock.clock,
       timers: lateBy(clock, 30),
       debugTarget: null,
@@ -410,7 +410,7 @@ describe('review fixes', () => {
   it('a late re-send timer still re-sends the cancelled pulses (finding 7)', () => {
     const clock = new FakeClock();
     const driver = new FakeDriver(clock.clock, true, 25);
-    const engine = new HapticEngine([driver], {
+    const engine = new SoundEngine([driver], {
       clock: clock.clock,
       timers: lateBy(clock, 30),
       debugTarget: null,
@@ -453,7 +453,7 @@ describe('updateTrain in the hot path (review P3)', () => {
       },
       clearTimeout: (h) => clock.clearTimeout(h),
     };
-    const engine = new HapticEngine([driver], { clock: clock.clock, timers, debugTarget: null });
+    const engine = new SoundEngine([driver], { clock: clock.clock, timers, debugTarget: null });
     engine.startTrain('t', { rateHz: 10, strength: 0.5, tag: 'measured', pitch: 0.2 });
     clock.advance(10);
     const before = sets;

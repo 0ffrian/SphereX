@@ -5,7 +5,7 @@
 import type { HapticChannel, HapticDriver, HapticEvent, HapticVoice, Tag } from '@/contract';
 import { DEFAULT_HONESTY, isTagShown, type HonestyState } from '@/viewer/honesty';
 import { getUnlockState, unlockAudio } from './audioContext';
-import { AudioDriver } from './drivers/audio';
+import { AudioDriver } from './voices';
 import {
   MAX_EVENTS_PER_SECOND,
   MIN_TICK_INTERVAL_MS,
@@ -96,7 +96,7 @@ export function playsTrains(d: HapticDriver): d is TrainCapableDriver {
   return typeof (d as Partial<TrainCapableDriver>).playTrain === 'function';
 }
 
-export interface HapticEngineOptions {
+export interface SoundEngineOptions {
   /** Milliseconds, monotonic. Default `performance.now`. */
   clock?: () => number;
   timers?: HapticTimers;
@@ -164,7 +164,7 @@ interface WindowBuffer {
   trainSeq: number;
 }
 
-export class HapticEngine {
+export class SoundEngine {
   private drivers: HapticDriver[];
   private readonly disabled = new Set<HapticDriver>();
   private active: HapticDriver[] = [];
@@ -197,7 +197,7 @@ export class HapticEngine {
   };
   private trainSeq = 0;
 
-  constructor(drivers: HapticDriver[], options: HapticEngineOptions = {}) {
+  constructor(drivers: HapticDriver[], options: SoundEngineOptions = {}) {
     this.drivers = [...drivers];
     this.clock = options.clock ?? (() => performance.now());
     this.timers = options.timers ?? defaultTimers();
@@ -625,7 +625,7 @@ export class HapticEngine {
 
 /** The engine with the audio driver: all the event app has (Q-132, R8.8.1 item 1). */
 export interface SoundOutputs {
-  readonly engine: HapticEngine;
+  readonly engine: SoundEngine;
   readonly audio: AudioDriver;
 }
 
@@ -634,9 +634,9 @@ export interface SoundOutputs {
  * no AudioContext (that waits for `engine.unlock()` in a click). Wire the settings with `bindEngine`
  * (settings.ts).
  */
-export function createHaptics(options: HapticEngineOptions = {}): SoundOutputs {
+export function createSoundEngine(options: SoundEngineOptions = {}): SoundOutputs {
   const audio = new AudioDriver();
-  const engine = new HapticEngine([audio], options);
+  const engine = new SoundEngine([audio], options);
   return { engine, audio };
 }
 
@@ -648,7 +648,7 @@ export function createHaptics(options: HapticEngineOptions = {}): SoundOutputs {
  * sound whose tag the new state hides stops at once.
  */
 export function bindHonesty(
-  engine: Pick<HapticEngine, 'setHonesty'>,
+  engine: Pick<SoundEngine, 'setHonesty'>,
   get: () => HonestyState,
   subscribe: (listener: () => void) => () => void,
 ): () => void {

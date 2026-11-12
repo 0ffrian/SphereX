@@ -1,4 +1,4 @@
-// R10 file layout: every module listed for frontend/src/viewer and frontend/src/haptics exists
+// R10 file layout: every module listed for frontend/src/viewer and frontend/src/sound exists
 // and exports something (a real API or a named placeholder).
 import { describe, expect, it } from 'vitest';
 import { MAX_AMBIENT_INTENSITY } from '@/viewer/lighting';
@@ -19,16 +19,17 @@ const R10_MODULES = [
   './viewer/renderers/Star.ts',
   './viewer/renderers/ShaderBody.ts',
   './viewer/fields/fieldWorker.ts',
-  // src/haptics (Atish, D-17; haptics cut, D-39)
-  './haptics/haptics.ts',
-  './haptics/audioContext.ts',
-  './haptics/audioGraph.ts',
-  './haptics/settings.ts',
-  './haptics/pitch.ts',
-  './haptics/spectrumMapping.ts',
-  './haptics/tuning.ts',
-  './haptics/drivers/audio.ts',
-  './haptics/sound/listenSweep.ts',
+  // src/sound (Atish, D-17; haptics cut and the audio moved here, D-39)
+  './sound/engine.ts',
+  './sound/audioContext.ts',
+  './sound/audioGraph.ts',
+  './sound/settings.ts',
+  './sound/pitch.ts',
+  './sound/spectrumMapping.ts',
+  './sound/tuning.ts',
+  './sound/voices.ts',
+  './sound/listenSweep.ts',
+  './sound/appSound.ts',
   // extra folders (frontend README): contract, state
   './contract/index.ts',
   './state/store.ts',
@@ -36,7 +37,7 @@ const R10_MODULES = [
 
 const modules = import.meta.glob<Record<string, unknown>>([
   './viewer/**/*.ts',
-  './haptics/**/*.ts',
+  './sound/*.ts',
   './contract/index.ts',
   './state/store.ts',
   '!./**/*.test.ts',

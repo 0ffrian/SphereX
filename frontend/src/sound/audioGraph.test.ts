@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest';
 import { FakeAudioContext, FakeCompressor, FakeGain, FakeSource } from '@/test/fakeAudio';
 import { getMasterBus, playBell } from './audioGraph';
-import { AudioDriver } from './drivers/audio';
+import { AudioDriver } from './voices';
 import { CHIME_DECAY_S, CHIME_PARTIAL_RATIO, LIMITER_THRESHOLD_DB } from './tuning';
 
 const asCtx = (c: FakeAudioContext) => c.asAudioContext();

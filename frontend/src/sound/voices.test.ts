@@ -10,8 +10,8 @@ import {
   FakePanner,
   FakeSource,
 } from '@/test/fakeAudio';
-import type { TrainWindow } from '../haptics';
-import { pitchToHz } from '../pitch';
+import type { TrainWindow } from './engine';
+import { pitchToHz } from './pitch';
 import {
   AUDIO_FLOOR_STRENGTH,
   AUDIO_LOOKAHEAD_S,
@@ -19,8 +19,8 @@ import {
   NOISE_BURST_S,
   NOISE_DECAY_S,
   MAX_AUDIO_VOICES,
-} from '../tuning';
-import { AudioDriver, audioGain, clampTrainRate, patternOnsetsMs, selectTimbre } from './audio';
+} from './tuning';
+import { AudioDriver, audioGain, clampTrainRate, patternOnsetsMs, selectTimbre } from './voices';
 
 function setup(options: ConstructorParameters<typeof FakeAudioContext>[0] = {}) {
   const ctx = new FakeAudioContext(options);
