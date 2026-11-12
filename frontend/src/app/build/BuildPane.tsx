@@ -161,24 +161,24 @@ export function BuildPane() {
     useAmbienceStore.getState().setAmbience(!atmoOn, atmo.model, card.id);
   };
   const renderPop = (b: (typeof POP_BUTTONS)[number]) => (
-              <button
-                key={b.id}
-                ref={(el) => {
-                  buttonRefs.current[b.id] = el;
-                }}
-                type="button"
-                className="sx-bp-tool sx-bp-text"
-                title={b.title}
-                aria-pressed={pop === b.id}
-                aria-expanded={pop === b.id}
-                aria-controls={BUILD_POP_ID}
-                onClick={() => setPop(pop === b.id ? null : b.id)}
-                data-testid={`build-${b.id === 'acc' ? 'accuracy' : b.id}`}
-              >
-                <Icon name={b.icon} className="size-[15px]" />
-                <span>{b.label}</span>
-              </button>
-            );
+    <button
+      key={b.id}
+      ref={(el) => {
+        buttonRefs.current[b.id] = el;
+      }}
+      type="button"
+      className="sx-bp-tool sx-bp-text"
+      title={b.title}
+      aria-pressed={pop === b.id}
+      aria-expanded={pop === b.id}
+      aria-controls={BUILD_POP_ID}
+      onClick={() => setPop(pop === b.id ? null : b.id)}
+      data-testid={`build-${b.id === 'acc' ? 'accuracy' : b.id}`}
+    >
+      <Icon name={b.icon} className="size-[15px]" />
+      <span>{b.label}</span>
+    </button>
+  );
   useEffect(() => {
     if (!ambienceOn) return;
     const onM = (e: globalThis.KeyboardEvent) => {
@@ -319,7 +319,7 @@ export function BuildPane() {
                 type="button"
                 className="sx-bp-tool sx-bp-text sx-bp-toggle"
                 aria-pressed={!closeHidden}
-                title={closeHidden ? 'Explore: the close-up on the left' : 'Close the close-up'}
+                title="Explore: the close-up on the left"
                 onClick={() => useCloseUpStore.getState().setHidden(!closeHidden)}
                 data-testid="build-explore"
               >

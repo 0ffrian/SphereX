@@ -105,15 +105,26 @@ export function CloseUpPane() {
     const el = rootRef.current;
     if (!el || wasOpen.current === open) return;
     wasOpen.current = open;
+    // When an animation ends, its inline styles go, so the stylesheet (and the phone layout) rules again.
+    const settle = () => {
+      el.style.removeProperty('opacity');
+      el.style.removeProperty('transform');
+    };
     if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
-      el.style.opacity = '';
-      el.style.transform = '';
+      settle();
       return;
     }
+    // On a phone the pane is the top of the screen: it fades, it does not slide in from the left.
+    const phone = window.matchMedia?.('(max-width: 640px)').matches ?? false;
+    const away = 'translateX(-48px) scale(0.98)';
     const a = open
-      ? animate(el, { opacity: [0, 1], transform: ['translateX(-48px) scale(0.98)', 'translateX(0px) scale(1)'] }, EXPLORE_SPRING)
-      : animate(el, { opacity: 0, transform: 'translateX(-48px) scale(0.98)' }, { duration: 0.35, ease: [0.4, 0, 1, 1] });
-    return () => a.stop();
+      ? animate(el, phone ? { opacity: [0, 1] } : { opacity: [0, 1], transform: [away, 'translateX(0px) scale(1)'] }, EXPLORE_SPRING)
+      : animate(el, phone ? { opacity: 0 } : { opacity: 0, transform: away }, { duration: 0.35, ease: [0.4, 0, 1, 1] });
+    void a.finished.then(settle, () => {});
+    return () => {
+      a.stop();
+      settle();
+    };
   }, [open]);
   const [about, setAbout] = useState(false);
   const focusRef = useRef<HTMLDivElement>(null);

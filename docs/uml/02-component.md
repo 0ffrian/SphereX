@@ -194,7 +194,7 @@ flowchart TB
     Store["Store (Zustand): card, RenderParams, honesty state, overrides"]
     PulseInd["On-screen pulse indicator (D-20)"]
     Settings["Haptics + audio settings"]
-    Shell["Shell (A21, Q-89): SkyDock (Known objects, Discovery, Search; D-38, Q-296), SkyZoom, ToolRail (openTool only) + railIcons, shellStore, areaStore, AreaCard, PanelCard, Readout, shortcuts, floating full-screen layout"]
+    Shell["Shell (A21, Q-89): SkyDock (Known objects, Discovery, Search; D-38, Q-296), SkyZoom, ToolRail (openTool only) + railIcons, FrameRate (frame-rate menu after the player, writes store sky.fps), shellStore, areaStore, AreaCard, PanelCard, Readout, shortcuts, floating full-screen layout"]
     Island["Island, app/island (Q-121, Q-123): orb, Thinking pill, grid loader"]
     SkyPane["SkyPane: sky image, markers, click to pick"]
     Transport["Transport bar"]
@@ -209,10 +209,11 @@ flowchart TB
   subgraph Build["app/build (issue #60, R5.8)"]
     SelectedCard["SelectedCard: the object card"]
     BodyLoader["selectedBody.ts: useSelectedBodyLoader"]
-    BuildPane["BuildPane: split pane, Feel, Replay, New seed, Close"]
+    BuildPane["BuildPane: header Accuracy, Ambience toggle, Explore, Details, Close; Replay, New seed (Q-419, Q-420)"]
     Mould["useMould + MouldStrip"]
     MouldAnim["MouldAnimation + mouldBody: mock-up moulding body, own WebGLRenderer (Q-415)"]
-    HearPanel["HearPanel + hearAudio: Atmosphere and spectrum sweep, own AudioContext (Q-416)"]
+    HearPanel["HearPanel + hearAudio (dormant, kept for Atish; no longer reachable from the header, Q-420): Atmosphere and spectrum sweep, own AudioContext (Q-416)"]
+    ExploreUI["ExploreIcon + exploreMotion: Explore toggle (compass on a spring) and the pane and close-up springs (Q-419, Q-420)"]
   end
 
   TrackPane["Track pane (A20, to build): time slider, zoom, spectrum hop by hop"]
@@ -279,7 +280,8 @@ flowchart TB
   BodyLoader -->|"GET card, render-params"| BackendAPI
   BuildPane --> Mould
   BuildPane --> MouldAnim
-  BuildPane --> HearPanel
+  BuildPane -.->|"dormant since Q-420"| HearPanel
+  BuildPane --> ExploreUI
   Mould -->|"showPlan, whenLoaded, setMould"| ViewerApp
   ViewerApp --> MouldRig
   BuildPane -->|"+ Artistic and the adapter accepts the card"| EngStages
