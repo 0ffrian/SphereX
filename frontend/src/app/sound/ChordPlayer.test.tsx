@@ -228,3 +228,46 @@ describe('chord strip and copy (code review, Q-446)', () => {
     expect(sound.getStatus().chord).toBeNull();
   });
 });
+
+describe('D-21: nothing derived at Measured only (PR #123 review)', () => {
+  const dipReply = () => {
+    const pts = Array.from({ length: 60 }, (_, i) => {
+      const l = 0.8 + i * 0.05;
+      return {
+        frame_id: `d${i}`,
+        wavelength_um: l,
+        flux: Math.abs(l - 2.3) < 0.06 ? 0.02 : 1,
+        error: 0.01,
+        flagged: false,
+      };
+    });
+    return { ...data, spectrum: pts as never };
+  };
+
+  for (const [state, derivedShown] of [
+    ['measured', false],
+    ['derived', true],
+    ['artistic', true],
+  ] as const) {
+    it(`at ${state}: Smooth ${derivedShown ? 'enabled' : 'disabled'}, A/B marks and sentence ${derivedShown ? 'shown' : 'hidden'}`, async () => {
+      useAppStore.setState({ honesty: state });
+      await act(async () =>
+        root.render(
+          <SoundProvider sound={sound}>
+            <SpectrumSound reply={dipReply() as never} />
+          </SoundProvider>,
+        ),
+      );
+      await click('sky-kind-chord');
+      const smooth = q('sky-chord-mode-smooth') as HTMLButtonElement;
+      expect(smooth.disabled).toBe(!derivedShown);
+      expect(q('sky-chord-smooth-why') !== null).toBe(!derivedShown);
+      const marks = host.querySelectorAll('[data-testid="sky-chord-ab-mark"]').length;
+      expect(marks > 0).toBe(derivedShown);
+      const summary = q('sky-chord-summary')!.textContent!;
+      expect(summary).toMatch(/of 12 notes sound/);
+      expect(summary.includes('Smooth')).toBe(derivedShown);
+      expect(summary).toMatch(/with no data/); // the gap below 0.8 um is listed apart from faint notes
+    });
+  }
+});
