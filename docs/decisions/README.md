@@ -451,4 +451,5 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | Q-443 | Spectrum chord | Decided | [sound-ambience](sound-ambience.md) |
 | Q-444 | Determinism for sound: one JavaScript engine | Decided | [sound-ambience](sound-ambience.md) |
 | Q-445 | Bake engine deviations from R13 (PR #119, #113) | Decided (as built) | [sound-ambience](sound-ambience.md) |
+| Q-449 | Weather overlay as built: strokes, glow spacing, small area, drawn deck (#117) | Decided (as built); parts open | [sound-ambience](sound-ambience.md) |
 | B-01 to B-04 | Post-event backlog | Backlog | [scope-process](scope-process.md#post-event-backlog) |
