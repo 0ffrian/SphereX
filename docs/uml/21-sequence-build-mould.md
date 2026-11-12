@@ -42,6 +42,10 @@ sequenceDiagram
   B->>M: start (seq)
   M->>V: showPlan(plan) behind "Loading the 3D view"
   M->>V: whenLoaded(): textures, meshes, generated field, compile
+  opt a D-37 world engine draws the body and has not formed it (hold, Q-339)
+    M->>B: phase forming: the first step shown in progress
+    B-->>M: hold ends: onFormed (shaders ready, spin-up done), or the engine fails and the three.js path draws
+  end
   loop every frame, 2.3 s per step, smoothstep
     M->>PL: stage s: planRender(card, params, ctx + hold = later steps' layers)
     M->>V: showPlan(stage plan) when the stage changes (framed like the normal plan)
@@ -59,6 +63,7 @@ sequenceDiagram
 ## Notes
 
 - Reduced motion (R9): no stages; the normal plan is shown at once and every step is ticked.
+- Engine hold (issue #93, Q-339): while a D-37 world engine compiles and forms the world, `useMould` is in the phase `'forming'`; the steps play from the start once the engine reports `onFormed`. The engine's own lifecycle and watchdog are in [R5.9](../rendering/engines.md#r59-prototype-engines-d-37) and diagram [10](10-sequence-view-3d.md).
 - The body loads in `useSelectedBodyLoader` (`app/build/selectedBody.ts`, called from `App.tsx`) when the card is asked for or the pane opens, not on every marker click (Q-120 item 5). SelectedCard only shows it.
 - Feel (R5.6) takes effect once the body is built; during the moulding a drag turns the body (R5.8). Raising the honesty level automatically while moulding (Q-113 item 7) is proposed, not built.
 - The rail's 3D viewer opens the same pane with `animate` false: the normal plan at once.

@@ -15,6 +15,8 @@ vi.mock('./render/pipeline', async (orig) => {
       if (state.mode === 'ctor') throw new Error('pipeline build failed');
     }
     setTier() {}
+    bloomEnabled = false;
+    setBloom() {}
     jitterIndex() {
       return null;
     }

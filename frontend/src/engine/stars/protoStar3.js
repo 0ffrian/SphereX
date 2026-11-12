@@ -1,10 +1,17 @@
 /* eslint-disable */
 // @ts-nocheck
-// Issue #71, D-37: the approved prototype's star and flare engine, extracted MECHANICALLY and unchanged.
+// Issue #71, D-37: the approved prototype's star and flare engine, extracted MECHANICALLY and unchanged except the @rename pairs declared below (issue #93 W1, deviation 7).
 // Source: .claude/worktrees/sculptor-reference/sculptor-preview-next.html, lines 850-1028 (loops and flares on the whole star).
 // Not yet imported by the app: it still needs the TypeScript host (DOM removed, `cardToStar`). Do not edit here;
 // re-run the slicing instead so the body stays byte-identical to the prototype.
+// @deviation (#93 W1 1.2; deviation 7 of the star engine, @rename pairs 23 and 24 below) the plasma pass (PlasmaGL.draw:
+// a clear, 4 blurs and the composite, 6 passes) ran on every frame where it can only give black: no spot groups, the
+// close-up view, true colour or hydrogen-alpha. A black plasma canvas is invisible (it is screened over the surface),
+// so the pass now runs once to clear the canvas when the plasma stops (leaving the Observatory view, say) and again
+// only when the canvas size changes; PL.blank keeps the size it was cleared at, and any drawn plasma frame resets it.
+// The picture is unchanged.
 // @verbatim L851-L1029
+// @rename if(starPL)starPL.draw(W,H,PL.data,0);=>if(starPL&&PL.blank!==W+'x'+H){starPL.draw(W,H,PL.data,0);PL.blank=W+'x'+H;} if(starPL)starPL.draw(W,H,PL.data,PL.n);=>if(starPL){starPL.draw(W,H,PL.data,PL.n);PL.blank=null;}
 /* ---------- loops and flares on the whole star, from the same spot groups ---------- */
 var OV = {
   clock: 0,
@@ -419,7 +426,10 @@ function drawOverlay(rot, tilt, half) {
   ox.clearRect(0, 0, W, H);
   PL.n = 0;
   if (!MODEL.groups.length || ST.view === 'close' || ST.filter === 0 || ST.filter === 1) {
-    if (starPL) starPL.draw(W, H, PL.data, 0);
+    if (starPL && PL.blank !== W + 'x' + H) {
+      starPL.draw(W, H, PL.data, 0);
+      PL.blank = W + 'x' + H;
+    }
     return;
   }
   setView(rot, tilt, half, W, H);
@@ -471,7 +481,10 @@ function drawOverlay(rot, tilt, half) {
     drawEvent(e, boost, lw);
     if (starPL) plasmaEvent(e, boost, lw);
   });
-  if (starPL) starPL.draw(W, H, PL.data, PL.n);
+  if (starPL) {
+    starPL.draw(W, H, PL.data, PL.n);
+    PL.blank = null;
+  }
   ox.globalCompositeOperation = 'source-over';
   b1x.clearRect(0, 0, b1.width, b1.height);
   b1x.imageSmoothingEnabled = true;

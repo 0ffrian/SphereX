@@ -7,9 +7,11 @@ the in-process check that the cache holds every target's frames and cutouts.
 
 Rows: every row of the demo search list (``SEARCH_LIST`` in ``scripts.bake_demo_pack``, the same
 list the search bar shows), every other ``group = "demo"`` target in ``targets.toml``, and 433
-Eros (the Track object, group ``fixture``). For each it calls ``/v1/resolve``, ``/card`` and
-``/render-params``, one texture the params point at, then ``/frames``, ``/spectrum`` and the
-first cutout PNG, and prints the time of each call. ``/frames`` gives the cutout URL.
+Eros (the Track object; in group ``demo`` since #73, and named here so it is never dropped).
+For each it calls ``/v1/resolve``, ``/card`` and ``/render-params``, one texture the params point
+at (a 404 is retried for ``--texture-wait`` seconds, default 60, while the background bake
+lands), then ``/frames``, ``/spectrum`` and the first cutout PNG, and prints the time of each
+call. ``/frames`` gives the cutout URL.
 
 A ``frames = false`` target in ``targets.toml`` (a catalogue-only exoplanet: TRAPPIST-1 e,
 K2-18 b) has no frame list in the cache by design, so its frames, spectrum and cutout are
@@ -29,6 +31,7 @@ talks HTTP only, so it never reads the cache itself: what it sees is what the br
 from __future__ import annotations
 
 import argparse
+import math
 import time
 import tomllib
 from collections.abc import Callable
@@ -41,7 +44,8 @@ import httpx
 from app.core.warm import frames_wanted
 from app.settings import Settings
 
-# The Track object (A10.2 step 1, Q-197): in group "fixture", not "demo", but shown on stage.
+# The Track object (A10.2 step 1, Q-197): shown on stage. In group "demo" since #73; named here
+# too, so moving it to another group cannot drop it from the check.
 EXTRA_TARGETS = ("433 Eros",)
 SKIPPED_NO_FRAMES = "skipped: frames = false"
 
@@ -132,7 +136,43 @@ def _texture_url(params: dict[str, Any]) -> str | None:
     return next((u for u in urls if isinstance(u, str) and u.startswith("/")), None)
 
 
-def check_row(client: httpx.Client, row: Row) -> list[Call]:
+# A texture URL is named in /render-params at once, but the bake runs in the background (Q-112):
+# on a cold run the first fetch can 404 until it lands. ASSUMPTION: 60 s covers one 2048x1024
+# bake (about 17 s, Q-112) with room for a queue of a few.
+TEXTURE_WAIT_S = 60.0
+TEXTURE_POLL_S = 2.0
+
+
+def _get_texture(
+    client: httpx.Client,
+    url: str,
+    wait_s: float,
+    poll_s: float = TEXTURE_POLL_S,
+    sleep: Callable[[float], None] = time.sleep,
+) -> Call:
+    """Fetch a texture, retrying a 404 for up to ``wait_s`` while its background bake lands.
+    The time printed is the whole wait; the note says when it took retries."""
+    t0 = time.perf_counter()
+    max_tries = 1 + max(0, math.ceil(wait_s / poll_s)) if poll_s > 0 else 1
+    tries = 1
+    call, _ = _get(client, "texture", url)
+    while call.status == 404 and tries < max_tries:
+        sleep(poll_s)
+        tries += 1
+        call, _ = _get(client, "texture", url)
+    call.ms = (time.perf_counter() - t0) * 1000
+    if tries > 1:
+        landed = "landed" if call.ok else f"still {call.status} after {wait_s:.0f} s"
+        call.note = f"{call.note} (bake {landed}, {tries} tries)".strip()
+    return call
+
+
+def check_row(
+    client: httpx.Client,
+    row: Row,
+    texture_wait_s: float = TEXTURE_WAIT_S,
+    sleep: Callable[[float], None] = time.sleep,
+) -> list[Call]:
     calls: list[Call] = []
     call, r = _get(client, "resolve", "/v1/resolve", q=row.query)
     calls.append(call)
@@ -159,7 +199,7 @@ def check_row(client: httpx.Client, row: Row) -> list[Call]:
         if url is None:
             calls.append(Call("texture", 200, 0.0, "skipped: no baked textures"))
         else:
-            calls.append(_get(client, "texture", url)[0])
+            calls.append(_get_texture(client, url, texture_wait_s, sleep=sleep))
     if not row.frames:
         calls += [Call(label, 200, 0.0, SKIPPED_NO_FRAMES) for label in ("frames", "spectrum")]
         calls.append(Call("cutout", 200, 0.0, SKIPPED_NO_FRAMES))
@@ -218,7 +258,13 @@ def wait_warm(
         sleep(poll_s)
 
 
-def run(client: httpx.Client, rows: list[Row], warm_timeout_s: float | None = None) -> int:
+def run(
+    client: httpx.Client,
+    rows: list[Row],
+    warm_timeout_s: float | None = None,
+    texture_wait_s: float = TEXTURE_WAIT_S,
+    sleep: Callable[[float], None] = time.sleep,
+) -> int:
     ok = True
     try:
         health = client.get("/v1/health").json()
@@ -233,7 +279,7 @@ def run(client: httpx.Client, rows: list[Row], warm_timeout_s: float | None = No
         print("FAIL warm start did not finish")
         ok = False
     for row in rows:
-        calls = check_row(client, row)
+        calls = check_row(client, row, texture_wait_s, sleep)
         good = all(c.ok for c in calls)
         ok = ok and good
         print(f"{'OK  ' if good else 'FAIL'} {row.name:<18} {row.query}")
@@ -249,6 +295,13 @@ def main(argv: list[str] | None = None, client: httpx.Client | None = None) -> i
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
     p.add_argument("--base", default="http://localhost:8000", help="backend base URL")
     p.add_argument("--timeout", type=float, default=120.0, help="seconds per call")
+    p.add_argument(
+        "--texture-wait",
+        type=float,
+        default=TEXTURE_WAIT_S,
+        metavar="SECONDS",
+        help="retry a texture 404 this long while its background bake lands",
+    )
     p.add_argument(
         "--wait-warm",
         type=float,
@@ -268,9 +321,9 @@ def main(argv: list[str] | None = None, client: httpx.Client | None = None) -> i
     if args.only:
         rows = [r for r in rows if r.name in args.only or r.query in args.only]
     if client is not None:
-        return run(client, rows, args.wait_warm)
+        return run(client, rows, args.wait_warm, args.texture_wait)
     with httpx.Client(base_url=args.base, timeout=args.timeout) as c:
-        return run(c, rows, args.wait_warm)
+        return run(c, rows, args.wait_warm, args.texture_wait)
 
 
 if __name__ == "__main__":

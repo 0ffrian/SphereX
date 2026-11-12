@@ -56,7 +56,7 @@ export function makeWorld(preset: Partial<WorldPreset> = {}, tags: Record<string
     id: 'earth', label: 'Earth (calibration)', type: 'rock', Ts: 5772, Rs: 1, a: 1, P: 365.25, Prot: 1, Rj: 0.0892,
     Me: 1, locked: false, fluid: 'water', Ps: 1, mu: 29, sea: 0.5, seed: 101, ...preset,
   };
-  return { ok: true, preset: p, overrides, tags, assumptions: [], missing: [], mismatches: [] };
+  return { ok: true, preset: p, overrides, tags, assumptions: [], missing: [], mismatches: [], measured: [] };
 }
 
 export interface AirInit {
