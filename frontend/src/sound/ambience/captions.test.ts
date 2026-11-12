@@ -1,6 +1,6 @@
 // §12.2 caption model and §12.3 air facts.
 import { describe, expect, it } from 'vitest';
-import { airFacts, bedDirection, caption, EYE_TEXT, LAVA_GAP_TEXT, levelNote } from './captions';
+import { airFacts, bedDirection, caption, ceilingCaption, CEILING_TEXT, EYE_TEXT, LAVA_GAP_TEXT, levelNote, sig2 } from './captions';
 import { earthAir, makePlace, makeWind, marsAir, venusAir } from './fakeEngine.testutil';
 import type { MixFrame } from './types';
 
@@ -59,5 +59,16 @@ describe('captions', () => {
     const facts = airFacts(marsAir());
     expect(facts.find((f) => f.label === 'Two speeds of sound')?.text).toContain('240 Hz');
     expect(airFacts({ ...earthAir(), airOK: false })).toEqual([]);
+  });
+
+  it('Q-447: the ceiling caption adds the action and the derived height, 2 significant figures', () => {
+    expect(sig2(97.16)).toBe('97');
+    expect(sig2(1234)).toBe('1200');
+    expect(sig2(4.56)).toBe('4.6');
+    expect(ceilingCaption(earthAir())).toBe(`${CEILING_TEXT} Fly below about 97 km to hear it.`);
+    // Mars-like: 11.1 km × ln(600) ≈ 71 km
+    expect(ceilingCaption(marsAir())).toBe(`${CEILING_TEXT} Fly below about 71 km to hear it.`);
+    // no usable height (surface already below the floor): the exact §4.1 text alone
+    expect(ceilingCaption(earthAir({ P0: 0.5 }))).toBe(CEILING_TEXT);
   });
 });
