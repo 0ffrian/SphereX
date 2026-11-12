@@ -19,7 +19,14 @@ describe('planMayBloom', () => {
     expect(planMayBloom(plan(name, 'artistic'))).toBe(true);
   });
 
-  it.each(['planet_rocky', 'planet_water', 'gas_giant', 'asteroid_procedural', 'asteroid_shape'])(
+  it.each(['planet_rocky', 'planet_water'])(
+    '%s keeps bloom (the Sun glint on water passes it)',
+    (name) => {
+      expect(planMayBloom(plan(name, 'artistic'))).toBe(true);
+    },
+  );
+
+  it.each(['gas_giant', 'asteroid_procedural', 'asteroid_shape'])(
     '%s skips bloom at every honesty level (lit, LDR)',
     (name) => {
       for (const h of LEVELS) expect(planMayBloom(plan(name, h)), `${name} ${h}`).toBe(false);
