@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { ToggleGroup } from '@/app/PanelControls';
 import type { ListenOutcome, SpectrumReply } from '@/sound/appSound';
 import { useOptionalSound, useOptionalSoundStatus } from '@/sound/SoundProvider';
-import { CHORD_CAPTION, CHORD_NO_SOUND, ChordPlayer } from './ChordPlayer';
+import { CHORD_CAPTION, CHORD_NO_SOUND, ChordPlayer, KIND_HINT } from './ChordPlayer';
 
 type Kind = 'sweep' | 'chord';
 
@@ -13,8 +13,8 @@ export const SWEEP_MAPPING =
   'Short wavelengths sound high, long wavelengths low. Brighter is louder.';
 
 const KIND_OPTIONS = [
-  { value: 'sweep', label: 'Sweep', testId: 'sky-kind-sweep' },
-  { value: 'chord', label: 'Chord', testId: 'sky-kind-chord' },
+  { value: 'sweep', label: 'Sweep', title: KIND_HINT.sweep, testId: 'sky-kind-sweep' },
+  { value: 'chord', label: 'Chord', title: KIND_HINT.chord, testId: 'sky-kind-chord' },
 ] as const;
 
 const LISTEN_LINE: Partial<Record<ListenOutcome, string>> = {
@@ -66,6 +66,9 @@ export function SpectrumSound({ reply }: { reply: SpectrumReply }) {
         onChange={setKind}
         testId="sky-kind"
       />
+      <p className="sx-hr-hint" data-testid="sky-kind-hint">
+        {KIND_HINT[kind]}
+      </p>
       {kind === 'chord' ? (
         <ChordPlayer reply={reply} owner="sky" testId="sky-chord" />
       ) : (

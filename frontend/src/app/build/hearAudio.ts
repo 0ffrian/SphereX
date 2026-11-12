@@ -185,6 +185,10 @@ export interface SpectrumHandle {
 export function startSpectrum(values: readonly (number | null)[], from: number): SpectrumHandle | null {
   const b = getBus();
   if (!b) return null;
+  // Q-446: one spectrum sound at a time. Claimed before anything is scheduled, so the chord or the
+  // Listen sweep stops first; `letGo` gives the slot back.
+  let stopMe: () => void = () => {};
+  let claim: SpectrumClaim | null = claimSpectrumSound(() => stopMe());
   const { ctx, master } = b;
   let pos = from;
   let rest = (1 - pos) * SPEC_SECONDS;
@@ -192,8 +196,6 @@ export function startSpectrum(values: readonly (number | null)[], from: number):
     pos = 0;
     rest = SPEC_SECONDS;
   }
-  // Q-446: one spectrum sound at a time; the chord or the Listen sweep stops before this starts.
-  let claim: SpectrumClaim | null = null;
   const now = ctx.currentTime + 0.03;
   const steps = Math.max(8, Math.round(rest * 60));
   const fr = new Float32Array(steps);
@@ -262,6 +264,6 @@ export function startSpectrum(values: readonly (number | null)[], from: number):
     },
   };
   liveSpectrum = handle;
-  claim = claimSpectrumSound(() => handle.stop());
+  stopMe = handle.stop;
   return handle;
 }

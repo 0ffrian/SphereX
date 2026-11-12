@@ -22,7 +22,7 @@ import {
   SPEC_POINTS,
 } from './hearModel';
 import { readWave, startSpectrum, waveSize, type SpectrumHandle } from './hearAudio';
-import { ChordPlayer } from '@/app/sound/ChordPlayer';
+import { ChordPlayer, KIND_HINT } from '@/app/sound/ChordPlayer';
 import { useOptionalSound } from '@/sound/SoundProvider';
 
 type Mode = 'atmo' | 'spec';
@@ -35,8 +35,8 @@ const MODE_OPTIONS = [
   { value: 'spec', label: 'Spectrum', testId: 'hear-mode-spec' },
 ] as const;
 const KIND_OPTIONS = [
-  { value: 'sweep', label: 'Sweep', testId: 'hear-kind-sweep' },
-  { value: 'chord', label: 'Chord', testId: 'hear-kind-chord' },
+  { value: 'sweep', label: 'Sweep', title: KIND_HINT.sweep, testId: 'hear-kind-sweep' },
+  { value: 'chord', label: 'Chord', title: KIND_HINT.chord, testId: 'hear-kind-chord' },
 ] as const;
 const WIND_OPTIONS = [
   { value: 'calm', label: 'Calm' },
@@ -513,6 +513,9 @@ export function HearPanel({ active, name }: { active: boolean; name: string | un
                 onChange={setKind}
                 testId="hear-kind"
               />
+              <p className="sx-hr-hint" data-testid="hear-kind-hint">
+                {KIND_HINT[kind]}
+              </p>
               {kind === 'chord' ? (
                 <ChordPlayer
                   reply={reply}

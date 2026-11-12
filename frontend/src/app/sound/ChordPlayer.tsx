@@ -5,6 +5,7 @@
 // No copy here claims a band or dip can be heard (R13.12 item 8). Escape stops the chord while focus
 // is in the player. Outside a SoundProvider (some tests) it says sound is not available.
 import { useEffect, useId, useMemo, useState, type KeyboardEvent } from 'react';
+import { ProvenanceBadge } from '@/app/Badge';
 import { ToggleGroup } from '@/app/PanelControls';
 import { useAppStore } from '@/state/store';
 import { effectiveHonesty, HONESTY_LABEL, isTagShown, stateThatShows } from '@/viewer/honesty';
@@ -18,6 +19,11 @@ export const CHORD_MAPPING =
   'The whole spectrum at once as 12 notes: short wavelengths high, long wavelengths low. Brighter is louder.';
 export const CHORD_NOTHING = 'No usable points to play as a chord.';
 export const CHORD_NO_SOUND = 'Sound is not available here.';
+/** The two spectrum sounds, told apart for non-experts: one at a time against all at once. */
+export const KIND_HINT = {
+  sweep: 'Sweep: one wavelength at a time, from short to long.',
+  chord: 'Chord: the whole spectrum all at once, as 12 notes.',
+} as const;
 
 const OUTCOME_LINE: Partial<Record<ChordOutcome, string>> = {
   'nothing-to-play': CHORD_NOTHING,
@@ -26,7 +32,22 @@ const OUTCOME_LINE: Partial<Record<ChordOutcome, string>> = {
   hidden: 'This spectrum is hidden at the current honesty level.',
 };
 
-/** The screen-reader summary of what the chord plays in `mode`. Never says a band is audible. */
+/** Notes whose level differs by at least this between Data and Smooth are marked on the strip. */
+export const AB_MARK_DB = 1;
+
+/**
+ * What the A/B changes for this spectrum (shown on screen, so a subtle difference is not mistaken for
+ * none, and none for a hidden one). Never says a band is audible.
+ */
+export function abSummary(plan: ChordPlan): string {
+  const changed = plan.bins.filter((b) => b.abDiffDb !== null && b.abDiffDb >= AB_MARK_DB).length;
+  if (changed === 0) {
+    return 'Data and Smooth are almost the same for this spectrum: no note changes by 1 dB or more.';
+  }
+  return `${changed} of 12 notes change between Data and Smooth by 1 dB or more (marked on the strip): narrow features in the data.`;
+}
+
+/** The summary of what the chord plays in `mode` (visible and live). Never says a band is audible. */
 export function chordSummary(plan: ChordPlan, mode: ChordMode): string {
   const quiet = (i: number) =>
     mode === 'smooth' ? plan.bins[i]!.smoothQuiet : plan.bins[i]!.quiet;
@@ -35,7 +56,7 @@ export function chordSummary(plan: ChordPlan, mode: ChordMode): string {
   const noisy = plan.bins.filter((b) => b.noisy && !quiet(b.index)).length;
   let s = `${sounding} of 12 notes sound.`;
   if (silent > 0) s += ` ${silent} silent: under 20% of the peak, or no data.`;
-  if (noisy > 0) s += ` ${noisy} wobble (~): noisy data.`;
+  if (noisy > 0) s += ` ${noisy} wobble (marked ~): noisy data.`;
   return s;
 }
 
@@ -150,28 +171,55 @@ export function ChordPlayer({
       </div>
       {!smoothShown && (
         <p className="sx-hr-hint" id={reasonId} data-testid={`${testId}-smooth-why`}>
-          Smooth is smoothed data, an estimate: shown from{' '}
-          {HONESTY_LABEL[stateThatShows(plan.smoothTag)]}.
+          Smooth is an estimate (smoothed data). Set honesty to{' '}
+          {HONESTY_LABEL[stateThatShows(plan.smoothTag)]} to use it.
         </p>
       )}
       <div className="sx-chord-strip" aria-hidden="true" data-testid={`${testId}-strip`}>
-        {levels.map((v, i) => (
-          <i
-            key={i}
-            data-silent={v === null}
-            style={{ height: `${Math.max(8, (v ?? 1) * 100)}%` }}
-            title={plan.bins[i]!.noisy ? 'noisy' : undefined}
-          />
-        ))}
+        {plan.bins.map((bin, i) => {
+          const v = levels[i]!;
+          const other = mode === 'smooth' ? bin.levelDb : bin.smoothLevelDb;
+          const marked = bin.abDiffDb !== null && bin.abDiffDb >= AB_MARK_DB;
+          return (
+            <span key={i} className="sx-chord-note" data-changed={marked} data-noisy={bin.noisy}>
+              <span className="sx-chord-bar">
+                {/* A silent note is a short empty box, never a tall one. */}
+                <i
+                  data-silent={v === null}
+                  style={{ height: v === null ? '12%' : `${Math.max(8, v * 100)}%` }}
+                />
+                {marked && (
+                  <b
+                    data-testid={`${testId}-ab-mark`}
+                    style={{
+                      bottom: other === null ? '0%' : `${Math.max(8, 10 ** (other / 20) * 100)}%`,
+                    }}
+                  />
+                )}
+              </span>
+              <span className="sx-chord-noise">{bin.noisy ? '~' : ''}</span>
+            </span>
+          );
+        })}
       </div>
-      <p className="sr-only" aria-live="polite" data-testid={`${testId}-summary`}>
-        {chordSummary(plan, mode)}
+      <div className="sx-chord-ax" aria-hidden="true">
+        <span>0.75 µm</span>
+        <span>5 µm</span>
+      </div>
+      <p className="sx-hr-hint" aria-live="polite" data-testid={`${testId}-summary`}>
+        {chordSummary(plan, mode)} {abSummary(plan)}
       </p>
       <p className="sx-hr-hint" data-testid={`${testId}-mapping`}>
         {CHORD_MAPPING}
       </p>
       <p className="sx-hr-hint" data-testid={`${testId}-caption`}>
-        {CHORD_CAPTION} {mode === 'smooth' ? 'Smooth: smoothed data (Estimated).' : null}{' '}
+        {CHORD_CAPTION}{' '}
+        {mode === 'smooth' ? (
+          <>
+            Smooth: smoothed data{' '}
+            <ProvenanceBadge tag={plan.smoothTag} tooltip={plan.smoothFormula} srText />{' '}
+          </>
+        ) : null}
         <span data-testid={`${testId}-loudness`}>{CHORD_LOUDNESS_LABEL}.</span>
       </p>
       {line && (

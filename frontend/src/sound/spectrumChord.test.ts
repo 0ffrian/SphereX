@@ -479,5 +479,10 @@ describe('SpectrumChord: the drone (R13.12 items 2, 3; R13.9)', () => {
     r.ctx.simulateState('suspended');
     vi.advanceTimersByTime((2 * CHORD_LOOP_S + DUCK_SAFETY_S) * 1000);
     expect(duckHolds(r.ac)).toBe(0);
+    // The context comes back (a later unlock): the still-playing drone ducks the ambience again.
+    r.ctx.simulateState('running');
+    expect(duckHolds(r.ac)).toBe(1);
+    r.chord.stop();
+    expect(duckHolds(r.ac)).toBe(0);
   });
 });
