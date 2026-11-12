@@ -127,11 +127,22 @@ class Contaminant(BaseModel):
     sep_px: float
 
 
+class StarMask(BaseModel):
+    """A star mask near a mover's track (issue #95, A19.6); ``r_px`` from magnitude [verify]."""
+
+    catalog: CatalogName
+    id: str
+    x: float
+    y: float
+    r_px: float
+
+
 class FrameOverlay(BaseModel):
     frame_id: str
     flags_url: str
     markers: list[Marker]
     contamination: list[Contaminant]
+    masks: list[StarMask]  # [] for fixed objects
     footprint: list[list[float]] | None
     cutout_box: list[list[float]]
 
