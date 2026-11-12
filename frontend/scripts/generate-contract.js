@@ -33,6 +33,7 @@ const ROOT = {
     'areaTracks',
     'areaChecks',
     'areaError',
+    'trackPath',
   ],
   properties: {
     card: { $ref: 'object-card.schema.json' },
@@ -44,6 +45,7 @@ const ROOT = {
     areaTracks: { $ref: 'area-tracks.schema.json' },
     areaChecks: { $ref: 'area-checks.schema.json' },
     areaError: { $ref: 'area-index.schema.json#/definitions/AreaError' },
+    trackPath: { $ref: 'track-path.schema.json' },
   },
 };
 
