@@ -1,0 +1,17 @@
+{
+ "body_sha256": "cf6f3a98b17ab69936df667698068a32dc8b34698c3c47d9596e31889873837d",
+ "body_size": 189,
+ "content_type": "application/json",
+ "fetched_at": "2026-11-12T08:59:13.327Z",
+ "key": {
+  "query": {
+   "id": "eros-2026-03",
+   "stage": "head",
+   "v": "area-2"
+  },
+  "release": "spherex_qr2",
+  "source": "derived.area"
+ },
+ "status": 200,
+ "url": "derived:area:head"
+}

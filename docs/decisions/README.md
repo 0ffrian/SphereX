@@ -33,7 +33,7 @@ The log is split by topic so a task loads only what it needs. **Load this index 
 | [haptics-sound.md](haptics-sound.md) | audio pairing (D-10), spectrum pitch and voice hints, the body tone and the Track path sound | 1 D, 10 Q, 13 KB |
 | [haptics-built.md](haptics-built.md) | the haptic engine, calibration and source choices as built | 0 D, 9 Q, 20 KB |
 | [platform-hosting.md](platform-hosting.md) | the three.js pin, hardware and frame budgets, hosting, the demo machine and the event platform | 3 D, 5 Q, 7 KB |
-| [moving-objects.md](moving-objects.md) | Rainbow Trails, the Track tool, Area search and Discovery (agreed), the P3 frames and dots choices (Q-400 to Q-402) | 1 D, 21 Q, 40 KB |
+| [moving-objects.md](moving-objects.md) | Rainbow Trails, the Track tool, Area search and Discovery (agreed), the P3 frames and dots choices (Q-400 to Q-402), the P4 to P7 choices (Q-420) | 1 D, 22 Q, 47 KB |
 | [moving-objects-review.md](moving-objects-review.md) | proposed fixes to Area search and Track after the 9 Nov 2026 audit, and Moon's review list (Q-202) | 0 D, 9 Q, 16 KB |
 | [moving-frames.md](moving-frames.md) | frames for moving objects: the path cone search, its tags and refusals, MOST | 0 D, 4 Q, 8 KB |
 | [exoplanets.md](exoplanets.md) | the exoplanet card fields (mass, orbit, host star), radius from the archive, tidal locking, mass in the physics layer, and the two demo exoplanet fixtures | 0 D, 5 Q, 15 KB |
@@ -443,6 +443,7 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | Q-415 | Moulding animation is the mock-up's generic body (amends Q-113 item 3) | Open | [shell-surfaces](shell-surfaces.md) |
 | Q-416 | Hear it: Atmosphere and the spectrum sweep (amends Q-295); amended by Q-446 (sweep on `pitch.ts`) | Open (Atish to wire after merge) | [shell-surfaces](shell-surfaces.md) |
 | Q-417 | The browser tab reads "Odysseus" | Decided (Moon, tab title only) | [shell-surfaces](shell-surfaces.md) |
+| Q-420 | Discovery from labels to the API: P4 to P7's choices (pair test, known check, entries, pack) | Proposed | [moving-objects](moving-objects.md) |
 | Q-430 | Pitch polarity: long wavelength = low pitch (amends Q-70, Q-134) | Decided (built #111) | [sound-ambience](sound-ambience.md) |
 | Q-431 | Listener model: quasi-static, no Doppler | Decided | [sound-ambience](sound-ambience.md) |
 | Q-432 | Air physics for sound | Decided | [sound-ambience](sound-ambience.md) |
