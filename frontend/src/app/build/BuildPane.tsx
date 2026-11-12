@@ -23,7 +23,7 @@ import { useCloseUpStore } from '@/app/closeUpStore';
 import { StatusLine } from '@/app/StatusLine';
 import { StatePill } from '@/app/island/StatePill';
 import { GENERATING_LOOK } from '@/app/island/loaderLooks';
-import { BuildDock, ZoomBar } from './BuildChrome';
+import { ReadPaper, ZoomBar } from './BuildChrome';
 import { Icon, type IconName } from '@/app/shell/icons';
 import { isEditableTarget } from '@/app/shell/shortcuts';
 import { useShellStore } from '@/app/shell/shellStore';
@@ -199,7 +199,20 @@ export function BuildPane() {
     if (popRef.current) setPop(null, true);
     else closeBuildPane();
   }, [setPop]);
+  // Q-456: minimised, the pane is hidden behind the island's pill: its keys stay off until restored,
+  // and on restore focus goes back to its title.
+  const minimised = useShellStore((s) => s.buildMinimised);
+  const minimise = useCallback(() => {
+    setPop(null);
+    useShellStore.getState().setBuildMinimised(true);
+  }, [setPop]);
+  const wasMini = useRef(minimised);
   useEffect(() => {
+    if (wasMini.current && !minimised) titleRef.current?.focus({ preventScroll: true });
+    wasMini.current = minimised;
+  }, [minimised]);
+  useEffect(() => {
+    if (minimised) return;
     const onKey = (e: globalThis.KeyboardEvent) => {
       if (e.key !== 'Escape' || e.defaultPrevented || isEditableTarget(e.target)) return;
       e.preventDefault();
@@ -207,7 +220,7 @@ export function BuildPane() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onEscape]);
+  }, [onEscape, minimised]);
   const onKeyDown = (e: KeyboardEvent<HTMLElement>) => {
     if (e.key !== 'Escape' || e.defaultPrevented) return;
     e.preventDefault();
@@ -353,6 +366,16 @@ export function BuildPane() {
             <button
               type="button"
               className="sx-bp-tool"
+              aria-label="Minimise the build view"
+              title="Minimise: the island brings it back"
+              onClick={minimise}
+              data-testid="build-minimise"
+            >
+              <Icon name="minimise" className="size-4" />
+            </button>
+            <button
+              type="button"
+              className="sx-bp-tool"
               aria-label="Close the build view"
               title="Close (Esc)"
               onClick={closeBuildPane}
@@ -404,8 +427,9 @@ export function BuildPane() {
           {say}
         </p>
       </aside>
+      {/* Q-456: no dock in the build view (Moon); the zoom card and the paper link stay. */}
       <ZoomBar />
-      <BuildDock pop={pop} onPop={setPop} />
+      <ReadPaper />
     </>
   );
 }

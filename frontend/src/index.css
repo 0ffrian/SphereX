@@ -1591,6 +1591,51 @@ body {
     left: 16px;
     padding: 0 14px 0 8px;
   }
+  /* Q-456: "Read paper" beside the zoom card: a paper icon that opens out to its label on hover or
+     focus (the label is always in its accessible name). */
+  .sx-paper {
+    left: 174px;
+    height: 48px;
+    padding: 0 16px;
+    gap: 0;
+    color: var(--muted);
+    text-decoration: none;
+    transition:
+      gap 0.3s var(--ease),
+      color 0.2s,
+      background 0.2s;
+  }
+  .sx-paper-label {
+    max-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    opacity: 0;
+    font-size: 13.5px;
+    font-weight: 500;
+    transition:
+      max-width 0.3s var(--ease),
+      opacity 0.2s;
+  }
+  .sx-paper:hover,
+  .sx-paper:focus-visible {
+    gap: 10px;
+    color: var(--fg);
+    background: var(--s2);
+  }
+  .sx-paper:hover .sx-paper-label,
+  .sx-paper:focus-visible .sx-paper-label {
+    max-width: 120px;
+    opacity: 1;
+  }
+  .sx-paper[aria-disabled='true'] {
+    cursor: default;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .sx-paper,
+    .sx-paper-label {
+      transition: none;
+    }
+  }
   .sx-btn-i {
     display: grid;
     place-items: center;
@@ -5207,4 +5252,20 @@ body {
   margin-top: -8px;
   font-size: 11px;
   color: var(--muted);
+}
+
+/* Q-456: a minimised build view stays mounted (no rebuild on restore) but is hidden and out of reach;
+   the island's pill brings it back. */
+.sx-bp-mini {
+  display: contents;
+  visibility: hidden;
+}
+/* The sky's own info button is for the sky image: the build view has "Read paper" instead. */
+.sx-bezel[data-split] :is(.sx-credit-btn, .sx-sky-credit) {
+  display: none;
+}
+/* "Read paper" is glass like the zoom card: its hover darkens the glass (the layered rule loses here). */
+.sx-paper:hover,
+.sx-paper:focus-visible {
+  background: var(--glass-grain), var(--glass-hover);
 }
