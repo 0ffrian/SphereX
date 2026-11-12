@@ -1235,7 +1235,9 @@ body {
     margin-right: 4px;
   }
   .sx-bp-tool[aria-pressed='true'],
-  .sx-bp-tool[aria-pressed='true']:hover {
+  .sx-bp-tool[aria-pressed='true']:hover,
+  .sx-bp-tool[data-pop][aria-expanded='true'],
+  .sx-bp-tool[data-pop][aria-expanded='true']:hover {
     background: var(--ac);
     color: var(--on-ac);
   }
@@ -1590,6 +1592,51 @@ body {
   .sx-zoom {
     left: 16px;
     padding: 0 14px 0 8px;
+  }
+  /* Q-457: "Read paper" beside the zoom card: a paper icon that opens out to its label on hover or
+     focus (the label is always in its accessible name). */
+  .sx-paper {
+    left: 174px;
+    height: 48px;
+    padding: 0 16px;
+    gap: 0;
+    color: var(--muted);
+    text-decoration: none;
+    transition:
+      gap 0.3s var(--ease),
+      color 0.2s,
+      background 0.2s;
+  }
+  .sx-paper-label {
+    max-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    opacity: 0;
+    font-size: 13.5px;
+    font-weight: 500;
+    transition:
+      max-width 0.3s var(--ease),
+      opacity 0.2s;
+  }
+  .sx-paper:hover,
+  .sx-paper:focus-visible {
+    gap: 10px;
+    color: var(--fg);
+    background: var(--s2);
+  }
+  .sx-paper:hover .sx-paper-label,
+  .sx-paper:focus-visible .sx-paper-label {
+    max-width: 120px;
+    opacity: 1;
+  }
+  .sx-paper[aria-disabled='true'] {
+    cursor: default;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .sx-paper,
+    .sx-paper-label {
+      transition: none;
+    }
   }
   .sx-btn-i {
     display: grid;
@@ -4110,12 +4157,17 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 16px;
+  /* The icon sits a little closer to the round end than the text does to the other (optical). */
+  padding: 8px 18px 8px 12px;
   border: 0;
   background: transparent;
   color: #fff;
   cursor: pointer;
   border-radius: 9999px;
+}
+/* The pill's button carries its own padding: the island's wrapper adds none, so it is not padded twice. */
+.sx-orb-in:has(> .sx-orb-mini) {
+  padding: 0;
 }
 .sx-orb-mini:focus-visible {
   outline: 2px solid var(--accent);
@@ -4946,26 +4998,48 @@ body {
   color: var(--fg);
 }
 
-/* #111 (R13.9): the Sound control in the top bar. Its open popover lifts the top bar above the
-   object panel (z 20) and the sky credit (z 25), so the popover is never covered. */
-.sx-top:has(.sx-sound-pop:not([hidden])) {
-  z-index: 31;
+/* Q-456: the sound settings in the build view's Ambience dropdown (SoundControls, AmbiencePanel). */
+.sx-snd {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
-/* Build view: the top bar is click-through (the build pane's header buttons sit under it), so the
-   Sound control moves to the bottom right, left of the island, and takes clicks again; its popover
-   opens upwards. */
-@media (min-width: 641px) {
-  .sx-bezel[data-split] .sx-sound {
-    position: fixed;
-    right: calc(var(--sx-in-r, 16px) + 72px);
-    bottom: 22px;
-    margin: 0;
-    pointer-events: auto;
-  }
-  .sx-bezel[data-split] .sx-sound-pop {
-    top: auto;
-    bottom: 100%;
-    margin: 0 0 8px;
+.sx-snd-status,
+.sx-snd-hint {
+  font-size: 12.5px;
+  line-height: 18px;
+  color: var(--muted);
+}
+.sx-snd-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.sx-snd-vol {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 40px;
+  padding: 0 12px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.sx-snd-vol label {
+  width: 118px;
+  white-space: nowrap;
+  flex: none;
+}
+.sx-snd-vol input {
+  flex: 1;
+  min-width: 0;
+  accent-color: var(--accent);
+}
+.sx-snd-vol input:disabled {
+  opacity: 0.4;
+}
+@media (pointer: coarse) {
+  .sx-snd-vol {
+    min-height: 44px;
   }
 }
 
@@ -5186,4 +5260,53 @@ body {
   margin-top: -8px;
   font-size: 11px;
   color: var(--muted);
+}
+
+/* Q-457: a minimised build view stays mounted (no rebuild on restore) but is hidden and out of reach;
+   the island's pill brings it back. */
+.sx-bp-mini {
+  display: contents;
+  visibility: hidden;
+}
+/* The sky's own info button is for the sky image: the build view has "Read paper" instead. */
+.sx-bezel[data-split] :is(.sx-credit-btn, .sx-sky-credit) {
+  display: none;
+}
+/* "Read paper" is glass like the zoom card: its hover darkens the glass (the layered rule loses here). */
+.sx-paper:hover,
+.sx-paper:focus-visible {
+  background: var(--glass-grain), var(--glass-hover);
+}
+/* Q-457: the island has nothing to say while a body is viewed, so it is not shown in the build view.
+   Hidden, not removed: the minimise animation still flies to its place, and it shows again as the
+   minimised pill (the build view is then no longer the split). */
+.sx-bezel[data-split] .sx-orb-wrap {
+  visibility: hidden;
+  pointer-events: none;
+}
+/* A minimised build is hidden whole: its close-up too (the open close-up sets its own visibility). */
+.sx-bp-mini .sx-cu,
+.sx-bp-mini .sx-cu.open {
+  visibility: hidden;
+}
+/* "Read paper" before the paper exists: dimmed; a press says why for a few seconds. */
+.sx-paper[aria-disabled='true'] {
+  opacity: 0.7;
+}
+.sx-paper-note {
+  position: absolute;
+  left: 174px;
+  bottom: 72px;
+  z-index: 21;
+  max-width: 260px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--glass-edge);
+  background: var(--glass-grain), var(--glass-bg);
+  -webkit-backdrop-filter: var(--glass-filter);
+  backdrop-filter: var(--glass-filter);
+  font-size: 12.5px;
+  line-height: 18px;
+  color: var(--fg);
+  text-shadow: var(--glass-text-shadow);
 }

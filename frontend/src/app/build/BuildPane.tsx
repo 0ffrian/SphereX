@@ -11,7 +11,7 @@ import {
   useCallback,
   useEffect,
   useId,
-  useMemo,
+  useLayoutEffect,
   useRef,
   useState,
   type KeyboardEvent,
@@ -24,14 +24,16 @@ import { useCloseUpStore } from '@/app/closeUpStore';
 import { StatusLine } from '@/app/StatusLine';
 import { StatePill } from '@/app/island/StatePill';
 import { GENERATING_LOOK } from '@/app/island/loaderLooks';
-import { BuildDock, ZoomBar } from './BuildChrome';
+import { ReadPaper, ZoomBar } from './BuildChrome';
 import { Icon, type IconName } from '@/app/shell/icons';
 import { isEditableTarget } from '@/app/shell/shortcuts';
 import { useShellStore } from '@/app/shell/shellStore';
 import { useAppStore } from '@/state/store';
 import { useAmbienceStore } from '@/app/sound/ambienceStore';
-import { atmosphereOf } from './hearModel';
-import { useSpringResize } from './exploreMotion';
+import { useShallow } from 'zustand/react/shallow';
+import { useSound, useSoundStatus } from '@/sound/SoundProvider';
+import { useSoundSettings } from '@/sound/settings';
+import { flyIsland, useSpringResize } from './exploreMotion';
 import { ExploreIcon } from './ExploreIcon';
 import type { MouldPhase } from './useMould';
 import { closeBuildPane } from './focus';
@@ -114,11 +116,16 @@ export function BuildPane() {
     const id = window.setTimeout(() => setShiftedSeq(build.seq), reduced ? 0 : SHIFT_DELAY_MS);
     return () => window.clearTimeout(id);
   }, [phase, build.animate, build.seq]);
-  // The close-up waits for the shift (a store the close-up pane and the viewer panel both read).
+  // Q-457: minimised, the pane is hidden behind the island's pill: its keys stay off until restored,
+  // and on restore focus goes back to its title.
+  const minimised = useShellStore((s) => s.buildMinimised);
+  // The close-up waits for the shift (a store the close-up pane and the viewer panel both read). It is
+  // also held while the build is minimised, so a hidden close-up stops drawing (its fly view stays
+  // mounted and paused, ready for the restore).
   useEffect(() => {
-    useCloseUpStore.getState().setHeld(!shifted);
+    useCloseUpStore.getState().setHeld(!shifted || minimised);
     return () => useCloseUpStore.getState().setHeld(false);
-  }, [shifted]);
+  }, [shifted, minimised]);
 
   const setPop = useCallback((next: PopId | null, returnFocus = false) => {
     const prev = popRef.current;
@@ -157,25 +164,15 @@ export function BuildPane() {
   // anywhere in the page that is not a text field (mock-up: Esc closes the build).
   // Ambience (the wind that outlives the Hear it panel) must always be visible and stoppable (WCAG 1.4.2).
   const ambienceOn = useAmbienceStore((s) => s.ambience && s.playing);
-  // The Atmosphere toggle in the header plays the ambience straight away, without opening Hear it.
-  // Shown only where an atmosphere sound is possible (same refusal rules as the Hear it panel).
-  const atmo = useMemo(() => atmosphereOf(card), [card]);
+  // Q-456: Ambience opens a dropdown (this body's atmosphere and the sound settings, AmbiencePanel).
+  // Its click unlocks audio (Q-73: a user gesture). The icon is crossed out until something can be
+  // heard: before the first click, with Sound off, or with neither the atmosphere nor the fly view's
+  // ambience on.
+  const sound = useSound();
+  const soundStatus = useSoundStatus();
+  const settings = useSoundSettings(useShallow((st) => ({ soundOn: st.soundOn, ambienceOn: st.ambienceOn })));
   const atmoOn = useAmbienceStore((s) => s.ambience && s.playing && s.key === (card?.id ?? ''));
-  // A tap on the dimmed Ambience says why there is nothing to hear (a touch screen shows no title).
-  const [atmoHint, setAtmoHint] = useState(false);
-  useEffect(() => {
-    if (!atmoHint) return;
-    const id = window.setTimeout(() => setAtmoHint(false), 4000);
-    return () => window.clearTimeout(id);
-  }, [atmoHint]);
-  const toggleAtmo = (): void => {
-    if (!atmo.ok) {
-      setAtmoHint(true);
-      return;
-    }
-    if (!card) return;
-    useAmbienceStore.getState().setAmbience(!atmoOn, atmo.model, card.id);
-  };
+  const audible = settings.soundOn && (atmoOn || (soundStatus.unlocked && settings.ambienceOn));
   const renderPop = (b: (typeof POP_BUTTONS)[number]) => (
     <button
       key={b.id}
@@ -185,7 +182,7 @@ export function BuildPane() {
       type="button"
       className="sx-bp-tool sx-bp-text"
       title={b.title}
-      aria-pressed={pop === b.id}
+      data-pop={b.id}
       aria-expanded={pop === b.id}
       aria-controls={BUILD_POP_ID}
       onClick={() => setPop(pop === b.id ? null : b.id)}
@@ -208,7 +205,39 @@ export function BuildPane() {
     if (popRef.current) setPop(null, true);
     else closeBuildPane();
   }, [setPop]);
+  // Q-457: the pane (and its zoom card and paper button) shrinks into the island on a spring, in
+  // animate-ui's style, and only then is it hidden; restoring grows it back out of the island.
+  const flyEls = () => [
+    paneRef.current,
+    document.querySelector<HTMLElement>('[data-testid="build-zoom"]'),
+    document.querySelector<HTMLElement>('[data-testid="build-paper"]'),
+  ];
+  const stopFly = useRef<() => void>(() => {});
+  /** A second click while the pane is on its way into the island does nothing (no snap back). */
+  const minimising = useRef(false);
+  const minimise = useCallback(() => {
+    if (minimising.current) return;
+    minimising.current = true;
+    setPop(null);
+    stopFly.current();
+    stopFly.current = flyIsland(flyEls(), 'in', () => {
+      minimising.current = false;
+      useShellStore.getState().setBuildMinimised(true);
+    });
+  }, [setPop]);
+  const wasMini = useRef(minimised);
+  useLayoutEffect(() => {
+    if (wasMini.current && !minimised) {
+      minimising.current = false;
+      titleRef.current?.focus({ preventScroll: true });
+      stopFly.current();
+      stopFly.current = flyIsland(flyEls(), 'out');
+    }
+    wasMini.current = minimised;
+  }, [minimised]);
+  useEffect(() => () => stopFly.current(), []);
   useEffect(() => {
+    if (minimised) return;
     const onKey = (e: globalThis.KeyboardEvent) => {
       if (e.key !== 'Escape' || e.defaultPrevented || isEditableTarget(e.target)) return;
       e.preventDefault();
@@ -216,7 +245,7 @@ export function BuildPane() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onEscape]);
+  }, [onEscape, minimised]);
   const onKeyDown = (e: KeyboardEvent<HTMLElement>) => {
     if (e.key !== 'Escape' || e.defaultPrevented) return;
     e.preventDefault();
@@ -317,24 +346,30 @@ export function BuildPane() {
             <p data-testid="build-subtitle">{subtitle}</p>
           </div>
           <div className="sx-bp-tools" role="group" aria-label="Build tools">
-            {/* Moon (12 Nov 2026, Q-450): Accuracy, Ambience, Explore, Details, then close. Ambience is a
-                toggle (off, crossed out, until clicked; local synthesis for now, Q-416) and takes Hear it's
-                place in the header; Hear it opens from a row in Details (PR #107 review). Explore is the split view
-                (the close-up on the left). Where there is no atmosphere to hear, Ambience stays
-                visible but off, and its name says why. */}
+            {/* Moon (12 Nov 2026, Q-450): Accuracy, Ambience, Explore, Details, then close. Ambience
+                opens a dropdown with this body's atmosphere and the sound settings (Q-456; crossed out
+                until something can be heard); Hear it opens from a row in Details (PR #107 review).
+                Explore is the split view (the close-up on the left). */}
             {renderPop(POP_BUTTONS[0]!)}
             {canBuild && (
               <button
+                ref={(el) => {
+                  buttonRefs.current.amb = el;
+                }}
                 type="button"
-                className="sx-bp-tool sx-bp-text sx-bp-toggle"
-                aria-label={atmo.ok ? 'Ambience' : `Ambience. ${atmo.line}`}
-                aria-pressed={atmoOn}
-                aria-disabled={!atmo.ok || undefined}
-                title={atmo.ok ? (atmoOn ? 'Stop the ambience (M)' : 'Play the ambience') : atmo.line}
-                onClick={toggleAtmo}
+                className="sx-bp-tool sx-bp-text"
+                title="Ambience and sound settings"
+                data-pop="amb"
+                aria-expanded={pop === 'amb'}
+                aria-controls={BUILD_POP_ID}
+                onClick={() => {
+                  // Synchronously inside the click: browsers only start audio from a user activation.
+                  void sound.unlock();
+                  setPop(pop === 'amb' ? null : 'amb');
+                }}
                 data-testid="build-ambience"
               >
-                <Icon name={atmoOn ? 'hear' : 'hearOff'} className="size-[15px]" />
+                <Icon name={audible ? 'hear' : 'hearOff'} className="size-[15px]" />
                 <span>Ambience</span>
               </button>
             )}
@@ -356,6 +391,16 @@ export function BuildPane() {
             <button
               type="button"
               className="sx-bp-tool"
+              aria-label="Minimise the build view"
+              title="Minimise (the pill reopens it)"
+              onClick={minimise}
+              data-testid="build-minimise"
+            >
+              <Icon name="minimise" className="size-4" />
+            </button>
+            <button
+              type="button"
+              className="sx-bp-tool"
               aria-label="Close the build view"
               title="Close (Esc)"
               onClick={closeBuildPane}
@@ -365,11 +410,6 @@ export function BuildPane() {
             </button>
           </div>
         </header>
-        {atmoHint && !atmo.ok && (
-          <p className="sx-bp-hint" role="status" data-testid="build-ambience-hint">
-            {atmo.line}
-          </p>
-        )}
         {bodyHere?.status === 'loading' ? (
           <div className="sx-bp-msg" data-testid="build-generating">
             <StatePill look={GENERATING_LOOK} word="Generating" />
@@ -412,8 +452,9 @@ export function BuildPane() {
           {say}
         </p>
       </aside>
+      {/* Q-457: no dock in the build view (Moon); the zoom card and the paper link stay. */}
       <ZoomBar />
-      <BuildDock pop={pop} onPop={setPop} />
+      <ReadPaper />
     </>
   );
 }
