@@ -58,7 +58,14 @@ class GaiaCone:
     served: Served
 
 
-def gaia_key(ra: float, dec: float, radius_deg: float, mag_limit: float = MAG_LIMIT_G) -> CacheKey:
+def gaia_key(
+    ra: float,
+    dec: float,
+    radius_deg: float,
+    mag_limit: float = MAG_LIMIT_G,
+    max_rows: int = MAX_ROWS,
+) -> CacheKey:
+    """The defaults give the key every recorded cone was stored under (issue #95 keeps them)."""
     return CacheKey.make(
         SOURCE,
         RELEASE,
@@ -66,7 +73,7 @@ def gaia_key(ra: float, dec: float, radius_deg: float, mag_limit: float = MAG_LI
         dec=norm_dec(dec),
         radius=norm_float(radius_deg, 5),
         g_lt=norm_float(mag_limit, 2),
-        top=str(MAX_ROWS),
+        top=str(max_rows),
     )
 
 
@@ -90,10 +97,17 @@ def parse(body: bytes) -> list[GaiaSource]:
 
 
 def cone(
-    ctx: Context, ra: float, dec: float, radius_deg: float, *, refresh: bool = False
+    ctx: Context,
+    ra: float,
+    dec: float,
+    radius_deg: float,
+    *,
+    refresh: bool = False,
+    max_rows: int = MAX_ROWS,
 ) -> GaiaCone:
-    """One cone, through the cache. Raises ``CacheMissOffline`` / ``UpstreamUnavailable``."""
-    key = gaia_key(ra, dec, radius_deg)
+    """One cone, through the cache. Raises ``CacheMissOffline`` / ``UpstreamUnavailable``.
+    ``max_rows`` is the row cap (part of the key); an answer that reaches it is truncated."""
+    key = gaia_key(ra, dec, radius_deg, max_rows=max_rows)
     q = dict(key.query)
 
     def adql(table: str) -> str:
@@ -105,7 +119,7 @@ def cone(
             q["radius"],
             where=f"phot_g_mean_mag < {q['g_lt']}",
             order_by="phot_g_mean_mag, source_id",
-            top=MAX_ROWS,
+            top=max_rows,
         )
 
     def live() -> LiveResponse:
@@ -121,7 +135,7 @@ def cone(
     served = ctx.cache.fetch(key, live, refresh=refresh)
     sources = parse(served.entry.body)
     table = str(served.entry.meta.get("table") or DEFAULT_TABLE)
-    return GaiaCone(sources, len(sources) >= MAX_ROWS, table, served)
+    return GaiaCone(sources, len(sources) >= max_rows, table, served)
 
 
 # --- astrophysical parameters of one star (issue #68 Part 8c, Q-152) ---------------------------
