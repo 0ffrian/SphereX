@@ -187,7 +187,9 @@ export const useAreaStore = create<AreaState>()((set, get) => {
     trackAbort = ctl;
     // The demo file is 433 Eros only: another object never borrows its sky image, cutouts or title.
     const demoAll = await erosDemo();
-    const demo = !obj || obj.objectId === DEMO_OBJECT_ID ? demoAll : null;
+    // The fallback row of an unreachable backend (no designation, no id) is the demo Eros too.
+    const isDemoEros = !obj || obj.objectId === DEMO_OBJECT_ID || (!obj.objectId && obj.designation === undefined);
+    const demo = isDemoEros ? demoAll : null;
     if (ctl.signal.aborted) return demo;
     // A real object: its frames and path from the API (issue #130).
     if (obj?.objectId) {
@@ -196,7 +198,8 @@ export const useAreaStore = create<AreaState>()((set, get) => {
         if (ctl.signal.aborted) return demo;
         const eros = mergeReal(demo, real.frames, real.path);
         if (eros.hops.length === 0) throw new ApiError('bad_response', 'No frames for this object.');
-        set({ eros, erosFailed: false, trackSource: 'real', trackPath: real.path !== null });
+        // A path reply with no points (`path:not_cached`) is no path: nothing is drawn or claimed.
+        set({ eros, erosFailed: false, trackSource: 'real', trackPath: (real.path?.points.length ?? 0) > 0 });
         return eros;
       } catch (e) {
         if (ctl.signal.aborted || (e instanceof ApiError && e.kind === 'aborted')) return demo;

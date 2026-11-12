@@ -150,6 +150,32 @@ describe('Known flow on the API (issue #130)', () => {
     expect(s.erosFailed).toBe(true);
     expect(s.eros).toBeNull();
   });
+  it('the fallback row of an unreachable backend (no id) opens the demo Eros, not a failed card', async () => {
+    const hop = { frame_id: 'd_1_D1', exposure: 1, detector: 'D1', mjd_avg: 61119.36, flux: 1, stars: [], seg: [] };
+    vi.stubGlobal('fetch', async () => ({
+      ok: true,
+      json: async () => ({ object: { name: 'Eros' }, wide: { png: '', w: 10, h: 10 }, track: [], hops: [hop] }),
+    }));
+    useAreaStore.getState().openEros({ id: '433', name: 'Eros', kind: 'asteroid', frames: 16, visits: 2, trackAvailable: true });
+    await vi.advanceTimersByTimeAsync(50);
+    const s = useAreaStore.getState();
+    expect(s.erosFailed).toBe(false);
+    expect(s.trackSource).toBe('demo');
+    expect(erosList(s.eros, null)).toHaveLength(1);
+  });
+  it('a /path reply with no points is no path: the card does not claim one', async () => {
+    setAreaApi({
+      frames: async () => ({
+        data: { frames: [{ frame_id: 'x_1_D1', time: '2026-03-20T08:30:00.000Z', wavelength_um: 1, x: 1, y: 1, cutout_url: '', flags: [] }] },
+        fixture: null,
+      }),
+      path: async () => ({ data: { points: [], frame_points: [], missing: ['path:not_cached'] }, fixture: null }),
+    } as unknown as ApiClient);
+    useAreaStore.getState().openEros({ id: '9', name: 'Other', kind: 'asteroid', frames: 1, visits: 1, objectId: 'sbdb-9', trackAvailable: true });
+    await vi.advanceTimersByTimeAsync(50);
+    expect(useAreaStore.getState().trackSource).toBe('real');
+    expect(useAreaStore.getState().trackPath).toBe(false);
+  });
   it('another object never borrows the Eros demo, and leaving the card aborts its request', async () => {
     const signals: AbortSignal[] = [];
     setAreaApi({
