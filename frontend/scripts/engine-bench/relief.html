@@ -125,7 +125,8 @@
               flyPitch: aim.pitch,
             });
             W.flyAlt = W.m.gas ? Math.max(alt, 50) : alt;
-            W.gl.draw(W.m);
+            // three draws of the same camera: an engine with the #93 F3 G-buffer shows its still frame (read back)
+            for (let k = 0; k < 3; k++) W.gl.draw(W.m);
             const v = W.view,
               img = new Uint8Array(v.gx * v.h * 4);
             gl.readPixels(0, 0, v.gx, v.h, gl.RGBA, gl.UNSIGNED_BYTE, img);
