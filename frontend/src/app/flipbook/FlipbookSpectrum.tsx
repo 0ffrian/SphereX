@@ -165,27 +165,31 @@ export function FlipbookSpectrum({ name }: { name: string }) {
           <span data-testid="spectrum-caveat">Not absolute photometry: no aperture correction yet.</span>
         </div>
         {/* R9: the text equivalent of the chart. */}
-        <table className="sr-only" data-testid="spectrum-table">
-          <caption>Spectrum points of {name}</caption>
-          <thead>
-            <tr>
-              <th scope="col">Wavelength</th>
-              <th scope="col">Flux ({data.flux_unit})</th>
-              <th scope="col">1σ error</th>
-              <th scope="col">Flagged</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.spectrum.map((p) => (
-              <tr key={`${p.frame_id}-${p.wavelength_um}`}>
-                <td>{formatWavelength(p.wavelength_um)}</td>
-                <td>{p.flux}</td>
-                <td>{p.error}</td>
-                <td>{p.flagged ? 'Yes' : 'No'}</td>
+        {/* The wrapper is what is hidden: a table's <caption> is drawn outside the table's own box,
+            so sr-only on the table left "Spectrum points of ..." on screen. */}
+        <div className="sr-only">
+          <table data-testid="spectrum-table">
+            <caption>Spectrum points of {name}</caption>
+            <thead>
+              <tr>
+                <th scope="col">Wavelength</th>
+                <th scope="col">Flux ({data.flux_unit})</th>
+                <th scope="col">1σ error</th>
+                <th scope="col">Flagged</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {data.spectrum.map((p) => (
+                <tr key={`${p.frame_id}-${p.wavelength_um}`}>
+                  <td>{formatWavelength(p.wavelength_um)}</td>
+                  <td>{p.flux}</td>
+                  <td>{p.error}</td>
+                  <td>{p.flagged ? 'Yes' : 'No'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </>
     );
   } else if (data && outcome) {

@@ -4607,6 +4607,8 @@ body {
 .sx-area-hint,
 .sx-credit-btn,
 .sx-sky-credit,
+.sx-fps-btn,
+.sx-fps-menu,
 .sx-orb {
   background: var(--glass-grain), var(--glass-bg);
   -webkit-backdrop-filter: var(--glass-filter);
@@ -4648,6 +4650,8 @@ body {
   .sx-area-hint,
   .sx-credit-btn,
   .sx-sky-credit,
+  .sx-fps-btn,
+  .sx-fps-menu,
   .sx-orb {
     background: var(--s1);
   }
@@ -4746,4 +4750,84 @@ body {
   font-family: var(--font-mono);
   font-size: 10.5px;
   opacity: 0.7;
+}
+
+/* The frame-rate menu after the player (FrameRate.tsx): a square glass button as tall as the player,
+   and a short menu that opens under it. */
+.sx-transport-slot {
+  gap: 8px;
+}
+.sx-fps {
+  position: relative;
+  flex: none;
+}
+.sx-fps-btn {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  border: 1px solid var(--glass-edge);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+}
+.sx-fps-btn b {
+  font-size: 15px;
+  line-height: 16px;
+  font-weight: 600;
+}
+.sx-fps-btn span {
+  font-size: 10px;
+  line-height: 11px;
+  color: var(--muted);
+}
+.sx-fps-btn:enabled:hover,
+.sx-fps-btn[aria-expanded='true'] {
+  background: var(--glass-grain), rgba(30, 32, 36, 0.75);
+}
+.sx-fps-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.sx-fps-btn:focus-visible,
+.sx-fps-item:focus-visible {
+  outline: 2px solid var(--color-sx-green);
+  outline-offset: 2px;
+}
+.sx-fps-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 30;
+  min-width: 112px;
+  padding: 4px;
+  border-radius: 10px;
+  border: 1px solid var(--glass-edge);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  transform-origin: top left;
+}
+.sx-fps-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 7px;
+  font-size: 13px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.sx-fps-item:hover,
+.sx-fps-item:focus-visible {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--fg);
+}
+.sx-fps-item[aria-checked='true'] {
+  color: var(--fg);
 }

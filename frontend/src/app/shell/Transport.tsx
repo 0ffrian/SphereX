@@ -36,15 +36,17 @@ export function Transport() {
   const demoIndex = useAreaStore((s) => s.index);
   const demoPlaying = useAreaStore((s) => s.playing);
   const demoHop = useAreaStore((s) => currentHop(s));
+  // The frame-rate menu (FrameRate.tsx) sets the speed for the demo exposures too.
+  const fps = useAppStore((s) => s.sky.fps);
   useEffect(() => {
     if (!demo || !demoPlaying) return;
     const t = setInterval(() => {
       const a = useAreaStore.getState();
       const n = erosList(a.eros, a.det).length;
       a.setIndex(n > 0 ? (a.index + 1) % n : 0);
-    }, 700);
+    }, 1000 / fps);
     return () => clearInterval(t);
-  }, [demo, demoPlaying]);
+  }, [demo, demoPlaying, fps]);
 
   const response = sky.status === 'ready' ? sky.frames : null;
   const n = demo ? demoN : (response?.frames.length ?? 0);
