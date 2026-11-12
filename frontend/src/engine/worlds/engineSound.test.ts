@@ -3,9 +3,12 @@ import { describe, expect, it } from 'vitest';
 import { FLY_FOV, projectFly, WorldEngine } from './WorldEngine';
 import { stubCanvas, stubGL } from './glStub.testutil';
 import type { WorldEngineLike } from '@/sound/ambience/types';
+import type { WorldEngineWithSpinup } from '@/sound/ambience/place';
 
 // Compile-time check: WorldEngine is the engine surface the ambience reads (Appendix B).
 const asLike = (e: WorldEngine): WorldEngineLike => e;
+// ... and the surface samplePlace reads (the contract plus the spin-up counter): a #93 rename breaks typecheck here.
+const asSpin = (e: WorldEngine): WorldEngineWithSpinup => e;
 
 describe('WorldEngine sound accessors', () => {
   const e = new WorldEngine(stubCanvas(stubGL().gl), { role: 'globe' });
@@ -16,6 +19,7 @@ describe('WorldEngine sound accessors', () => {
   it('rocky world: weather arrays are the energy budget arrays, cyclones are copied; no gas field', () => {
     e.setPreset('earth');
     expect(asLike(e)).toBe(e);
+    expect(asSpin(e).spinup).toBeGreaterThanOrEqual(0);
     expect(core.EB.ready).toBe(true); // setPreset runs ebInit
     const w = e.weatherFields();
     expect(w).not.toBeNull();
