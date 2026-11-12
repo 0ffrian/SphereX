@@ -2,20 +2,28 @@
 
     uv run python -m scripts.preflight [--base http://localhost:8000] [--wait-warm 600]
 
-For every row of the demo search list (``SEARCH_LIST`` in ``scripts.bake_demo_pack``, the same
+This is the go/no-go check before going on stage (A10.2 step 5). ``scripts.smoke_offline`` is
+the in-process check that the cache holds every target's frames and cutouts.
+
+Rows: every row of the demo search list (``SEARCH_LIST`` in ``scripts.bake_demo_pack``, the same
 list the search bar shows), every other ``group = "demo"`` target in ``targets.toml``, and 433
-Eros (the Track object, group ``fixture``), it calls ``/v1/resolve``, ``/card``,
-``/render-params``, ``/frames``, ``/spectrum`` and the first cutout PNG, and prints the time of
-each call. ``/frames`` is called because it gives the cutout URL (and the app calls it too).
+Eros (the Track object, group ``fixture``). For each it calls ``/v1/resolve``, ``/card`` and
+``/render-params``, one texture the params point at, then ``/frames``, ``/spectrum`` and the
+first cutout PNG, and prints the time of each call. ``/frames`` gives the cutout URL.
+
+A ``frames = false`` target in ``targets.toml`` (a catalogue-only exoplanet: TRAPPIST-1 e,
+K2-18 b) has no frame list in the cache by design, so its frames, spectrum and cutout are
+skipped, not called (the warm start and the pre-fetch skip them too).
 
 Exit code 1 on any non-200 answer (a 503 ``offline_cache_miss`` is the usual one), a connection
-error, or a cutout that is not a PNG. A card or params answer still ``measuring`` is a warning.
-A row with no frames (a moving object outside SPHEREx's windows, a catalogue-only exoplanet) is
-not a failure; its cutout is reported as skipped.
+error, a reply that is not the JSON it should be, or a cutout that is not a PNG. Reported but not
+failed: a card or params answer still ``measuring``, a row whose frame list is empty (a moving
+object outside SPHEREx's windows), and render params with no textures (drawn in the browser).
 
 ``--wait-warm`` polls ``/v1/health`` until the start-up warm cache reports ``finished`` (or the
-time runs out, which fails) before the rows are checked. It talks HTTP only, so it never reads
-the cache itself: what it sees is what the browser will see.
+time runs out, which fails) before the rows are checked. Health's ``warm.total`` counts the warm
+list (the ``SX_PREFETCH_GROUPS`` targets that want frames), not the rows checked here. The script
+talks HTTP only, so it never reads the cache itself: what it sees is what the browser will see.
 """
 
 from __future__ import annotations
@@ -26,19 +34,23 @@ import tomllib
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import httpx
 
+from app.core.warm import frames_wanted
 from app.settings import Settings
 
 # The Track object (A10.2 step 1, Q-197): in group "fixture", not "demo", but shown on stage.
 EXTRA_TARGETS = ("433 Eros",)
+SKIPPED_NO_FRAMES = "skipped: frames = false"
 
 
 @dataclass(frozen=True)
 class Row:
     name: str
     query: str
+    frames: bool = True  # targets.toml ``frames``; False: catalogue only, no frame list
 
 
 def demo_rows(targets_file: Path, search_list: list[tuple[str, str]] | None = None) -> list[Row]:
@@ -50,12 +62,19 @@ def demo_rows(targets_file: Path, search_list: list[tuple[str, str]] | None = No
         search_list = [(r.name, r.query) for r in SEARCH_LIST]
     doc = tomllib.loads(targets_file.read_text(encoding="utf-8"))
     targets = [t for t in doc.get("target", []) if isinstance(t, dict) and "query" in t]
-    rows = [Row(n, q) for n, q in search_list]
+    by_query = {str(t["query"]): t for t in targets}
+
+    def wants(query: str) -> bool:
+        t = by_query.get(query)
+        return frames_wanted(t) if t is not None else True
+
+    rows = [Row(n, q, wants(q)) for n, q in search_list]
     seen = {r.query for r in rows}
     for t in targets:
-        if (t.get("group") == "demo" or t.get("name") in EXTRA_TARGETS) and t["query"] not in seen:
-            rows.append(Row(str(t.get("name", t["query"])), str(t["query"])))
-            seen.add(t["query"])
+        q = str(t["query"])
+        if (t.get("group") == "demo" or t.get("name") in EXTRA_TARGETS) and q not in seen:
+            rows.append(Row(str(t.get("name", q)), q, frames_wanted(t)))
+            seen.add(q)
     return rows
 
 
@@ -65,10 +84,11 @@ class Call:
     status: int | None  # None: no answer (connection error, timeout)
     ms: float
     note: str = ""
+    bad_body: bool = False  # a 200 whose body is not what the route promises
 
     @property
     def ok(self) -> bool:
-        return self.status == 200 and not self.note.startswith("not a PNG")
+        return self.status == 200 and not self.bad_body
 
 
 def _get(
@@ -84,36 +104,90 @@ def _get(
     if r.status_code != 200:
         try:
             note = str(r.json().get("error", ""))
-        except ValueError:
+        except (ValueError, AttributeError):
             note = r.text[:60]
     return Call(label, r.status_code, ms, note), r
+
+
+def _json(call: Call, resp: httpx.Response | None) -> dict[str, Any] | None:
+    """The body of a 200 as a dict, or None. A 200 that is not a JSON object fails the call."""
+    if resp is None or resp.status_code != 200:
+        return None
+    try:
+        body = resp.json()
+    except ValueError:
+        body = None
+    if not isinstance(body, dict):
+        call.bad_body, call.note = True, "200 but not a JSON object"
+        return None
+    return body
+
+
+def _texture_url(params: dict[str, Any]) -> str | None:
+    """One texture the render params point at (albedo first); None when there are none."""
+    textures = params.get("textures")
+    if not isinstance(textures, dict):
+        return None
+    urls = [textures.get("albedo"), *textures.values()]
+    return next((u for u in urls if isinstance(u, str) and u.startswith("/")), None)
 
 
 def check_row(client: httpx.Client, row: Row) -> list[Call]:
     calls: list[Call] = []
     call, r = _get(client, "resolve", "/v1/resolve", q=row.query)
     calls.append(call)
-    if r is None or r.status_code != 200:
+    resolved = _json(call, r)
+    if resolved is None:
         return calls
-    base = f"/v1/objects/{r.json()['id']}"
+    if not isinstance(resolved.get("id"), str):
+        call.bad_body, call.note = True, "200 without an id"
+        return calls
+    base = f"/v1/objects/{resolved['id']}"
+    params: dict[str, Any] | None = None
     for label in ("card", "render-params"):
         call, resp = _get(client, label, f"{base}/{label}")
+        body = _json(call, resp)
         # Issue #41: a 200 that is not the final answer yet (warm start not done for this
         # object). Reported, not failed: the app shows it and improves it when the job ends.
-        if resp is not None and resp.status_code == 200 and "X-SX-Measuring" in resp.headers:
+        if body is not None and resp is not None and "X-SX-Measuring" in resp.headers:
             call.note = f"warning: still measuring ({resp.headers['X-SX-Measuring']})"
         calls.append(call)
+        if label == "render-params":
+            params = body
+    if params is not None:
+        url = _texture_url(params)
+        if url is None:
+            calls.append(Call("texture", 200, 0.0, "skipped: no baked textures"))
+        else:
+            calls.append(_get(client, "texture", url)[0])
+    if not row.frames:
+        calls += [Call(label, 200, 0.0, SKIPPED_NO_FRAMES) for label in ("frames", "spectrum")]
+        calls.append(Call("cutout", 200, 0.0, SKIPPED_NO_FRAMES))
+        return calls
     call, fr = _get(client, "frames", f"{base}/frames")
     calls.append(call)
-    calls.append(_get(client, "spectrum", f"{base}/spectrum")[0])
-    frames = fr.json().get("frames", []) if fr is not None and fr.status_code == 200 else None
-    if frames:
-        call, png = _get(client, "cutout", frames[0]["cutout_url"])
-        if png is not None and png.status_code == 200 and not png.content.startswith(b"\x89PNG"):
-            call.note = "not a PNG"
-        calls.append(call)
-    elif frames is not None:
+    frames_body = _json(call, fr)
+    sp_call, sp = _get(client, "spectrum", f"{base}/spectrum")
+    _json(sp_call, sp)
+    calls.append(sp_call)
+    if frames_body is None:
+        return calls
+    frames = frames_body.get("frames")
+    if not isinstance(frames, list):
+        call.bad_body, call.note = True, "200 without a frames list"
+        return calls
+    if not frames:
         calls.append(Call("cutout", 200, 0.0, "skipped: no frames"))
+        return calls
+    first = frames[0] if isinstance(frames[0], dict) else {}
+    cutout_url = first.get("cutout_url")
+    if not isinstance(cutout_url, str):
+        call.bad_body, call.note = True, "frame without a cutout_url"
+        return calls
+    call, png = _get(client, "cutout", cutout_url)
+    if png is not None and png.status_code == 200 and not png.content.startswith(b"\x89PNG"):
+        call.bad_body, call.note = True, "not a PNG"
+    calls.append(call)
     return calls
 
 

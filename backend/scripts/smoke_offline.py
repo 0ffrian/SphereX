@@ -4,7 +4,11 @@ every cutout PNG with SX_OFFLINE=1 and all non-loopback network blocked.
     uv run python -m scripts.smoke_offline [--group test]
 
 Exit code 1 if any target has no frames, a cutout fails, or `missing` lists anything other
-than a per-frame geometric refusal. A moving object may honestly have no frames.
+than a per-frame geometric refusal. A moving object may honestly have no frames. A
+``frames = false`` target (a catalogue-only exoplanet) has no frame list by design and is skipped.
+
+This checks the cache in-process. The go/no-go check before going on stage is
+``scripts.preflight``, against the running backend (issue #103).
 """
 
 from __future__ import annotations
@@ -56,6 +60,7 @@ def main(argv: list[str] | None = None) -> int:
     from fastapi.testclient import TestClient
 
     from app.core.find.frames import is_complete
+    from app.core.warm import frames_wanted
     from app.main import create_app
     from app.settings import Settings
 
@@ -66,6 +71,9 @@ def main(argv: list[str] | None = None) -> int:
     print(f"cache: {settings.cache_dir}  offline: {settings.offline}")
     with TestClient(create_app(settings)) as client:
         for t in targets:
+            if not frames_wanted(t):  # catalogue only: no frame list is fetched for it
+                print(f"  SKIP {t['name']:<16} frames = false")
+                continue
             r = client.get("/v1/resolve", params={"q": t["name"]})
             if r.status_code != 200:
                 print(f"  FAIL {t['name']}: resolve {r.status_code} {r.text}")
