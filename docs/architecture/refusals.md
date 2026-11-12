@@ -74,7 +74,7 @@ Not a refusal: a point kept with dropped pixels is `flagged`, with `dropped_flag
 | `overlay:gaia`, `overlay:wise` | the catalogue cannot be served (failed cone, remembered `catalog_failure_ttl_s`); for a moving object, any visit's cone failed, or its frame list is incomplete for a reason other than deferred work ([A19.6](moving-objects/track.md#a196-star-list-for-movers), Q-403); a mover's frames still get flag masks and cutout boxes ([Q-125](../decisions/moving-frames.md)) |
 | `overlay:<cat>:pending` | the cone is still running after `overlay_wait_s`; a later request has it. For a moving object also: its frames are still deferred to the object's job, or the visit cones beyond the 8 a request may start (A19.6) |
 | `overlay:<cat>:truncated` | the cone hit the 5000-row cap (brightest first) |
-| `footprint:<frame_id>` | no usable `s_region` for the frame; for a mover, every frame, because its frame record does not carry `s_region` (Q-125; Track changes this, A19.3) |
+| `footprint:<frame_id>` | no usable `s_region` for the frame. A mover's frame record keeps its own `s_region` since issue #74 (A19.3), so a mover gets this code only when IRSA gave none |
 | `flags_mask:<frame_id>` | no FLAGS mask for the frame (`flags.png` answers 404 `flags_unavailable`) |
 
 #### Composite (`/composite`)
@@ -85,9 +85,22 @@ Owner of the rules: [backend/README.md#composite](../../backend/README.md#compos
 
 The repaint status body's `missing` starts with `albedo_ai`, followed by the reason; the reasons are listed in [A6.2](generators.md#a62-optional-gemini-artistic-layer). A bake that cannot use an input bakes flat and lists it in `BakeParams.missing` (`albedo_map`, `gaia_rgb`, `brightness`, `bands`), which a Gemini `bake_refused` reply passes on.
 
+#### Track path (`/path`, A19.5)
+
+Built (issue #74). Wording: `frontend/src/app/messages.ts`. Nothing is stored: `/path` is rebuilt from the cached Horizons answers on every request, so a later request can differ after `path:deferred`, `path:ephemeris` or `path:frames_incomplete`.
+
+| Code | Meaning |
+|---|---|
+| `path:deferred` | a Horizons range answer of a served span is not cached (or its body fails its SHA-256); the request started or joined the object job, which fetches it. `points` and `windows` are empty, the other codes found are kept; poll |
+| `path:not_cached` | offline (`SX_OFFLINE=1`) and a range answer is not cached; that window is left out |
+| `path:observer` | part of the span is past the end of Horizons' SPHEREx ephemeris (2026-12-07, Q-62 **[verify]**); the span is clipped there, never served from the geocentre |
+| `path:ephemeris` | a cached answer gave no usable ephemeris, the object has no SPK id, or the job's live fetch failed within `SX_LIVE_FAILURE_TTL_S`; that window is left out |
+| `path:window` | `start`/`end` lie outside every window, so `points` is empty |
+| `path:frames_incomplete` | the frame list is not final yet (work still with the job), so `frame_points` and `interp_error_arcsec` cover only the frames listed so far; poll |
+
 #### Planned (Track and Area search)
 
 | Code | Spec | Status |
 |---|---|---|
-| `path:deferred`, `path:ephemeris`, `path:observer`, `path:not_cached`, `path:window` (`/path`); `extended_source:<frame_id>` (`/spectrum`); `imagery:<survey>`, `track:not_moving` (frontend) | A19.10 ([moving-objects/track-contract.md](moving-objects/track-contract.md#a1910-refusal-codes)), which says whether each marks a result incomplete; the meanings of the `/path` codes are in A19.5 ([moving-objects/track.md](moving-objects/track.md#a195-path-endpoint)) | to build (Track, Q-141, Q-144) |
+| `extended_source:<frame_id>` (`/spectrum`); `imagery:<survey>`, `track:not_moving` (frontend; `track:not_moving` has its wording and the `trackRefusal` guard in `refusals.ts` since issue #74, for the Track pane to call) | A19.10 ([moving-objects/track-contract.md](moving-objects/track-contract.md#a1910-refusal-codes)), which says whether each marks a result incomplete | to build (Track, Q-144, A20.5) |
 | `area:not_prepared` (a square outside the precomputed areas), `area:visits` (fewer than 2 visits), `stars:<cat>:<visit>` (a visit's star cone failed; `<cat>` is `gaia` or `wise`), `skybot:<visit>` (a visit's SkyBoT cone failed), `horizons:<designation>` (a candidate's Horizons call failed), `stamp:<dot_id>` (stamp cutout not cached), `cutout:<frame_id>` (a frame's cutout could not be fetched), `rate_grid:visits` (fewer than 3 visits; pairs used), `checks:not_run` (no gated check ran), `checks:d4_not_run` (no test mover or grid), `checks:d5_not_run` (no control); Q-208 | [A17.8](moving-objects/area-contract.md#a178-endpoints), which owns their meanings | to build (D1, D2) |
