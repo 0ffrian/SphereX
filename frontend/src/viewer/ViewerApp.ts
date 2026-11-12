@@ -8,16 +8,20 @@
 // Plain module (no React) so it works with or without React (A10).
 import {
   AmbientLight,
+  CanvasTarget,
   Color,
   DirectionalLight,
   Matrix4,
   Mesh,
+  MeshBasicNodeMaterial,
   MeshStandardNodeMaterial,
   type Object3D,
   PerspectiveCamera,
+  QuadMesh,
   Raycaster,
   RenderTarget,
   SRGBColorSpace,
+  Texture,
   UnsignedByteType,
   Scene,
   SphereGeometry,
@@ -25,6 +29,7 @@ import {
   Vector3,
   WebGPURenderer,
 } from 'three/webgpu';
+import { texture as textureNode } from 'three/tsl';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import type { ObjectCard, RenderParams } from '@/contract';
 import { buildLights, MAX_AMBIENT_INTENSITY } from './lighting';
@@ -38,6 +43,13 @@ import { SimClock, type ClockProcess, type PauseReason } from './render/clock';
 import type { Motion } from './motion/motion';
 import type { MouldPose } from './mould/mouldSteps';
 import { RenderChain } from './render/pipeline';
+import { planMayBloom } from './render/bloomGate';
+import {
+  DynamicResolution,
+  dynamicResolutionFromSearch,
+  gpuTimingFlags,
+  RollingStats,
+} from './render/gpuTiming';
 import { noiseBakePending, whenNoiseIdle } from './volume/noiseVolume';
 import { onVolumeNoiseReady } from './volume/VolumeBody';
 import {
@@ -54,6 +66,7 @@ import {
   initialTier,
   isTierName,
   capIntervalMs,
+  desktopCapFromSearch,
   FrameCap,
   qualityFromSearch,
   TIERS,
@@ -84,6 +97,19 @@ export interface RenderStats {
   p50Ms: number;
   p95Ms: number;
   drops: number;
+  /**
+   * GPU milliseconds per frame from three r187's timestamp queries (roadmap 0.1), or null when they
+   * are off (no `?gputime=1` / `?inspector=1` in a dev or fixtures build and no dynamic resolution)
+   * or the adapter has no 'timestamp-query'.
+   */
+  gpuP50Ms: number | null;
+  gpuP95Ms: number | null;
+  /** Scene scale in use (roadmap 1.14 and 2.5); 1 on SMAA. */
+  renderScale: number;
+  /** Whether the bloom pass runs for what is on screen (issue #50). */
+  bloom: boolean;
+  /** How the close-up pane is painted (roadmap 1.11): directly on WebGPU, else by read-back. */
+  closeUpPaint: 'direct' | 'readback';
 }
 
 /** Fired when the governor (or `setQualityTier`) changes the tier; the panel announces it. */
@@ -301,8 +327,23 @@ export class ViewerApp {
   /** A TAAU restart waits for its first loop frame, which is drawn and discarded (see restartSettle). */
   private primePending = false;
   private loopLast: number | null = null;
-  /** R5.7 phone frame-rate cap; no cap on desktop or the medium and high levels. */
+  /**
+   * R5.7 phone frame-rate cap; no cap on desktop or the medium and high levels unless the desktop
+   * cap setting is on (`?fpscap=60`, roadmap 0.2; off by default because of Q-66).
+   */
   private readonly cap = new FrameCap();
+  private readonly desktopCap: number | null;
+  /** GPU ms per frame (roadmap 0.1), null while timestamps are off. */
+  private readonly gpuStats = new RollingStats(STATS_WINDOW);
+  private gpuTiming = false;
+  private gpuResolving = false;
+  private gpuFramesAt = 0;
+  /** Roadmap 2.5: scene scale from GPU time while the clock runs; null when off. */
+  private dynRes: DynamicResolution | null = null;
+  /** Issue #50: 'auto' follows the plan (`planMayBloom`); 'on' and 'off' are test hooks. */
+  private bloomMode: 'auto' | 'on' | 'off' = 'auto';
+  /** The placeholder sphere is LDR; each plan sets this (`planMayBloom`). */
+  private bloomWanted = false;
   /** Coarse pointer (phone or tablet): 30 fps start tier and the R5.7 idle pause. */
   private readonly coarsePointer: boolean;
   private idleTimer: ReturnType<typeof setTimeout> | null = null;
@@ -333,6 +374,18 @@ export class ViewerApp {
   /** True while a D-37 engine (world, star, rock) draws the body: this viewer builds, steps and draws nothing. */
   private engineOwned = false;
   private closeTmp: HTMLCanvasElement | null = null;
+  /**
+   * Roadmap 1.11: on WebGPU the pane's canvas is a second r187 `CanvasTarget` of this renderer and
+   * the close-up target is drawn onto it with one full-screen pass, with no read-back to the CPU.
+   * Null on the WebGL2 fallback (one context per canvas there, so the read-back stays) or when the
+   * canvas cannot give a WebGPU context (`?closeup=readback` forces the read-back for comparisons).
+   */
+  private closeTarget: CanvasTarget | null = null;
+  private closeBlit: {
+    quad: QuadMesh;
+    material: MeshBasicNodeMaterial;
+    tex: { value: unknown };
+  } | null = null;
   private closeRaf: number | null = null;
   private readonly closeCamera = new PerspectiveCamera(40, 1, 0.01, 100);
   private onCloseChange: ((info: CloseUpInfo) => void) | null = null;
@@ -363,7 +416,19 @@ export class ViewerApp {
    * WebGL2. Rejects if neither backend is available; the caller shows that state.
    */
   static async create(canvas: HTMLCanvasElement): Promise<ViewerApp> {
-    const renderer = new WebGPURenderer({ canvas, antialias: true });
+    const search = window.location?.search ?? '';
+    const flags = gpuTimingFlags(
+      search,
+      import.meta.env.DEV || import.meta.env.MODE === 'fixtures',
+    );
+    const dynRes = dynamicResolutionFromSearch(search);
+    // r187: the backend reads `trackTimestamp` here; it is switched off again below where it is not
+    // used (WebGL2 without the dev flag, or an adapter without 'timestamp-query').
+    const renderer = new WebGPURenderer({
+      canvas,
+      antialias: true,
+      trackTimestamp: flags.timing || dynRes,
+    });
     try {
       await renderer.init();
     } catch (err) {
@@ -371,8 +436,72 @@ export class ViewerApp {
       throw err;
     }
     const app = new ViewerApp(canvas, renderer);
+    app.setupGpuTiming(flags.timing, dynRes);
+    if (flags.inspector) void app.mountInspector();
     await app.initPipeline();
     return app;
+  }
+
+  /**
+   * Roadmap 0.1 / 2.5: GPU timestamps on when asked for (dev flag) or when dynamic resolution can
+   * use them (WebGPU with 'timestamp-query'). r187 `Renderer.hasFeature` after init;
+   * `backend.trackTimestamp` is the switch the r187 Inspector also flips.
+   */
+  private setupGpuTiming(devTiming: boolean, dynRes: boolean): void {
+    const r = this.renderer as unknown as {
+      hasFeature?: (name: string) => boolean;
+      backend: { trackTimestamp?: boolean };
+    };
+    const webgpu = this.backend === 'webgpu';
+    const hasTs = webgpu ? r.hasFeature?.('timestamp-query') === true : devTiming;
+    const dyn = dynRes && webgpu && hasTs;
+    this.gpuTiming = hasTs && (devTiming || dyn);
+    if (r.backend && 'trackTimestamp' in r.backend) r.backend.trackTimestamp = this.gpuTiming;
+    this.dynRes = dyn ? new DynamicResolution(TIERS[this.tier].renderScale) : null;
+  }
+
+  /** Dev only (`?inspector=1`): the r187 Inspector (three/addons/inspector) on this renderer. */
+  private async mountInspector(): Promise<void> {
+    if (!import.meta.env.DEV && import.meta.env.MODE !== 'fixtures') return;
+    try {
+      const { Inspector } = await import('three/addons/inspector/Inspector.js');
+      if (this.disposed) return;
+      (this.renderer as unknown as { inspector: unknown }).inspector = new Inspector();
+      this.gpuTiming = true;
+    } catch (err) {
+      console.warn('[viewer] the r187 Inspector could not start', err);
+    }
+  }
+
+  /**
+   * After a drawn frame: asks r187 for the GPU time of the render passes since the last ask (one
+   * ask at a time) and spreads it over the frames it covers. Feeds dynamic resolution while the
+   * clock runs.
+   */
+  private sampleGpu(): void {
+    if (!this.gpuTiming || this.gpuResolving) return;
+    const r = this.renderer as unknown as {
+      resolveTimestampsAsync?: (type?: string) => Promise<number | undefined>;
+    };
+    if (typeof r.resolveTimestampsAsync !== 'function') return;
+    const frames = Math.max(1, this.frames - this.gpuFramesAt);
+    this.gpuFramesAt = this.frames;
+    this.gpuResolving = true;
+    void r
+      .resolveTimestampsAsync('render')
+      .then((ms) => {
+        if (this.disposed || typeof ms !== 'number' || !(ms > 0)) return;
+        const perFrame = ms / frames;
+        this.gpuStats.push(perFrame);
+        if (this.dynRes && this.clock.running && this.chain) {
+          const next = this.dynRes.feed(perFrame);
+          if (next !== null) this.chain.setRenderScale(next);
+        }
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        this.gpuResolving = false;
+      });
   }
 
   private constructor(
@@ -393,7 +522,8 @@ export class ViewerApp {
       qualityFromSearch(window.location?.search ?? '') ??
       initialTier({ backend: this.backend, coarsePointer: this.coarsePointer });
     this.governor = new FrameGovernor(this.tier);
-    this.cap.setInterval(capIntervalMs(this.tier, this.coarsePointer));
+    this.desktopCap = desktopCapFromSearch(window.location?.search ?? '');
+    this.cap.setInterval(capIntervalMs(this.tier, this.coarsePointer, this.desktopCap));
 
     this.scene = new Scene();
     // The background must be scene.background: through the HDR RenderPipeline the clear colour alone
@@ -569,6 +699,7 @@ export class ViewerApp {
     if (this.built && key === this.builtKey) {
       // Nothing that is built changed: only the lights, the honesty state or the labels did. A
       // generated body takes the new tags and light in place (no field is regenerated).
+      this.wantBloom(planMayBloom(plan));
       this.built.update(plan);
       if (this.built === this.onScreen) {
         this.syncProcesses(plan.spin, this.built, plan.motion);
@@ -617,6 +748,7 @@ export class ViewerApp {
       }
     }
     if (!next) {
+      this.wantBloom(false);
       this.setLights(lights);
       this.removeOnScreen();
       this.placeholder.visible = false;
@@ -627,6 +759,8 @@ export class ViewerApp {
     this.built = next;
     this.builtKey = key;
     this.pending = { lights, plan };
+    // Before the compile, so the new content's pipelines are warmed for the chain it is drawn by.
+    this.wantBloom(planMayBloom(plan));
     this.swapInAfterCompile(next);
   }
 
@@ -746,6 +880,7 @@ export class ViewerApp {
   clearObject(): void {
     if (this.disposed) return;
     this.clearBuilt();
+    this.wantBloom(false);
     this.placeholder.visible = true;
     this.setLights(this.placeholderLights);
     this.frame('', 1, 0);
@@ -968,6 +1103,7 @@ export class ViewerApp {
       this.dropChain(err);
       return;
     }
+    this.applyBloom();
     if (typeof this.renderer.compileAsync === 'function') await this.compile(this.scene);
     if (!this.disposed) this.renderNow();
   }
@@ -982,7 +1118,8 @@ export class ViewerApp {
     const from = this.tier;
     this.tier = name;
     this.governor.setTier(name);
-    this.cap.setInterval(capIntervalMs(name, this.coarsePointer));
+    this.cap.setInterval(capIntervalMs(name, this.coarsePointer, this.desktopCap));
+    this.dynRes?.reset(TIERS[name].renderScale);
     this.built?.setTier(name);
     if (this.chain) {
       try {
@@ -1011,7 +1148,39 @@ export class ViewerApp {
       p50Ms: percentile(this.frameTimes, 0.5),
       p95Ms: percentile(this.frameTimes, 0.95),
       drops: this.drops,
+      gpuP50Ms: this.gpuStats.percentile(0.5),
+      gpuP95Ms: this.gpuStats.percentile(0.95),
+      renderScale: this.chain?.renderScale ?? 1,
+      bloom: this.chain?.bloomEnabled ?? false,
+      closeUpPaint: this.closeTarget ? 'direct' : 'readback',
     };
+  }
+
+  /**
+   * Issue #50 test hook: 'on' and 'off' force the bloom pass, 'auto' (the default) runs it only for
+   * a plan that can draw above its threshold (`planMayBloom`).
+   */
+  setBloomMode(mode: 'auto' | 'on' | 'off'): void {
+    if (this.disposed) return;
+    this.bloomMode = mode;
+    this.applyBloom();
+    this.restartSettle();
+  }
+
+  private applyBloom(): void {
+    const on = this.bloomMode === 'auto' ? this.bloomWanted : this.bloomMode === 'on';
+    if (!this.chain || this.chain.bloomEnabled === on) return;
+    try {
+      this.chain.setBloom(on);
+    } catch (err) {
+      this.dropChain(err);
+    }
+  }
+
+  /** The content going on screen decides whether bloom runs (set before its compile, so it warms the right chain). */
+  private wantBloom(on: boolean): void {
+    this.bloomWanted = on;
+    this.applyBloom();
   }
 
   /** Resolves when no settle burst is pending and no shader compile is in flight. */
@@ -1073,6 +1242,30 @@ export class ViewerApp {
   /** Continuous rAF only while the clock runs; otherwise frames come from changes (D-05). */
   private updateLoop(): void {
     if (this.clock.running) this.schedule();
+    // Roadmap 2.5: a still picture is drawn at the base scale (determinism), so a clock that stops
+    // while dynamic resolution had lowered it settles once more at the base.
+    else if (this.chain && this.chain.renderScale !== this.chain.config.renderScale)
+      this.restartSettle();
+  }
+
+  /**
+   * Roadmap 2.5: the scene scale of this frame. Dynamic resolution's while the clock runs, the
+   * level's base otherwise. A change back to the base on a still frame restarts the temporal history
+   * so the settled frame does not depend on the lower-resolution frames before it.
+   */
+  private syncRenderScale(): void {
+    const chain = this.chain;
+    if (!chain) return;
+    const base = chain.config.renderScale;
+    const want = this.clock.running && this.dynRes ? this.dynRes.scale : base;
+    if (chain.renderScale === want) return;
+    chain.setRenderScale(want);
+    if (want === base && !this.clock.running) {
+      this.dynRes?.reset(base);
+      chain.restartTemporal();
+      this.primePending = true;
+      this.burstLeft = Math.max(this.burstLeft, this.settleFrames() + 1);
+    }
   }
 
   private schedule(): void {
@@ -1092,8 +1285,10 @@ export class ViewerApp {
       this.clock.tick();
       this.applySpinAngle();
     }
+    this.syncRenderScale();
     this.stepClose(now);
     this.draw();
+    this.sampleGpu();
     // Frame time is only meaningful between consecutive frames of one continuous run. A longer
     // gap (a hidden tab, a stalled main thread) is not a frame time and would skew p95.
     if (this.loopLast !== null && now - this.loopLast <= FEED_GAP_MS) {
@@ -1319,10 +1514,40 @@ export class ViewerApp {
   // belongs to this renderer), read back, and painted into the pane's own 2D canvas. Only when the
   // picture changed, and at a quarter scale while the user is moving it.
 
-  /** The pane's 2D canvas (the React pane gives it; null detaches). */
+  /** The pane's canvas (the React pane gives it; null detaches). */
   setCloseUpCanvas(canvas: HTMLCanvasElement | null): void {
+    if (canvas === this.closeCanvas) {
+      if (canvas) this.requestCloseRender();
+      return;
+    }
+    this.releaseCloseTarget();
     this.closeCanvas = canvas;
-    if (canvas) this.requestCloseRender();
+    if (canvas) {
+      this.closeTarget = this.directCloseTarget(canvas);
+      this.requestCloseRender();
+    }
+  }
+
+  /**
+   * Roadmap 1.11: a `CanvasTarget` for the pane on WebGPU, else null (read-back). A canvas that
+   * already holds a 2D context gives no WebGPU context (null), and then keeps the read-back.
+   */
+  private directCloseTarget(canvas: HTMLCanvasElement): CanvasTarget | null {
+    if (this.backend !== 'webgpu') return null;
+    if (new URLSearchParams(window.location?.search ?? '').get('closeup') === 'readback')
+      return null;
+    try {
+      if (!canvas.getContext('webgpu')) return null;
+      return new CanvasTarget(canvas);
+    } catch {
+      return null;
+    }
+  }
+
+  private releaseCloseTarget(): void {
+    // r187: dispose() fires the renderer's listener, which frees the target's GPU data.
+    this.closeTarget?.dispose();
+    this.closeTarget = null;
   }
 
   setCloseUpHandler(handler: ((info: CloseUpInfo) => void) | null): void {
@@ -1522,8 +1747,63 @@ export class ViewerApp {
     }
   }
 
-  /** Reads the target back and paints it into the pane canvas (one read at a time; the newest wins). */
+  /** Puts the close-up target on the pane: directly on WebGPU, else by read-back. */
   private paintClose(rt: RenderTarget): void {
+    if (this.closeTarget && this.closeCanvas) {
+      try {
+        this.blitClose(rt, this.closeTarget);
+        return;
+      } catch (err) {
+        // Never blank: the next pictures use the read-back. The canvas holds a WebGPU context now,
+        // so the read-back gets a fresh canvas from the pane only after a remount; say so once.
+        console.warn('[viewer] could not paint the close-up directly; using the read-back', err);
+        this.releaseCloseTarget();
+        return;
+      }
+    }
+    this.readBackClose(rt);
+  }
+
+  /**
+   * Roadmap 1.11: one full-screen pass of `rt` onto the pane's `CanvasTarget` (r187
+   * `Renderer.setCanvasTarget` / `getCanvasTarget`; the WebGPU backend keeps a context, colour and
+   * depth buffer per canvas target). The pane's canvas is sized to the target, like the read-back's
+   * temporary canvas, and CSS stretches it to the pane. Everything the renderer had set is put back,
+   * also when a compile in flight left the scene pass target and MRT set.
+   */
+  private blitClose(rt: RenderTarget, target: CanvasTarget): void {
+    const r = this.renderer;
+    const blit = (this.closeBlit ??= this.makeCloseBlit());
+    blit.tex.value = rt.texture;
+    const prevCanvas = r.getCanvasTarget();
+    const prevTarget = r.getRenderTarget();
+    const prevMrt = r.getMRT();
+    r.setCanvasTarget(target);
+    try {
+      r.setRenderTarget(null);
+      r.setMRT(null);
+      if (target.getPixelRatio() !== 1) target.setPixelRatio(1);
+      const size = target.getSize(new Vector2());
+      if (size.x !== rt.width || size.y !== rt.height) target.setSize(rt.width, rt.height, false);
+      blit.quad.render(r);
+    } finally {
+      r.setCanvasTarget(prevCanvas);
+      r.setRenderTarget(prevTarget);
+      r.setMRT(prevMrt);
+    }
+  }
+
+  private makeCloseBlit(): NonNullable<ViewerApp['closeBlit']> {
+    const tex = textureNode(new Texture());
+    const material = new MeshBasicNodeMaterial();
+    material.colorNode = tex;
+    material.depthTest = false;
+    material.depthWrite = false;
+    return { quad: new QuadMesh(material), material, tex: tex as unknown as { value: unknown } };
+  }
+
+  /** Reads the target back and paints it into the pane canvas (one read at a time; the newest wins). */
+  private readBackClose(rt: RenderTarget): void {
     const c = this.close;
     if (c.reading) {
       c.dirty = true;
@@ -1567,7 +1847,9 @@ export class ViewerApp {
           canvas.width = tw;
           canvas.height = th;
         }
-        const g = canvas.getContext('2d')!;
+        // Null when the canvas already holds a WebGPU context (a direct paint that failed).
+        const g = canvas.getContext('2d');
+        if (!g) return;
         g.imageSmoothingEnabled = true;
         g.drawImage(tmp, 0, 0, tw, th);
       })
@@ -1616,6 +1898,9 @@ export class ViewerApp {
     this.unsubscribeNoise = null;
     this.closeUpOff(true);
     this.releaseCloseRt();
+    this.releaseCloseTarget();
+    this.closeBlit?.material.dispose();
+    this.closeBlit = null;
     this.clearBuilt();
     this.chain?.dispose();
     this.chain = null;
