@@ -38,7 +38,8 @@ export default tseslint.config(
     languageOptions: { globals: { ...globals.node } },
   },
   {
-    files: ['src/engine/**/*.{ts,d.ts}'],
+    // src/sound/ambience/types.ts: the spec R13 App. B contract, copied verbatim (it types engine objects as any).
+    files: ['src/engine/**/*.{ts,d.ts}', 'src/sound/ambience/types.ts'],
     rules: { '@typescript-eslint/no-explicit-any': 'off' },
   },
   {
