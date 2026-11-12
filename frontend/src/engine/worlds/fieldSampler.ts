@@ -1,4 +1,5 @@
-// D-37 / D-12: what the haptics feel on a world the engine draws. The engine keeps its terrain, climate and river
+// D-37 / D-12: the engine's fields at a place, for sound (app/sound/ambienceLocal.ts; haptics cut, D-39).
+// Written for the haptics on a world the engine draws. The engine keeps its terrain, climate and river
 // arrays on the CPU (`WorldEngine.cpuFields()`); this reads them at a longitude and latitude, so touch matches the
 // picture. The old path gave the haptics a `FieldSampler` (viewer/fields/fieldGenerator.ts) with `sampleUV` returning a
 // `FieldSample`; this has the same `sampleUV(u, v)` and `sampleDirection(d)`, plus the physical values themselves.
@@ -142,7 +143,7 @@ export class WorldFieldSampler {
     };
   }
 
-  /** `FieldSample` shape for the existing haptic sources: height 0..1 of the highest ground, sea as `ocean`. */
+  /** `FieldSample` shape (made for the haptic sources, cut by D-39): height 0..1 of the highest ground, sea as `ocean`. */
   sampleUV(u: number, v: number): FieldSample {
     // The viewer's UV (fieldGenerator.directionToUV: phi = atan2(z, -x), theta from the north pole) back to a direction.
     const phi = u * TAU;

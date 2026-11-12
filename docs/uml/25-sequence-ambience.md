@@ -15,7 +15,7 @@ sequenceDiagram
   F->>H: mount (close-up open, fly entered, sound unlocked, ambienceOn)
   H->>E: cpuFields(), weatherFields(), groundKm(), flyCameraBasis()
   H->>W: bake beds the physics allows (seeded, worker)
-  W-->>H: bed ready (fade in; a failed bed is captioned, never faked)
+  W-->>H: bed ready, fade in - a failed bed is captioned, never faked
   loop every 100 ms
     H->>P: placeFeatures(samples, weather, model), windAt(...)
     P-->>H: features, wind (tags kept)
@@ -24,5 +24,5 @@ sequenceDiagram
   end
   Note over G: ambience → 35 Hz HPF → duck (−9 dB under data sounds) → level (ambienceVolume × volume) → master → limiter
   F-->>H: honesty drops, mute, ambienceOn off, close, page hidden
-  H->>M: fade out 0.6 s; beds stay cached for 2 min
+  H->>M: fade out 0.6 s, beds stay cached for 2 min
 ```

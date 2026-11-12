@@ -59,3 +59,5 @@ any ──(engine failed / WebGL2 missing)──► Idle; caption "Sound needs t
 | Bed memory | ≤ 96 MB per world | sum of buffer sizes |
 | Fly view frame rate | no measurable drop with ambience on (A/B, 60 s flight, median frame time within 0.5 ms) | `gpuMs()` plus the rAF log |
 | Audio glitches | none in a 5-minute flight | Chrome `chrome://media-internals` underruns |
+
+> **Appendix D R12:** fields that are not ready yet (the engine still baking its climate or hydro) mean "waiting", not a refusal. The state is re-evaluated every tick, and no "Not heard here" reason is shown while waiting.

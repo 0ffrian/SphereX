@@ -14,7 +14,7 @@
 
 **Presentation window.**
 - After the §11.4 offset, every non-silent bed is held inside a window: `L_pres = L_TARGET + clamp(L_true + G_present − L_TARGET, −STAGE_WINDOW_DB, +6)`, with `STAGE_WINDOW_DB = 24`. A quiet layer stays audible on a PA instead of vanishing under room noise.
-- **Physical silence is never lifted:** no air, above the ceiling, a refused source, the hurricane eye at near zero wind.
+- **Physical silence is never lifted:** no air, above the ceiling, a refused source, the hurricane eye at near zero wind. The window lifts **present** beds only (Appendix D R8: class fraction > 0, driver > 0, within 40 dB of the loudest present bed).
 - The window changes only presentation. The "What you hear" panel shows true levels.
 
 **Loudness targets** (master at volume 1):

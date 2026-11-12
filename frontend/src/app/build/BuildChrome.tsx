@@ -1,6 +1,6 @@
 // Issue #71 stream U (Q-294): the two floating panels of the mock-up's build view that sit at the
 // bottom of the screen: the zoom bar (bottom left, `.zoom`: minus, the zoom, plus) and the tool
-// dock (bottom centre, `.dock`: target, audio, haptics, area, then search). Both are shell chrome in
+// dock (bottom centre, `.dock`: target, audio, area, then search; the mock-up's haptics button is cut, D-39). Both are shell chrome in
 // the mock-up and are drawn here only while the build is open, on a desktop width (a phone keeps
 // the tab bar). Each button does a real thing or says it cannot:
 //   zoom bar   -> the 3D view (ViewerApp.zoom / resetView; the value is its own zoom, 100% = as opened)
