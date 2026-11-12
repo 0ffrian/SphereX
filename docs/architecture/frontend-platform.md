@@ -1,6 +1,6 @@
 # Frontend and platform
 
-> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A10–A10.2 · **Implements:** [D-03, D-05, D-24, Q-132](../decisions/platform-hosting.md), [D-37](../decisions/rendering-engines.md), [Q-367, Q-368](../decisions/rendering-engines-tuning.md), [Q-369](../decisions/demo-pack.md), [Q-220, Q-366](../decisions/catalogue-values.md), [D-15, D-25](../decisions/data-sources.md), [D-22, D-27](../decisions/contract.md), [Q-29](../decisions/gemini.md), [Q-112](../decisions/pipeline-jobs.md), [Q-137](../decisions/scope-process.md) · **Read with:** [../../frontend/README.md](../../frontend/README.md), [../../backend/README.md](../../backend/README.md#settings-sx_-environment-variables) (settings), [../rendering/display-rules.md](../rendering/display-rules.md) (R5.5 budget), [sky-shell.md](sky-shell.md) (A21 app shell)
+> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A10–A10.2 · **Implements:** [D-03, D-05, D-24, Q-132](../decisions/platform-hosting.md), [D-37](../decisions/rendering-engines.md), [Q-367, Q-368](../decisions/rendering-engines-tuning.md), [Q-369](../decisions/demo-pack.md), [Q-220, Q-366](../decisions/catalogue-values.md), [Q-378](../decisions/physics-fixes.md), [D-15, D-25](../decisions/data-sources.md), [D-22, D-27](../decisions/contract.md), [Q-29](../decisions/gemini.md), [Q-112](../decisions/pipeline-jobs.md), [Q-137](../decisions/scope-process.md) · **Read with:** [../../frontend/README.md](../../frontend/README.md), [../../backend/README.md](../../backend/README.md#settings-sx_-environment-variables) (settings), [../rendering/display-rules.md](../rendering/display-rules.md) (R5.5 budget), [sky-shell.md](sky-shell.md) (A21 app shell)
 
 ## A10 Frontend and platform
 
@@ -41,7 +41,7 @@ The run steps for 14 to 15 Nov, gathered from D-24, D-25, Q-112, Q-137, Q-366, Q
 **1. Online, before the event** (in `backend/`):
 
 - [ ] Fill the cache: `uv run python -m scripts.prefetch --group test`, `--group demo` and the Track object (433 Eros is in group `fixture`, see Q-197 in [A3.12](targets.md#a312-test-and-demo-targets)); the sky with `uv run python -m scripts.sky_mirror --max-order 6 --max-mb 45000 --allow-unclonable --bake` (D-35, depth Q-88); the precomputed Area search areas (D3, A16.7).
-- [ ] Re-warm the Gaia and Exoplanet Archive caches (the #93 keys `cols="msc1-flame2"` and the archive's columns version 3 changed every Gaia star and archive planet key, Q-220, Q-366): `uv run python -m scripts.prefetch --group test --group demo --overlays-only`.
+- [ ] Re-warm the Gaia and Exoplanet Archive caches (the #93 keys `cols="msc1-flame3"` and the archive's columns version 4 changed every Gaia star and archive planet key, Q-220, Q-366, Q-378): `uv run python -m scripts.prefetch --group test --group demo --overlays-only`.
 - [ ] `uv run python -m scripts.bake_demo_pack --check --strict`. It must exit 0. **Never run `bake_demo_pack` without `--check` while `SX_OFFLINE=1`.**
 - [ ] `uv run python -m scripts.smoke_offline --group test --group demo`: every target answers with the network blocked, its render parameters carry no data gap, and its asset status is printed (Q-369).
 - [ ] `uv run python -m scripts.backup_cache` (zipped copy, D-25).

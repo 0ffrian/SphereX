@@ -1,6 +1,6 @@
 # Display levels and shared 3D view rules
 
-> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R4, R5, R5.1–R5.7 · **Implements:** [D-05, Q-15, Q-64, Q-132](../decisions/platform-hosting.md), [D-21, Q-27](../decisions/contract-tags.md), [D-37, Q-287](../decisions/rendering-engines.md), [D-23, Q-36](../decisions/contract.md), [D-34, Q-66](../decisions/rendering-motion.md), [Q-104, Q-107](../decisions/rendering-kinds.md), [Q-115, Q-116, Q-117](../decisions/rendering-layers.md), [Q-119](../decisions/contract-tags.md), [D-28](../decisions/moving-objects.md), [Q-113](../decisions/shell-surfaces.md), [Q-155, Q-165](../decisions/exoplanets.md), [Q-156, Q-157, Q-166](../decisions/exoplanet-looks.md) · **Read with:** [build-mould.md](build-mould.md) (R5.8), [engines.md](engines.md) (R5.9), [data-contract.md](data-contract.md) (R3.4), [accessibility.md](accessibility.md) (R9)
+> **Part of:** Rendering & haptics spec ([index](README.md)) · **Sections:** R4, R5, R5.1–R5.7 · **Implements:** [D-05, Q-15, Q-64, Q-132](../decisions/platform-hosting.md), [D-21, Q-27](../decisions/contract-tags.md), [Q-379](../decisions/physics-fixes.md), [D-37, Q-287](../decisions/rendering-engines.md), [D-23, Q-36](../decisions/contract.md), [D-34, Q-66](../decisions/rendering-motion.md), [Q-104, Q-107](../decisions/rendering-kinds.md), [Q-115, Q-116, Q-117](../decisions/rendering-layers.md), [Q-119](../decisions/contract-tags.md), [D-28](../decisions/moving-objects.md), [Q-113](../decisions/shell-surfaces.md), [Q-155, Q-165](../decisions/exoplanets.md), [Q-156, Q-157, Q-166](../decisions/exoplanet-looks.md) · **Read with:** [build-mould.md](build-mould.md) (R5.8), [engines.md](engines.md) (R5.9), [data-contract.md](data-contract.md) (R3.4), [accessibility.md](accessibility.md) (R9)
 
 ## R4. Display levels
 
@@ -62,6 +62,7 @@ One state per badge (D-21):
 - **Build exception (proposed, Q-113 item 7; Moon to confirm, with Q-49):** *Build it*, *Replay* and *New seed* raise the level to + Artistic when the plan has hidden layers, and say so. Rules in R5.8.
 - **Engines (Q-287, Atish, 11 Nov 2026):** the prototype engines mount only at + Artistic; at + Estimated and Measured only the three.js path draws ([R5.9](engines.md#r59-prototype-engines-d-37)).
 - Each visible layer shows a small tag chip in the legend.
+- **Card readouts (Q-379, open):** a planet's eclipse and phase-curve readouts are listed at every level, each with its tag badge, so a `measured` one is not reachable only at + Artistic; they are not filtered by the toggle (rules in [R3.2](data-contract.md#r32-objectcard-produced-by-the-backend-get-v1objectsidcard)).
 - Haptics and sounds use the same filter. The rule is owned by [§8.2](haptics/platform-encoding.md#r82-two-kinds-of-haptics-both-labelled-in-the-ui).
 
 ### R5.4 Scale bar
