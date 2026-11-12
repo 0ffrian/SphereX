@@ -27,7 +27,7 @@ The log is split by topic so a task loads only what it needs. **Load this index 
 | [rendering-layers.md](rendering-layers.md) | the per-layer body fixes of issue #62 (PR #63): gas giant five tiered layers, brown dwarf limb and infrared bands, asteroid sphere and displacement, the flared T Tauri disc | 0 D, 4 Q, 11 KB |
 | [gemini.md](gemini.md) | the Gemini layer: scope, offline behaviour and its contract | 1 D, 2 Q, 7 KB |
 | [sky-shell.md](sky-shell.md) | the sky view, sky endpoints and sky tiles, the flipbook UI | 1 D, 10 Q, 12 KB |
-| [shell-surfaces.md](shell-surfaces.md) | the tool rail and the island, the object panel and card, the Build split view, the full-bleed layout | 1 D, 19 Q, 32 KB |
+| [shell-surfaces.md](shell-surfaces.md) | the tool rail and the island, the object panel and card, the Build split view, the full-bleed layout | 1 D, 20 Q, 33 KB |
 | [shell-proposals.md](shell-proposals.md) | open shell proposals that Track and Area search need: pane kinds, feature cards, hash keys, Escape order | 0 D, 9 Q, 15 KB |
 | [haptics-design.md](haptics-design.md) | haptics design rules, creative ownership, the haptics API, the shared field on shader kinds, texture and data sources per type | 5 D, 12 Q, 20 KB |
 | [haptics-sound.md](haptics-sound.md) | audio pairing (D-10), spectrum pitch and voice hints, the body tone and the Track path sound | 1 D, 10 Q, 13 KB |
@@ -464,5 +464,6 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | Q-447 | Ceiling caption gains the height to fly below, N = H ln(P0 / P_FLOOR) (#116 code review) | Decided | [sound-ambience](sound-ambience.md) |
 | Q-448 | Ambience integration as built (#116): fades, groups, weatherBus, chip, sound-check | Decided (as built; contract amendment 4 proposed) | [sound-ambience](sound-ambience.md) |
 | Q-449 | Weather overlay as built: strokes, glow spacing, small area, drawn deck (#117) | Decided (as built); parts open | [sound-ambience](sound-ambience.md) |
+| Q-451 | Client timeouts (25 s for resolve only) and error boundaries for the demo (issue #102) | Decided | [shell-surfaces](shell-surfaces.md) |
 | Q-454 | Warm-start progress on `/v1/health` and the demo preflight (amends Q-195) | Proposed (Kevin to confirm with Q-195) | [contract](contract.md) |
 | B-01 to B-04 | Post-event backlog | Backlog | [scope-process](scope-process.md#post-event-backlog) |
