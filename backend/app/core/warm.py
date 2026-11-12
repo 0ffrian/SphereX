@@ -54,7 +54,11 @@ class WarmCache:
         self.pipeline = pipeline
         self.aliases = aliases
         self.queries = queries
-        self.done: list[str] = []  # object ids warmed, in order (for tests and the log)
+        # Both hold queries, in order (issue #103): ``done`` warmed, ``failed`` not resolved or
+        # whose job could not start or raised. Health exposes only their lengths.
+        self.done: list[str] = []
+        self.failed: list[str] = []
+        self._finished = threading.Event()
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
 
@@ -69,6 +73,26 @@ class WarmCache:
         if self._thread is not None:
             self._thread.join(timeout)
 
+    @property
+    def state(self) -> str:
+        """``idle`` (built, ``start`` not called yet; the lifespan starts it at once, so health
+        does not normally show it), ``running``, ``finished`` (every query in the warm list
+        tried; ``failed`` counts the ones that did not warm) or ``stopped`` (shut down first)."""
+        if self._finished.is_set():
+            return "finished"
+        if self._stop.is_set():
+            return "stopped"
+        return "running" if self._thread is not None else "idle"
+
+    def status(self) -> dict[str, object]:
+        """The ``warm`` block of ``/v1/health`` (issue #103)."""
+        return {
+            "state": self.state,
+            "total": len(self.queries),
+            "done": len(self.done),
+            "failed": len(self.failed),
+        }
+
     def _run(self) -> None:
         log.info("warm cache: %d targets", len(self.queries))
         for q in self.queries:
@@ -78,17 +102,29 @@ class WarmCache:
                 obj = resolve(self.ctx, q, self.aliases).obj
             except Exception as exc:  # NotFound, BadQuery, an outage: skip this target
                 log.warning("warm cache: %r not resolved: %s", q, exc)
+                self.failed.append(q)
                 continue
-            job = self.pipeline.ensure_job(obj)
+            try:
+                job = self.pipeline.ensure_job(obj)
+            except Exception as exc:  # a dead thread would leave health "running" for ever
+                log.warning("warm cache: %r job not started: %s", q, exc)
+                self.failed.append(q)
+                continue
+            ok = True
             while not self._stop.is_set():
                 try:
                     if job.wait_final(timeout=1.0) is not None:
                         break
                 except Exception as exc:  # the job failed; the next request will retry it
                     log.warning("warm cache: %r failed: %s", q, exc)
+                    ok = False
                     break
             else:
                 return
-            self.done.append(obj.id)
-            log.info("warm cache: %s ready", obj.id)
-        log.info("warm cache: finished")
+            if ok:
+                self.done.append(q)
+                log.info("warm cache: %s ready", obj.id)
+            else:
+                self.failed.append(q)
+        self._finished.set()
+        log.info("warm cache: finished (%d ready, %d failed)", len(self.done), len(self.failed))
