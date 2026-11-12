@@ -6,8 +6,9 @@ export type EngineRole = 'globe' | 'fly';
 
 /**
  * Longest wait for the shaders before the stage gives up and the three.js path draws (ms). Measured cold on an RTX 4060
- * Ti: the globe's programs 1.2 to 1.9 s alone (R5.9, Q-337); the fly shader about 20 s alone, but 40 to 55 s in the app,
- * where it compiles while the globe draws and forms (#93 regression fix). The A15 is slower: [verify] there.
+ * Ti desktop (R5.9, Q-337): the globe's programs 2.3 to 4.6 s; the fly shader 22 to 43 s alone, and 40 to 55 s in the
+ * app, where it compiles while the globe draws and forms. Chrome keeps these programs on disk only with
+ * ANGLEPerContextBlobCache (Q-368), so a cold launch pays this again. The A15 is not measured: [verify] there.
  */
 export const ENGINE_READY_TIMEOUT_MS: Record<EngineRole, number> = { globe: 60_000, fly: 180_000 };
 
