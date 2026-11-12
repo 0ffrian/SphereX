@@ -1,6 +1,6 @@
 # R11.3 Frame-time checks
 
-> **Part of:** Rendering & haptics spec ([index](../README.md)) · **Sections:** R11.3 (a sub-page of [R11](../acceptance-tests.md): the frame-time gate for R5.7; the A15 session order is [R11.4](a15-checks.md)) · **Implements:** [D-05, Q-64, Q-132](../../decisions/platform-hosting.md), [Q-66](../../decisions/rendering-motion.md) · **Read with:** [display-rules.md](../display-rules.md) (R5.5, R5.7)
+> **Part of:** Rendering & haptics spec ([index](../README.md)) · **Sections:** R11.3 (a sub-page of [R11](../acceptance-tests.md): the frame-time gate for R5.7; the A15 session order is [R11.4](a15-checks.md)) · **Implements:** [D-05, Q-64, Q-132](../../decisions/platform-hosting.md), [Q-66](../../decisions/rendering-motion.md), [Q-383, Q-387](../../decisions/rendering-engines-perf.md) · **Read with:** [display-rules.md](../display-rules.md) (R5.5, R5.7)
 
 A renderer that misses its quality level's target on the real devices does not merge. This is a manual procedure; the results table below is empty until someone measures.
 
@@ -55,9 +55,12 @@ Record the browser version, date and commit hash with each column, plus the `Win
 
 Measured with `__sxPerf.record(20)` in the vsync-off run of [R11.4](a15-checks.md) step 4. Cell format: `p50 ms / p95 ms / quality level / drops`.
 
+The skip is opt-in since issue #93 (Q-387): on main bloom runs on every frame, and "After (#50)" means the page opened with `?bloomgate=1`. A wet planet keeps bloom, because its Sun glint passes the 2.0 threshold (94 to 151 levels on SwiftShader, `e2e/bloomGate.spec.ts`), so under the gate only gas giants and lit bodies without a bright emitter skip bloom (`planMayBloom`); stars, rocky and water worlds keep it, and their "After" cells measure the gate's own cost. Bloom is at half resolution on High and Medium in both columns (Q-383).
+
 | Body                 | Before (main) | After (#50) |
 | -------------------- | ------------- | ----------- |
 | HDR emitter (nebula) | to measure    | to measure  |
 | HDR emitter (nova)   | to measure    | to measure  |
 | Star (no HDR)        | to measure    | to measure  |
 | Rocky world (no HDR) | to measure    | to measure  |
+| Gas giant (skips bloom under the gate) | to measure | to measure |

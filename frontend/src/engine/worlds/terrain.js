@@ -3,7 +3,7 @@
 // CPU value noise, plate-tectonic terrain build, river routing
 // Verbatim source lines: 1767-1905
 import { clamp, lerp, sstep, fmt, rng, g, planck, planckRGB, LMIN, LMAX, LUT, compile, unis, FULL } from './helpers.js';
-// @verbatim L1766-L1905
+// @verbatim L1766-L1883
 /* ---------- value noise on the CPU for the terrain builder ---------- */
 function hsh(i, j, k) { var h = Math.imul(i, 374761393) + Math.imul(j, 668265263) + Math.imul(k, 2147483647) | 0; h = Math.imul(h ^ h >>> 13, 1274126177); return ((h ^ h >>> 16) >>> 0) / 4294967296; }
 function vn3(x, y, z) {
@@ -122,7 +122,13 @@ function buildTerrain(p, oceanFrac, gv, opt) {
    7. Big rivers carry sediment into the sea as a plume at the mouth (deltas). */
 function routeTerrain(t) {
   var Wd = t.W, Hd = t.H, N = Wd * Hd, h = new Float32Array(N), i;
-  for (i = 0; i < N; i++) { var yq = Math.floor(i / Wd), xq = i - yq * Wd, laq = ((yq + 0.5) / Hd - 0.5) * Math.PI, loq = ((xq + 0.5) / Wd - 0.5) * 6.2832, cq = Math.cos(laq), px = cq * Math.cos(loq) * 24, py = Math.sin(laq) * 24, pz = cq * Math.sin(loq) * 24; h[i] = t.data[i * 2]; if (h[i] > 0) h[i] += 0.12 * (fbm3(px, py, pz, 4) - 0.5) + 0.05 * (fbm3(px * 3.1, py * 3.1, pz * 3.1, 3) - 0.5); }
+// @end-verbatim
+// @deviation (#93 3.4) the river relief noise had no seed, so every world's rivers wandered over the same pattern. It
+// is offset by t.so, the card world's seed3 (terrainCache.js sets it; three integers in [0, 256)); a prototype preset
+// has none and reads at an offset of 0, exactly as before. Replaces the prototype's line L1884.
+  var so = t.so || [0, 0, 0];
+  for (i = 0; i < N; i++) { var yq = Math.floor(i / Wd), xq = i - yq * Wd, laq = ((yq + 0.5) / Hd - 0.5) * Math.PI, loq = ((xq + 0.5) / Wd - 0.5) * 6.2832, cq = Math.cos(laq), px = cq * Math.cos(loq) * 24, py = Math.sin(laq) * 24, pz = cq * Math.sin(loq) * 24; h[i] = t.data[i * 2]; if (h[i] > 0) h[i] += 0.12 * (fbm3(px + so[0], py + so[1], pz + so[2], 4) - 0.5) + 0.05 * (fbm3(px * 3.1 + so[0], py * 3.1 + so[1], pz * 3.1 + so[2], 3) - 0.5); }
+// @verbatim L1885-L1905
   var fill = new Float32Array(N), rec = new Int32Array(N), order = new Int32Array(N), seen = new Uint8Array(N), hIdx = new Int32Array(N + 8), hVal = new Float32Array(N + 8), hn = 0, cnt = 0, low = 0;
   function push(ix, v) { var c = hn++; while (c > 0) { var p = (c - 1) >> 1; if (hVal[p] <= v) break; hVal[c] = hVal[p]; hIdx[c] = hIdx[p]; c = p; } hVal[c] = v; hIdx[c] = ix; }
   function pop() { var top = hIdx[0], lv = hVal[--hn], li = hIdx[hn], c = 0; for (;;) { var ch = 2 * c + 1; if (ch >= hn) break; if (ch + 1 < hn && hVal[ch + 1] < hVal[ch]) ch++; if (hVal[ch] >= lv) break; hVal[c] = hVal[ch]; hIdx[c] = hIdx[ch]; c = ch; } hVal[c] = lv; hIdx[c] = li; return top; }

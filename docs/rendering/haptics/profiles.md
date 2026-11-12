@@ -1,6 +1,6 @@
 # Haptics: per-type profiles and spectrum haptics
 
-> **Part of:** Rendering & haptics spec ([index](../README.md)) · **Sections:** R8.5, R8.6 · **Implements:** [D-12, D-20, Q-37, Q-78 to Q-82, Q-86](../../decisions/haptics-design.md), [Q-133](../../decisions/haptics-sound.md), [Q-76, Q-77, Q-83](../../decisions/haptics-built.md), [Q-103](../../decisions/rendering-kinds.md), [D-21](../../decisions/contract-tags.md) · **Read with:** [sources.md](sources.md) (R8.4), [audio-pairing.md](audio-pairing.md) (R8.9), [engine-api.md](engine-api.md) (R8.8)
+> **Part of:** Rendering & haptics spec ([index](../README.md)) · **Sections:** R8.5, R8.6 · **Implements:** [D-12, D-20, Q-37, Q-78 to Q-82, Q-86](../../decisions/haptics-design.md), [Q-133](../../decisions/haptics-sound.md), [Q-359](../../decisions/physics-fixes.md), [Q-76, Q-77, Q-83](../../decisions/haptics-built.md), [Q-103](../../decisions/rendering-kinds.md), [D-21](../../decisions/contract-tags.md) · **Read with:** [sources.md](sources.md) (R8.4), [audio-pairing.md](audio-pairing.md) (R8.9), [engine-api.md](engine-api.md) (R8.8)
 
 ### R8.5 Per-type haptic profile
 
@@ -46,6 +46,7 @@
 | `nova` | — | — (no haptics, Q-103) | — |
 
 - `TouchHaptics` drives the two sources (pointer sample from Feel mode at the event, Touch mode after; neither is wired yet, R5.6): moving gives texture events; holding still for `HOLD_STILL_MS` starts the `teq_pulse` or `flux_pulse` (the viewer's frame loop calls `poll`, Q-83); the scrubber drives the light-curve pulses.
+- **`teq_pulse` and its tag (issue #93, Q-359):** an Exoplanet Archive `pl_eqt` is `derived` with its albedo assumption, so for the demo exoplanets the pulse is `derived`: it plays at + Estimated and is silent in "Measured only". It plays there only when `teq_K` is `measured` (the `ref-jupiter` and `ref-saturn` cards keep `measured` values).
 - The R11 honesty test runs these through the real engine with the R8.2 filter; `asteroid_shape` is silent while its mesh haptics are refused.
 
 ### R8.6 Spectrum haptics (every object; the most useful for blind and low-vision users)
