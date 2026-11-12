@@ -5,6 +5,7 @@
 // and catches up from a snapshot when it draws again.
 import type { EngineOverrides, WorldPreset } from './types';
 import { SimHost, type SimOp, type SimSnapshot, type SimState } from './simHost';
+import type { WorkerReply, WorkerRequest } from './simWorkerCore';
 
 /** A view that draws a source's world (WorldEngine). */
 export interface SimFollower {
@@ -17,8 +18,10 @@ export interface SimFollower {
 
 /** A view that has not pumped for this long is not drawing (UI pacing, ms): ops skip it and it catches up later. */
 export const SIM_LIVE_MS = 300;
+/** The longest frame time a worker tick is given (the core caps a tick's dt at 0.06 s itself). */
+const MAX_DT = 0.06;
 
-export type SimMode = 'own' | 'shared';
+export type SimMode = 'own' | 'shared' | 'worker';
 
 export abstract class SimSource {
   private followers = new Set<SimFollower>();
@@ -178,8 +181,136 @@ export class LocalSimSource extends SimSource {
 }
 
 /**
+ * Worker mode (roadmap 1.10): the SimHost runs in `sim.worker.ts`. The driving view asks for one tick a frame; while a
+ * tick is still running in the worker no new one is asked for (its frame time is carried over), so a slow simulation
+ * slows the world, never the page. Replies replay their ops in every drawing view on arrival. The arrays come over by
+ * transfer, not by copy (simWorkerCore.ts). Replies from before a rebuild (an older generation) are dropped.
+ */
+export class WorkerSimSource extends SimSource {
+  readonly mode = 'worker' as const;
+  private worker: Worker;
+  private gen = 1;
+  private inFlight = false;
+  private dtAcc = 0;
+  private latest: SimSnapshot | null = null;
+  private keyNow: string;
+
+  /** `key` is the simulation key of the views that create the source (the worker's own is not readable here). */
+  constructor(
+    preset: WorldPreset,
+    applied: EngineOverrides | undefined,
+    key: string,
+    makeWorker: () => Worker = () =>
+      new Worker(new URL('./sim.worker.ts', import.meta.url), { type: 'module' }),
+  ) {
+    super();
+    this.keyNow = key;
+    this.worker = makeWorker();
+    this.worker.onmessage = (ev: MessageEvent<WorkerReply>) => this.receive(ev.data);
+    this.worker.onerror = (ev: ErrorEvent) => {
+      ev.preventDefault?.();
+      this.fail(new Error('simulation worker failed: ' + (ev.message || 'error')));
+    };
+    this.worker.onmessageerror = () => this.fail(new Error('simulation worker message error'));
+    this.post({ t: 'init', preset, applied: applied ?? {}, gen: this.gen });
+    this.inFlight = true;
+  }
+
+  get key(): string {
+    return this.keyNow;
+  }
+  get spinup(): number {
+    return this.latest ? this.latest.state.spinup : Infinity;
+  }
+
+  private post(m: WorkerRequest): void {
+    this.worker.postMessage(m);
+  }
+
+  setOverrides(o: EngineOverrides, key?: string): void {
+    if (o.fluid != null || o.spin != null || o.tect != null) {
+      this.gen++;
+      this.latest = null;
+    }
+    if (key) this.keyNow = key;
+    this.post({ t: 'set', o, gen: this.gen });
+    this.inFlight = true;
+  }
+
+  protected step(playing: boolean, dt: number): void {
+    this.dtAcc = Math.min(MAX_DT, this.dtAcc + (dt || 0));
+    if (this.inFlight) return;
+    this.inFlight = true;
+    this.post({ t: 'tick', playing, dt: this.dtAcc });
+    this.dtAcc = 0;
+  }
+
+  private receive(r: WorkerReply): void {
+    if (r.t === 'error') {
+      this.fail(new Error('simulation worker: ' + r.message));
+      return;
+    }
+    this.inFlight = false;
+    if (r.state.gen < this.gen) return;
+    for (const op of r.ops) {
+      this.deliver(op);
+      this.remember(op);
+    }
+    const prev = this.latest;
+    this.latest = {
+      state: r.state,
+      T: r.T ?? prev?.T ?? null,
+      rain: r.rain ?? prev?.rain ?? null,
+      out: this.lastOut ?? null,
+      out2: this.lastOut2 ?? null,
+      cyc: this.lastCyc,
+      cycAt: this.lastCycAt,
+      hydro: this.lastHydro,
+      vel: r.state.gas ? this.lastVel : null,
+    };
+    this.deliverState(r.state, r.T, r.rain);
+    // While the world forms nothing is drawn (the Forming cover), so the worker spins up back to back instead of one
+    // tick a frame: a tick round trip is longer than a frame, which made the worker form Earth in 22 s against 15 s
+    // on the main thread. Each tick still keeps the prototype's 14 ms budget, so the steps are the same.
+    if (r.state.spinup > 0 && !this.error && this.viewCount) {
+      this.inFlight = true;
+      this.post({ t: 'tick', playing: false, dt: 0 });
+    }
+  }
+
+  private lastOut: Float32Array | null = null;
+  private lastOut2: Float32Array | null = null;
+  private lastCyc: SimSnapshot['cyc'] = [];
+  private lastCycAt = -1;
+  private lastHydro: SimSnapshot['hydro'] = null;
+  private lastVel: Float32Array | null = null;
+
+  private remember(op: SimOp): void {
+    if (op.o === 'eb') {
+      this.lastOut = op.out;
+      this.lastOut2 = op.out2;
+    } else if (op.o === 'cloud') {
+      this.lastCyc = op.cyc;
+      this.lastCycAt = op.cycAt;
+    } else if (op.o === 'hydro') this.lastHydro = op.hd;
+    else if (op.o === 'vel') this.lastVel = op.d;
+  }
+
+  protected snapshot(): SimSnapshot | null {
+    return this.latest;
+  }
+
+  protected release(): void {
+    this.worker.onmessage = null;
+    this.post({ t: 'dispose' });
+    this.worker.terminate();
+  }
+}
+
+/**
  * The source a new view should follow: the other view's, when it runs the same world, else a new one in `mode`. Null
- * for mode 'own' (the view runs its own simulation, as the prototype does).
+ * for mode 'own' (the view runs its own simulation, as the prototype does). A worker that cannot be created falls back
+ * to the main thread.
  */
 export function simSourceFor(
   mode: SimMode,
@@ -190,12 +321,19 @@ export function simSourceFor(
 ): SimSource | null {
   if (mode === 'own') return null;
   if (other && other.key === view.simKey()) return other;
+  if (mode === 'worker') {
+    try {
+      return new WorkerSimSource(preset, applied, view.simKey());
+    } catch (err) {
+      console.warn('[world engine] no simulation worker, running it on the main thread', err);
+    }
+  }
   return new LocalSimSource(preset, applied);
 }
 
-/** `?sim=own|shared`; the default is one shared simulation (the worker comes with roadmap 1.10). */
+/** `?sim=own|shared|worker`; the default is the worker where there is one. */
 export function simModeFromQuery(search = typeof location === 'undefined' ? '' : location.search) {
   const q = new URLSearchParams(search).get('sim');
-  if (q === 'own' || q === 'shared') return q;
-  return 'shared';
+  if (q === 'own' || q === 'shared' || q === 'worker') return q;
+  return typeof Worker === 'undefined' ? 'shared' : 'worker';
 }
