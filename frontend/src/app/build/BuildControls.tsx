@@ -183,6 +183,7 @@ function Control({ c }: { c: BuildControl }) {
             value={c.value}
             options={c.options.map((o) => ({ value: o.value, label: o.label, disabled: c.disabled || o.disabled }))}
             onChange={c.onChange}
+            wrap={c.options.length > 3}
           />
           {hint}
         </div>

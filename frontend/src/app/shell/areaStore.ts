@@ -6,6 +6,7 @@
 // a dummy that is marked `demo: true`. Nothing here is a real search of the area.
 import { create } from 'zustand';
 import {
+  AreaRefused,
   discoverIn,
   erosDemo,
   knownObjectsIn,
@@ -52,6 +53,17 @@ export interface AreaSay {
   text: string;
 }
 
+/** Why the area gave no answer (Q-414): the demo has no prepared data for it. */
+export interface AreaRefusal {
+  code: string;
+  message: string;
+}
+export function refusalOf(e: unknown): AreaRefusal {
+  return e instanceof AreaRefused
+    ? { code: e.code, message: e.message }
+    : { code: 'area:failed', message: 'The area search failed. Draw the area again.' };
+}
+
 export interface AreaState {
   /** Which dock tool started this (the dock highlight follows it). */
   flow: AreaFlow;
@@ -68,6 +80,8 @@ export interface AreaState {
   known: KnownObjectsResult | null;
   disc: DiscoveryResult | null;
   eros: ErosDemo | null;
+  /** Set when the area has no answer; the cards say so and draw nothing. */
+  refusal: AreaRefusal | null;
   /** The demo file could not be loaded. */
   erosFailed: boolean;
   /** Discovery: the last step that is done (-1: none yet), and whether the run is going. */
@@ -127,6 +141,7 @@ const FRESH = {
   minimised: false,
   known: null,
   disc: null,
+  refusal: null as AreaRefusal | null,
   step: -1,
   running: false,
   sel: -1,
@@ -166,11 +181,27 @@ export const useAreaStore = create<AreaState>()((set, get) => {
     clearTimers();
     const mine = token;
     set({ ...FRESH, stage: 'set', box, last: box, screen: 'search', say: { kind: 'searching', text: 'Known objects in this area' } });
-    const answer = knownObjectsIn(box);
+    // Settled at once (a refusal must not sit unhandled while the island "searches").
+    const answer = knownObjectsIn(box).then(
+      (res) => ({ res }),
+      (e: unknown) => ({ refusal: refusalOf(e) }),
+    );
     timers.push(
       setTimeout(() => {
-        void answer.then((res) => {
+        void answer.then((a) => {
           if (mine !== token) return;
+          if ('refusal' in a) {
+            const refusal = a.refusal;
+            set({ say: { kind: 'found', text: refusal.message } });
+            timers.push(
+              setTimeout(() => {
+                if (mine !== token) return;
+                set({ say: null, screen: 'list', known: null, refusal });
+              }, FOUND_MS),
+            );
+            return;
+          }
+          const res = a.res;
           const n = res.objects.length;
           const names = res.objects.map((o) => `${o.id} ${o.name}`).join(', ');
           set({
@@ -197,6 +228,7 @@ export const useAreaStore = create<AreaState>()((set, get) => {
     ...FRESH,
     last: null,
     eros: null,
+    refusal: null,
     erosFailed: false,
     fitSeq: 0,
     startFlow: (flow) => {
@@ -233,11 +265,17 @@ export const useAreaStore = create<AreaState>()((set, get) => {
       set((s) => ({ screen: 'disc', minimised: false, step: -1, running: false, sel: -1, fitSeq: s.fitSeq + 1 }));
       const box = get().box;
       if (!box) return;
-      void Promise.all([discoverIn(box), loadEros()]).then(([disc]) => {
-        if (mine !== token) return;
-        set({ disc });
-        startRun();
-      });
+      void Promise.all([discoverIn(box), loadEros()]).then(
+        ([disc]) => {
+          if (mine !== token) return;
+          set({ disc });
+          startRun();
+        },
+        (e: unknown) => {
+          if (mine !== token) return;
+          set({ refusal: refusalOf(e), running: false });
+        },
+      );
     },
     openMover: (i) =>
       set({ screen: 'mover', sel: i, minimised: false, index: 0, det: null, playing: false }),

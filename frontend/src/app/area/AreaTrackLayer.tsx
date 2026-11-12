@@ -3,6 +3,7 @@
 // the area state changes and while the marker glides to the time of the shown exposure.
 // Demo data: see areaService.ts.
 import { useEffect, useRef } from 'react';
+import { DemoTag } from './DemoTag';
 import type { SkyView } from '@/viewer/sky/SkyView';
 import { currentHop, useAreaStore } from '@/app/shell/areaStore';
 import { boxToPixels } from '@/app/sky/areaDraw';
@@ -10,6 +11,10 @@ import { drawTrackWindow } from './erosDraw';
 
 export function AreaTrackLayer({ view }: { view: SkyView | null }) {
   const ref = useRef<HTMLCanvasElement>(null);
+  // The canvas draws demo data (Eros's real frames, made-up dots): it wears the tag too (Q-414).
+  const demoOn = useAreaStore(
+    (s) => (s.screen === 'eros' || s.screen === 'disc' || s.screen === 'mover') && !!s.box && !!s.eros && !s.refusal,
+  );
 
   useEffect(() => {
     const canvas = ref.current;
@@ -34,7 +39,7 @@ export function AreaTrackLayer({ view }: { view: SkyView | null }) {
       g.setTransform(dpr, 0, 0, dpr, 0, 0);
       g.clearRect(0, 0, width, height);
       const on = s.screen === 'eros' || s.screen === 'disc' || s.screen === 'mover';
-      if (!on || !s.box || !s.eros) return;
+      if (!on || !s.box || !s.eros || s.refusal) return;
       const rect = boxToPixels(s.box);
       if (!rect) return;
       const hop = currentHop(s);
@@ -78,11 +83,13 @@ export function AreaTrackLayer({ view }: { view: SkyView | null }) {
   }, [view]);
 
   return (
-    <canvas
-      ref={ref}
-      className="sx-area-track"
-      aria-hidden="true"
-      data-testid="area-track"
-    />
+    <>
+      <canvas ref={ref} className="sx-area-track" aria-hidden="true" data-testid="area-track" />
+      {demoOn && (
+        <span className="sx-area-track-tag" data-testid="area-track-demo">
+          <DemoTag testId="area-track-demo-tag" />
+        </span>
+      )}
+    </>
   );
 }

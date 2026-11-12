@@ -455,6 +455,25 @@ describe('ViewerPanel', () => {
     });
   };
 
+  it('Details has a Show row in the build pane that lowers the level, and a Motion row wired like P (D-21, Q-412)', async () => {
+    const { card, params } = fixture('star_mira');
+    useAppStore.getState().setObject(card, params);
+    useAppStore.getState().setHonesty('artistic');
+    await mountPane();
+    const inDetails = (label: string) =>
+      [...container.querySelectorAll<HTMLButtonElement>('[data-testid="build-details-panel"] button')].find(
+        (b) => b.textContent === label,
+      );
+    await act(async () => inDetails('Measured only')!.click());
+    expect(useAppStore.getState().honesty).toBe('measured');
+    await act(async () => {});
+    expect(useAppStore.getState().honesty).toBe('measured');
+    await act(async () => inDetails('Paused')!.click());
+    expect(fake.setSpinPaused).toHaveBeenLastCalledWith(true);
+    await act(async () => inDetails('Playing')!.click());
+    expect(fake.setSpinPaused).toHaveBeenLastCalledWith(false);
+  });
+
   it('there is no Pause button; P pauses and resumes everything that moves, and says so (WCAG 2.2.2)', async () => {
     // A Mira (pulsation only) has no spin and still moves.
     const { card, params } = fixture('star_mira');

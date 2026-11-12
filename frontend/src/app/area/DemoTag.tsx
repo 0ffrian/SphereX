@@ -3,13 +3,13 @@
 export const DEMO_NOTE =
   'Demo data: this is not a search of the area you drew. Eros’s frames and path are real SPHEREx data shown as an example; where they sit here, the dots and the other movers are made up.';
 
-export function DemoTag() {
+export function DemoTag({ testId = 'demo-tag' }: { testId?: string }) {
   return (
     <span
       className="sx-tagbadge"
       style={{ ['--dot' as string]: 'var(--p-asm)' }}
       title={DEMO_NOTE}
-      data-testid="demo-tag"
+      data-testid={testId}
     >
       Demo data
     </span>

@@ -1,5 +1,5 @@
 // "Hear it" panel of the build pane (approved design, panels-preview.html). Two sounds:
-//   Atmosphere: the wind you would hear on the surface (artistic, shown as "Imagined"), from the card's measured
+//   Atmosphere: the wind you would hear on the surface (artistic, shown as "Default"), from the card's measured
 //     surface pressure and temperature and the dominant gas (hearModel.atmosphereOf). Refused when an input is missing.
 //   Spectrum: the object's own SPHEREx spectrum played as pitch (measured), 0.75 to 5 um over about 9 s.
 // One sound at a time. Leaving the tab, closing the panel or changing object stops it.
@@ -412,7 +412,7 @@ export function HearPanel({ active, name }: { active: boolean; name: string | un
                 <div className="sx-hr-reach-h">
                   <span className="sx-eyebrow">Highest pitch that carries</span>
                   <span className="sx-hr-imag" title="The sound is an artist's impression (artistic)">
-                    Imagined
+                    Default
                   </span>
                 </div>
                 <div className="sx-hr-bar" aria-hidden="true">

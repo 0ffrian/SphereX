@@ -9,17 +9,22 @@ import type { SpectrumPoint } from '@/app/api/types';
 import { typeLabel } from '@/app/build/selectedBody';
 import { formatWavelength } from '@/app/format';
 import { summarizeSpectrum, ALL_SATURATED } from '@/app/refusals';
+import { DataBadge, ProvenanceBadge } from '@/app/Badge';
 import { useAppStore } from '@/state/store';
 
 const W = 400;
 const H = 170;
 const L = 34;
-const R = 8;
+const R = 14;
 const T = 12;
-const B = 26;
+const B = 30;
 const X0 = 0.75;
 const X1 = 5;
-/** F_nu peak: lambda_max [um] = 5100 / T [K] (derived). */
+/**
+ * F_nu peak: lambda_max [um] = 5100 / T [K] (derived). 5100 um K is the frequency-form Wien
+ * displacement constant, b' ~ 5.1e-3 m K (the peak of F_nu; the familiar 2898 um K is the peak of
+ * F_lambda). A known physical constant, not a tuned number.
+ */
 export const FNU_PEAK_UM_K = 5100;
 
 /** The card's `{value}` fields, or null; a card of another object is not used. */
@@ -61,7 +66,7 @@ function Chart({
       {[1, 2, 3, 4, 5].map((l) => (
         <g key={l}>
           <line x1={X(l)} x2={X(l)} y1={T} y2={H - B} stroke="var(--line)" />
-          <text x={X(l)} y={H - 8} fill="var(--muted)" fontSize="11" textAnchor="middle">
+          <text x={X(l)} y={H - 10} fill="var(--muted)" fontSize="11" textAnchor="middle">
             {l} µm
           </text>
         </g>
@@ -154,6 +159,11 @@ export function FlipbookSpectrum({ name }: { name: string }) {
             ))}
           </div>
         )}
+        {/* D-02 badge for the measured points (Fixture on dev data) and the Q-23 caveat. */}
+        <div className="fb-meta" data-testid="spectrum-provenance">
+          {sky.fixture ? <DataBadge fixture variant="tag" /> : <ProvenanceBadge tag="measured" variant="tag" />}
+          <span data-testid="spectrum-caveat">Not absolute photometry: no aperture correction yet.</span>
+        </div>
         {/* R9: the text equivalent of the chart. */}
         <table className="sr-only" data-testid="spectrum-table">
           <caption>Spectrum points of {name}</caption>
