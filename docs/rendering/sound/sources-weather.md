@@ -80,7 +80,7 @@ Thunder only where lightning has been observed, or where the analog is strong [S
 - **Visual flash:**
   - A host overlay over the fly pane, not engine code: a radial white gradient at the strike bearing, opacity 0.25, 120 ms.
   - At most one flash per 2 s, so never 3 per second (WCAG 2.3.1).
-  - Off under `prefers-reduced-motion` and when the "Flashes" toggle is off (default on).
+  - Under `prefers-reduced-motion`, or with the "Flashes" toggle off (default on), the flash is replaced by §8.5's slow glow (Q-449).
   - The flash is tagged `artistic` and listed in "What is drawn".
 
 #### 8.4 Thunder sound
@@ -97,7 +97,7 @@ Thunder only where lightning has been observed, or where the analog is strong [S
 **The surface.** A transparent `<canvas>` (2D context) stacked over the fly engine canvas in `WorldFlyStage`.
 - `pointer-events: none` and `aria-hidden`, so it never catches input.
 - No engine code changes (`@verbatim` untouched).
-- It is drawn by the same hook as the sound (`useWeather`). The sound and the picture read one `WeatherVisualFrame` (Appendix B), so they always agree.
+- It reads the same `WeatherVisualFrame` (Appendix B) the sound uses, from the weather bus (`weatherBus.ts`, #116), so the two always agree.
 
 **Rain.** Shown when `precipPhase==='rain'`, `rainRate > 0.05`, and the listener is below the cloud base (`z < zc`, or below 5 km if `zc` is null). From above the clouds, rain is not drawn: the cloud deck hides it.
 - **Streak count:** `N = RAIN_STREAKS_MAX · clamp(rainRate/1.5, 0, 1) · (1 + 0.6·cnv)`, capped at 600.
@@ -125,6 +125,28 @@ Thunder only where lightning has been observed, or where the analog is strong [S
   - At most one strike group (all its strokes) per `FLASH_MIN_GAP_S` = 2 s, so never 3 flashes per second (WCAG 2.3.1).
   - Under `prefers-reduced-motion`, or with the "Flashes" toggle off, the bolt and strokes are replaced by a slow 1 s glow at 0.15 opacity.
 - **Timing:** thunder plays `d/c` after the first stroke (§8.4). The caption says "Lightning 6 km away".
+
+**As built (#117, [Q-449](../../decisions/sound-ambience.md)).** These amend the text above:
+- **Strokes:** 2–3 return strokes, not 2–4.
+- **Glows:** every large-area layer (cloud, deck and edge glow) gives one pulse per strike group. A glow starts only
+  if 2 s have passed since the last glow, on the overlay's clock.
+- **Bolt flicker:** only the thin bolt restrikes, and only while its lit area is under WCAG's small-area limit
+  (21 824 px² at 1024×768, scaled to the pane). A larger bolt follows the one pulse.
+- **Bolt shape:** a seeded 2D polyline laid in screen space between the projected deck point and the projected
+  ground point. Both points are clipped to camera depth ≥ 0.1 km.
+- **What is in view:** decided by projecting the bolt, not by `|bearing − head| < fov·aspect/2`, which mixes a
+  tangent with an angle.
+- **Cloud deck:** the overlay uses the deck the engine draws, `1 + max(zc, 0.3)·ex/rkm`. With clouds on, the deck is
+  always drawn, at 3.5 km when `zc` is null. Rain needs the frame's rain (the cut at the real cloud base) and a
+  camera below the drawn deck; above the deck there is only the in-deck glow. On a gas giant every strike is an
+  in-deck glow, with no bolt. A near bolt is clipped to the pane, and its cloud glow sits where it enters.
+- **Label:** while weather is drawn, an 18 px caption on the fly view reads "Weather: artist's impression from the
+  simulated climate · colour not from data", bottom-left (`.sx-wx-cap`), clear of the Sound chip (Q-449(11)). The
+  "What is drawn" rows come from `weatherRows` (weather bus). Rain and snow are seeded from the world's seed (Q-449(12)).
+- **Reduced motion and Flashes off:** both give §8.5's slow glow (a 1 s raised cosine at 0.15). This replaces §8.3's
+  "off" and R13.10's "no flash".
+- **Timing:** strikes come from the weather bus (`onStrike`) ahead of their `t0`, and the first stroke draws at
+  `t0`. A strike that arrives later than 50 ms after `t0` shows only its glow.
 
 **Cyclones.** No extra drawing: the engine already draws the spiral clouds. In the eye, the rain stops (the §6.5 profile drives `rainRate × 0` inside `0.4 Rm`).
 
