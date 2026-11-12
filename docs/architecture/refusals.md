@@ -49,7 +49,7 @@ Per frame, `<reason>:<frame_id>`: `saturated` (core `OVERFLOW`, or a NaN core wi
 | `spectrum:saturated` | every listed frame was refused as `saturated` (D-31) |
 | `spectrum:extended_source` | **To build** ([Q-144](../decisions/moving-objects.md)): a comet whose coma fills the aperture; otherwise the aperture brightness is shown with "aperture, not total flux". Per-frame form `extended_source:<frame_id>`: A19.8 and A19.10 ([moving-objects/track-contract.md](moving-objects/track-contract.md)) |
 
-Not a refusal: a point kept with dropped pixels is `flagged`, with `dropped_flags` and `flag_reasons` (incl. `no_proper_motion`). For moving objects, `OUTLIER` on the core will be a flag, not a refusal: the point is `flagged` and `flag_reasons` gains `outlier_core` ([Q-139](../decisions/moving-objects.md), A19.7; to build, ticket T4). Until then the core `OUTLIER` refuses the frame as `aperture_flags` for movers too (15 of 16 Eros frames, A4.2).
+Not a refusal: a point kept with dropped pixels is `flagged`, with `dropped_flags` and `flag_reasons` (incl. `no_proper_motion`). For moving objects, `OUTLIER` on the core is a flag, not a refusal: the point is `flagged` and `flag_reasons` gains `outlier_core` ([Q-139](../decisions/moving-objects.md), A19.7; built in issue #72, [Q-456](../decisions/moving-objects.md)). For fixed objects the core `OUTLIER` still refuses the frame as `aperture_flags`.
 
 #### Card and RenderParams (A4.3 to A4.7)
 

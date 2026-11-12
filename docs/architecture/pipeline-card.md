@@ -51,7 +51,7 @@ A sketch from SPHEREx only is often a `candidate`, which gets no 3D body (render
   | `CARD_TO_PARAMS_VERSION` | `core/render/card_to_params.py` | `1` | a stage 7 rule changes the drawn body |
   | `BAKER_RULES_VERSION` | `core/render/bake.py` | `4` (3: issue #71 asteroid physics, Q-210; 4: crater depth and rubble relief, Q-326) | an R6.2 to R6.5 rule changes |
   | `GENERATOR_VERSION` | `core/render/card_to_params.py` | `p1-b4` | follows the two above; it also seeds every body (A5.1) |
-  | `MEASURE_VERSION` | `core/measure/config.py` | `measure-1` | a stage 2 rule changes (Q-139 will bump it) |
+  | `MEASURE_VERSION` | `core/measure/config.py` | `measure-2` | a stage 2 rule changes (Q-139 bumped it from `measure-1`, Q-456) |
   | `DERIVATION_VERSION` | `core/find/version.py` | `1` | a stage 1 rule changes |
   | `COMPOSITE_VERSION` | `core/composite/config.py` | `composite-1` | a composite rule changes |
   | `PAINT_VERSION` | `core/render/gemini_paint.py` | `1` | the Gemini repaint method changes (A6.2) |

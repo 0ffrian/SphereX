@@ -89,6 +89,27 @@ def test_done_when_eros_offline_from_env(
         assert points | refused == frame_ids and not points & refused
 
 
+def test_eros_outlier_on_the_core_is_a_flagged_point(client: TestClient) -> None:
+    """Q-139, A19.7: 14 points, 13 flagged `outlier_core`, 2 frames refused (hardware flags)."""
+    oid = eros(client)
+    sp = client.get(f"/v1/objects/{oid}/spectrum").json()
+    pts = sp["spectrum"]
+    assert len(pts) == 14
+    assert sum("outlier_core" in p["flag_reasons"] for p in pts) == 13
+    assert all(p["flagged"] for p in pts)  # all 14 are hollow (A20.7)
+    assert any("PERSIST" in p["dropped_flags"] for p in pts)
+    refused = [m for m in sp["missing"] if m.startswith("aperture_flags:")]
+    assert len(refused) == 2
+    assert sp["method"]["core_flag_only"] == ["OUTLIER"]
+    assert sp["method"]["version"] == "measure-2"
+    assert sp["tag"] == "measured"
+    assert [p["frame_id"] for p in pts] == [
+        p["frame_id"] for p in sorted(pts, key=lambda p: (p["wavelength_um"], p["frame_id"]))
+    ]
+    lc = sp["light_curve"]
+    assert len(lc) == 14 and all(p["flagged"] for p in lc)
+
+
 def test_frames_are_in_their_footprint_and_time(client: TestClient) -> None:
     oid = eros(client)
     body = client.get(f"/v1/objects/{oid}/frames").json()

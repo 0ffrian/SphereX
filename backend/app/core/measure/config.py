@@ -9,11 +9,11 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
 # Bump when the measurement code changes in a way that changes results.
-MEASURE_VERSION = "measure-1"
+MEASURE_VERSION = "measure-2"  # measure-2: OUTLIER on a mover's core is a flag (Q-139, Q-456)
 
 # V1, checked 5 Nov 2026: the IRSA tutorial "SPHEREx Source Discovery Tool demo" bad_flags list
 # (https://caltech-ipac.github.io/irsa-tutorials/spherex-source-discovery-tool-demo/). Names and
@@ -61,14 +61,30 @@ class MeasureConfig:
     reject_flags: tuple[str, ...] = REJECT_FLAGS
     saturation_flags: tuple[str, ...] = SATURATION_FLAGS
     saturation_context_flags: tuple[str, ...] = SATURATION_CONTEXT_FLAGS
+    # Reject names that, inside the core, are kept in the sum and recorded as a flag instead of
+    # refusing the frame (Q-139). Empty for fixed objects; see ``mover_config``.
+    core_flag_only: tuple[str, ...] = ()
 
 
 DEFAULT_CONFIG = MeasureConfig()
 
+# A moving object's own pixels are marked OUTLIER by the SPHEREx pipeline (15 of 16 Eros frames),
+# so for movers only OUTLIER within the core is a flag, not a refusal (Q-139, A19.7).
+MOVER_CORE_FLAGS: tuple[str, ...] = ("OUTLIER",)
+
+
+def mover_config(cfg: MeasureConfig = DEFAULT_CONFIG) -> MeasureConfig:
+    """``cfg`` with the moving-object core rule on (Q-139)."""
+    return replace(cfg, core_flag_only=MOVER_CORE_FLAGS)
+
+
+def config_for(moving: bool, cfg: MeasureConfig = DEFAULT_CONFIG) -> MeasureConfig:
+    return mover_config(cfg) if moving else cfg
+
 
 def method_dict(cfg: MeasureConfig = DEFAULT_CONFIG) -> dict[str, Any]:
     """The ``method`` block of the response; its hash is part of the derived cache key."""
-    return {
+    out: dict[str, Any] = {
         "kind": "aperture",
         "aperture_radius_px": cfg.aperture_radius_px,
         "annulus_px": [cfg.annulus_inner_px, cfg.annulus_outer_px],
@@ -85,6 +101,9 @@ def method_dict(cfg: MeasureConfig = DEFAULT_CONFIG) -> dict[str, Any]:
         "recentroid": False,
         "version": MEASURE_VERSION,
     }
+    if cfg.core_flag_only:  # absent for fixed objects, so their method block is unchanged
+        out["core_flag_only"] = list(cfg.core_flag_only)
+    return out
 
 
 def method_sha(cfg: MeasureConfig = DEFAULT_CONFIG) -> str:
