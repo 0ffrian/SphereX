@@ -25,12 +25,13 @@ import { FrameRate } from './shell/FrameRate';
 import { Transport } from './shell/Transport';
 import { SkyPane } from './sky/SkyPane';
 import { useHashSync } from './useHashSync';
-import { BuildPane } from './build/BuildPane';
+import { BuildPane, closeBuildPane } from './build/BuildPane';
 import { SelectedCard } from './build/SelectedCard';
 import { useSelectedBodyLoader } from './build/selectedBody';
 import { Island } from './island/Island';
 import { SoundProvider } from '@/sound/SoundProvider';
 import { SoundSettings } from '@/sound/ui/SoundSettings';
+import { ErrorBoundary } from './ErrorBoundary';
 
 /**
  * A new search opens the object panel (unless it is already open at the spectrum), a marker click
@@ -57,6 +58,9 @@ function useOpenPanelOnSearch(): void {
     });
   }, []);
 }
+
+/** Issue #102: the build pane's fallback can close it, since a reload reopens it (`&build`). */
+const CLOSE_BUILD = { label: 'Close build', onClick: closeBuildPane };
 
 /** "/" focuses the search field from anywhere except a text field. */
 function useSearchShortcut(): void {
@@ -105,6 +109,9 @@ export function App() {
   // Under the phone sheet the sky must not be reachable by Tab or a screen reader.
   const phone = usePhoneWidth();
   const skyHidden = split && phone;
+  // Issue #102: a new search clears a part that failed, so the demo goes on without a reload.
+  const query = useAppStore((s) => s.sky.query);
+  const resetKeys = [query];
   return (
     <SoundProvider>
       <FlipbookSessionProvider>
@@ -115,32 +122,89 @@ export function App() {
               <h1 className="sr-only">Shift &amp; Spectrum</h1>
               <FixtureBanner />
               {/* R13.9 (Q-442): sound on/off, volume, ambience and Flashes; its click unlocks audio. */}
-              <SoundSettings className="ml-auto" />
-              <Readout />
+              <ErrorBoundary area="The sound settings" resetKeys={resetKeys} className="ml-auto">
+                <SoundSettings className="ml-auto" />
+              </ErrorBoundary>
+              <ErrorBoundary
+                area="The sky position"
+                resetKeys={resetKeys}
+                className="absolute top-4 right-4 z-50"
+              >
+                <Readout />
+              </ErrorBoundary>
             </header>
             <main className="sx-view" aria-label="Sky view" data-split={split || undefined}>
+              {/* Issue #102: each part fails on its own; a throw in one leaves the others usable. */}
               <div className="sx-sky-slot" inert={skyHidden || undefined}>
-                <SkyPane>
-                  <SelectedCard />
-                  <Panels />
-                </SkyPane>
+                <ErrorBoundary area="The sky view" resetKeys={resetKeys} className="m-4">
+                  <SkyPane>
+                    <ErrorBoundary
+                      area="The object card"
+                      resetKeys={resetKeys}
+                      className="relative z-10 m-4"
+                    >
+                      <SelectedCard />
+                    </ErrorBoundary>
+                    <ErrorBoundary
+                      area="This panel"
+                      resetKeys={resetKeys}
+                      className="relative z-10 m-4"
+                    >
+                      <Panels />
+                    </ErrorBoundary>
+                  </SkyPane>
+                </ErrorBoundary>
               </div>
-              {split && <BuildPane />}
+              {split && (
+                <ErrorBoundary
+                  area="The build pane"
+                  resetKeys={resetKeys}
+                  action={CLOSE_BUILD}
+                  className="relative z-10 m-4"
+                >
+                  <BuildPane />
+                </ErrorBoundary>
+              )}
             </main>
             {/* Mock-up floating layout: the dock (tools, then the search) bottom centre and the zoom
                 card bottom left, over the full-bleed sky; the player is top left, the readout top
                 right (the header) and the island bottom right. */}
-            <SkyDock />
+            {/* Issue #102: the floating parts fail on their own too; a fallback sits in their corner. */}
+            <ErrorBoundary
+              area="The search and tools"
+              resetKeys={resetKeys}
+              className="absolute bottom-4 left-1/2 z-30 -translate-x-1/2"
+            >
+              <SkyDock />
+            </ErrorBoundary>
             <div className="sx-zoom-slot" inert={split || undefined}>
-              <SkyZoom />
+              <ErrorBoundary
+                area="The zoom control"
+                resetKeys={resetKeys}
+                className="absolute bottom-4 left-4 z-30"
+              >
+                <SkyZoom />
+              </ErrorBoundary>
             </div>
             {/* The flipbook transport belongs to the flipbook: it steps aside in the split view. */}
             <div className="sx-transport-slot" inert={split || undefined}>
-              <Transport />
-              <FrameRate />
+              <ErrorBoundary
+                area="The frame player"
+                resetKeys={resetKeys}
+                className="absolute top-4 left-4 z-30"
+              >
+                <Transport />
+                <FrameRate />
+              </ErrorBoundary>
             </div>
             {/* Issue #66 (mock-up `.island-wrap`): the island, over everything in the bezel. */}
-            <Island />
+            <ErrorBoundary
+              area="The status island"
+              resetKeys={resetKeys}
+              className="absolute right-4 bottom-4 z-40"
+            >
+              <Island />
+            </ErrorBoundary>
           </div>
           <LiveAnnouncer />
         </div>

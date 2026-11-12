@@ -9,6 +9,14 @@ export const API_BASE = '/v1';
  */
 export const API_TIMEOUT_MS = 90_000;
 
+/**
+ * ASSUMPTION (issue #102, Q-451): a shorter wait for `resolve` only, the first request of a
+ * search: a hung one shows its error after this, not after API_TIMEOUT_MS. `card` and
+ * `render-params` keep API_TIMEOUT_MS, because offline `/card` waits for the object's job with no
+ * limit of its own (Q-111 (2), A4.10). The frames poll and the other requests keep it too.
+ */
+export const API_QUICK_TIMEOUT_MS = 25_000;
+
 /** Response header the dev fixture server sets on every synthetic reply. */
 export const FIXTURE_HEADER = 'x-sx-fixture';
 
