@@ -59,6 +59,76 @@ export interface CpuFields {
   hydro: any;
 }
 
+/** Issue #114 (sound spec §3.3): the energy budget's weather arrays, NX x NY cells, row 0 = south pole. */
+export interface WeatherFields {
+  NX: number;
+  NY: number;
+  /** EB.h, sea-ice thickness (engine units). */
+  iceH: Float32Array;
+  /** EB.s, frost and snow on land. */
+  snow: Float32Array;
+  /** EB.out, 4 per cell: T, smoothed ice, smoothed frost, relative humidity. */
+  out: Float32Array;
+  /** EB.out2, 4 per cell: rain / rainMax, ocean-current speed, u, v. */
+  out2: Float32Array;
+  /**
+   * The cyclones the clouds draw (EB.cyc, first 12, as cloudStep): centre where the vortex is drawn now (lon drifted
+   * by (W.step - born) * drift and wrapped as core.js does), radius r (rad), spin sign s.
+   */
+  cyclones: { lon: number; lat: number; r: number; s: number }[];
+}
+
+/** Issue #114 (§3.3, §8.5): the fly camera basis (body frame) and its drawing constants. */
+export interface FlyCameraBasis {
+  /**
+   * Eye position in planet radii (body frame): up * (1 + (ex * groundKm + alt) / rkm). A world point at height h km over
+   * the unit direction d is d * (1 + h * ex / rkm) (the shader's surfR; the cloud shell is 1 + cloudKm * ex / rkm).
+   */
+  cam: [number, number, number];
+  fwd: [number, number, number];
+  rt: [number, number, number];
+  up: [number, number, number];
+  /** Planet radius, km. */
+  rkm: number;
+  /** Vertical exaggeration of the drawn relief (3 rocky, 2 gas). */
+  ex: number;
+  /**
+   * tan of the half vertical field of view (FLY_FS: rd = fwd + q.x * fov * rt + q.y * fov * up, q.y in [-1, 1]); 0.62 is
+   * a 63.6 degree vertical view. The horizontal extent is fov * aspect, aspect = the fly pane's width / height.
+   */
+  fov: number;
+}
+
+/** The fly view's field of view: core.js draw sets `gl.uniform1f(uF.uFov, 0.62)`. */
+export const FLY_FOV = 0.62;
+
+/** Issue #114 (blue 13, for #117): where a body-frame point (planet radii) falls in the fly view. */
+export interface FlyProjection {
+  /** -1 (left edge) .. 1 (right edge) of the fly pane; outside that range the point is off screen. */
+  x: number;
+  /** -1 (bottom) .. 1 (top). */
+  y: number;
+  /** The point is in front of the eye. */
+  inFront: boolean;
+}
+
+/**
+ * Project a body-frame point (planet radii, see FlyCameraBasis.cam) into the fly view, inverting FLY_FS's ray
+ * rd = fwd + q.x * fov * rt + q.y * fov * up with q = (2 frag - res) / res.y. `aspect` is the fly pane's width / height
+ * (core draws the fly view into viewport (0, 0, round(0.6 w), h); not the canvas aspect). Visible: inFront and |x|, |y| <= 1.
+ */
+export function projectFly(
+  b: Pick<FlyCameraBasis, 'cam' | 'fwd' | 'rt' | 'up' | 'fov'>,
+  aspect: number,
+  p: readonly [number, number, number],
+): FlyProjection {
+  const v = [p[0] - b.cam[0], p[1] - b.cam[1], p[2] - b.cam[2]];
+  const dot = (a: readonly number[]) => v[0]! * a[0]! + v[1]! * a[1]! + v[2]! * a[2]!;
+  const a = dot(b.fwd);
+  if (!(a > 0)) return { x: NaN, y: NaN, inFront: false };
+  return { x: dot(b.rt) / (a * b.fov * aspect), y: dot(b.up) / (a * b.fov), inFront: true };
+}
+
 export interface EngineState {
   Tstar: number;
   orbit: number;
@@ -439,6 +509,83 @@ export class WorldEngine implements SimFollower {
           }
         : null,
       hydro: W.hydro ?? null,
+    };
+  }
+
+  /**
+   * Issue #114 (sound spec §3.3): the energy budget's weather arrays (references; do not write). Null until the budget is
+   * ready, and null on a gas giant: EB keeps the previous rocky world's state across a switch to a giant.
+   */
+  weatherFields(): WeatherFields | null {
+    const EB = this.core.EB;
+    if (!EB.ready || this.core.W.m?.gas) return null;
+    // core.js cloudStep draws the first 12 entries at lon + (W.step - born) * drift, wrapped with its 6.2832.
+    const step = this.core.W.step as number;
+    const cyc = (
+      (EB.cyc ?? []) as {
+        lon: number;
+        lat: number;
+        r: number;
+        s: number;
+        born?: number;
+        drift?: number;
+      }[]
+    )
+      .slice(0, 12)
+      .map((c) => {
+        const lon = c.lon + (step - (c.born ?? step)) * (c.drift ?? 0);
+        return {
+          lon: ((((lon + Math.PI) % 6.2832) + 6.2832) % 6.2832) - Math.PI,
+          lat: c.lat,
+          r: c.r,
+          s: c.s,
+        };
+      });
+    return {
+      NX: EB.NX,
+      NY: EB.NY,
+      iceH: EB.h,
+      snow: EB.s,
+      out: EB.out,
+      out2: EB.out2,
+      cyclones: cyc,
+    };
+  }
+
+  /**
+   * Issue #114 (§3.3): the gas simulation's field, 256 x 128 x [u, v, vorticity, storm stamp], row 0 = south pole,
+   * column 0 = lon -pi. `exportField(false)` rewrites the simulation's own buffer from the current state, so the array
+   * is live: the next call (or the next GPU upload) overwrites it. Null on rocky worlds (the simulation outlives a switch
+   * to a rocky world, so its field would be stale).
+   */
+  gasField(): Float32Array | null {
+    if (!this.core.W.m?.gas) return null;
+    const gs = this.core.getGS();
+    return gs ? (gs.exportField(false) as Float32Array) : null;
+  }
+
+  /** Issue #114 (§3.3): the raw terrain cell under (lon, lat) in km, clamped at sea level on ocean worlds (core.groundKm). */
+  groundKm(lon: number, lat: number): number {
+    return this.core.groundKm(lon, lat);
+  }
+
+  /**
+   * Issue #114 (§3.3, §8.5): the fly camera's basis, from core.flyCamera(m, 0, 0, [0, 0, 1]). Tilt, spin and the light
+   * vector change only the light direction, never the basis. Null before a world is loaded.
+   */
+  flyCameraBasis(): FlyCameraBasis | null {
+    const W = this.core.W;
+    if (!W.m || !W.p) return null;
+    const c = this.core.flyCamera(W.m, 0, 0, [0, 0, 1]);
+    const v3 = (v: number[]): [number, number, number] => [v[0]!, v[1]!, v[2]!];
+    return {
+      cam: v3(c.uCam),
+      fwd: v3(c.uFwd),
+      rt: v3(c.uRt),
+      up: v3(c.uUp),
+      rkm: c.rkm,
+      ex: c.ex,
+      fov: FLY_FOV,
     };
   }
 
