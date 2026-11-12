@@ -4673,3 +4673,77 @@ body {
 .sx-panel-head .sx-panel-x + .sx-panel-x {
   margin-left: -7px;
 }
+
+/* The build view's side bar (Moon, 12 Nov 2026): Split view and the Atmosphere sound, two toggles
+   in a small matte-glass column on the right edge of the build pane. */
+.sx-bp-side {
+  position: absolute;
+  z-index: 6;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px;
+  border-radius: 10px;
+  border: 1px solid var(--glass-edge);
+  background: var(--glass-grain), var(--glass-bg);
+  -webkit-backdrop-filter: var(--glass-filter);
+  backdrop-filter: var(--glass-filter);
+  box-shadow:
+    inset 0 1px 0 var(--glass-hi),
+    0 10px 30px rgba(0, 0, 0, 0.35);
+}
+.sx-bp-sidebtn {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  background: transparent;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+.sx-bp-sidebtn:hover {
+  color: var(--fg);
+  background: rgba(255, 255, 255, 0.06);
+}
+.sx-bp-sidebtn[aria-pressed='true'] {
+  color: var(--fg);
+  background: var(--ac);
+}
+.sx-bp-sidebtn[aria-disabled='true'] {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.sx-bp-sidebtn[aria-disabled='true']:hover {
+  background: transparent;
+  color: var(--muted);
+}
+.sx-bp-sidebtn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+/* Split view off: once built, the body keeps the whole view instead of moving to the right half. */
+.sx-bp[data-shifted][data-solo] {
+  width: 100%;
+}
+@media (max-width: 640px) {
+  .sx-bp-side {
+    top: auto;
+    bottom: 96px;
+    transform: none;
+  }
+  .sx-bp-sidebtn {
+    width: 44px;
+    height: 44px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sx-bp-sidebtn {
+    transition: none;
+  }
+}

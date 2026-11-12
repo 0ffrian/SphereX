@@ -48,7 +48,8 @@ export const useCloseUpStore = create<CloseUpState>((set) => ({
   engineWorld: null,
   reducedMotion: false,
   info: null,
-  hidden: false,
+  // Moon (12 Nov 2026): the split view is off until asked for (the side bar's Split view toggle).
+  hidden: true,
   held: false,
   publish: (p) => set(p),
   setInfo: (info) => set({ info }),
