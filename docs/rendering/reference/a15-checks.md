@@ -51,7 +51,7 @@ Observation: to measure.
 
 ## 6. Audio (R12 #10, #35): pending #76
 
-`outputLatency` can already be read with "Read audio latency" on `/haptics-test.html`, wired and Bluetooth. Lookahead is judged by ear after #76. Results go in R12 and `haptics/tuning.ts` (`AUDIO_LOOKAHEAD_S`, `HIGH_OUTPUT_LATENCY_S`), not here.
+`outputLatency` is read on the sound-check page (`sound-check.html`, R13.9, #116), wired and Bluetooth; the haptics test page that used to show it is deleted (D-39). Lookahead is judged by ear after #76. Results go in R12 and `haptics/tuning.ts` (`AUDIO_LOOKAHEAD_S`, `HIGH_OUTPUT_LATENCY_S`), not here.
 
 ## 7. After the sitting
 

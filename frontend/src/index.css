@@ -4588,3 +4588,26 @@ body {
 .sx-bezel[data-split] .sx-top {
   pointer-events: none;
 }
+
+/* #111 (R13.9): the Sound control in the top bar. Its open popover lifts the top bar above the
+   object panel (z 20) and the sky credit (z 25), so the popover is never covered. */
+.sx-top:has(.sx-sound-pop:not([hidden])) {
+  z-index: 31;
+}
+/* Build view: the top bar is click-through (the build pane's header buttons sit under it), so the
+   Sound control moves to the bottom right, left of the island, and takes clicks again; its popover
+   opens upwards. */
+@media (min-width: 641px) {
+  .sx-bezel[data-split] .sx-sound {
+    position: fixed;
+    right: calc(var(--sx-in-r, 16px) + 72px);
+    bottom: 22px;
+    margin: 0;
+    pointer-events: auto;
+  }
+  .sx-bezel[data-split] .sx-sound-pop {
+    top: auto;
+    bottom: 100%;
+    margin: 0 0 8px;
+  }
+}
