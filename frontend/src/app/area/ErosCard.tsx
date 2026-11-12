@@ -290,7 +290,7 @@ export function ErosCard({ title: given, back }: { title?: string; back?: () => 
                   srText
                   variant="tag"
                 />
-                {` ${n} frames from the backend${hasPath ? ', path from Horizons' : ', no path for this object'}`}
+                {` ${eros?.hops.length ?? 0} frames from the backend${hasPath ? ', path from Horizons' : ', no path for this object'}`}
               </p>
             )}
             {known && (
