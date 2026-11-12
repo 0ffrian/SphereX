@@ -12,17 +12,18 @@ const inp = (g: Partial<GateInputs> = {}, o: Partial<StepInput> = {}): StepInput
 describe('ambience lifecycle reducer', () => {
   it.each<[AmbienceStatus, StepInput, AmbienceStatus, string[]]>([
     ['idle', inp({}, { placeReady: false }), 'waiting', []],
-    ['idle', inp({}, { ready: 0 }), 'baking', []],
-    ['waiting', inp({}, { ready: 0 }), 'baking', []],
+    ['idle', inp({}, { ready: 0 }), 'baking', ['fadeIn']],
+    ['waiting', inp({}, { ready: 0 }), 'baking', ['fadeIn']],
+    ['waiting', inp(), 'playing', ['fadeIn']], // B1: back from waiting within the fade revives the group
     ['baking', inp(), 'playing', []],
-    ['idle', inp(), 'playing', []],
+    ['idle', inp(), 'playing', ['fadeIn']], // B1/m3: a remount of the same world while its group still fades
     ['playing', inp({}, { selected: 0, ready: 0 }), 'playing', []], // nothing to play (all refused): silent, captioned
     ['playing', inp({}, { placeReady: false }), 'waiting', ['fadeOut']],
     ['fading', inp(), 'playing', ['fadeIn']],
     ['fading', inp({}, { ready: 0 }), 'baking', ['fadeIn']],
     ['playing', inp({ failed: true }), 'noSurface', ['fadeOut']],
     ['idle', inp({ failed: true }), 'noSurface', []],
-    ['noSurface', inp(), 'playing', []],
+    ['noSurface', inp(), 'playing', ['fadeIn']],
     ['error', inp(), 'error', []],
     ['idle', inp({ soundOn: false }), 'idle', []],
     ['fading', inp({ soundOn: false }), 'fading', []],

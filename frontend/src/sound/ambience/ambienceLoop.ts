@@ -4,11 +4,13 @@
 // Each tick: read the engine through its accessors (never cache its arrays: #93's simulation swaps them), rebuild the
 // AirModel while the world forms or waits (C7) or after a debounced physics change, sample the place, run the strike
 // scheduler STRIKE_LOOKAHEAD_S ahead and publish the weather snapshot (with or without sound), then, when sound may
-// play, select and request beds, pull the ready set from the palette (C4), mix and fire thunder. An exception logs
-// once and fades the sound; the fly view never breaks (C9).
+// play, select and request beds, pull the ready set from the palette (C4), mix and fire thunder. An audio-graph
+// exception logs once and fades the sound for good; a place or sampling exception only skips that tick and retries
+// (m1). The fly view never breaks (C9).
 import type { CardToWorldOk } from '@/engine/worlds/cardToWorld';
+import { airAt } from './air';
 import { buildAirModel, isWaiting, REFUSAL_TEXT } from './airModel';
-import { airFacts } from './captions';
+import { airFacts, ceilingCaption } from './captions';
 import { isOneShot } from './dsp';
 import { bedKey, mixFrame } from './levels';
 import type { AmbienceMixer, BufferSource, Timers } from './mixer';
@@ -106,6 +108,8 @@ export function createAmbienceLoop(deps: LoopDeps, initial: Partial<GateInputs> 
   let air: AirModel | null = null;
   let airKey = '';
   let airSettled = false;
+  /** m4: while the world forms or waits, the AirModel is rebuilt only when this signature changes. */
+  let formingKey = '';
   let pending: { key: string; since: number } | null = null;
   let place: Place | null = null;
   let placeReady = false;
@@ -124,6 +128,9 @@ export function createAmbienceLoop(deps: LoopDeps, initial: Partial<GateInputs> 
   let lastPalette: PaletteLike | null = null;
   let audioBroken = false;
   let logged = false;
+  let placeLogged = false;
+  /** M1/B2: the next push after this tick's mix skips the CAPTION_MIN_S throttle (a status change, a first frame). */
+  let uiDirty = false;
   let tickMs = 0;
   let disposed = false;
   const sample = deps.sample ?? ((e: WorldEngineWithSpinup, a: AirModel) => samplePlace(e, a, windAt));
@@ -175,6 +182,14 @@ export function createAmbienceLoop(deps: LoopDeps, initial: Partial<GateInputs> 
     // §13: beds stay cached for KEEP_ALIVE_MS after the soundscape goes idle (the holder owns that timer).
     deps.idle?.(status === 'idle' || status === 'noSurface' || status === 'error' || status === 'waiting');
     pushUi(true);
+    // M1/B2: a status change pushed before this tick's mix frame existed; push once more, unthrottled, after the mix,
+    // so the caption is never left blank or stale for CAPTION_MIN_S.
+    uiDirty = true;
+  }
+
+  /** Q-447: the listener is above the §4.1 silence ceiling (in an atmosphere that carries sound at the ground). */
+  function aboveCeiling(): boolean {
+    return !!air && !!place && air.airOK && airAt(air, place.features.z_km).silent;
   }
 
   function evaluate() {
@@ -198,9 +213,11 @@ export function createAmbienceLoop(deps: LoopDeps, initial: Partial<GateInputs> 
       case 'error':
         return { caption: SOUND_UNAVAILABLE, levelNote: null };
       case 'baking':
+        // Q-447: above the ceiling nothing would play, whatever is baked: say so (and how to hear it) at once.
+        if (aboveCeiling()) return { caption: ceilingCaption(air!), levelNote: null };
         return { caption: `Preparing sounds (${readyCount(deps.palette())} of ${specs.size})…`, levelNote: null };
       case 'playing': {
-        if (!frame) return { caption: '', levelNote: null };
+        if (!frame) return { caption: aboveCeiling() ? ceilingCaption(air!) : '', levelNote: null };
         const c = frame.caption;
         const line = c.silentReason ?? c.line;
         if (!line && specs.size === 0) {
@@ -240,12 +257,30 @@ export function createAmbienceLoop(deps: LoopDeps, initial: Partial<GateInputs> 
     deps.onUi(ui);
   }
 
-  /** The AirModel for this tick (C7): rebuilt every tick while forming or waiting, else on a debounced physics change. */
+  /**
+   * The signature of everything buildAirModel's answer depends on while the world forms or waits (m4): the physics key,
+   * the world and its applied overrides, whether the engine still spins up, and whether the climate and hydro fields
+   * (R12's readiness) exist yet. All cheap reads: cpuFields() builds a small object of references.
+   */
+  function formingSig(e: WorldEngineWithSpinup, key: string, w: CardToWorldOk): string {
+    const cpu = e.cpuFields();
+    return [key, w.preset.id, JSON.stringify(w.overrides), e.spinup > 0, !!cpu?.climate?.stats, !!cpu?.hydro].join('#');
+  }
+
+  /**
+   * The AirModel for this tick (C7): while forming or waiting it follows the world as soon as the world changes, but is
+   * rebuilt only when formingSig changes (m4: not every tick, since readouts() runs worldUi() during the busiest
+   * frames); once settled, on a debounced physics change.
+   */
   function airFor(e: WorldEngineWithSpinup, now: number): AirModel {
     const key = physicsKey(e);
-    // C7: while the world forms or waits, and once more when it has settled, rebuild every tick (no debounce).
     if (!air || !airSettled || e.spinup > 0 || isWaiting(air)) {
-      air = build(deps.world(), e);
+      const w = deps.world();
+      const sig = formingSig(e, key, w);
+      if (!air || sig !== formingKey) {
+        air = build(w, e);
+        formingKey = sig;
+      }
       airSettled = e.spinup === 0 && !isWaiting(air);
       airKey = key;
       pending = null;
@@ -319,10 +354,12 @@ export function createAmbienceLoop(deps: LoopDeps, initial: Partial<GateInputs> 
       });
       for (const s of strikes) deps.strike(s);
     } catch (err) {
-      log('Ambience: the place loop failed; the soundscape is off for this view.', err);
-      audioBroken = true;
-      publishNull();
-      evaluate();
+      // m1: the place part touches no audio; a throw here (for example while #93's simulation swaps its arrays) skips
+      // this tick and retries on the next one. It never latches the soundscape off.
+      if (!placeLogged && import.meta.env.DEV) {
+        placeLogged = true;
+        (deps.log ?? ((m, e) => console.warn(m, e)))('Ambience: the place loop failed; skipping this tick.', err);
+      }
       tickMs = (typeof performance !== 'undefined' ? performance.now() : 0) - t0;
       return;
     }
@@ -347,12 +384,15 @@ export function createAmbienceLoop(deps: LoopDeps, initial: Partial<GateInputs> 
           m.setWorld(worldKey);
           const baked = new Set<string>();
           for (const [k, s] of specs) if (!isOneShot(s.id, s.variant) && p.get(s.id, s.variant)) baked.add(k);
+          if (!frame) uiDirty = true; // the first frame of this world or status: caption it now (M1)
           frame = mixFrame(a, pl, baked, frame, specs);
           m.apply(frame, p);
           for (const s of strikes) m.fire(s, a, p, { nowS: now, z_km: pl.features.z_km, head: pl.head });
         }
       }
-      pushUi(false);
+      const force = uiDirty;
+      uiDirty = false;
+      pushUi(force);
     } catch (err) {
       log('Ambience: the mixer failed; the soundscape fades out.', err);
       audioBroken = true;

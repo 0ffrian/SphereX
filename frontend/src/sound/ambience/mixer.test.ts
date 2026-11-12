@@ -202,6 +202,31 @@ describe('AmbienceMixer fades (C1 to C3: audio clock + wall-clock stop, no ticks
     expect(ctx.nodes.length).toBe(n);
   });
 
+  it('setWorld with the same key while its group fades fades it back in, with no new sources (m3)', () => {
+    const m = playing();
+    const n = ctx.nodes.length;
+    m.fadeOut();
+    vi.advanceTimersByTime(300);
+    expect(m.playing).toBe(false);
+    m.setWorld('w1');
+    expect(m.playing).toBe(true);
+    expect(worldGain().gain.targets.at(-1)!.v).toBe(1);
+    vi.advanceTimersByTime(5000);
+    expect(sources().every((s) => s.stopCalls === 0)).toBe(true);
+    m.apply(frame([bed('S5'), bed('S1_land')]), palette(BUFS));
+    expect(ctx.nodes.length).toBe(n);
+  });
+
+  it('a quick A → B → A revives A while it still fades (m3)', () => {
+    const m = playing();
+    const a = worldGain();
+    m.setWorld('w2');
+    vi.advanceTimersByTime(200);
+    m.setWorld('w1');
+    expect(m.playing).toBe(true);
+    expect(a.gain.targets.at(-1)!.v).toBe(1);
+  });
+
   it('after a full fade the next apply rebuilds the beds from the palette at once', () => {
     const m = playing();
     m.fadeOut();

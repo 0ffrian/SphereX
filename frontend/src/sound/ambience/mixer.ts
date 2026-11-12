@@ -134,13 +134,17 @@ export class AmbienceMixer {
 
   /**
    * §9.6 / C5: a new world key fades the old world's group out at once (whatever the new world has, airless included)
-   * and the new group in over REBAKE_XFADE_S as its beds arrive. The same key is a no-op.
+   * and the new group in over REBAKE_XFADE_S as its beds arrive. The same key keeps the group; if that group is still
+   * fading (a remount of the same world, or a quick A → B → A), it is faded back in, not left to fall silent (m3).
    */
   setWorld(key: string): void {
-    if (this.disposed || key === this.current) return;
-    const old = this.current ? this.groups.get(this.current) : undefined;
-    if (old) this.fadeGroup(old, REBAKE_XFADE_S);
-    this.current = key;
+    if (this.disposed) return;
+    if (key !== this.current) {
+      const old = this.current ? this.groups.get(this.current) : undefined;
+      if (old) this.fadeGroup(old, REBAKE_XFADE_S);
+      this.current = key;
+    }
+    this.fadeIn(); // a no-op unless the group for `key` exists and is fading
   }
 
   /** §10 step 3: one tick's bed levels. Buffers come from `palette.get` every tick (C4), so cached beds play at once. */
