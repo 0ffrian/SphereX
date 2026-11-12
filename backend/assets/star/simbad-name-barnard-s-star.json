@@ -1,5 +1,5 @@
 {
-  "asset_version": "12",
+  "asset_version": "13",
   "card": {
     "flare_rate_per_d": {
       "source": "not available: no published flare rate per day was confirmed: the star is in neither the Guenther et al. 2020 TESS catalogue (AJ 159, 60; sectors 1-2) nor the Medina et al. 2020 sample (ApJ 905, 107)",
@@ -9,9 +9,10 @@
     "id": "simbad-name-barnard-s-star",
     "lum_lsun": {
       "assumption": "FLAME luminosity from the Gaia G magnitude, the GSP-Phot extinction, the parallax (or GSP-Phot distance) and a bolometric correction that depends on the GSP-Phot Teff, gravity and metallicity (Gaia DR3 datamodel, lum_flame); a model value, not a measured luminosity, and it inherits GSP-Phot's weakness for cool stars",
+      "err": 3.4009000000022327e-07,
       "source": "Gaia DR3 astrophysical_parameters lum_flame, source 4472832130942575872, matched 0.00 arcsec from the SIMBAD position moved to 2016.0 by its proper motion",
       "tag": "model_dependent",
-      "value": 0.003
+      "value": 0.00339805347
     },
     "mass_msun": {
       "source": "not available: Gaia DR3 has no FLAME mass_flame for this star",
@@ -55,7 +56,7 @@
   },
   "created_at": "2025-10-01T00:00:00.000Z",
   "generator_version": "p1-b4",
-  "inputs_sha256": "eb40dd02945cf37be8fa91ab3ed6ad7e13d745c6ccbb5d17ae2e8c929dfdc9e9",
+  "inputs_sha256": "c73f3bd3f7e58b621893d02343575816cfd4e8594ad4d1423f16a4e3a9b45893",
   "render_params": {
     "alt_text": "NAME Barnard's star, Star, 0.202 solar radii (model dependent), colour from Teff, self-luminous. Surface relief: illustrative.",
     "confidence": {
