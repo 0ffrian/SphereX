@@ -3,8 +3,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useCloseUpStore } from '@/app/closeUpStore';
-import { useShellStore } from '@/app/shell/shellStore';
-import { BuildDock, ZoomBar, zoomPercent } from './BuildChrome';
+import { PAPER_PENDING, ReadPaper, ZoomBar, zoomPercent } from './BuildChrome';
 import type { ViewerApp } from '@/viewer/ViewerApp';
 
 declare global {
@@ -58,20 +57,11 @@ describe('zoom bar', () => {
 });
 
 describe('dock', () => {
-  it('Area search is shown but off, and says so', async () => {
-    await act(async () => root.render(<BuildDock pop={null} onPop={() => {}} />));
-    const area = q('dock-area');
-    expect(area.disabled).toBe(true);
-    expect(area.getAttribute('aria-label')).toMatch(/not available yet/i);
-  });
-
-  it('has no Feel button (removed on purpose); the sky button closes the build', async () => {
-    const onPop = vi.fn();
-    useShellStore.getState().openBuild(false);
-    await act(async () => root.render(<BuildDock pop={null} onPop={onPop} />));
-    expect(host.querySelector('[data-testid="dock-feel"]')).toBeNull();
-    await act(async () => q('dock-sky').click());
-    expect(useShellStore.getState().build.open).toBe(false);
-    expect(onPop).not.toHaveBeenCalled();
+  it('Read paper says the paper is not out yet, and links to it once it is (Q-456)', async () => {
+    await act(async () => root.render(<ReadPaper url={null} />));
+    expect(q('build-paper').getAttribute('aria-disabled')).toBe('true');
+    expect(q('build-paper').getAttribute('aria-label')).toContain(PAPER_PENDING);
+    await act(async () => root.render(<ReadPaper url="https://example.org/paper.pdf" />));
+    expect(q('build-paper').getAttribute('href')).toBe('https://example.org/paper.pdf');
   });
 });

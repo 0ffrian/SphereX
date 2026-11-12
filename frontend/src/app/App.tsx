@@ -104,7 +104,10 @@ export function App() {
   useHashSync();
   useSearchShortcut();
   useSelectedBodyLoader();
-  const split = useShellStore((s) => s.build.open);
+  const buildOpen = useShellStore((s) => s.build.open);
+  // Q-456: a minimised build stays mounted (hidden), and the sky is the view again.
+  const buildMini = useShellStore((s) => s.buildMinimised);
+  const split = buildOpen && !buildMini;
   // Under the phone sheet the sky must not be reachable by Tab or a screen reader.
   const phone = usePhoneWidth();
   const skyHidden = split && phone;
@@ -151,15 +154,17 @@ export function App() {
                   </SkyPane>
                 </ErrorBoundary>
               </div>
-              {split && (
-                <ErrorBoundary
-                  area="The build pane"
-                  resetKeys={resetKeys}
-                  action={CLOSE_BUILD}
-                  className="relative z-10 m-4"
-                >
-                  <BuildPane />
-                </ErrorBoundary>
+              {buildOpen && (
+                <div className={buildMini ? 'sx-bp-mini' : 'contents'} inert={buildMini || undefined} aria-hidden={buildMini || undefined}>
+                  <ErrorBoundary
+                    area="The build pane"
+                    resetKeys={resetKeys}
+                    action={CLOSE_BUILD}
+                    className="relative z-10 m-4"
+                  >
+                    <BuildPane />
+                  </ErrorBoundary>
+                </div>
               )}
             </main>
             {/* Mock-up floating layout: the dock (tools, then the search) bottom centre and the zoom
