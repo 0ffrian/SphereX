@@ -21,6 +21,8 @@ export const CACHED_SHOW_MS = 1400;
 /** Moon (12 Nov 2026): every build shows the mould for at least this long, cached bodies included. */
 export const MIN_SHOW_MS = 5000;
 export const FINISH_MS = 600;
+/** Each step of the show gets at least this long, also after a long load (Moon: the body morphs slowly, Q-421). */
+export const STEP_MIN_MS = 700;
 export const HAND_OVER_MS = 350;
 /** The mock-up's `STAGE_S` and the rotation speed of the body while it is built. */
 export const STAGE_S = 2.3;
@@ -271,12 +273,13 @@ export function MouldOverlay({ active, id, kind, steps, inputs, seed, reduced, c
     const elapsed = now - startedAt.current;
     if (reduced) return leave();
     // The mould plays its remaining stages over whatever is left of MIN_SHOW_MS (a cached body that
-    // was ready at once gets the whole 5 s show); a long real wait just finishes its stage quickly.
-    const ms = Math.max(FINISH_MS, MIN_SHOW_MS - elapsed);
+    // was ready at once gets the whole 5 s show). After a long real wait every step still gets
+    // STEP_MIN_MS, so the body morphs through each one and the strip can be read (Q-421).
+    const ms = Math.max(FINISH_MS, steps * STEP_MIN_MS, MIN_SHOW_MS - elapsed);
     setRushMs(ms);
     setSt('rush');
     timers.current.push(setTimeout(leave, ms));
-  }, [active, id, reduced, kind]);
+  }, [active, id, reduced, kind, steps]);
 
   if (stage === 'off') return null;
   const leaving = stage === 'leave';
