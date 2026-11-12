@@ -1,6 +1,6 @@
 // #76: the event app's one sound engine, audio only (Q-132, R8.8.1 items 1, 2, 9, 10). Framework-free:
 // `SoundProvider` mounts one for the app and #83's UI calls it. It owns the engine (audio driver
-// only, never a vibrate driver), the Listen sweep, and the wiring that keeps both in step with the
+// only, D-39), the Listen sweep, and the wiring that keeps both in step with the
 // settings (R8.7), the honesty toggle (D-21) and the page lifecycle (R8.8). Creating one has no side
 // effects: no AudioContext and no listeners until `bind()`.
 import type { SpectrumResponse } from '@/app/api/types';
@@ -12,8 +12,20 @@ import {
   subscribeUnlockState,
   type UnlockState,
 } from './audioContext';
-import { bindHonesty, createSoundEngine, type SoundEngineOptions, type SoundOutputs } from './engine';
-import { bindEngine, getSoundSettings, useSoundSettings, type SoundSettingsValues } from './settings';
+import { refreshAmbienceLevel, setAmbienceLevelSource } from './audioGraph';
+import {
+  bindHonesty,
+  createSoundEngine,
+  type SoundEngineOptions,
+  type SoundOutputs,
+} from './engine';
+import {
+  ambienceLevelFor,
+  bindEngine,
+  getSoundSettings,
+  useSoundSettings,
+  type SoundSettingsValues,
+} from './settings';
 import {
   DOCUMENT_PAGE,
   ListenSweep,
@@ -183,7 +195,19 @@ export function createAppSound(options: AppSoundOptions = {}): AppSound {
       };
     },
     bind(honesty) {
+      // R13.9: the ambience bus level follows the settings (ambienceVolume × volume, 0 when sound
+      // or ambience is off). Events and spectrum apply `volume` themselves; T6's mixer must not
+      // multiply the master volume into its bed gains again.
+      setAmbienceLevelSource(() => ambienceLevelFor(getSoundSettings()));
+      const refresh = () => refreshAmbienceLevel(getAudioContext());
+      refresh();
       const undo = [
+        () => {
+          setAmbienceLevelSource(null);
+          refresh();
+        },
+        subscribeUnlockState(refresh),
+        useSoundSettings.subscribe(refresh),
         bindEngine(outputs),
         bindHonesty(engine, honesty.get, honesty.subscribe),
         bindHonesty(sweep, honesty.get, honesty.subscribe),

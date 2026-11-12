@@ -6,7 +6,7 @@ import { useStore } from 'zustand';
 import { createStore, type StoreApi } from 'zustand/vanilla';
 import type { SoundOutputs } from './engine';
 import { clamp01 } from './pitch';
-import { DEFAULT_VOLUME } from './tuning';
+import { AMBIENCE_DEFAULT_VOLUME, DEFAULT_VOLUME } from './tuning';
 
 export const SETTINGS_STORAGE_KEY = 'sx.haptics.settings';
 
@@ -16,8 +16,16 @@ export const SETTINGS_STORAGE_KEY = 'sx.haptics.settings';
  */
 export interface SoundSettingsValues {
   soundOn: boolean;
-  /** 0–1. */
+  /** 0–1: the master volume. */
   volume: number;
+  /** R13.9: the flyover ambience on/off (it plays only at "+ Artistic" in the fly view, #116). */
+  ambienceOn: boolean;
+  /** R13.9: 0–1, × the master volume. */
+  ambienceVolume: number;
+  /** R13.6 / R13.10: lightning flashes in the fly view (reduced motion still wins, R13.10). */
+  flashesOn: boolean;
+  /** R13.10 live caption: "Read changes aloud" (default off, no UI until #116). */
+  readCaptions: boolean;
 }
 
 export interface SoundSettingsState extends SoundSettingsValues {
@@ -30,7 +38,14 @@ export interface SoundSettingsState extends SoundSettingsValues {
 }
 
 export function defaultSettings(): SoundSettingsValues {
-  return { soundOn: true, volume: DEFAULT_VOLUME };
+  return {
+    soundOn: true,
+    volume: DEFAULT_VOLUME,
+    ambienceOn: true,
+    ambienceVolume: AMBIENCE_DEFAULT_VOLUME,
+    flashesOn: true,
+    readCaptions: false,
+  };
 }
 
 /** Keep only valid fields of `raw` over `base`. Anything malformed is ignored. */
@@ -38,8 +53,13 @@ export function sanitizeSettings(raw: unknown, base: SoundSettingsValues): Sound
   const out = { ...base };
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return out;
   const r = raw as Record<string, unknown>;
-  if (typeof r.soundOn === 'boolean') out.soundOn = r.soundOn;
-  if (typeof r.volume === 'number' && Number.isFinite(r.volume)) out.volume = clamp01(r.volume);
+  for (const k of ['soundOn', 'ambienceOn', 'flashesOn', 'readCaptions'] as const) {
+    if (typeof r[k] === 'boolean') out[k] = r[k];
+  }
+  for (const k of ['volume', 'ambienceVolume'] as const) {
+    const v = r[k];
+    if (typeof v === 'number' && Number.isFinite(v)) out[k] = clamp01(v);
+  }
   return out;
 }
 
@@ -106,8 +126,8 @@ function scheduleSave(s: SoundSettingsValues): void {
 }
 
 function pick(s: SoundSettingsValues): SoundSettingsValues {
-  const { soundOn, volume } = s;
-  return { soundOn, volume };
+  const { soundOn, volume, ambienceOn, ambienceVolume, flashesOn, readCaptions } = s;
+  return { soundOn, volume, ambienceOn, ambienceVolume, flashesOn, readCaptions };
 }
 
 // Static initial values: storage is read on first use, not at import.
@@ -163,6 +183,15 @@ export function getSoundSettings(): SoundSettingsState {
 /** Read storage once (first call only). Reads do this by themselves; kept for callers. */
 export function ensureLoaded(): void {
   store.getState();
+}
+
+/**
+ * The ambience bus level the settings ask for (R13.9): ambienceVolume × volume, 0 when sound or
+ * the ambience is off. Only the ambience bus takes the master volume this way; the events and
+ * spectrum producers apply `volume` on their own gains, so it is never applied twice.
+ */
+export function ambienceLevelFor(s: SoundSettingsValues): number {
+  return s.soundOn && s.ambienceOn ? clamp01(s.ambienceVolume) * clamp01(s.volume) : 0;
 }
 
 /** Push settings into the engine and the audio driver. */

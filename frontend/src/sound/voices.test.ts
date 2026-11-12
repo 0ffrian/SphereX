@@ -9,7 +9,9 @@ import {
   FakeGain,
   FakePanner,
   FakeSource,
+  type FakeNode,
 } from '@/test/fakeAudio';
+import { getBus, sharedNodes } from './audioGraph';
 import type { TrainWindow } from './engine';
 import { pitchToHz } from './pitch';
 import {
@@ -172,9 +174,10 @@ describe('scheduling (R8.9)', () => {
     osc!.end();
     const made = ctx.nodes.filter((n) => n.nodeType !== 'destination');
     const limiter = made.find((n) => n instanceof FakeCompressor)!;
-    const bus = made.find((n) => n instanceof FakeGain && n.outputs[0] === limiter)!;
+    // R13.9: the driver's volume feeds the events bus; the graph's own nodes stay.
+    const bus = getBus(ctx.asAudioContext(), 'events') as unknown as FakeNode;
     const volume = made.find((n) => n instanceof FakeGain && n.outputs[0] === bus)!;
-    const kept = [limiter, bus, volume];
+    const kept = [...(sharedNodes(ctx.asAudioContext()) as unknown as FakeNode[]), volume];
     for (const n of made) if (!kept.includes(n)) expect(n.disconnected).toBe(true);
     for (const n of kept) expect(n.disconnected).toBe(false);
     expect(limiter.outputs[0]).toBe(ctx.destination);
@@ -199,7 +202,8 @@ describe('scheduling (R8.9)', () => {
     b.driver.emit(ev());
     const env = envelopeOf(b.ctx.sources()[0]!);
     const volume = env.outputs[0] as FakeGain;
-    expect((volume.outputs[0] as FakeGain).outputs[0]).toBe(b.ctx.destination);
+    const events = volume.outputs[0] as FakeGain; // events bus → master → destination
+    expect((events.outputs[0] as FakeGain).outputs[0]).toBe(b.ctx.destination);
   });
 
   it('keeps one audio-clock anchor per train across windows (sample-accurate, R8.9)', () => {

@@ -79,7 +79,7 @@ describe('spectrumMapping (R8.6)', () => {
     expect(out.pitch).toBeCloseTo(wavelengthToPitch(2));
     const bright = m.sampleAt(1)!.pitch;
     const dim = m.sampleAt(4)!.pitch;
-    expect(dim).toBeGreaterThan(bright); // longer λ, higher pitch, though dimmer
+    expect(dim).toBeLessThan(bright); // Q-430: longer λ, lower pitch, whatever the brightness
   });
 });
 
@@ -92,9 +92,11 @@ describe('pitch (R8.9)', () => {
   });
 
   it('maps λ over the SPHEREx band', () => {
-    expect(wavelengthToPitch(0.75)).toBe(0);
-    expect(wavelengthToPitch(5)).toBe(1);
-    expect(wavelengthToPitch(10)).toBe(1);
+    // Q-430: the short end is the top of the range, the long end the bottom.
+    expect(wavelengthToPitch(0.75)).toBe(1);
+    expect(wavelengthToPitch(5)).toBe(0);
+    expect(wavelengthToPitch(10)).toBe(0);
+    expect(pitchToHz(wavelengthToPitch(1))).toBeGreaterThan(pitchToHz(wavelengthToPitch(4)));
     expect(wavelengthToPitch(2, 2, 2)).toBe(0.5);
   });
 });

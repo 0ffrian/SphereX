@@ -89,6 +89,14 @@ export class FakePanner extends FakeNode {
   }
 }
 
+export class FakeWaveShaper extends FakeNode {
+  curve: Float32Array | null = null;
+  oversample = 'none';
+  constructor(ctx: FakeAudioContext) {
+    super(ctx, 'waveshaper');
+  }
+}
+
 export class FakeCompressor extends FakeNode {
   readonly threshold = new FakeParam();
   readonly knee = new FakeParam();
@@ -105,6 +113,7 @@ export interface FakeAudioOptions {
   outputLatency?: number;
   stereoPanner?: boolean;
   compressor?: boolean;
+  waveShaper?: boolean;
 }
 
 export class FakeAudioContext extends EventTarget {
@@ -117,6 +126,7 @@ export class FakeAudioContext extends EventTarget {
   resumes = 0;
   createStereoPanner?: () => FakePanner;
   createDynamicsCompressor?: () => FakeCompressor;
+  createWaveShaper?: () => FakeWaveShaper;
 
   constructor(options: FakeAudioOptions = {}) {
     super();
@@ -127,6 +137,7 @@ export class FakeAudioContext extends EventTarget {
     if (options.compressor !== false) {
       this.createDynamicsCompressor = () => new FakeCompressor(this);
     }
+    if (options.waveShaper !== false) this.createWaveShaper = () => new FakeWaveShaper(this);
   }
 
   async resume() {

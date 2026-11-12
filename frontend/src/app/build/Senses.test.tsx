@@ -36,6 +36,13 @@ describe('Hear it', () => {
     expect((q('hear-play') as HTMLButtonElement).disabled).toBe(true);
   });
 
+  it('says how the mapping sounds (Q-430: long wavelengths low, brighter louder)', async () => {
+    await act(async () => root.render(<HearPanel active name={undefined} />));
+    expect(host.textContent).toContain('Wavelength becomes pitch');
+    expect(host.textContent).toMatch(/Short wavelengths sound\s+high, long wavelengths low\. Brighter is louder\./);
+    expect(host.textContent).not.toContain('Higher pitch is brighter');
+  });
+
   it('asks for the spectrum when opened and says it is loading', async () => {
     const load = vi.fn(async () => {});
     useAppStore.setState({

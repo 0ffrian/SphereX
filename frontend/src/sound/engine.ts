@@ -1,4 +1,6 @@
-// R8.8 haptic engine (D-08, D-09, D-10, D-20, D-21). Sources call `emit` for one-shots and
+// R8.8 sound engine (was the haptic engine; haptics cut by D-39, audio only; D-10, D-20, D-21).
+// The train re-send logic for a cancelled vibration pattern stays dormant (the audio driver never
+// blocks a train, oneShotBlockMs 0); post-event clean-up. Sources call `emit` for one-shots and
 // `startTrain` / `updateTrain` / `stopTrain` for pulse trains; the engine applies the honesty gate,
 // the R8.3 rate cap and the strength multiplier, then fans every event out to all active drivers.
 // Drivers never know about objects. Nothing here runs at import time.
@@ -241,7 +243,7 @@ export class SoundEngine {
     this.refreshActive();
   }
 
-  /** The haptics and sound switches (R8.7). A disabled driver is stopped and gets no events. */
+  /** The sound switch (R8.7). A disabled driver is stopped and gets no events. */
   setDriverEnabled(driver: HapticDriver, enabled: boolean): void {
     if (enabled) this.disabled.delete(driver);
     else if (!this.disabled.has(driver)) {

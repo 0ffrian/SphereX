@@ -8,7 +8,7 @@ import {
   type FakeNode,
 } from '@/test/fakeAudio';
 import { fixture } from '@/test/sharedFixtures';
-import { getMasterBus } from './audioGraph';
+import { getBus, getMasterBus, sharedNodes } from './audioGraph';
 import { pitchToHz, wavelengthToPitch } from './pitch';
 import {
   buildSpectrumMapping,
@@ -57,11 +57,11 @@ describe('planSweep (A8, R8.6 item 3)', () => {
     const plan = planSweep(buildSpectrumMapping(dipSpectrum()))!;
     expect(plan.tag).toBe('measured');
     expect(plan.steps).toHaveLength(Math.max(SWEEP_STEPS, SWEEP_SAMPLES_PER_POINT * 81) + 1);
-    // Same λ → pitch mapping as the haptics (pitch.ts).
+    // Same λ → pitch mapping as the voices (pitch.ts).
     for (const st of plan.steps)
       expect(st.hz).toBeCloseTo(pitchToHz(wavelengthToPitch(st.lambdaUm)));
-    // Pitch rises with λ (PITCH_RISES_WITH_WAVELENGTH).
-    expect(plan.steps.at(-1)!.hz).toBeGreaterThan(plan.steps[0]!.hz);
+    // Q-430: long λ = low pitch, so the pitch falls across the sweep.
+    expect(plan.steps.at(-1)!.hz).toBeLessThan(plan.steps[0]!.hz);
     const dip = plan.steps.filter((s) => Math.abs(s.lambdaUm - 3) < 0.1);
     expect(dip.length).toBeGreaterThanOrEqual(3);
     expect(dip.every((s) => s.quiet && s.level === 0)).toBe(true);
@@ -120,11 +120,11 @@ function fakeSettings(volume = 1, soundOn = true) {
   };
 }
 
-/** Every node of the sweep is disconnected; the shared master bus and its limiter stay. */
+/** Every node of the sweep is disconnected; the shared graph (buses, limiter) stays. */
 function freed(ctx: FakeAudioContext, nodes: readonly FakeNode[] = ctx.nodes): boolean {
-  const bus = getMasterBus(ctx.asAudioContext()) as unknown as FakeNode;
+  const shared = sharedNodes(ctx.asAudioContext()) as unknown as readonly FakeNode[];
   return nodes
-    .filter((n) => n.nodeType !== 'destination' && n !== bus && !(n instanceof FakeCompressor))
+    .filter((n) => n.nodeType !== 'destination' && !shared.includes(n))
     .every((n) => n.disconnected);
 }
 
@@ -198,11 +198,14 @@ describe('ListenSweep on the audio clock', () => {
     expect(tone.startAt).toBeCloseTo(10 + AUDIO_LOOKAHEAD_S);
     // One limiter only: the shared bus's.
     expect(ctx.nodes.filter((n) => n instanceof FakeCompressor)).toHaveLength(1);
-    const bus = getMasterBus(ctx.asAudioContext()) as unknown as FakeNode;
-    const gains = ctx.nodes.filter((n): n is FakeGain => n instanceof FakeGain && n !== bus);
+    // R13.9: the sweep's volume feeds the spectrum bus (then the master and the limiter).
+    const bus = getBus(ctx.asAudioContext(), 'spectrum') as unknown as FakeNode;
+    const shared = sharedNodes(ctx.asAudioContext()) as unknown as readonly FakeNode[];
+    const gains = ctx.nodes.filter((n): n is FakeGain => n instanceof FakeGain && !shared.includes(n));
     const volume = gains[0]!;
     expect(volume.gain.value).toBe(0.5);
     expect(volume.outputs).toContain(bus);
+    expect((bus as FakeGain).outputs).toEqual([getMasterBus(ctx.asAudioContext())]);
     // Tone gain: peak at full flux, 0 at the dip, ramps (no hard steps) from the start.
     const calls = gains[1]!.gain.calls;
     expect(Math.max(...calls.map((c) => c[1]))).toBeCloseTo(SWEEP_PEAK_GAIN);

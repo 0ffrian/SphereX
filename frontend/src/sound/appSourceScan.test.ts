@@ -12,6 +12,32 @@ const entries = Object.entries(sources);
 const count = (re: RegExp) => entries.reduce((n, [, text]) => n + (text.match(re)?.length ?? 0), 0);
 const where = (re: RegExp) => entries.filter(([, text]) => re.test(text)).map(([path]) => path);
 
+// D-39: nothing imports the deleted haptics folder any more. Test files are left out, so the
+// needle below cannot match itself; it is also built in two parts.
+const everything = import.meta.glob(['../**/*.{ts,tsx}', '!../**/*.test.{ts,tsx}'], {
+  query: '?raw',
+  import: 'default',
+  eager: true,
+}) as Record<string, string>;
+const HAPTICS_IMPORT = new RegExp(String.raw`from\s+['"](?:@/|(?:\.\.?/)+)` + 'hap' + 'tics/');
+
+describe('the haptics folder is gone (D-39)', () => {
+  it('no module imports from a haptics/ path', () => {
+    expect(Object.keys(everything).length).toBeGreaterThan(100);
+    expect(
+      Object.entries(everything)
+        .filter(([, t]) => HAPTICS_IMPORT.test(t))
+        .map(([p]) => p),
+    ).toEqual([]);
+  });
+
+  it('the needle would catch a straggler', () => {
+    expect(HAPTICS_IMPORT.test(`import { x } from '@/${'hap' + 'tics'}/settings';`)).toBe(true);
+    expect(HAPTICS_IMPORT.test(`import { x } from '../${'hap' + 'tics'}/pitch';`)).toBe(true);
+    expect(HAPTICS_IMPORT.test(`import { x } from '@/sound/pitch';`)).toBe(false);
+  });
+});
+
 describe('the event app builds one audio-only sound engine (Q-132)', () => {
   it('scans the app tree and the provider (and no test files)', () => {
     expect(entries.length).toBeGreaterThan(20);

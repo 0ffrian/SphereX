@@ -51,7 +51,7 @@ let shared: AudioContext | null = null;
  * resumed, or interrupted by the OS: a click must resume it), `running`.
  */
 export interface UnlockState {
-  /** A click has called `unlockAudio()` (the user activation vibration needs too). */
+  /** A click has called `unlockAudio()`. */
   readonly unlocked: boolean;
   readonly audio: 'none' | 'suspended' | 'running';
 }
