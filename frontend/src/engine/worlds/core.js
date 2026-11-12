@@ -469,6 +469,56 @@ function WorldGL(canvas) {
     gl.activeTexture(gl.TEXTURE0); pyrOk = P ? 1 : 0; pyrFor = null;
   };
   this.pyrBind = function () { if (!pF || pyrFor === pF) return; gl.useProgram(pF); if (uF.uPyr) gl.uniform1i(uF.uPyr, 11); if (uF.uPyrOn) gl.uniform1f(uF.uPyrOn, pyrOk); pyrFor = pF; };
+// @deviation (#93 F3) the fly view's static G-buffer (shaders.js flyPasses). A rocky world's fly draw renders into gbo
+// (colour plus the three float targets of the march, normal, gullies and shadow) and copies the colour to the canvas
+// once the camera has stopped (the second draw with the same camera, size, footprint scale, terrain, seed, ocean and
+// lava settings, gbLast); the draws after that (gbGeo) read the targets back instead (uGB = 2), and the shadow too when
+// the Sun has not moved either (gbSun). While the camera moves, it draws straight to the canvas (uGB = 0), as before. A gas giant draws
+// straight to the canvas as before (uGB = 0). Units 12 to 14 hold the targets only during a read-back pass (a target
+// bound for reading while it is drawn to would be a feedback loop). A G-buffer the driver cannot draw to (incomplete)
+// is not used: the fly view then draws straight to the canvas, as before.
+  var gbo = null, gbGeo = null, gbSun = null, gbTerr = null, gbGen = 0, gbLast = null;
+  function gbUnits(on) { for (var i = 0; i < 3; i++) { gl.activeTexture(gl.TEXTURE12 + i); gl.bindTexture(gl.TEXTURE_2D, on ? gbo.t[i] : null); } gl.activeTexture(gl.TEXTURE0); }
+  function geoMoved(m, cam, f1, gx, h) {
+    if (m.gas) return true;
+    if (W.terr !== gbTerr) { gbTerr = W.terr; gbGen++; }
+    var geo = [cam.uCam, cam.uFwd, cam.uRt, cam.uUp, cam.ex, cam.rkm, gx, h, scale / W.fp93, f1.uOcean, f1.uLava, f1.uHM, gbGen, W.p.seed3 || W.p.seed].join('|'), moved = geo !== gbLast;
+    gbLast = geo; if (moved) gbGeo = null;
+    return moved;
+  }
+  this.flyDraw = function (m, cam, f1, gx, h) {
+    if (uF.uGB1) { gl.uniform1i(uF.uGB1, 12); gl.uniform1i(uF.uGB2, 13); gl.uniform1i(uF.uGB3, 14); }
+    if (m.gas || !uF.uGB || geoMoved(m, cam, f1, gx, h)) { if (uF.uGB) { gl.uniform1f(uF.uGB, 0); gl.uniform1f(uF.uGBsh, 0); } gl.drawArrays(gl.TRIANGLES, 0, 3); return; }
+    var geo = gbLast, sun = cam.uLb.join();
+    if (gbo && gbo.ok && gbo.w === gx && gbo.h === h && gbGeo === geo) {
+      gl.uniform1f(uF.uGB, 2); gl.uniform1f(uF.uGBsh, gbSun === sun ? 1 : 0); gbUnits(true);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      gbUnits(false);
+      return;
+    }
+    if (!gbo || gbo.w !== gx || gbo.h !== h) {
+      if (gbo) { gl.deleteFramebuffer(gbo.f); gbo.t.forEach(function (t) { gl.deleteTexture(t); }); gl.deleteTexture(gbo.c); }
+      gbo = { w: gx, h: h, f: gl.createFramebuffer(), c: gl.createTexture(), t: [gl.createTexture(), gl.createTexture(), gl.createTexture()] };
+      gl.activeTexture(gl.TEXTURE15);
+      [gbo.c].concat(gbo.t).forEach(function (t, i) {
+        gl.bindTexture(gl.TEXTURE_2D, t); gl.texStorage2D(gl.TEXTURE_2D, 1, i ? gl.RGBA32F : gl.RGBA8, gx, h);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      });
+      gl.bindTexture(gl.TEXTURE_2D, null); gl.activeTexture(gl.TEXTURE0);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, gbo.f);
+      [gbo.c].concat(gbo.t).forEach(function (t, i) { gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0 + i, gl.TEXTURE_2D, t, 0); });
+      gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1, gl.COLOR_ATTACHMENT2, gl.COLOR_ATTACHMENT3]);
+      gbo.ok = gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE; gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    }
+    if (!gbo.ok) { gl.uniform1f(uF.uGB, 0); gl.uniform1f(uF.uGBsh, 0); gl.drawArrays(gl.TRIANGLES, 0, 3); return; }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, gbo.f); gbUnits(false);
+    gl.uniform1f(uF.uGB, 1); gl.uniform1f(uF.uGBsh, 0);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    gl.bindFramebuffer(gl.READ_FRAMEBUFFER, gbo.f); gl.readBuffer(gl.COLOR_ATTACHMENT0); gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, null);
+    gl.blitFramebuffer(0, 0, gx, h, 0, 0, gx, h, gl.COLOR_BUFFER_BIT, gl.NEAREST);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gbGeo = geo; gbSun = sun;
+  };
 // @verbatim L2267-L2301
 // @rename 2.214)=>2.2165) 0.005)=>0.0027) 0.004)=>0.0012)
   gl.bindVertexArray(gl.createVertexArray());
@@ -540,7 +590,7 @@ function WorldGL(canvas) {
 // The first rename below (#93 1.4, B9) passes the resolution scale over the eased scale W.fp93 to FLY_FS as uScale; the
 // second is PR #89's.
     if (pW && !(fly && role === 'fly')) gl.drawArrays(gl.TRIANGLES, 0, 3);
-// @verbatim L2317-L2338
+// @verbatim L2317-L2326
 // @rename uF.uFov,=>uF.uScale,scale/W.fp93);gl.uniform1f(uF.uFov, uF.uCloudKm,=>uF.uCloudKm,m.zc!=null?Math.max(m.zc,0.3):
     W.view = { tilt: f1.uTilt, spin: f1.uSpin, frame: f1.uFrame, flat: f1.uF, roll: f1.uRoll, gx: gx, gw: gw, w: w, h: h, L: v3.uL };
     if (!fly) return;
@@ -552,7 +602,11 @@ function WorldGL(canvas) {
     gl.uniform2f(uF.uR, gx, h); gl.uniform2f(uF.uOff, 0, 0);
     ['uCam', 'uFwd', 'uRt', 'uUp', 'uLb'].forEach(function (k) { gl.uniform3fv(uF[k], cam[k]); });
     gl.uniform1f(uF.uScale,scale/W.fp93);gl.uniform1f(uF.uFov, 0.62); gl.uniform1f(uF.uEx, cam.ex); gl.uniform1f(uF.uRkm, cam.rkm); gl.uniform1f(uF.uAltKm, W.flyAlt); gl.uniform1f(uF.uCloudKm,m.zc!=null?Math.max(m.zc,0.3): 3.5); if (uF.uHkm) gl.uniform1f(uF.uHkm, m.H / 1000);
-    gl.drawArrays(gl.TRIANGLES, 0, 3);
+// @end-verbatim
+// @deviation (#93 F3) the fly draw goes through WorldGL.flyDraw (the static G-buffer): a full pass into the G-buffer
+// when the camera or the terrain changed, a pass that reads it back while they have not. Replaces L2327.
+    this.flyDraw(m, cam, f1, gx, h);
+// @verbatim L2328-L2338
   };
   this.tick = function (m, playing, dtw) {
     var t0 = performance.now(), n = 0, acc = 0;
