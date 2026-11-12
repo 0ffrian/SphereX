@@ -298,20 +298,20 @@ function fillHalf(t: DataTexture, src: Float32Array): void {
   t.needsUpdate = true;
 }
 
-/** Deterministic noise for the tracer: a torus of fractal value noise, R channel. */
+/**
+ * Deterministic noise for the tracer, R channel, one copy over the whole sphere (#93 2.2). It was a torus of noise the
+ * tracer read tiled 4 x 3 times, so every giant showed four east-west copies the jets never smeared out. Now each
+ * texel holds fractal value noise at its own sphere direction, stretched (24, 54, 24) so the streak density stays, plus
+ * the seed; read at the tracer's own uv (u = longitude, v = latitude, as the engine's GAS_FS with uNzSph = 1).
+ */
 function noiseTexture(seed: number): DataTexture {
   const data = new Uint8Array(NOISE_W * NOISE_H * 4);
   for (let j = 0; j < NOISE_H; j++) {
-    const b1 = (j / NOISE_H) * TAU;
+    const la = ((j + 0.5) / NOISE_H - 0.5) * Math.PI;
+    const cl = Math.cos(la);
     for (let i = 0; i < NOISE_W; i++) {
-      const a1 = (i / NOISE_W) * TAU;
-      const v = fbm(
-        Math.cos(a1) * 6 + Math.cos(b1) * 3,
-        Math.sin(a1) * 6,
-        Math.sin(b1) * 18,
-        4,
-        seed,
-      );
+      const lo = ((i + 0.5) / NOISE_W - 0.5) * TAU;
+      const v = fbm(cl * Math.cos(lo) * 24, Math.sin(la) * 54, cl * Math.sin(lo) * 24, 4, seed);
       const k = (j * NOISE_W + i) * 4;
       data[k] = Math.round(Math.min(1, Math.max(0, v)) * 255);
       data[k + 3] = 255;
@@ -321,7 +321,7 @@ function noiseTexture(seed: number): DataTexture {
   t.minFilter = LinearFilter;
   t.magFilter = LinearFilter;
   t.wrapS = RepeatWrapping;
-  t.wrapT = RepeatWrapping;
+  t.wrapT = ClampToEdgeWrapping;
   t.generateMipmaps = false;
   t.needsUpdate = true;
   return t;
@@ -874,7 +874,7 @@ export class GasWorld implements BodyRenderer {
       clamp(uvN.y.sub(v2.y.div(Math.PI).mul(this.uDt)), 0.002, 0.998),
     );
     const bd = texture(this.bandTex, vec2(0.5, uvN.y));
-    const nz = texture(this.noiseTex, uvN.mul(vec2(4, 3))).r;
+    const nz = texture(this.noiseTex, uvN).r;
     const rm = clamp(v2.a.sub(2), 0, 1).mul(this.uStormsOn);
     const mask = select(v2.a.greaterThan(1.5), float(0), clamp(v2.a, -1, 1)).mul(this.uStormsOn);
     const tr = clamp(bd.r.sub(v2.z.mul(0.08)), 0, 1)

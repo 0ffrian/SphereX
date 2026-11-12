@@ -6,3 +6,7 @@ test-results
 package-lock.json
 src/engine/worlds/*.js
 src/engine/rocks/source.ts
+.bench-ref
+src/engine/stars/protoStar*.js
+# Spec R13 App. B: the ambience contract is copied verbatim from the spec.
+src/sound/ambience/types.ts

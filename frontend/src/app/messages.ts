@@ -207,6 +207,20 @@ const NOTE_TEXT: Readonly<Record<string, string>> = {
     'The Gaia list hit its size limit, so only the brightest stars are shown.',
   'overlay:wise:truncated':
     'The WISE list hit its size limit, so only the brightest sources are shown.',
+  // Track path (A19.5): the predicted path seen from SPHEREx.
+  'path:deferred':
+    'The predicted path is still being loaded from JPL Horizons. It appears here when it is ready.',
+  'path:not_cached':
+    'The predicted path for this object is not saved on this computer, and the app is offline, so it can’t be drawn.',
+  'path:observer':
+    'Part of this time span is past the end of the spacecraft’s own orbit data, so the path stops there.',
+  'path:ephemeris':
+    'JPL Horizons gave no usable path for all or part of this time span, so part of the path is missing. Try again later.',
+  'path:window':
+    'SPHEREx did not observe this object in the time span asked for, so there is no path to show.',
+  'path:frames_incomplete':
+    'Some frames are still being loaded, so not every exposure is marked on the path yet.',
+  'track:not_moving': 'This object does not move across the sky, so it has no path to follow.',
 };
 
 /** Per colour band (`composite:<channel>:<reason>`): the words after "Blue band:". */
