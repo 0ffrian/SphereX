@@ -1,8 +1,10 @@
 // R13.9 / R13.10 (Q-441, Q-442): the app shell's Sound control. A "Sound" button in the top bar
 // opens a small popover with sound on/off, volume, ambience on/off and volume, and Flashes. The
 // button's click unlocks audio (Q-73: a user gesture, never on load); no sound plays from it. The
-// settings are the `useSoundSettings` store (saved under the pre-D-39 key). The ambience itself
-// plays only in the fly view at "+ Artistic" (#116); the sweep follows the volume and the switch now.
+// settings are the `useSoundSettings` store (saved under the pre-D-39 key). Every sound follows
+// Sound and Volume (the engine, the Listen sweep and the build pane's Hear it, hearAudio.ts); the
+// ambience itself plays only in the fly view at "+ Artistic" (#116). In the build view the top bar
+// is click-through, so index.css moves this control to the bottom right and gives it clicks.
 // Popover pattern as ConfidencePopover: Escape (consumed, so the shell's own Escape handlers skip it,
 // A21.10) and an outside click close it, and focus goes back to the button. Native controls with
 // visible labels, targets at least 24 px (R9).
@@ -15,7 +17,7 @@ export const SOUND_STATUS_OFF = 'Sound is off.';
 export const SOUND_STATUS_NONE = 'This browser cannot play sound.';
 export const SOUND_STATUS_SUSPENDED = 'The browser paused the sound. Click Sound again to resume it.';
 export const SOUND_STATUS_READY =
-  'Data sounds follow these settings. The imagined ambience plays in the fly view at + Artistic.';
+  'Every sound follows Sound and Volume, Hear it included. The imagined ambience plays in the fly view at + Artistic.';
 export const FLASHES_HINT = 'Lightning flashes in the fly view. Reduced motion always turns them off.';
 
 const rowClass = 'flex min-h-11 items-center gap-3';
@@ -82,7 +84,7 @@ export function SoundSettings({ className }: { className?: string }) {
         : SOUND_STATUS_READY;
 
   return (
-    <div className={`relative shrink-0 ${className ?? ''}`} data-testid="sound-settings">
+    <div className={`sx-sound relative shrink-0 ${className ?? ''}`} data-testid="sound-settings">
       <button
         ref={button}
         type="button"
@@ -102,7 +104,7 @@ export function SoundSettings({ className }: { className?: string }) {
         aria-labelledby={titleId}
         aria-describedby={statusId}
         hidden={!open}
-        className="absolute top-full right-0 z-50 mt-2 w-72 rounded-lg border border-line bg-s1 p-3 text-sm text-fg shadow-lg"
+        className="sx-sound-pop absolute top-full right-0 z-50 mt-2 w-72 rounded-lg border border-line bg-s1 p-3 text-sm text-fg shadow-lg"
         data-testid="sound-popover"
       >
         <h2 id={titleId} className="mb-1 text-sm font-semibold">

@@ -2,7 +2,7 @@
 
 Vite + TypeScript + React web app. three.js **r187** (`three/webgpu`).
 
-Status: the tooling, the data-contract types, typed placeholder modules for every R10 file and a viewer smoke scene (one plain sphere), set up on 4 Nov 2026. M1 (issue #3, 5 Nov 2026) adds the SPHEREx flipbook and spectrum view: search by name or RA/Dec, frame playback, the spectrum chart, Rainbow Trails and the shareable URL hash. Issue #7 (M2) adds the 3D viewer for the baked types: see "Viewer: baked types" below. Issues #9, #10 and #11 (M3) add the haptics and sound modules (`src/haptics`), built and tested against fixtures and the haptics test page; M5 wires them into the app. On 7 Nov 2026 a feasibility prototype (branch `feat/sky-view-prototype`, not yet confirmed by Moon, D-17) rebuilt the shell in the mock-up's layout with an all-sky image as the main view: see "Shell and sky view (prototype)" below.
+Status: the tooling, the data-contract types, typed placeholder modules for every R10 file and a viewer smoke scene (one plain sphere), set up on 4 Nov 2026. M1 (issue #3, 5 Nov 2026) adds the SPHEREx flipbook and spectrum view: search by name or RA/Dec, frame playback, the spectrum chart, Rainbow Trails and the shareable URL hash. Issue #7 (M2) adds the 3D viewer for the baked types: see "Viewer: baked types" below. Issues #9, #10 and #11 (M3) add the haptics and sound modules (`src/sound` (haptics cut, D-39)), built and tested against fixtures and the haptics test page; M5 wires them into the app. On 7 Nov 2026 a feasibility prototype (branch `feat/sky-view-prototype`, not yet confirmed by Moon, D-17) rebuilt the shell in the mock-up's layout with an all-sky image as the main view: see "Shell and sky view (prototype)" below.
 
 ## Run it
 

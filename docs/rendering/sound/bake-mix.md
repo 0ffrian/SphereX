@@ -1,6 +1,6 @@
 # Sound: baking, live mixing and levels
 
-> **Part of:** Rendering & sound spec ([index](../README.md)) · **Sections:** R13.7, R13.8 · **Implements:** [Q-439, Q-440, Q-444](../../decisions/sound-ambience.md) · **Read with:** [buses-stage.md](buses-stage.md) (R13.9), [sources-weather.md](sources-weather.md) (R13.5)
+> **Part of:** Rendering & sound spec ([index](../README.md)) · **Sections:** R13.7, R13.8 · **Implements:** [Q-439, Q-440, Q-444, Q-445](../../decisions/sound-ambience.md) · **Read with:** [buses-stage.md](buses-stage.md) (R13.9), [sources-weather.md](sources-weather.md) (R13.5)
 
 ## R13.7 Baking (worker)
 
@@ -58,6 +58,24 @@ Changing these engine controls (build-pane sliders) changes the physics, so the 
 - `Ps`, `fluid`, `Tstar`, `orbit`, `co2` (which change Ts and state).
 
 Wind changes do not trigger a bake; they are live (§7).
+
+#### As built: deviations (issue #113, PR #119; [Q-445](../../decisions/sound-ambience.md))
+
+The bake engine in `frontend/src/sound/ambience/` differs from the text above in these points. Q-445 records them; where they disagree, this list wins.
+
+- **One-shots are linear, not loops.** Thunder and vent bursts are baked as zero-padded one-shots that do not loop.
+- **Separate budgets.** One-shots have their own 36 MB memory budget, apart from the 96 MB bed budget (§9.5).
+- **One-shot level.** One-shots peak at −16 dBFS.
+- **No thunder echo pass at bake.** `d_m` and `absK2` are not used when baking thunder.
+- **Air absorption is live.** The mixer applies it ([R13.8](#r138-live-mixing-and-levels)); it is not baked into the loops.
+- **Loudness.** It uses the sample peak with gain reduction and no soft clip.
+- **Gust timescale.** `GUST_TIME_S` is unused; the gust timescale comes from the envelope spectrum.
+- **High pings dropped.** Bubble and patter pings above 0.47 × the sample rate are dropped.
+- **S12 phaser.** The gas-roar phaser is baked into the loop.
+- **Lava vent burst.** It is S8 variant 1.
+- **Cache key.** It includes a hash of the spec.
+- **Bake failure.** The palette falls back to one bed.
+- **Seam test.** "Seamless" is tested as an exact continuity bound across the wrap.
 
 ## R13.8 Live mixing and levels
 

@@ -4,7 +4,7 @@
 // timeout. On the fake AudioContext.
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { HapticEvent } from '@/contract';
-import { FakeAudioContext, type FakeSource } from '@/test/fakeAudio';
+import { FakeAudioContext, type FakeGain, type FakeNode, type FakeSource } from '@/test/fakeAudio';
 import { setAudioContextFactory } from './audioContext';
 import { ambienceLevelNow, duckHolds, getBus, setAmbienceLevelSource } from './audioGraph';
 import { createAppSound } from './appSound';
@@ -247,6 +247,22 @@ describe('AppSound: unbind lets go, and the ambience level follows the settings'
     expect(duckHolds(asCtx(ctx))).toBe(1);
     unbind();
     expect(duckHolds(asCtx(ctx))).toBe(0);
+  });
+
+  it('a settings change after the graph exists retargets the ambience level gain', async () => {
+    const ctx = new FakeAudioContext();
+    setAudioContextFactory(() => asCtx(ctx));
+    const sound = createAppSound({ engine: { debugTarget: null } });
+    const unbind = sound.bind({ get: () => 'derived', subscribe: () => () => undefined });
+    await sound.unlock();
+    const input = getBus(asCtx(ctx), 'ambience') as unknown as FakeNode;
+    const level = input.outputs[0]!.outputs[0]!.outputs[0] as FakeGain;
+    useSoundSettings.getState().update({ volume: 0.5, ambienceVolume: 0.2 });
+    expect(level.gain.calls.at(-1)![0]).toBe('target');
+    expect(level.gain.calls.at(-1)![1]).toBeCloseTo(0.1);
+    useSoundSettings.getState().update({ ambienceOn: false });
+    expect(level.gain.calls.at(-1)![1]).toBe(0);
+    unbind();
   });
 
   it('bind registers ambienceVolume × volume; off or unbound gives 0', () => {
