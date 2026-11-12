@@ -344,6 +344,8 @@ describe('ViewerApp compile timeout through the chain', () => {
     let finish: (() => void) | null = null;
     (v as unknown as { chain: unknown }).chain = {
       config: { settleFrames: 0 },
+      bloomEnabled: false,
+      setBloom() {},
       render() {},
       restartTemporal() {},
       dispose() {},

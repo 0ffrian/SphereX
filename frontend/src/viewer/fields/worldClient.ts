@@ -1,8 +1,14 @@
 // Issue #71 stream D (Q-240): main-thread side of the world worker. Never blank: if Workers are
-// unavailable or the worker fails, the same function runs on the main thread. Requests with equal
-// params are not cached here: the body asks once per build.
+// unavailable or the worker fails, the same function runs on the main thread. Roadmap 0.9: the body
+// asks once per build, but a quality-level change rebuilds every shader kind, so the last worlds
+// are kept by their params (seed and grid included). A full world holds large arrays (its river
+// raster alone is 2048 x 1024), so
+// only two are kept (the full and the low grid of the object on screen).
 import { generateWorld, type WorldData, type WorldParams } from './worldGenerator';
 import type { WorldRequest, WorldResponse } from './worldWorker';
+import { ResultCache, stableKey } from './resultCache';
+
+export const worldCache = new ResultCache<WorldData | null>(2);
 
 /** How many requests each path served (the e2e reads it, like the field worker's counter). */
 export const worldStats = { worker: 0, main: 0 };
@@ -39,7 +45,11 @@ function getWorker(): Worker | null {
 }
 
 /** Generates the world in the worker; falls back to the main thread on any failure. Null: refused (an input was unusable). */
-export async function requestWorld(params: WorldParams): Promise<WorldData | null> {
+export function requestWorld(params: WorldParams): Promise<WorldData | null> {
+  return worldCache.get(stableKey(params), () => makeWorld(params));
+}
+
+async function makeWorld(params: WorldParams): Promise<WorldData | null> {
   const w = getWorker();
   if (w) {
     const id = nextId++;

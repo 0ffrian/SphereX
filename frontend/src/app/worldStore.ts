@@ -18,6 +18,12 @@ interface WorldStoreState {
   world: CardToWorldOk | null;
   globe: WorldEngine | null;
   fly: WorldEngine | null;
+  /**
+   * Render-performance roadmap 0.7: the fly engine stays mounted while the close-up is closed, paused.
+   * A paused fly engine takes every control change (so it reopens in step) but is not redrawn.
+   */
+  flyPaused: boolean;
+  setFlyPaused(p: boolean): void;
   /** Everything applied since the world was loaded (the artifact's slider and pill state). */
   applied: EngineOverrides;
   playing: boolean;
@@ -84,6 +90,8 @@ export const useWorldStore = create<WorldStoreState>((set, get) => ({
   world: null,
   globe: null,
   fly: null,
+  flyPaused: false,
+  setFlyPaused: (flyPaused) => set({ flyPaused }),
   applied: {},
   playing: true,
   target: null,
@@ -110,8 +118,8 @@ export const useWorldStore = create<WorldStoreState>((set, get) => ({
   },
   pick: (lon, lat) => set((s) => ({ target: { lon, lat, seq: (s.target?.seq ?? 0) + 1 } })),
   redraw: () => {
-    const { globe, fly } = get();
-    for (const e of [globe, fly]) if (e && drawReady(e)) e.draw();
+    const { globe, fly, flyPaused } = get();
+    for (const e of [globe, flyPaused ? null : fly]) if (e && drawReady(e)) e.draw();
   },
   bump: () => set((s) => ({ rev: s.rev + 1 })),
 }));
