@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { HonestyState } from '@/viewer/honesty';
-import { bindHonesty } from './haptics';
-import { ListenSweep } from './sound/listenSweep';
+import { bindHonesty } from './engine';
+import { ListenSweep } from './listenSweep';
 
 describe('bindHonesty (M5 wiring of the D-21 toggle)', () => {
   it('applies the toggle now and on every change, until unsubscribed', () => {

@@ -1,5 +1,5 @@
 // #76 (Q-132): the event app has one sound engine and no vibrate driver. A source scan of the app
-// tree and the provider, so a second `createHaptics`, a `vibrate: true` or a WebVibrateDriver in
+// tree and the provider, so a second `createSoundEngine`, a `vibrate: true` or a WebVibrateDriver in
 // app code, or a lost `<SoundProvider>` wrap in App.tsx, fails here (precedent: layout.test.ts).
 import { describe, expect, it } from 'vitest';
 
@@ -24,10 +24,10 @@ describe('the event app builds one audio-only sound engine (Q-132)', () => {
     expect(where(/vibrate\s*:\s*true/)).toEqual([]);
   });
 
-  it('never calls createHaptics( in app code: only createAppSound does', () => {
+  it('never calls createSoundEngine( in app code: only createAppSound does', () => {
     const appOnly = entries.filter(([p]) => p.startsWith('../app/'));
-    expect(appOnly.filter(([, t]) => /createHaptics\s*\(/.test(t)).map(([p]) => p)).toEqual([]);
-    expect(where(/createHaptics\s*\(/)).toEqual([]);
+    expect(appOnly.filter(([, t]) => /createSoundEngine\s*\(/.test(t)).map(([p]) => p)).toEqual([]);
+    expect(where(/createSoundEngine\s*\(/)).toEqual([]);
   });
 
   it('calls createAppSound( exactly once, in SoundProvider.tsx', () => {

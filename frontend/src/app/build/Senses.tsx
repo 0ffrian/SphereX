@@ -5,10 +5,10 @@
 //   SPHEREx spectrum (measured), under the honesty level (D-21). No spectrum, no sound.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAppStore } from '@/state/store';
-import { ListenSweep, gasLinesForEpoch, planSweep } from '@/haptics/sound/listenSweep';
-import { buildSpectrumMapping } from '@/haptics/spectrumMapping';
-import { unlockAudio } from '@/haptics/audioContext';
-import { getHapticSettings } from '@/haptics/settings';
+import { ListenSweep, gasLinesForEpoch, planSweep } from '@/sound/listenSweep';
+import { buildSpectrumMapping } from '@/sound/spectrumMapping';
+import { unlockAudio } from '@/sound/audioContext';
+import { getSoundSettings } from '@/sound/settings';
 import { effectiveHonesty } from '@/viewer/honesty';
 import { epochsWithQ } from '@/viewer/renderers/Comet';
 import { defaultContext } from '@/viewer/renderPlan';
@@ -125,7 +125,7 @@ export function HearPanel({ active, name }: { active: boolean; name: string | un
       sweep.stop();
       return;
     }
-    if (!getHapticSettings().soundOn) {
+    if (!getSoundSettings().soundOn) {
       setState('failed');
       return;
     }
@@ -152,7 +152,7 @@ export function HearPanel({ active, name }: { active: boolean; name: string | un
     raf.current = requestAnimationFrame(tick);
   };
 
-  const soundOff = !getHapticSettings().soundOn;
+  const soundOff = !getSoundSettings().soundOn;
   const note = !resolved
     ? HEAR_NOTE_NONE
     : spectrum.status === 'idle' || spectrum.status === 'waiting' || spectrum.status === 'loading'

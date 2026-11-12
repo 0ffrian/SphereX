@@ -15,11 +15,11 @@
 import type { CometEpoch, ObjectCard, Tag } from '@/contract';
 import { isTagShown, type HonestyState } from '@/viewer/honesty';
 import { gasQForEpoch } from '@/viewer/renderers/Comet';
-import { getAudioContext } from '../audioContext';
-import { getMasterBus, playBell } from '../audioGraph';
-import { pitchToHz, wavelengthToPitch } from '../pitch';
-import { getHapticSettings, stopWhenHidden, useHapticSettings } from '../settings';
-import type { SpectrumMapping, SpectrumSample } from '../spectrumMapping';
+import { getAudioContext } from './audioContext';
+import { getMasterBus, playBell } from './audioGraph';
+import { pitchToHz, wavelengthToPitch } from './pitch';
+import { getSoundSettings, stopWhenHidden, useSoundSettings } from './settings';
+import type { SpectrumMapping, SpectrumSample } from './spectrumMapping';
 import {
   AUDIO_LOOKAHEAD_S,
   SWEEP_CHIME_GAIN,
@@ -31,7 +31,7 @@ import {
   SWEEP_SAMPLES_PER_POINT,
   SWEEP_STEPS,
   SWEEP_WAVE,
-} from '../tuning';
+} from './tuning';
 
 export type SweepGas = 'h2o' | 'co2' | 'co';
 
@@ -164,8 +164,8 @@ export interface SweepSettings {
 
 const SETTINGS: SweepSettings = {
   // Lazy: the first read loads the stored settings, so the sweep never sees unloaded defaults.
-  get: () => getHapticSettings(),
-  subscribe: (fn) => useHapticSettings.subscribe(fn),
+  get: () => getSoundSettings(),
+  subscribe: (fn) => useSoundSettings.subscribe(fn),
 };
 
 /** What the sweep reads from the page lifecycle: a hidden page stops it and blocks a start. */

@@ -2,7 +2,7 @@
 // and a recording navigator.vibrate, so the haptics can be tested without a phone. App modules
 // must never import this (fixtures.test.ts checks it).
 import type { HapticDriver, HapticEvent } from '@/contract';
-import type { HapticTimers, TrainCapableDriver, TrainWindow } from '@/haptics/haptics';
+import type { HapticTimers, TrainCapableDriver, TrainWindow } from '@/sound/engine';
 
 /** A manual clock. `advance` runs due timers in time order, setting `now` to each one's time. */
 export class FakeClock implements HapticTimers {
