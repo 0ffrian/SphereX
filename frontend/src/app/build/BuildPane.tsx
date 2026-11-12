@@ -60,6 +60,7 @@ export function BuildPane() {
   const card = useAppStore((s) => s.card);
   const params = useAppStore((s) => s.params);
   const query = useAppStore((s) => s.sky.query);
+  const closeType = useCloseUpStore((s) => s.type);
   const titleRef = useRef<HTMLHeadingElement>(null);
   const titleId = useId();
   const [phase, setPhase] = useState<MouldPhase>('idle');
@@ -263,8 +264,13 @@ export function BuildPane() {
   return (
     <>
       {/* The close-up fills the left half over the sky, as the mock-up's #cuPane (Q-275). */}
-      {/* Issue #102: a throw in the close-up leaves the build pane usable. */}
-      <ErrorBoundary area="The close-up" resetKey={query} className="relative z-10 m-4">
+      {/* Issue #102: a throw in the close-up leaves the build pane usable. A new object, a new kind
+          of close-up, or hiding and showing it again (the toggle next to Feel) gives it a fresh try. */}
+      <ErrorBoundary
+        area="The close-up"
+        resetKeys={[query, closeType, closeHidden]}
+        className="relative z-10 m-4"
+      >
         <CloseUpPane />
       </ErrorBoundary>
       <aside
