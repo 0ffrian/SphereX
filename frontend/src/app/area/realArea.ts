@@ -51,6 +51,14 @@ export interface RealDiscovery {
 export interface RealKnown {
   entry: AreaIndexEntry;
   known: AreaKnown;
+  /**
+   * The area's summary (its frames and visit times, for the provenance lines) and Discovery's
+   * tracks (which known objects Discovery detected, Q-466); null when that reply did not load.
+   */
+  summary: AreaSummary | null;
+  tracks: AreaTracks | null;
+  /** The dots, read only when a track found a known object (its measured dots on the sky). */
+  dots: AreaDots | null;
   missing: string[];
   synthetic: boolean;
 }
@@ -148,19 +156,49 @@ export async function loadDiscovery(
   };
 }
 
+/**
+ * `/known`, with the summary and the tracks beside it (Q-466): `/known` is needed; without the
+ * tracks no row is marked Detected (`area:detections_unavailable`), without the summary the visit
+ * times are not given (`area:summary_unavailable`), and without the dots a detected object's
+ * measured dots are not drawn (`area:dots_unavailable`).
+ */
 export async function loadKnown(
   api: ApiClient,
   entry: AreaIndexEntry,
   fixture: string | null,
   signal?: AbortSignal,
 ): Promise<RealKnown> {
-  const r = await api.areaKnown(entry.area_id, signal).catch(areaFailed);
+  const missing: string[] = [];
+  const [r, summary, tracks] = await Promise.all([
+    api.areaKnown(entry.area_id, signal).catch(areaFailed),
+    part(() => api.area(entry.area_id, signal), 'area:summary_unavailable', missing),
+    part(() => api.areaTracks(entry.area_id, signal), 'area:detections_unavailable', missing),
+  ]);
+  // The measured dots of the detected objects: only when there is one (a busy area has many dots).
+  const found = (tracks?.tracks ?? []).some((t) => t.verdict === 'found_blind' && t.match !== null);
+  const dots = found ? await part(() => api.areaDots(entry.area_id, signal), 'area:dots_unavailable', missing) : null;
   return {
     entry,
     known: r.data,
-    missing: [...new Set(r.data.missing)],
+    summary,
+    tracks,
+    dots,
+    missing: [...new Set([...r.data.missing, ...missing])],
     synthetic: isSynthetic(r.fixture ?? fixture, entry.data_release),
   };
+}
+
+/** True for an area computed live (#141: its id is `live-<hash>`), false for a prepared one. */
+export const isLiveArea = (areaId: string): boolean => areaId.startsWith('live-');
+
+/** The first frame time of each visit of the area, in visit order (ISO). */
+export function visitStarts(summary: Pick<AreaSummary, 'frames'>): string[] {
+  const first = new Map<number, string>();
+  for (const f of summary.frames) {
+    const t = first.get(f.visit);
+    if (t === undefined || Date.parse(f.time) < Date.parse(t)) first.set(f.visit, f.time);
+  }
+  return [...first.entries()].sort((a, b) => a[0] - b[0]).map(([, t]) => t);
 }
 
 // ---- Words -------------------------------------------------------------------------------------
@@ -170,8 +208,14 @@ export function precomputedNote(computedAt: string): string {
   return `Precomputed · run ${formatUtc(computedAt)}`;
 }
 
+/**
+ * "433 Eros" from a match. SkyBoT's designation of a numbered object already starts with its number
+ * ("433 Eros"), so the number is put in front only when it is not there yet: never "433 433 Eros".
+ */
 export function matchName(m: { designation: string; number: number | null }): string {
-  return m.number !== null ? `${m.number} ${m.designation}` : m.designation;
+  if (m.number === null) return m.designation;
+  const n = String(m.number);
+  return m.designation === n || m.designation.startsWith(`${n} `) ? m.designation : `${n} ${m.designation}`;
 }
 
 /** The on-sky label of a track (A18.2). Never "asteroid", "new" or "discover" (Q-205). */
@@ -205,6 +249,9 @@ export function missingText(code: string): string {
       if (rest === 'dots_unavailable') return 'The dots could not be loaded, so none are drawn.';
       if (rest === 'tracks_unavailable')
         return 'The tracks could not be loaded, so none are drawn.';
+      if (rest === 'detections_unavailable')
+        return "Discovery's tracks could not be loaded, so no object is marked Detected.";
+      if (rest === 'summary_unavailable') return 'The visits of the area could not be loaded.';
       if (rest.startsWith('unmatched_dots:')) {
         const n = rest.slice('unmatched_dots:'.length);
         return `${n} track ${n === '1' ? 'point is' : 'points are'} not in the dots reply, so some tracks are drawn short.`;
