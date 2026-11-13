@@ -11,6 +11,7 @@ job fails with ``cancelled``). A queued job stops at once; a running one at its 
 step and each cutout), so it reads ``running`` for a moment after ``DELETE``, and a job past its
 last check before storing finishes ``done``. Jobs live in memory: after a restart a stored
 area still answers ``done`` through the store, and a lost job is simply asked for again.
+Finished jobs are kept for the life of the process (a few per demo; nothing prunes them).
 """
 
 from __future__ import annotations
@@ -71,6 +72,11 @@ class Job:
     @property
     def area_id(self) -> str:
         return self.plan.area_id
+
+    @property
+    def active(self) -> bool:
+        """Queued or running and not stopped: the job a new request for the same area joins."""
+        return self.state in ("queued", "running") and not self.cancel.is_set()
 
 
 class Progress:
@@ -189,10 +195,13 @@ class LiveJobs:
             return self._jobs.get(area_id)
 
     def submit(self, plan: Plan) -> Job:
-        """Queue a plan; an area already queued, running or done is returned as it is."""
+        """Queue a plan; an area already queued or running (and not stopped) is returned as it
+        is. A done job is run again: the caller checks the store first, so a done job reaching
+        here means its stored area is gone. A stopped job that is still winding down is
+        replaced by a fresh job queued after it."""
         with self._lock:
             job = self._jobs.get(plan.area_id)
-            if job is not None and job.state in ("queued", "running", "done"):
+            if job is not None and job.active:
                 return job
             job = Job(plan)
             self._jobs[plan.area_id] = job
