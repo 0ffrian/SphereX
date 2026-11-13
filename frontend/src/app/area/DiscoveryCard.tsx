@@ -18,7 +18,7 @@ import { API_BASE } from '@/app/api/config';
 import { visitNumbers } from '@/app/sky/area/blink';
 import { SPECTRUM_STEP, type DiscoveryMover } from './areaService';
 import { SpectrumRowWord } from './SpectrumCard';
-import { dotInfoFrom } from './spectrumWords';
+import { flagsFrom } from './spectrumWords';
 import { ToggleGroup } from '@/app/PanelControls';
 import { useAppStore } from '@/state/store';
 import { useMemo, useState } from 'react';
@@ -45,17 +45,12 @@ type MoverFilter = 'all' | 'rock' | 'known';
 const keep = (m: DiscoveryMover, f: MoverFilter) =>
   f === 'all' || (f === 'rock' ? m.spectrum?.verdict === 'rock' : m.known !== null);
 
-/** A dot's visit, time, detector and flags, from the area's `/dots` and its frames (Points used). */
-function useDotInfo(real: RealDiscovery | null) {
-  return useMemo(() => {
-    const dots = new Map(
-      (real?.dots?.visits ?? []).flatMap((v) =>
-        v.dots.map((d) => [d.dot_id, { visit: v.visit, time: d.time, detector: d.detector, flags: d.flags }] as const),
-      ),
-    );
-    const frames = new Map((real?.summary.frames ?? []).map((f) => [f.frame_id, { visit: f.visit, time: f.time }] as const));
-    return dotInfoFrom(dots, frames);
-  }, [real]);
+/** A dot's flags from the area's `/dots` (Points used). */
+function useDotFlags(real: RealDiscovery | null) {
+  return useMemo(
+    () => flagsFrom(new Map((real?.dots?.visits ?? []).flatMap((v) => v.dots.map((d) => [d.dot_id, d.flags] as const)))),
+    [real],
+  );
 }
 
 /** smoothui's demo looks (loaderLooks.ts) at the row's size; the current step shows one of them. */
@@ -250,14 +245,14 @@ export function MoverCard() {
   const disc = useAreaStore((s) => s.disc);
   const openDisc = useAreaStore((s) => s.openDisc);
   const measuredOnly = useAppStore((s) => s.honesty === 'measured');
-  const info = useDotInfo(disc?.real ?? null);
+  const flags = useDotFlags(disc?.real ?? null);
   const m = disc?.movers[sel];
   if (!m) return null;
   if (m.track && disc?.real?.tracks) {
     const spectra = disc.real.spectra;
     return (
       <RealTrackCard
-        spectrum={spectra && m.spectrum ? { track: m.spectrum, spectra, info, measuredOnly } : null}
+        spectrum={spectra && m.spectrum ? { track: m.spectrum, spectra, flags, measuredOnly } : null}
         track={m.track}
         provenance={disc.real.tracks.provenance}
         synthetic={disc.real.synthetic}

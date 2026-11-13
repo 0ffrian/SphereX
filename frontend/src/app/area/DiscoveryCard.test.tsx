@@ -144,13 +144,13 @@ describe('DiscoveryCard with a prepared area', () => {
 });
 
 // Issue #162 (A18.7): the spectrum check on the results rows and the Result card.
-import MOCK_SPECTRA from './spectraMock.json';
+import { erosPackStage } from '@/test/areaFixtures';
 import type { AreaSpectra } from './spectraApi';
 
-/** The multivisit fixture (one track) with a spectrum check: a mock-up track (default T3: rock, heat glow) on it. */
+/** The multivisit fixture (one track) with a spectrum check: an Eros pack track (default T3: rock, heat glow) on it. */
 function spectrumDisc(pick: readonly string[] = ['T3']): DiscoveryResult {
   const f = areaFixture('multivisit');
-  const mock = structuredClone(MOCK_SPECTRA) as unknown as AreaSpectra;
+  const mock = erosPackStage<AreaSpectra>('spectra');
   const tracks = f.tracks.tracks.map((t, i) => ({
     ...mock.tracks.find((m) => m.track_id === pick[i % pick.length])!,
     track_id: t.track_id,

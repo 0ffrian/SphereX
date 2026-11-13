@@ -23,7 +23,6 @@ import {
   VERDICT_WORDS,
   verdictLine,
   type ChartModel,
-  type DotInfo,
 } from './spectrumWords';
 import { whenUtc } from './RealAreaNotes';
 
@@ -181,16 +180,17 @@ function ChartKey({ model, rAu }: { model: ChartModel; rAu: number | null }) {
 export interface SpectrumBlockProps {
   spectrum: TrackSpectrum;
   spectra: Pick<AreaSpectra, 'calibration' | 'method' | 'provenance'>;
-  info: (dotId: string) => DotInfo;
+  /** A dot's flags from the area's `/dots` (Points used). */
+  flags: (dotId: string) => readonly string[];
   measuredOnly: boolean;
   /** Synthetic fixture data: never wears the Measured badge. */
   fixture: boolean;
 }
 
 /** The Spectrum section (chart and key); none for `one_colour`, nothing to compare. */
-export function SpectrumSection({ spectrum: t, spectra, info, measuredOnly, fixture }: SpectrumBlockProps) {
+export function SpectrumSection({ spectrum: t, spectra, measuredOnly, fixture }: Omit<SpectrumBlockProps, 'flags'>) {
   if (t.verdict === 'one_colour') return null;
-  const model = chartModel(t, info, reflectedRange(spectra.method), measuredOnly);
+  const model = chartModel(t, reflectedRange(spectra.method), measuredOnly);
   if (model.points.length === 0 && model.limits.length === 0) return null;
   return (
     <section className="sx-sp-sec" aria-labelledby={`sp-h-${t.track_id}`} data-testid="spectrum-section">
@@ -253,12 +253,20 @@ const RHO_LATEX = String.raw`\rho = \dfrac{F_{\mathrm{long}} / F_{\mathrm{short}
 const RHO_PLAIN = 'rho equals F long over F short, divided by F sun long over F sun short';
 
 /** "How this is checked" and "Points used n", the same on every track card. */
-export function SpectrumHow({ spectrum: t, spectra, info }: Pick<SpectrumBlockProps, 'spectrum' | 'spectra' | 'info'>) {
+export function SpectrumHow({ spectrum: t, spectra, flags }: Pick<SpectrumBlockProps, 'spectrum' | 'spectra' | 'flags'>) {
   const scatter = starScatter(spectra.calibration);
-  const floor = scatter !== null ? `plus the ${pct(scatter)} scatter we measure on stars` : 'plus a 6% allowance for the instrument';
+  const fallback = spectra.method.settings.sigma_sys_default;
+  const floor =
+    scatter !== null
+      ? `plus the ${pct(scatter)} scatter we measure on stars`
+      : typeof fallback === 'number'
+        ? `plus a ${pct(fallback)} allowance for the instrument`
+        : 'plus an allowance for the instrument';
+  const snrMin = spectra.method.settings.snr_min;
   const rows = t.points
-    .map((p) => ({ p, i: info(p.dot_id) }))
-    .sort((a, b) => (a.i.time ?? '').localeCompare(b.i.time ?? '') || a.p.lambda_um - b.p.lambda_um);
+    .slice()
+    .sort((a, b) => a.time.localeCompare(b.time) || a.lambda_um - b.lambda_um)
+    .map((p) => ({ p, f: flags(p.dot_id) }));
   return (
     <div className="sx-sp-acc">
     <Rows>
@@ -287,16 +295,15 @@ export function SpectrumHow({ spectrum: t, spectra, info }: Pick<SpectrumBlockPr
       </Row>
       <Row title="Points used" count={t.points.length} testId="spectrum-points">
         <ul className="sx-sp-points" data-testid="spectrum-points-list">
-          {rows.map(({ p, i }) => (
+          {rows.map(({ p, f }) => (
             <li key={p.dot_id} data-used={p.used || undefined}>
               <span>
-                {i.time ? whenUtc(i.time) : 'time not given'} · {i.detector !== null ? `D${i.detector}` : 'detector not given'} ·{' '}
-                {p.lambda_um.toFixed(2)} µm
+                {whenUtc(p.time)} · D{p.detector} · {p.lambda_um.toFixed(2)} µm
               </span>
               <span>
                 {Math.round(p.flux_uJy)} ± {Math.round(p.flux_err)} µJy · SNR {p.snr.toFixed(1)}
-                {i.flags.length > 0 ? ` · ${i.flags.join(', ')}` : ''}
-                {p.used ? '' : ' · not used: too faint'}
+                {f.length > 0 ? ` · ${f.join(', ')}` : ''}
+                {p.used ? '' : !p.point ? ` · not used: below SNR ${typeof snrMin === 'number' ? snrMin : 'the minimum'}` : ' · not used: no pair or step'}
               </span>
             </li>
           ))}

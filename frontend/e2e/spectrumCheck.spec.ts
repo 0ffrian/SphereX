@@ -1,7 +1,7 @@
 // Issue #162 (A18.7, Q-474) on the committed Eros pack (backend/assets/areas, area eros-2026-03):
-// the routes serve the pack's own stored replies (summary, dots, tracks) on the SYNTHETIC fixture
-// server, and the spectrum check comes from the mock behind `?spectra=mock` until #161's endpoint
-// exists (the mock is the mock-up's Eros values). Without `?spectra=mock` the check is "not run".
+// the routes serve the pack's own stored replies (summary, dots, tracks and #161's spectra stage,
+// the real backend's bytes) on the SYNTHETIC fixture server. An area stored without the check answers
+// 404 spectra_not_prepared and lists "Spectrum check not run".
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
@@ -35,18 +35,19 @@ const indexBody = {
   provenance: { areas: { tag: 'derived', source: 'test', formula: 'test' } },
 };
 
-async function openDiscovery(page: Page, query: string) {
+async function openDiscovery(page: Page, spectra: boolean) {
   const body = (b: string) => ({ status: 200, contentType: 'application/json', body: b });
   await page.route('**/v1/areas', (r) => r.fulfill(body(JSON.stringify(indexBody))));
   await page.route('**/v1/areas/eros-2026-03', (r) => r.fulfill(body(stage('summary'))));
   await page.route('**/v1/areas/eros-2026-03/dots', (r) => r.fulfill(body(stage('dots'))));
   await page.route('**/v1/areas/eros-2026-03/tracks', (r) => r.fulfill(body(stage('tracks'))));
-  // As a backend before #161: no route. The mock never asks.
   await page.route('**/v1/areas/eros-2026-03/spectra', (r) =>
-    r.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ error: 'spectra_not_prepared', detail: 'not run' }) }),
+    spectra
+      ? r.fulfill(body(stage('spectra')))
+      : r.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ error: 'spectra_not_prepared', detail: 'not run' }) }),
   );
   await page.setViewportSize({ width: 1280, height: 1000 });
-  await page.goto(`/${query}`);
+  await page.goto('/');
   await expect(page.getByTestId('sky-pane')).toHaveAttribute('data-sky-state', 'ready', { timeout: 30_000 });
   await page.waitForFunction(() => '__sxSky' in globalThis);
   await page.evaluate((v) => (globalThis as unknown as { __sxSky: SkyHook }).__sxSky.setView(v), { ra: 91.23, dec: 13.43, fovDeg: 3 });
@@ -57,7 +58,7 @@ async function openDiscovery(page: Page, query: string) {
 
 test('Discovery on the Eros pack: row verdicts, T3 chart with heat glow, the accordion', async ({ page }) => {
   test.setTimeout(90_000);
-  await openDiscovery(page, '?spectra=mock');
+  await openDiscovery(page, true);
   await expect(page.getByTestId('disc-steps')).toContainText('3 rock-like, 1 very red, 5 one colour');
   const word = (id: string) => page.getByTestId(`disc-mover-${id}`).getByTestId('spectrum-word');
   for (const id of ['T3', 'T1', 'T4']) await expect(word(id)).toHaveText('Rock-like');
@@ -77,9 +78,9 @@ test('Discovery on the Eros pack: row verdicts, T3 chart with heat glow, the acc
   await expect(page.getByTestId('spectrum-formula')).toBeVisible();
 });
 
-test('without ?spectra=mock the check is not run: no verdicts, listed under Not shown', async ({ page }) => {
+test('an area stored without the check: no verdicts, "Spectrum check not run" under Not shown', async ({ page }) => {
   test.setTimeout(90_000);
-  await openDiscovery(page, '');
+  await openDiscovery(page, false);
   await expect(page.getByTestId('spectrum-word')).toHaveCount(0);
   await expect(page.getByTestId('area-missing').locator('li[data-code="spectra:not_run"]')).toHaveText('Spectrum check not run.');
 });

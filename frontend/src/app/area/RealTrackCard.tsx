@@ -17,7 +17,6 @@ import { buildKnown, buildPlaceholder } from './buildFrom';
 import { areaTrackLabel, matchName } from './realArea';
 import { middleTime } from './trackJobStore';
 import type { AreaSpectra, TrackSpectrum } from './spectraApi';
-import type { DotInfo } from './spectrumWords';
 import { SpectrumFacts, SpectrumHow, SpectrumSection, SpectrumVerdictLine } from './SpectrumCard';
 
 const VERDICT: Record<AreaTrack['verdict'], string> = {
@@ -87,7 +86,7 @@ export function RealTrackCard({
   spectrum?: {
     track: TrackSpectrum;
     spectra: Pick<AreaSpectra, 'calibration' | 'method' | 'provenance'>;
-    info: (dotId: string) => DotInfo;
+    flags: (dotId: string) => readonly string[];
     measuredOnly: boolean;
   } | null;
 }) {
@@ -117,7 +116,6 @@ export function RealTrackCard({
           <SpectrumSection
             spectrum={spectrum.track}
             spectra={spectrum.spectra}
-            info={spectrum.info}
             measuredOnly={spectrum.measuredOnly}
             fixture={synthetic}
           />
@@ -162,7 +160,7 @@ export function RealTrackCard({
         </div>
         {!obj && <p className="sx-live-m">{NO_ORBIT_NOTE}</p>}
         {obj && !obj.objectId && <Alert tone="warn" title="No JPL id" line="Its Track cannot be computed here." />}
-        {spectrum && <SpectrumHow spectrum={spectrum.track} spectra={spectrum.spectra} info={spectrum.info} />}
+        {spectrum && <SpectrumHow spectrum={spectrum.track} spectra={spectrum.spectra} flags={spectrum.flags} />}
         <div className="sx-live-btns">
           <button
             type="button"

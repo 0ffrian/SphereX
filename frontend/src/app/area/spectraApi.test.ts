@@ -1,30 +1,21 @@
-// Issue #162: the spectrum check's one module. The reply check, the HTTP answers (ok, 404 → not run,
-// anything else → unavailable), the mock only behind `?spectra=mock` and only for the Eros area, and
-// loadDiscovery listing "Spectrum check not run" under Not shown.
+// Issue #162: the spectrum check's one module on #161's endpoint. The reply check (the committed Eros
+// pack's stored stage and the contract fixture), the HTTP answers (ok, 404 spectra_not_prepared → not
+// run, anything else → unavailable), and loadDiscovery listing "Spectrum check not run" under Not shown.
 import { describe, expect, it } from 'vitest';
 import type { ApiClient } from '@/app/api/client';
-import { areaFixture, areaIndexFixture } from '@/test/areaFixtures';
+import { areaFixture, areaIndexFixture, erosPackStage, spectraFixture } from '@/test/areaFixtures';
 import { loadDiscovery, missingText } from './realArea';
-import {
-  httpSpectraApi,
-  MOCK_AREA_ID,
-  mockSpectraApi,
-  parseAreaSpectra,
-  spectraMockFromUrl,
-  SPECTRUM_VERDICTS,
-  type AreaSpectra,
-  type SpectraApi,
-} from './spectraApi';
-import MOCK from './spectraMock.json';
+import { httpSpectraApi, parseAreaSpectra, SPECTRUM_VERDICTS, type AreaSpectra, type SpectraApi } from './spectraApi';
 
+const EROS = erosPackStage<AreaSpectra>('spectra');
 const reply = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 const fetchOf = (res: () => Response | Promise<Response>) => (async () => res()) as unknown as typeof fetch;
 
 describe('reply check', () => {
-  it('accepts the mock reply (the Eros values of the mock-up)', () => {
-    const r = parseAreaSpectra(MOCK);
-    expect(r.area_id).toBe(MOCK_AREA_ID);
+  it('accepts the Eros pack: the verdicts A17.13 expects for the recorded area', () => {
+    const r = parseAreaSpectra(EROS);
+    expect(r.area_id).toBe('eros-2026-03');
     expect(r.tracks.map((t) => [t.track_id, t.verdict])).toEqual([
       ['T1', 'rock'],
       ['T2', 'one_colour'],
@@ -39,11 +30,16 @@ describe('reply check', () => {
     const t3 = r.tracks[2]!;
     expect(t3.heat_glow).toBe(true);
     expect(t3.r_source).toBe('parallax');
+    expect(Math.abs(t3.r_au - 1.157)).toBeLessThan(0.05);
+  });
+
+  it('accepts the contract fixture', () => {
+    expect(parseAreaSpectra(spectraFixture()).tracks.length).toBeGreaterThan(0);
   });
 
   it('refuses a reply that breaks the contract', () => {
     const bad = (f: (o: AreaSpectra) => void) => {
-      const o = structuredClone(MOCK) as unknown as AreaSpectra;
+      const o = structuredClone(EROS);
       f(o);
       return () => parseAreaSpectra(o);
     };
@@ -51,6 +47,7 @@ describe('reply check', () => {
     expect(bad((o) => ((o.tracks[0]!.pairs[0] as { rho: unknown }).rho = '1.2'))).toThrow(/rho/);
     expect(bad((o) => ((o.calibration[0] as { source: string }).source = 'guess'))).toThrow(/source/);
     expect(bad((o) => ((o.tracks[0]!.points[0] as { used: unknown }).used = 1))).toThrow(/used/);
+    expect(bad((o) => ((o.tracks[0]!.points[0] as { visit: unknown }).visit = null))).toThrow(/visit/);
     expect(() => parseAreaSpectra(null)).toThrow();
   });
 
@@ -60,12 +57,11 @@ describe('reply check', () => {
 });
 
 describe('the HTTP client', () => {
-  it('ok, 404 (not run), and everything else unavailable', async () => {
-    expect((await httpSpectraApi('/v1', fetchOf(() => reply(MOCK))).areaSpectra('eros-2026-03')).kind).toBe('ok');
+  it('ok; 404 spectra_not_prepared is not run; everything else unavailable', async () => {
+    expect((await httpSpectraApi('/v1', fetchOf(() => reply(EROS))).areaSpectra('eros-2026-03')).kind).toBe('ok');
     const notRun = reply({ error: 'spectra_not_prepared', detail: 'x' }, 404);
     expect(await httpSpectraApi('/v1', fetchOf(() => notRun)).areaSpectra('a')).toEqual({ kind: 'not_run' });
-    // A backend from before #161 has no route: the check was not run either.
-    expect(await httpSpectraApi('/v1', fetchOf(() => reply({ detail: 'Not Found' }, 404))).areaSpectra('a')).toEqual({ kind: 'not_run' });
+    expect(await httpSpectraApi('/v1', fetchOf(() => reply({ error: 'area_not_found' }, 404))).areaSpectra('a')).toEqual({ kind: 'unavailable' });
     expect(await httpSpectraApi('/v1', fetchOf(() => reply({}, 500))).areaSpectra('a')).toEqual({ kind: 'unavailable' });
     expect(await httpSpectraApi('/v1', fetchOf(() => reply({ tracks: 'no' }))).areaSpectra('a')).toEqual({ kind: 'unavailable' });
     const offline = (async () => {
@@ -76,24 +72,18 @@ describe('the HTTP client', () => {
 
   it('asks the area route, escaped', async () => {
     let url = '';
-    const f = (async (u: string) => ((url = u), reply(MOCK))) as unknown as typeof fetch;
+    const f = (async (u: string) => ((url = u), reply(EROS))) as unknown as typeof fetch;
     await httpSpectraApi('/v1', f).areaSpectra('a b');
     expect(url).toBe('/v1/areas/a%20b/spectra');
   });
-});
 
-describe('the mock', () => {
-  it('answers only with ?spectra=mock', () => {
-    expect(spectraMockFromUrl('')).toBeNull();
-    expect(spectraMockFromUrl('?live=mock')).toBeNull();
-    expect(spectraMockFromUrl('?spectra=1')).toBeNull();
-    expect(spectraMockFromUrl('?spectra=mock')).not.toBeNull();
-  });
-
-  it('answers for the Eros area only, so no verdict is made up for another area', async () => {
-    const api = mockSpectraApi(async () => MOCK);
-    expect((await api.areaSpectra(MOCK_AREA_ID)).kind).toBe('ok');
-    expect(await api.areaSpectra('live-0123456789ab')).toEqual({ kind: 'not_run' });
+  it('passes the caller\'s abort through', async () => {
+    const ctl = new AbortController();
+    ctl.abort();
+    const f = (async () => {
+      throw new DOMException('aborted', 'AbortError');
+    }) as unknown as typeof fetch;
+    await expect(httpSpectraApi('/v1', f).areaSpectra('a', ctl.signal)).rejects.toThrow();
   });
 });
 
@@ -126,7 +116,7 @@ describe('loadDiscovery', () => {
   });
 
   it('keeps the reply and its own missing codes', async () => {
-    const data = { ...(structuredClone(MOCK) as unknown as AreaSpectra), missing: ['spectra:calibration_default'] };
+    const data = { ...structuredClone(EROS), missing: ['spectra:calibration_default'] };
     const r = await loadDiscovery(api, entry, 'synthetic', undefined, of({ kind: 'ok', data }));
     expect(r.spectra?.tracks).toHaveLength(9);
     expect(r.missing).toContain('spectra:calibration_default');
