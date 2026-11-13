@@ -31,8 +31,15 @@ const indexBody = {
   cached_at: NOW, computed_at: NOW, missing: [],
   provenance: { areas: { tag: 'derived', source: 'test', formula: 'test' } },
 };
-const knownBody = (trackAvailable: boolean) => ({
+// An object the pack cannot Track offline (no object id): its row says Open, with the reason.
+const OTHER = {
+  designation: '2026 AB1', number: null, object_id: null, kind: 'asteroid', v_mag: 19.2,
+  n_frames: 2, n_visits: 1, track_available: false,
+  positions: [{ frame_id: FRAME_IDS[0], time: frameTime(0), ra: 91.0, dec: 13.3 }],
+};
+const knownBody = (trackAvailable: boolean, other = false) => ({
   known: [
+    ...(other ? [OTHER] : []),
     {
       designation: '433 Eros', number: 433, object_id: EROS_ID, kind: 'asteroid', v_mag: 11.5,
       n_frames: 18, n_visits: 2, track_available: trackAvailable,
@@ -57,10 +64,10 @@ const framesBody = {
   north_up: true, stretch: { kind: 'asinh', params: {} }, data_release: 'spherex_qr2', cached_at: NOW, missing: [],
 };
 
-async function routes(page: Page, trackAvailable: boolean) {
+async function routes(page: Page, trackAvailable: boolean, other = false) {
   const json = (body: unknown) => ({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
   await page.route('**/v1/areas', (r) => r.fulfill(json(indexBody)));
-  await page.route('**/v1/areas/eros-2026-03/known', (r) => r.fulfill(json(knownBody(trackAvailable))));
+  await page.route('**/v1/areas/eros-2026-03/known', (r) => r.fulfill(json(knownBody(trackAvailable, other))));
   await page.route(`**/v1/objects/${EROS_ID}/frames`, (r) => r.fulfill(json(framesBody)));
   await page.route(`**/v1/objects/${EROS_ID}/path`, (r) =>
     r.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ error: 'not_found', detail: 'no path' }) }),
@@ -77,19 +84,21 @@ async function drawAt(page: Page, view: { ra: number; dec: number; fovDeg: numbe
 }
 
 test('draw over Eros: the Known list shows 433 Eros from /known, with positions on the sky', async ({ page }) => {
-  await routes(page, false);
+  await routes(page, false, true);
   await drawAt(page, { ra: 91.23, dec: 13.43, fovDeg: 3 });
   const list = page.getByTestId('known-list');
   await expect(list).toBeVisible({ timeout: 15_000 });
-  const row = page.getByTestId('known-row');
-  await expect(row).toHaveCount(1);
-  await expect(row).toContainText('433');
-  await expect(row).toContainText('Eros');
-  await expect(row).toContainText('18 frames in 2 visits');
+  await expect(page.getByTestId('known-row')).toHaveCount(2);
+  const eros = page.getByTestId('known-row').filter({ hasText: 'Eros' });
+  await expect(eros).toContainText('433');
+  await expect(eros).toContainText('18 frames in 2 visits');
+  // Q-455 (3): the demo object stays trackable while the pack says track_available false (#129).
+  await expect(eros).toContainText('Track it');
   await expect(page.getByTestId('known-skybot')).toContainText('SkyBoT last answered');
-  // No Track offline for this object yet: Open, with the reason.
-  await expect(row).toContainText('Open');
-  await expect(page.getByTestId('known-no-track')).toHaveText('Track not prepared for this object offline');
+  // An object with no Track offline: Open, with the reason.
+  const other = page.getByTestId('known-row').filter({ hasText: '2026 AB1' });
+  await expect(other).toContainText('Open');
+  await expect(other.getByTestId('known-no-track')).toHaveText('Track not prepared for this object offline');
   await expect(page.getByTestId('demo-tag')).toHaveCount(0);
   await expect(page.getByTestId('known-position').first()).toBeAttached();
 });
