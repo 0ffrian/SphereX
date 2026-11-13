@@ -72,6 +72,12 @@ classDiagram
     emitTogether(notes) number
     bind(honesty) unbind
   }
+  class PathSoundController {
+    <<sound/track/pathSound.ts, #78, Q-459>>
+    start() Promise~boolean~
+    scrub(hop, frames, playing)
+    stop()
+  }
   class SpectrumChord {
     <<sound/spectrumChord.ts>>
     start(plan, mode, honesty) bool
@@ -117,6 +123,7 @@ classDiagram
   AppSound *-- SoundEngine
   AppSound *-- ListenSweep
   AppSound *-- SpectrumChord
+  PathSoundController ..> AppSound : emitTogether ticks, path tone
   SpectrumChord ..> ChordPlan
   SpectrumChord ..> pitch
   SpectrumChord ..> spectrumExclusive : one spectrum sound
