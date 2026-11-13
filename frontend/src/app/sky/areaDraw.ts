@@ -11,7 +11,9 @@ import {
   type SkyCamera,
 } from '@/viewer/sky/skyMath';
 import { useAreaStore, type AreaBox, type AreaDrag } from '@/app/shell/areaStore';
-import { AIM_HEIGHT_DEG, clampCentred, clampDrag } from '@/app/area/aim';
+import { clampCentred, clampDrag } from '@/app/area/aim';
+import { regionBox, selectionAt, type Selection } from '@/app/area/scanGrid';
+import { useScanStore } from '@/app/area/scanStore';
 
 export interface AreaViewAccess {
   getView(): SkyCamera;
@@ -76,28 +78,42 @@ export function centreRect(): AreaBox | null {
   return boxFromPixels(clampCentred(width / 2, height / 2, m * 0.3, m * 0.18, measurePixels));
 }
 
-/** Aim (issue #144): the view after a click at (x, y): north up, AIM_HEIGHT_DEG tall, centred there. */
-export function aimViewAt(x: number, y: number): SkyCamera | null {
+/** The selection rectangle at (x, y) now (issue #157, state 1), or null with no view. */
+export function selectionNow(x: number, y: number): Selection | null {
   if (!access) return null;
   const { width, height } = access.getSize();
-  const p = screenToRaDec(access.getView(), x, y, width, height, { ra: 0, dec: 0 });
-  return { ra: p.ra, dec: p.dec, fovDeg: clampFov(AIM_HEIGHT_DEG) };
+  return selectionAt(access.getView(), x, y, width, height);
 }
 
 /**
- * Enter in the area tools (the keyboard way to draw): while aiming at a view much wider than the
- * next one, it zooms to the middle as a click there would; otherwise it sets a centred box of at
- * most 2° a side, so a box is never a few pixels on a wide sky.
+ * Select a region (issue #157; mock-up states 1 and 2): the sky zooms north up so the region fills
+ * the screen. A region of one square is a single area (the cards of #144 and #145); a larger one
+ * is gridded and offered for a scan (scanStore).
+ */
+export function pickRegionAt(x: number, y: number): void {
+  const sel = selectionNow(x, y);
+  if (!sel) return;
+  const s = useAreaStore.getState();
+  flyToView(sel.target, reducedMotion());
+  const box = regionBox(sel.region);
+  if (sel.cols * sel.rows === 1) {
+    s.setBox(box);
+    return;
+  }
+  s.openScan(s.flow, box);
+  void useScanStore.getState().plan(s.flow, sel.region);
+}
+
+/**
+ * Enter in the area tools (the keyboard way to select): while selecting, the region in the middle
+ * of the screen, as a click there would; in the #144 draw step, a centred box of at most 2° a side.
  */
 export function enterInArea(): void {
   if (!access) return;
   const s = useAreaStore.getState();
-  if (s.stage === 'aiming' && access.getView().fovDeg > 2 * AIM_HEIGHT_DEG) {
+  if (s.stage === 'aiming') {
     const { width, height } = access.getSize();
-    const to = aimViewAt(width / 2, height / 2);
-    if (!to) return;
-    s.pickPatch();
-    flyToView(to, reducedMotion());
+    pickRegionAt(width / 2, height / 2);
     return;
   }
   const b = centreRect();
