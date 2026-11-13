@@ -9,6 +9,11 @@ area is 404 ``area_not_found``. Beyond D-16 (Q-146 (6)).
   area was prepared and stored with it as raw pixels (so it works offline without the cutouts);
   the PNG is encoded when serving.
 - ``GET /v1/areas/{area_id}/export.ecsv``: the A17.7 file.
+- ``POST /v1/areas/live``, ``GET`` and ``DELETE /v1/areas/live/{area_id}`` (Q-462, issue #141):
+  a box drawn anywhere. ``start=false`` answers the plan (one SIA cone at the box centre picks
+  two visits); ``start=true`` queues a background job (``live_jobs``), which runs the pipeline
+  and stores the area, then served by the routes above like a prepared one. The request never
+  computes the area itself (A16.2).
 
 ``/checks`` is not served: D4 and D5 are cut (Q-203 gate); ``summary.missing`` says
 ``checks:not_run``. Errors are ``{error, detail}``: 404 ``area_not_found``, 404 ``dot_not_found``,
@@ -25,13 +30,20 @@ from typing import Annotated, Any, cast
 import numpy as np
 from fastapi import APIRouter, Depends, Path, Request
 from fastapi.responses import Response
+from pydantic import BaseModel, Field
 
+from app.adapters.http import UpstreamError
 from app.api.models import ErrorResponse
+from app.cache.store import CacheMissOffline, UpstreamUnavailable
 from app.context import Context
 from app.core.area.config import AREA_ID
+from app.core.area.live import LiveAreaError, Plan, plan_area, snap_box
+from app.core.area.live_jobs import LiveJobs, done_reply
 from app.core.area.store import AreaStore
+from app.core.card.validate import check
 from app.core.find.png import encode_png
 from app.errors import ApiError
+from app.timefmt import parse_utc
 
 router = APIRouter(prefix="/v1/areas", tags=["areas"])
 
@@ -40,6 +52,11 @@ DotIdPath = Annotated[
     str, Path(pattern=r"^[A-Za-z0-9][A-Za-z0-9_.-]*:[1-9][0-9]*$", max_length=200)
 ]
 ERRORS: dict[int | str, dict[str, Any]] = {404: {"model": ErrorResponse}}
+LIVE_ERRORS: dict[int | str, dict[str, Any]] = {
+    404: {"model": ErrorResponse},
+    422: {"model": ErrorResponse},
+    503: {"model": ErrorResponse},
+}
 JSON = "application/json"
 NO_STORE: dict[str, str] = {}
 
@@ -68,6 +85,97 @@ def _stage(store: AreaStore, area_id: str, stage: str) -> bytes:
 def get_index(store: Annotated[AreaStore, Depends(get_area_store)]) -> Response:
     body = json.dumps(store.index(), sort_keys=True, separators=(",", ":")).encode()
     return Response(content=body, media_type=JSON)
+
+
+class LiveAreaRequest(BaseModel):
+    """A drawn box (Q-462). ``visits`` picks a visit pair by the two visit starts (ISO UTC)."""
+
+    ra: float
+    dec: float
+    width_deg: float
+    height_deg: float
+    start: bool = False
+    visits: list[str] | None = Field(default=None, min_length=2, max_length=2)
+
+
+def get_live_jobs(request: Request) -> LiveJobs:
+    jobs = getattr(request.app.state, "live_jobs", None)
+    if jobs is None:
+        jobs = LiveJobs(cast(Context, request.app.state.ctx))
+        request.app.state.live_jobs = jobs
+    return cast(LiveJobs, jobs)
+
+
+def _json(body: dict[str, Any], schema: str, status: int = 200) -> Response:
+    check(body, schema)
+    return Response(
+        content=json.dumps(body, sort_keys=True, separators=(",", ":")).encode(),
+        media_type=JSON,
+        status_code=status,
+    )
+
+
+def _plan(request: Request, req: LiveAreaRequest) -> Plan:
+    ctx = cast(Context, request.app.state.ctx)
+    try:
+        box = snap_box(req.ra, req.dec, req.width_deg, req.height_deg)
+        pair = None
+        if req.visits is not None:
+            pair = (parse_utc(req.visits[0]), parse_utc(req.visits[1]))
+        return plan_area(ctx, box, pair=pair)
+    except LiveAreaError as exc:
+        raise ApiError(422, exc.code, exc.detail) from exc
+    except ValueError as exc:  # a visit start that is not an ISO time
+        raise ApiError(422, "area:bad_box", f"Bad visit start: {exc}") from exc
+    except CacheMissOffline as exc:
+        raise ApiError(503, "offline", "Live areas need the network (SX_OFFLINE=1).") from exc
+    except (UpstreamUnavailable, UpstreamError) as exc:
+        raise ApiError(
+            503, "upstream_unavailable", "The SPHEREx frame archive did not answer."
+        ) from exc
+
+
+@router.post("/live", responses={202: {}, **LIVE_ERRORS})
+def post_live(
+    req: LiveAreaRequest,
+    request: Request,
+    store: Annotated[AreaStore, Depends(get_area_store)],
+    jobs: Annotated[LiveJobs, Depends(get_live_jobs)],
+) -> Response:
+    """The plan of a box (``start=false``), or its job (``start=true``). A box already stored
+    answers ``done``; one already queued or running answers its job, whatever ``start`` is."""
+    plan = _plan(request, req)
+    if store.entry(plan.area_id, "summary") is not None:
+        return _json(done_reply(plan.area_id), "area-job.schema.json")
+    job = jobs.get(plan.area_id)
+    if job is not None and job.state in ("queued", "running"):
+        return _json(jobs.reply(job), "area-job.schema.json")
+    if not req.start:
+        return _json(plan.reply(), "area-live-plan.schema.json")
+    if jobs.ctx.settings.offline:
+        raise ApiError(503, "offline", "Live areas need the network (SX_OFFLINE=1).")
+    return _json(jobs.reply(jobs.submit(plan)), "area-job.schema.json", status=202)
+
+
+@router.get("/live/{area_id}", responses=LIVE_ERRORS)
+def get_live(
+    area_id: AreaIdPath,
+    store: Annotated[AreaStore, Depends(get_area_store)],
+    jobs: Annotated[LiveJobs, Depends(get_live_jobs)],
+) -> Response:
+    job = jobs.get(area_id)
+    if job is not None and not (job.state == "failed" and store.entry(area_id, "summary")):
+        return _json(jobs.reply(job), "area-job.schema.json")
+    if store.entry(area_id, "summary") is not None:
+        return _json(done_reply(area_id), "area-job.schema.json")
+    raise ApiError(404, "job_not_found", f"No live area job '{area_id}'.")
+
+
+@router.delete("/live/{area_id}", status_code=204, responses=LIVE_ERRORS)
+def delete_live(area_id: AreaIdPath, jobs: Annotated[LiveJobs, Depends(get_live_jobs)]) -> Response:
+    if not jobs.cancel(area_id):
+        raise ApiError(404, "job_not_found", f"No queued or running job '{area_id}'.")
+    return Response(status_code=204)
 
 
 @router.get("/{area_id}", responses=ERRORS)

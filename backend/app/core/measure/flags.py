@@ -13,7 +13,8 @@ from app.core.find import wcs
 
 
 def bits_by_name(header: Any) -> dict[str, int]:
-    """Name -> bit number (e.g. ``HOT`` -> 10). Empty when the header names no bits (``wcs.flag_names``)."""
+    """Name -> bit number (e.g. ``HOT`` -> 10). Empty when the header names no bits
+    (``wcs.flag_names``)."""
     return {name: bit for bit, name in wcs.flag_names(header).items()}
 
 

@@ -41,7 +41,7 @@ In one sentence for the public: draw a square, then either follow a rock we alre
 - **Spectrum smoothness score** (A17.13): a label per track saying whether its flux against wavelength looks like one body.
 - **Rate-grid linker** (A17.12): for an area with 3 or more visits, links all visits at once.
 
-**Phase 2 (after the event), kept so the idea is not lost:** ADES export, live areas anywhere on the sky, a larger completeness grid over many areas, and the full THOR or HelioLinC run on many visits.
+**As built (issue #141, [Q-462](../../decisions/moving-objects.md), 13 Nov 2026):** live areas anywhere on the sky were pulled forward from Phase 2: a box of up to 2° a side is computed on request in a background job on SPHEREx DR1. **Phase 2 (after the event), kept so the idea is not lost:** ADES export, live areas anywhere on the sky, a larger completeness grid over many areas, and the full THOR or HelioLinC run on many visits.
 
 **Never:**
 

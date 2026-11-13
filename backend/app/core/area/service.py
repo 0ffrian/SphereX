@@ -180,18 +180,24 @@ def run_area(
     inputs: str = "area_cones",
     sources: Mapping[str, str] | None = None,
     refresh: bool = False,
+    on_step: Callable[[str], None] | None = None,
 ) -> AreaResult:
     """P4 to P6 on P3's records. ``star_cones`` replaces the area cone (the recorded area uses
     Track's recorded visit cones); ``inputs`` names where the frames came from and is written
-    into ``method.settings`` (and so ``params_hash``)."""
+    into ``method.settings`` (and so ``params_hash``). ``on_step`` is told ``labels``, ``join``
+    and ``known`` as each step starts (live area progress, Q-462); it never changes a result."""
+    step = on_step or (lambda _name: None)
+    step("labels")
     geo = clean.area_geometry(frames, cfg)
     cones = dict(star_cones) if star_cones is not None else clean.star_cones(frames)
     st = clean.star_lists(ctx, cones, refresh=refresh)
     labels = clean.label_dots(
         frames, bodies, per_frame, st.lists, cfg, star_missing=st.missing, geo=geo
     )
+    step("join")
     w, w_served = join.spherex_w(ctx, frames, geo, refresh=refresh)
     joined = join.join(labels, frames, geo, w, cfg)
+    step("known")
     known = match.known_step(ctx, frames, geo, cfg, refresh=refresh)
     verdicts = match.verdicts(joined.tracks, known, geo, cfg)
     objects = match.known_list(frames, known, geo, cfg)

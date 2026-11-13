@@ -37,6 +37,8 @@ Payload shapes as built: `shared/schemas/area-*.schema.json`; gap choices in [Q-
 
 Beyond D-16, which keys every endpoint on one object id; Q-146 (6) answered the `/v1/areas` routes and a D-16 note is pending. The endpoint register is [A4.11](../endpoints.md); refusal codes are also in [A4.12](../refusals.md).
 
+> **As built (issue #141, [Q-462](../../decisions/moving-objects.md), Q-463, Q-467):** live areas add three routes, served before the `/{area_id}` ones. `POST /v1/areas/live` takes `{ra, dec, width_deg, height_deg, start, visits?}`; with `start=false` it answers the plan (`shared/schemas/area-live-plan.schema.json`), with `start=true` it queues a job (202, `area-job.schema.json`); a stored area answers `done`, a queued or running one its job. `GET /v1/areas/live/{area_id}` answers the job (queued, running, done, failed with `error.code`); `DELETE` stops it (204). Error codes: `area:too_large`, `area:bad_box`, `area:no_visit_pair` (422); `offline`, `upstream_unavailable` (503); `job_not_found` (404); job errors `area:frames_incomplete`, `area:no_cutouts`, `area:no_dots`, `cancelled`, `internal`. A done live area is served by the routes below like a prepared one; the index lists areas of every release present (Q-463).
+
 | Endpoint | Returns |
 |---|---|
 | `GET /v1/areas` | Index: `[{area_id, ra, dec, width_deg, height_deg, data_release, n_frames, n_visits, computed_at, cached_at}]`, only areas prepared with the running code and settings (A17.10) |
