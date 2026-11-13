@@ -68,6 +68,7 @@ import { KnownPositionsLayer } from '@/app/area/KnownPositionsLayer';
 import { boxFromPixels, clampedRect, enterInArea, pickRegionAt, registerAreaView, restoreSavedScan } from './areaDraw';
 import { ScanOverlay, scanClickAt } from './ScanOverlay';
 import { AimOverlay } from './AimOverlay';
+import { ReplayBar } from './ReplayBar';
 import { useCachedMarkers } from './useCachedMarkers';
 import { useTargetMarkers, type TargetMarker } from './useTargetMarkers';
 
@@ -815,6 +816,7 @@ export function SkyPane({ children }: { children?: ReactNode }) {
       <AreaOverlay view={view} />
       <AimOverlay view={view} />
       <ScanOverlay view={view} />
+      <ReplayBar />
       <AreaTrackLayer view={view} />
       <KnownPositionsLayer view={view} />
       {/* Panels sit right after the canvas in the tab order. */}
