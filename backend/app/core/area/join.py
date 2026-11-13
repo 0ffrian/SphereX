@@ -20,10 +20,11 @@
    positions (equal weights) and ``u`` the least-squares value over all its legs, clamped at 0
    (``chain_fit``); for two legs this is the pair test's own ``v_AB`` and ``u``. A chain fit
    that fails the pair test's limits (rate window, ``u <= 1/delta_min``, ``v_tol`` with the
-   largest ``sigma_v`` of the chain's legs) is not served: the track keeps the ``v_AB`` of its
-   first pair whose rate also lies in the chain's window, never that pair's ``u`` (fitted on two
-   of the legs only), or no rate at all when no pair does. ``u`` is fitted only when every leg
-   has ``w``. A 2-leg track is always fitted as a ``"chain"``.
+   largest ``sigma_v`` of the chain's legs), or a chain of three or more legs with ``w`` for
+   only some of them, is not served: the track keeps the ``v_AB`` of its first pair whose rate
+   also lies in the chain's window, never that pair's ``u`` (fitted on two of the legs only), or
+   no rate at all when no pair does. ``u`` is fitted only when every leg has ``w``. A 2-leg
+   track is always fitted as a ``"chain"``.
 
 Pure: ``w`` comes in as a mapping; ``spherex_w`` fetches it through the cache.
 """
@@ -196,11 +197,12 @@ def chain_fit(
     two, and must pass ``u <= 1/delta_min`` and every leg's perpendicular residual ``<= v_tol``.
     ``v_tol = max(v_tol_min, v_tol_sigma * sigma_v)`` with the largest ``sigma_v`` of all the
     chain's legs (for two legs, the pair test's own ``v_tol``; for three or more it is looser
-    than any single pair's). Unless every leg has ``w``, ``u`` is ``None`` (the rate-window
-    fallback, as in ``pair_fit`` for a pair missing either visit's ``w``): a ``u`` fitted on a
-    subset of the legs would mean something else than on the other tracks of the run. For two
-    legs this is the pair test's own ``v_AB`` and ``u``, so a 2-leg track is always
-    ``"chain"``."""
+    than any single pair's). With ``w`` for no leg, ``u`` is ``None`` (the rate-window fallback,
+    as in ``pair_fit``). With ``w`` for only some of three or more legs, ``None``: the legs with
+    ``w`` cannot be held to the chain test without the others, and a ``u`` fitted on a subset of
+    the legs would mean something else than on the other tracks of the run. For two legs this
+    is the pair test's own ``v_AB`` and ``u``, including its fallback when either visit lacks
+    ``w``, so a 2-leg track is always ``"chain"``."""
     if len(legs) < 2:
         raise ValueError("a track has two or more legs")
     if len(legs) == 2:
@@ -218,8 +220,11 @@ def chain_fit(
         )
     if not rate_min <= math.hypot(*v_ab) <= rate_max:
         return None
-    if any(lg.visit not in w for lg in legs):
+    n_w = sum(lg.visit in w for lg in legs)
+    if n_w == 0 or (len(legs) == 2 and n_w < 2):
         return v_ab, None  # rate window only, as pair_fit for a pair missing either visit's w
+    if n_w < len(legs):
+        return None  # w for only some of three or more legs: refused, see above
     with_w = [(lg, w[lg.visit]) for lg in legs]
     num = den = 0.0
     for lg, wx in with_w:
