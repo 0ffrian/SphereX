@@ -9,6 +9,7 @@ import { createAppSound, type AppSound } from '../appSound';
 import { defaultSettings, flushSoundSettings, useSoundSettings } from '../settings';
 import { SoundProvider } from '../SoundProvider';
 import {
+  LATENCY_HINT,
   SOUND_STATUS_AMBIENCE_OFF,
   SOUND_STATUS_NONE,
   SOUND_STATUS_OFF,
@@ -110,5 +111,28 @@ describe('SoundControls', () => {
     await render();
     await act(async () => sound.unlock());
     expect(q('sound-status').textContent).toBe(SOUND_STATUS_NONE);
+  });
+
+  it('hints at Bluetooth only after unlock when the output latency is high (R8.9)', async () => {
+    ctx = new FakeAudioContext({ state: 'suspended', outputLatency: 0.2 });
+    setAudioContextFactory(() => ctx.asAudioContext());
+    sound = createAppSound({ engine: { debugTarget: null } });
+    await render();
+    expect(q('sound-latency-hint')).toBeNull();
+    await act(async () => sound.unlock());
+    expect(q('sound-latency-hint')?.textContent).toBe(LATENCY_HINT);
+  });
+
+  it('shows no latency hint at a low or unknown output latency', async () => {
+    for (const outputLatency of [0.02, undefined]) {
+      ctx = new FakeAudioContext({ state: 'suspended', outputLatency });
+      setAudioContextFactory(() => ctx.asAudioContext());
+      sound = createAppSound({ engine: { debugTarget: null } });
+      await render();
+      await act(async () => sound.unlock());
+      expect(q('sound-latency-hint')).toBeNull();
+      await act(async () => root.unmount());
+      root = createRoot(host);
+    }
   });
 });
