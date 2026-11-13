@@ -129,7 +129,19 @@ export function ScanOverlay({ view }: { view: SkyView | null }) {
       if (squareLooks[i] === 'done') quads.push({ index: s.index, pts: q });
     });
     hits = { quads, open: (index) => void openRef.current(index) };
-    for (const o of objects) {
+    // Labels never overlap (as the area layer's placeLabels): found objects first, then
+    // unexplained, then predicted; each tries the right of its ring, then the left, else it is not
+    // drawn (the ring keeps its name as its accessible label).
+    const placed: { x0: number; y0: number; x1: number; y1: number }[] = [];
+    const RANK: Record<ScanObject['kind'], number> = { known: 0, unexplained: 1, predicted: 2 };
+    const ordered = objects.slice().sort((a, b) => RANK[a.kind] - RANK[b.kind]);
+    // Every ring on screen is an obstacle for the other objects' labels.
+    const rings = objects.flatMap((o) => {
+      const last = o.positions[o.positions.length - 1];
+      const e = last ? skyToPixels(last.ra, last.dec) : null;
+      return e ? [{ key: o.key, x0: e.x - 12, y0: e.y - 12, x1: e.x + 12, y1: e.y + 12 }] : [];
+    });
+    for (const o of ordered) {
       const g = svg.querySelector<SVGGElement>(`[data-obj="${CSS.escape(o.key)}"]`);
       if (!g) continue;
       const p = o.positions.map((q) => skyToPixels(q.ra, q.dec));
@@ -149,11 +161,30 @@ export function ScanOverlay({ view }: { view: SkyView | null }) {
       ring?.setAttribute('cy', end.y.toFixed(1));
       const label = g.querySelector('text');
       if (label) {
-        label.setAttribute('x', (end.x + 14).toFixed(1));
-        label.setAttribute('y', (end.y - 2).toFixed(1));
-        label
-          .querySelectorAll('tspan')
-          .forEach((ts) => ts.setAttribute('x', (end.x + 14).toFixed(1)));
+        // Width from the text length (11 px Inter is about 6 px a character).
+        const w = Math.max(o.title.length, o.line.length) * 6 + 4;
+        const spots = [
+          { x: end.x + 14, anchor: 'start', x0: end.x + 12, x1: end.x + 14 + w },
+          { x: end.x - 14, anchor: 'end', x0: end.x - 14 - w, x1: end.x - 12 },
+        ];
+        const y0 = end.y - 13;
+        const y1 = end.y + (o.line ? 14 : 2);
+        const hit = (
+          sp: { x0: number; x1: number },
+          r: { x0: number; y0: number; x1: number; y1: number },
+        ) => sp.x0 < r.x1 && sp.x1 > r.x0 && y0 < r.y1 && y1 > r.y0;
+        const spot = spots.find(
+          (sp) =>
+            !placed.some((r) => hit(sp, r)) && !rings.some((r) => r.key !== o.key && hit(sp, r)),
+        );
+        if (spot) {
+          placed.push({ x0: spot.x0, y0, x1: spot.x1, y1 });
+          label.style.display = '';
+          label.setAttribute('text-anchor', spot.anchor);
+          label.setAttribute('x', spot.x.toFixed(1));
+          label.setAttribute('y', (end.y - 2).toFixed(1));
+          label.querySelectorAll('tspan').forEach((ts) => ts.setAttribute('x', spot.x.toFixed(1)));
+        } else label.style.display = 'none';
       }
     }
   };

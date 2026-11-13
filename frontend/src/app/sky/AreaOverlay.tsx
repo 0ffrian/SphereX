@@ -11,7 +11,8 @@ import { boxToPixels, measurePixels } from './areaDraw';
 export function AreaOverlay({ view }: { view: SkyView | null }) {
   const ref = useRef<HTMLDivElement>(null);
   const drag = useAreaStore((s) => s.drag);
-  const box = useAreaStore((s) => s.box);
+  // A scan draws its own grid and frame (ScanOverlay): no single-area outline under it.
+  const box = useAreaStore((s) => (s.screen === 'scan' ? null : s.box));
 
   const place = (r: { x0: number; y0: number; x1: number; y1: number } | null) => {
     const el = ref.current;
