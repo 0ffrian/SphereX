@@ -9,7 +9,7 @@
 import { useEffect, useId } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { SwitchRow } from '@/app/PanelControls';
-import { useSoundStatus } from '../SoundProvider';
+import { useSound, useSoundStatus } from '../SoundProvider';
 import { ensureLoaded, useSoundSettings } from '../settings';
 
 export const SOUND_STATUS_OFF = 'Sound is off.';
@@ -18,6 +18,8 @@ export const SOUND_STATUS_SUSPENDED = 'The browser paused the sound. Click Ambie
 export const SOUND_STATUS_READY = 'Ambience plays in the fly view when Show is set to + Artistic.';
 export const SOUND_STATUS_AMBIENCE_OFF = 'Ambience is off.';
 export const FLASHES_HINT = 'Lightning in the fly view. Off with reduced motion.';
+/** R8.9 (R12 #10): `outputLatency` above HIGH_OUTPUT_LATENCY_S, likely Bluetooth (#83). */
+export const LATENCY_HINT = 'High audio delay: Bluetooth? Use the laptop speaker or wired output.';
 
 function Volume({
   label,
@@ -54,6 +56,7 @@ function Volume({
 
 /** The sound settings as a panel body (no button of its own): the Ambience dropdown holds it. */
 export function SoundControls() {
+  const sound = useSound();
   const status = useSoundStatus();
   const s = useSoundSettings(
     useShallow((st) => ({
@@ -66,6 +69,10 @@ export function SoundControls() {
     })),
   );
   const hintId = useId();
+  // R8.9: read only after a click unlocked audio (the driver's check reads the shared context, which
+  // must not be made outside a gesture, Q-73). Re-read whenever the status changes.
+  const highLatency =
+    status.unlocked && status.audio !== 'none' && sound.outputs.audio.isHighLatency();
 
   useEffect(() => ensureLoaded(), []);
 
@@ -84,6 +91,11 @@ export function SoundControls() {
       <p className="sx-snd-status" role="status" data-testid="sound-status">
         {line}
       </p>
+      {highLatency && (
+        <p className="sx-snd-hint" data-testid="sound-latency-hint">
+          {LATENCY_HINT}
+        </p>
+      )}
       <div className="sx-snd-group">
         <SwitchRow label="Sound" checked={s.soundOn} onChange={(v) => s.update({ soundOn: v })} testId="sound-on" />
         <Volume

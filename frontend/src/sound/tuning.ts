@@ -31,7 +31,7 @@ export const TRAIN_MAX_RATE_HZ = 40;
 
 /** R8.9: lookahead added to `currentTime` before every scheduled sound. [verify on phones] (R8.9) */
 export const AUDIO_LOOKAHEAD_S = 0.03;
-/** R8.9: `outputLatency` above this suggests Bluetooth; advise the speaker or wired earphones. [verify on phones] R12 #10 */
+/** R8.9: `outputLatency` above this suggests Bluetooth; advise the laptop speaker or wired output (Q-132). [verify on the A15] R12 #10 */
 export const HIGH_OUTPUT_LATENCY_S = 0.1;
 /** pitch 0 → this frequency (the mock-up's Listen sweep base). CREATIVE placeholder — Atish to decide (D-13). */
 export const PITCH_MIN_HZ = 220;

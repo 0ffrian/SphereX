@@ -2,7 +2,7 @@
 
 > **Part of:** Rendering & haptics spec ([index](../README.md)) · **Sections:** R11.4 (a sub-page of [R11](../acceptance-tests.md): the one-sitting runbook for the checks only the A15 can answer, issue #16) · **Implements:** [Q-132, D-05, Q-64](../../decisions/platform-hosting.md) · **Read with:** [frame-time.md](frame-time.md) (R11.3, where frame-time and bloom numbers go), [open-items.md](../open-items.md) (R12 #1, #10, #35), [frontend-platform.md](../../architecture/frontend-platform.md) (A10.1, where the GPU summary goes)
 
-This page is tooling and order, not results. It holds only the two facts nobody else owns: the **machine record** and the **GPU probe report** (the evidence behind A10.1's GPU line and R12 #1), plus the device-lost observation. Frame times and bloom numbers go in [R11.3](frame-time.md), audio values in R12 and `haptics/tuning.ts`, the GPU summary in A10.1. Every A15 cell stays "to measure" until Atish fills it on the A15 itself. Numbers from any other machine never go in a committed file.
+This page is tooling and order, not results. It holds only the two facts nobody else owns: the **machine record** and the **GPU probe report** (the evidence behind A10.1's GPU line and R12 #1), plus the device-lost observation. Frame times and bloom numbers go in [R11.3](frame-time.md), audio values in R12 and `sound/tuning.ts`, the GPU summary in A10.1. Every A15 cell stays "to measure" until Atish fills it on the A15 itself. Numbers from any other machine never go in a committed file.
 
 Run the steps in this order, in one sitting.
 
@@ -51,7 +51,7 @@ Observation: to measure.
 
 ## 6. Audio (R12 #10, #35): pending #76
 
-`outputLatency` is read on the sound-check page (`sound-check.html`, R13.9, #116), wired and Bluetooth; the haptics test page that used to show it is deleted (D-39). Lookahead is judged by ear after #76. Results go in R12 and `haptics/tuning.ts` (`AUDIO_LOOKAHEAD_S`, `HIGH_OUTPUT_LATENCY_S`), not here.
+`outputLatency` is read on the sound-check page (`sound-check.html`, R13.9, #116), wired and Bluetooth; the haptics test page that used to show it is deleted (D-39). The app's sound settings show the Bluetooth hint too (#83). Lookahead is judged by ear after #76. Results go in R12 and `haptics/tuning.ts` (`AUDIO_LOOKAHEAD_S`, `HIGH_OUTPUT_LATENCY_S`), not here.
 
 ## 7. After the sitting
 
