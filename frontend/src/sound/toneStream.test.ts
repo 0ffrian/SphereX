@@ -15,7 +15,7 @@ import { FakeClock, FakeDriver } from '@/test/fakeSound';
 import { setAudioContextFactory } from './audioContext';
 import { duckHolds, getBus } from './audioGraph';
 import { createAppSound, type AppSound } from './appSound';
-import { SoundEngine, type ToneCapableDriver, type ToneOutput } from './engine';
+import { HAPTIC_DEBUG_EVENT, SoundEngine, type ToneCapableDriver, type ToneOutput } from './engine';
 import { pitchToHz, wavelengthToPitch } from './pitch';
 import { defaultSettings, flushSoundSettings, useSoundSettings } from './settings';
 import {
@@ -239,6 +239,22 @@ describe('emitTogether: the two-note exposure tick (Q-458, R8.9.2)', () => {
     expect(engine.emitTogether([note(d1, { tag: 'artistic' })])).toBe(0);
   });
 
+  it('the debug hook fires once per note that played (Q-458)', () => {
+    const clock = new FakeClock();
+    const driver = new FakeToneDriver(clock.clock);
+    const debug = new EventTarget();
+    let n = 0;
+    debug.addEventListener(HAPTIC_DEBUG_EVENT, () => n++);
+    const engine = new SoundEngine([driver], {
+      clock: clock.clock,
+      timers: clock,
+      debugTarget: debug,
+      honesty: 'measured',
+    });
+    expect(engine.emitTogether([note(d1), note(d4), note(0.5, { tag: 'derived' })])).toBe(2);
+    expect(n).toBe(2);
+  });
+
   it('refuses empty, oversized, stop, pulseTrain or NaN-strength groups', () => {
     const { driver, engine } = setup('measured');
     expect(engine.emitTogether([])).toBe(0);
@@ -350,7 +366,11 @@ describe('audio driver tones: shape (R8.8, R8.9)', () => {
     const panner = env.outputs[0] as FakePanner;
     ctx.currentTime = 3;
     driver.stopTone('path');
-    expect(env.gain.calls.at(-2)).toEqual(['cancel', 0, 3]);
+    // No cancelAndHoldAtTime on the fake: cancel, then hold the current value, then fade.
+    expect(env.gain.calls.slice(-3, -1)).toEqual([
+      ['cancel', 0, 3],
+      ['set', env.gain.value, 3],
+    ]);
     expect(env.gain.targets.at(-1)).toEqual({
       v: 0,
       t: 3,
@@ -362,6 +382,21 @@ describe('audio driver tones: shape (R8.8, R8.9)', () => {
     osc!.end();
     for (const n of [osc!, env, panner]) expect(n.disconnected).toBe(true);
     expect(driver.ducking).toBe(false);
+  });
+
+  it('uses cancelAndHoldAtTime when the browser has it, so the fade cannot jump', () => {
+    const { ctx, driver } = audio();
+    driver.startTone('path', out());
+    const env = envOf(toneSources(ctx)[0]!);
+    const held: number[] = [];
+    (env.gain as unknown as { cancelAndHoldAtTime: (t: number) => void }).cancelAndHoldAtTime = (
+      t,
+    ) => held.push(t);
+    ctx.currentTime = 0.01; // still inside the fade-in's lookahead
+    driver.stopTone('path');
+    expect(held).toEqual([0.01]);
+    expect(env.gain.calls.filter((c) => c[0] === 'cancel')).toHaveLength(0);
+    expect(env.gain.targets.at(-1)!.v).toBe(0);
   });
 
   it('a tag that changes the timbre cross-fades to a new voice', () => {
@@ -406,6 +441,21 @@ describe('audio driver tones: locked context and the duck', () => {
     const [osc] = toneSources(ctx);
     expect(osc!.frequency.value).toBeCloseTo(pitchToHz(0.7));
     expect(envOf(osc!).gain.targets[0]!.tau).toBeCloseTo(TONE_FADE_IN_S / DUCK_TAU_DIVISOR);
+  });
+
+  it('startTone while suspended cuts the old voice, so resume never brings back its old pitch', async () => {
+    const { ctx, driver } = audio();
+    driver.startTone('path', out({ pitch: 0.1 }));
+    const [old] = toneSources(ctx);
+    ctx.simulateState('suspended');
+    driver.startTone('path', out({ pitch: 0.9 }));
+    expect(old!.disconnected).toBe(true);
+    expect(driver.toneIds).toEqual([]);
+    await ctx.resume();
+    driver.updateTone('path', out({ pitch: 0.9 }));
+    const fresh = toneSources(ctx).at(-1)!;
+    expect(fresh).not.toBe(old);
+    expect(fresh.frequency.value).toBeCloseTo(pitchToHz(0.9));
   });
 
   it('a context that has no output at all is a no-op', () => {
@@ -470,8 +520,10 @@ describe('AppSound tones (the API #78 calls)', () => {
     await new Promise((r) => setTimeout(r, TONE_UPDATE_MIN_MS + 5));
     expect(sound.updateTone('path', { pan: 0.5 })).toBe(true);
     expect(sound.outputs.audio.toneIds).toEqual(['path']);
+    expect(sound.hasTone('path')).toBe(true);
     unbind();
     expect(sound.outputs.audio.toneIds).toEqual([]);
+    expect(sound.hasTone('path')).toBe(false); // the caller restarts it with startTone
   });
 
   it('mute fades the tone out; the volume sets the tone bus gain', async () => {

@@ -68,6 +68,7 @@ classDiagram
     startTone(id, params) bool
     updateTone(id, changes) bool
     stopTone(id)
+    hasTone(id) bool
     emitTogether(notes) number
     bind(honesty) unbind
   }

@@ -282,7 +282,7 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | Q-186 | Measurable coma-fills-aperture test | Proposed | [moving-objects-review](moving-objects-review.md) |
 | Q-187 | Track tickets and milestone | Proposed | [scope-process](scope-process.md) |
 | Q-188 | Mesh height for the body tone | Deferred (D-39) | [haptics-sound](haptics-sound.md) |
-| Q-189 | Tone stream in the haptics API | Proposed (stays live for sound: Track path voice, D-39); built as written by #77, see Q-458 | [haptics-sound](haptics-sound.md) |
+| Q-189 | Tone stream in the haptics API | Proposed (stays live for sound: Track path voice, D-39) | [haptics-sound](haptics-sound.md) |
 | Q-190 | Sustained-tone timbre by tag; body level | Proposed (timbre part stays live for sound, D-39) | [haptics-sound](haptics-sound.md) |
 | Q-191 | Body tone on bodies without height | Deferred (D-39) | [haptics-sound](haptics-sound.md) |
 | Q-192 | Height ticks after the event | Deferred (D-39) | [haptics-sound](haptics-sound.md) |
