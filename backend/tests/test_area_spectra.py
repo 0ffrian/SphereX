@@ -474,8 +474,8 @@ def test_backfill_writes_the_missing_stage_once(tmp_path: Path) -> None:
     pack = _copy_pack(tmp_path)
     _drop_spectra(pack)
     assert area_spectra.main(["--root", str(pack), "--check"]) == 1
-    assert area_spectra.backfill(pack) == (1, 0, 0)
-    assert area_spectra.backfill(pack) == (0, 1, 0)  # idempotent
+    assert area_spectra.backfill(pack) == (1, 0, 0, 0)
+    assert area_spectra.backfill(pack) == (0, 1, 0, 0)  # idempotent
     assert area_spectra.main(["--root", str(pack), "--check"]) == 0
     _, p = _pack_bodies(pack)
     key = spectra_key(RELEASE, EROS, p, spectra_settings_sha())
@@ -483,6 +483,28 @@ def test_backfill_writes_the_missing_stage_once(tmp_path: Path) -> None:
     committed = ReadThroughCache(PACK, offline=True).get(key)
     assert fresh is not None and committed is not None
     assert fresh.body == committed.body and fresh.meta == committed.meta
+
+
+def test_backfill_reports_a_failing_area_and_exits_1(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    pack = _copy_pack(tmp_path)
+    _drop_spectra(pack)
+
+    def boom(*_: Any, **__: Any) -> dict[str, Any]:
+        raise ValueError("track T1: dots ['x'] are not in /dots")
+
+    monkeypatch.setattr(spectrum, "spectra_from_bodies", boom)
+    assert area_spectra.backfill(pack) == (0, 0, 0, 1)
+    assert area_spectra.main(["--root", str(pack)]) == 1
+
+
+def test_a_faint_arm_with_no_flux_and_no_error_gives_no_limit() -> None:
+    t = datetime(2026, 3, 20, tzinfo=UTC)
+    s = spectrum.DotRow("s", 1, 1, 1, t, 1.0, 0.0, 0.0, 0.0, "mover", 0.0, 0.0)
+    lo = spectrum.DotRow("l", 1, 4, 1, t, 3.0, 50.0, 5.0, 10.0, "mover", 0.0, 0.0)
+    sig = {(1, 1): 0.05, (1, 4): 0.05}
+    assert spectrum._pair(s, lo, spectrum.load_sun(), sig, CFG) is None
 
 
 def test_the_committed_pack_is_up_to_date() -> None:
