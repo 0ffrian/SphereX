@@ -10,7 +10,6 @@ Plane coordinates are in degrees (tangent-plane units times 180/pi).
 
 from __future__ import annotations
 
-import collections
 import functools
 import math
 import threading
@@ -284,34 +283,30 @@ class CellGrid:
         return (self.x0 + col * self.cell_deg, self.y0 + row * self.cell_deg)
 
 
-# Grids by (half_w, half_h, cell_arcsec), least recently used first, each with the lock that
-# guards the first build of its centres. A 10 x 10 deg box at 30" holds about 23 MB of centres,
-# so a few sizes at once (two areas served side by side) stay cached without growing unbounded.
-_GRID_MAX = 4
-_GRIDS: collections.OrderedDict[tuple[float, float, float], tuple[CellGrid, threading.Lock]] = (
-    collections.OrderedDict()
-)
-_GRID_LOCK = threading.Lock()  # guards _GRIDS only; never held while centres are built
+# A 10 x 10 deg box at 30" holds about 23 MB of centres, and a box drawn anywhere rarely repeats
+# a size, so only the two areas a run can serve side by side are kept.
+_GRID_MAX = 2
+_GRID_LOCK = threading.Lock()  # guards the lookup only; never held while centres are built
+
+
+@functools.lru_cache(maxsize=_GRID_MAX)
+def _sized_grid(
+    half_w: float, half_h: float, cell_arcsec: float
+) -> tuple[CellGrid, threading.Lock]:
+    """The grid and the lock that guards the first build of its centres."""
+    return CellGrid.sized(half_w, half_h, cell_arcsec), threading.Lock()
 
 
 def cell_grid(box: AreaBox, cell_arcsec: float) -> CellGrid:
     """``CellGrid.of`` built once per box size and cell size, so every step of a run shares one
     grid and its centres (issue #128 (2)). The key is the box's half sizes, not its centre (the
     plane is centred on the box), so two areas of the same size share one grid. The latest
-    ``_GRID_MAX`` sizes are kept, so areas of different sizes run in turn or at once do not
-    evict each other. The global lock covers only the lookup; each grid's own lock makes its
-    centres build once, so a large grid being built never holds up a run on another size."""
-    key = (box.half_w, box.half_h, cell_arcsec)
+    ``_GRID_MAX`` sizes are kept, so two areas of different sizes run in turn or at once do not
+    evict each other. The global lock covers only the lookup (``lru_cache`` alone may call
+    ``_sized_grid`` twice for one key); each grid's own lock makes its centres build once, so a
+    large grid being built never holds up a run on another size."""
     with _GRID_LOCK:
-        got = _GRIDS.get(key)
-        if got is None:
-            got = (CellGrid.sized(*key), threading.Lock())
-            _GRIDS[key] = got
-            while len(_GRIDS) > _GRID_MAX:
-                _GRIDS.popitem(last=False)
-        else:
-            _GRIDS.move_to_end(key)
-    grid, build = got
+        grid, build = _sized_grid(box.half_w, box.half_h, cell_arcsec)
     with build:
         grid.centres()
     return grid

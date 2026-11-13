@@ -193,10 +193,9 @@ def test_a_three_visit_chain_is_fitted_over_all_its_legs() -> None:
     v_ab, u = got
     assert v_ab == pytest.approx((0.5, 0.0), abs=1e-12)
     assert u == pytest.approx(1.7, abs=1e-9)
-    # w for only some legs: the rate window only, so no u from a subset of the legs.
+    # w for only some legs: the legs with w cannot be held to the chain test alone, refused.
     for some in ({1: W3[1], 2: W3[2]}, {2: W3[2], 3: W3[3]}):
-        got = join.chain_fit(legs, some, 0.0034, 1.16, CFG)
-        assert got is not None and got[1] is None
+        assert join.chain_fit(legs, some, 0.0034, 1.16, CFG) is None
     # w for no leg: the rate-window fallback, the chain's line and no u.
     none = join.chain_fit(legs, {}, 0.0034, 1.16, CFG)
     assert none is not None and none[1] is None
@@ -247,15 +246,17 @@ def test_join_reports_the_whole_chain_rate_for_three_visits() -> None:
     assert got.pair_test == "parallax"
 
 
-def test_join_keeps_the_first_pair_fit_when_the_chain_fit_is_refused(
+def test_join_keeps_the_first_pair_rate_when_the_chain_fit_is_refused(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """The pair's rate and PA, but not its ``u`` (2.6016 here): that one is fitted on two of
+    the three legs, so it would mean something else than a chain's."""
     labels, geo, frames = _three_visit_join_inputs()
     monkeypatch.setattr(join, "chain_fit", lambda *_a, **_k: None)
     t = join.join(labels, frames, geo, W3, CFG).tracks[0]
     assert t.status == "track" and len(t.legs) == 3
     assert t.v_ab is not None and math.hypot(*t.v_ab) == pytest.approx(0.45, abs=1e-9)
-    assert t.u == pytest.approx(2.6016, abs=1e-4)
+    assert t.u is None
     assert t.fit == "pair"
 
 
@@ -278,15 +279,15 @@ def test_a_refused_chain_never_serves_a_pair_rate_outside_the_whole_span_window(
     assert t.fit == "none" and t.v_ab is None and t.u is None
 
 
-def test_a_chain_with_w_for_only_some_visits_has_no_u() -> None:
-    """Visit 3 lost its Horizons vector: the chain is fitted on all three legs with the rate
-    window only, so its ``u`` is null like every other track without ``w`` for all its legs,
-    never a ``u`` from a subset of them."""
+def test_a_chain_with_w_for_only_some_visits_keeps_the_first_pair_rate_and_no_u() -> None:
+    """Visit 3 lost its Horizons vector: the chain test cannot run on all three legs, and
+    skipping it for legs 1 and 2 would let through a chain the full test refuses. The track
+    keeps the 1-2 pair's rate, which passed the parallax test, and no ``u``."""
     labels, geo, frames = _three_visit_join_inputs()
     got = join.join(labels, frames, geo, {1: W3[1], 2: W3[2]}, CFG)
     t = got.tracks[0]
-    assert t.status == "track" and len(t.legs) == 3 and t.fit == "chain"
-    assert t.v_ab is not None and math.hypot(*t.v_ab) == pytest.approx(0.5, abs=1e-9)
+    assert t.status == "track" and len(t.legs) == 3 and t.fit == "pair"
+    assert t.v_ab is not None and math.hypot(*t.v_ab) == pytest.approx(0.45, abs=1e-9)
     assert t.u is None
     assert got.pair_test == "rate_window"
 
