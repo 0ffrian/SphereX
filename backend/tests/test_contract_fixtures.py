@@ -20,7 +20,9 @@ from app.api.models import Tag as ApiTag
 from app.contract.area_checks_schema import AreaChecks
 from app.contract.area_dots_schema import AreaDots
 from app.contract.area_index_schema import AreaIndex
+from app.contract.area_job_schema import LiveAreaJob
 from app.contract.area_known_schema import AreaKnown
+from app.contract.area_live_plan_schema import LiveAreaPlan
 from app.contract.area_summary_schema import AreaSummary
 from app.contract.area_tracks_schema import AreaTracks
 from app.contract.object_card_schema import ObjectCard
@@ -77,6 +79,8 @@ MODELS: dict[str, type[BaseModel]] = {
     "area-dots": AreaDots,
     "area-tracks": AreaTracks,
     "area-checks": AreaChecks,
+    "area-job": LiveAreaJob,
+    "area-live-plan": LiveAreaPlan,
     "track-path": TrackPath,
 }
 

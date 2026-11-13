@@ -6,7 +6,7 @@ Status: **agreed plan; A17.1 to A17.5 and A17.7 built** (A17.1 and A17.2 in issu
 
 ## A17 Discovery backend
 
-An **area** pipeline in `backend/app/core/area/`, run offline by `backend/scripts/area_discovery.py`. It never runs inside a web request. Its outputs are `derived.area` cache entries that `backend/app/api/areas.py` serves (A17.8, A17.10).
+An **area** pipeline in `backend/app/core/area/`, run offline by `backend/scripts/area_discovery.py`. It never runs inside a web request. **As built (issue #141, [Q-462](../../decisions/moving-objects.md)):** it also runs in a live-area job (`core/area/live_jobs.py`), one at a time in a worker thread started by `POST /v1/areas/live`; the request only plans (`core/area/live.py`: one SIA cone at the box centre) and never computes the area. Its outputs are `derived.area` cache entries that `backend/app/api/areas.py` serves (A17.8, A17.10).
 
 **Units and symbols.** Pixel `p` = 6.15″. `Δt_v` = the time between the two visits' mid-times (Eros: 1.017 d). `σ_c` = a dot's centroid error in px.
 
