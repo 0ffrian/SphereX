@@ -107,7 +107,9 @@ def create_app(
         app.add_middleware(
             CORSMiddleware,
             allow_origins=s.cors_list,
-            allow_methods=["GET"],
+            # GET, and POST for Track on demand (issue #142); the admin POST stays curl-only
+            # because its X-SX-Admin-Token header is not an allowed header.
+            allow_methods=["GET", "POST"],
             # Let the browser read the D-16 cached_at, the asset status (Q-39) and the
             # combine metadata (Q-50).
             expose_headers=[

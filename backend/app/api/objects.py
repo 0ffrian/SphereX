@@ -22,6 +22,7 @@ import anyio
 import anyio.to_thread
 from fastapi import APIRouter, Depends, Path, Query
 from fastapi.responses import JSONResponse, Response, StreamingResponse
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.api.deps import get_ctx, get_frame_service, get_pipeline, require_object
 from app.api.models import ErrorResponse, Frame, FramesResponse, JobStatus, Provenance, Stretch
@@ -162,7 +163,7 @@ def _time_param(name: str, value: str | None) -> datetime | None:
         return None
     try:
         return parse_utc(value)
-    except ValueError as exc:
+    except (ValueError, OverflowError) as exc:  # OverflowError: year 1 with an offset
         raise ApiError(400, "bad_request", f"'{name}' is not an ISO-8601 time.") from exc
 
 
@@ -293,6 +294,61 @@ def get_job(
     obj = require_object(ctx, object_id)
     job = pipeline.jobs.get(obj.id)
     return JSONResponse(job.snapshot() if job is not None else _idle(obj.id))
+
+
+class TrackRequest(BaseModel):
+    """``POST /v1/objects/{id}/track`` body (issue #142, Q-468): the path search of a mover is
+    limited to ``around`` +- ``days`` (clipped to the target's or the release's windows)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    around: str = Field(max_length=40, description="ISO-8601 time (UTC when no offset)")
+    days: float = Field(
+        default=moving.TRACK_WINDOW_DAYS,
+        gt=0,
+        le=moving.TRACK_WINDOW_MAX_DAYS,
+        description="half-width of the window, in days",
+    )
+
+
+@router.post(
+    "/{object_id}/track",
+    status_code=202,
+    responses={202: {"model": JobStatus}, 400: {"model": ErrorResponse}, **ERRORS},
+)
+def post_track(
+    object_id: ObjectId,
+    body: TrackRequest,
+    ctx: Annotated[Context, Depends(get_ctx)],
+    pipeline: Annotated[ObjectPipeline, Depends(get_pipeline)],
+) -> JSONResponse:
+    """Track on demand (issue #142, Q-468): record the window for the object's path search,
+    then start (or join) the object job, which fills the frames, path, cutouts and spectrum.
+    The reply is the ``/job`` JSON (``JobStatus``) with 202; follow it on ``/job/events``."""
+    obj = require_object(ctx, object_id)
+    if not obj.moving:
+        raise ApiError(404, "not_moving", f"'{object_id}' does not move: it has no path.")
+    if not obj.spkid:
+        raise ApiError(404, "no_ephemeris", f"'{object_id}' has no SPK id: Horizons has no path.")
+    around = _time_param("around", body.around)
+    if around is None:  # not reached: a str parses or raises; narrows the type
+        raise ApiError(400, "bad_request", "'around' is required.")
+    try:
+        window: moving.Window | None = moving.track_window(around, body.days)
+    except OverflowError:  # past year 1 or 9999: outside every search window anyway
+        window = None
+    if window is None or moving.add_track_window(ctx, obj.spkid, window) is None:
+        raise ApiError(
+            400,
+            "track_window_outside",
+            "The window misses every search window of this object (its targets.toml windows "
+            "or the data release).",
+        )
+    # A finished job is not reused: it may have searched other windows. A running one is
+    # joined (ASSUMPTION, Q-468): when it ends, the caller reads Track, and posts again if the
+    # frames are not the new window's yet.
+    job = pipeline.ensure_job(obj, restart_finished=True)
+    return JSONResponse(job.snapshot(), status_code=202)
 
 
 @router.get(

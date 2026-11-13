@@ -1,6 +1,6 @@
 # 23 Track: components and sequences
 
-Track of [A19](../architecture/moving-objects/track.md) (data and backend, with [A19.9 to A19.15](../architecture/moving-objects/track-contract.md)) and [A20](../architecture/moving-objects/track-ui.md) (the screen): one known solar-system object, its path seen from SPHEREx, the SPHEREx frames that caught it, a north-up zoom with stars masked and a spectrum built exposure by exposure (Q-131, Q-134 to Q-145). Three diagrams: components, opening Track (with the object job filling the path), and moving the time slider. Drawn 9 Nov 2026 from the spec; PR #53 (merged 10 Nov) built the frame search, everything else is to build. Items marked "proposed" wait on a decision (Q-178 to Q-187 in the spec).
+Track of [A19](../architecture/moving-objects/track.md) (data and backend, with [A19.9 to A19.15](../architecture/moving-objects/track-contract.md)) and [A20](../architecture/moving-objects/track-ui.md) (the screen): one known solar-system object, its path seen from SPHEREx, the SPHEREx frames that caught it, a north-up zoom with stars masked and a spectrum built exposure by exposure (Q-131, Q-134 to Q-145). Four diagrams: components, opening Track (with the object job filling the path), Track on demand (issue #142) and moving the time slider. Drawn 9 Nov 2026 from the spec; PR #53 (merged 10 Nov) built the frame search, everything else is to build. Items marked "proposed" wait on a decision (Q-178 to Q-187 in the spec).
 
 ## Components
 
@@ -96,6 +96,33 @@ sequenceDiagram
   API-->>ST: star masks, footprints, 14 points on Eros (13 flagged OUTLIER)
   ST-->>SH: panels ready, Track layer draws the path, camera fits it
   Note over ST,API: Offline and not pre-fetched: path:not_cached, the pane says so
+```
+
+## Track on demand (issue #142, Q-468)
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant FE as Frontend (Known card, Track it)
+  participant API as Backend API
+  participant C as Cache (derived.track_window)
+  participant J as Object job (Q-111)
+  participant H as Horizons and IRSA
+  FE->>API: POST /v1/objects/id/track {around: visit time, days: 3}
+  alt unknown, not moving, no SPK id, bad body or window outside
+    API-->>FE: 400 or 404 error, nothing stored, no job
+  else
+    API->>C: add the window (union, clipped to moving_windows or the release)
+    API->>J: start the job (a running one is joined)
+    API-->>FE: 202, the /job JSON
+    J->>H: path, cones and TLIST inside the window only, cutouts
+    J->>J: Stage 2 spectrum stored (also for a saved card)
+    loop until state done
+      FE->>API: GET /job/events
+      API-->>FE: stage, frames n of N
+    end
+    FE->>API: GET frames, path, spectrum (as in Opening Track)
+  end
 ```
 
 ## Moving the time slider

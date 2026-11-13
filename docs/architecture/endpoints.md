@@ -1,6 +1,6 @@
 # Endpoint register
 
-> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A4.11 · **Implements:** [D-16](../decisions/contract.md), [D-25, Q-328](../decisions/data-sources.md), [Q-39](../decisions/contract.md), [Q-50](../decisions/data-sources.md), [Q-87](../decisions/sky-shell.md), [Q-92](../decisions/data-sources.md), [Q-98](../decisions/sky-shell.md), [Q-111](../decisions/pipeline-jobs.md), [Q-122](../decisions/gemini.md), [Q-141](../decisions/moving-objects.md), [Q-145](../decisions/moving-objects.md), [Q-146](../decisions/moving-objects.md), [Q-164](../decisions/demo-pack.md), [Q-195](../decisions/contract.md) · **Read with:** [refusals.md](refusals.md) (A4.12), [../../backend/README.md](../../backend/README.md#endpoints-d-16) (response shapes)
+> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A4.11 · **Implements:** [D-16](../decisions/contract.md), [D-25, Q-328](../decisions/data-sources.md), [Q-39](../decisions/contract.md), [Q-50](../decisions/data-sources.md), [Q-87](../decisions/sky-shell.md), [Q-92](../decisions/data-sources.md), [Q-98](../decisions/sky-shell.md), [Q-111](../decisions/pipeline-jobs.md), [Q-122](../decisions/gemini.md), [Q-141](../decisions/moving-objects.md), [Q-145](../decisions/moving-objects.md), [Q-146](../decisions/moving-objects.md), [Q-164](../decisions/demo-pack.md), [Q-195](../decisions/contract.md), [Q-468](../decisions/moving-objects.md) · **Read with:** [refusals.md](refusals.md) (A4.12), [../../backend/README.md](../../backend/README.md#endpoints-d-16) (response shapes)
 
 ### A4.11 Endpoint register
 
@@ -19,6 +19,7 @@ Every HTTP route the backend serves or is planned to serve, in one list. D-16 de
 | `GET /v1/objects/{id}/render-params` | RenderParams (R3.4) | D-16 | [A4.7](pipeline-card.md#a47-stage-7-renderparams) |
 | `GET /v1/objects/{id}/job` | the object job's state | Q-111 (open) | [A4.10](jobs.md#a410-object-job-and-fan-out) |
 | `GET /v1/objects/{id}/job/events` | the same, as server-sent events | Q-111 (open) | [A4.10](jobs.md#a410-object-job-and-fan-out) |
+| `POST /v1/objects/{id}/track` | Track on demand: body `{around, days}` limits a mover's path search to `around` +- `days` (default 3, at most 15) and starts the object job; reply 202 with the `/job` JSON; errors 400 `bad_request`, 400 `track_window_outside`, 404 `not_moving`, 404 `no_ephemeris`; built (issue #142), beyond D-16 | Q-468 (proposed) | A19.3 ([moving-objects/track.md](moving-objects/track.md#a193-frame-list)), [A4.10](jobs.md#a410-object-job-and-fan-out) |
 | `GET /v1/objects/{id}/overlays` | Gaia and CatWISE markers, contamination, footprint, star masks for movers (A19.6) | Q-50 (open) | [A4.9](overlays.md#a49-overlays-flag-mask-and-combine) |
 | `GET /v1/objects/{id}/flags/{frame_id}.png` | flag mask PNG | Q-50 (open) | [A4.9](overlays.md#a49-overlays-flag-mask-and-combine) |
 | `GET /v1/objects/{id}/combine.png?op=add\|sub&a=&b=` | A ± B on frame A's grid | Q-50, Q-54 (open) | [A4.9](overlays.md#a49-overlays-flag-mask-and-combine) |
@@ -46,7 +47,7 @@ Every HTTP route the backend serves or is planned to serve, in one list. D-16 de
 **Rules shared by every route.**
 
 - Every object route is keyed by the id `resolve` returns (D-16). Times are ISO-8601 UTC with a trailing `Z`.
-- Only `GET` is allowed through CORS (`SX_CORS_ORIGINS`), so the admin `POST` is for `curl` only.
+- Only `GET` and `POST` are allowed through CORS (`SX_CORS_ORIGINS`); `POST` for Track on demand (Q-468). The admin `POST` stays `curl` only, because its `X-SX-Admin-Token` header is not an allowed header.
 - JSON replies served from the cache carry `cached_at` (D-25). For the card and RenderParams, whose schema forbids extra fields, it is the `X-SX-Cached-At` header (Q-39).
 - **Error envelope:** `{"error": <code>, "detail": <sentence>}` with a 4xx or 5xx status (`backend/app/errors.py`). A refusal of one value or layer is never an error: it is a 200 with the code in `missing` ([A4.12](refusals.md#a412-missing-and-refusal-codes)).
 
@@ -60,7 +61,9 @@ Every HTTP route the backend serves or is planned to serve, in one list. D-16 de
   | 404 | `flags_unavailable` | a cutout with no usable FLAGS mask (permanent) |
   | 404 | `albedo_ai_unavailable` | no applied, current AI albedo |
   | 400 | `path_span_too_long` | `/path` with a `start`–`end` span over `SX_PATH_MAX_SPAN_DAYS` (A19.5) |
-  | 404 | `not_moving` | `/path` for an id with `moving = false` (A19.5) |
+  | 404 | `not_moving` | `/path` or `POST /track` for an id with `moving = false` (A19.5, Q-468) |
+  | 404 | `no_ephemeris` | `POST /track` for a mover without an SPK id: Horizons has no path (Q-468) |
+  | 400 | `track_window_outside` | `POST /track` with a window that misses every search window of the object (its `moving_windows` or the release window); nothing is stored (Q-468) |
   | 503 | `offline_cache_miss` | `SX_OFFLINE=1` and the call is not in the cache (D-25) |
   | 503 | `upstream_unavailable` | an external service failed after retries and no older cache entry exists |
   | 503 | `cutout_unavailable` | a cutout that cannot be fetched or read |
