@@ -65,3 +65,27 @@ describe('minimise the object panel into the island', () => {
     expect(s().minimised).toBe(false);
   });
 });
+
+describe('minimise the build view into the island (Q-457)', () => {
+  const s = () => useShellStore.getState();
+  it('only applies to an open build, and building, closing or choosing a tool clears it', () => {
+    s().setBuildMinimised(true);
+    expect(s().buildMinimised).toBe(false); // no build open: nothing to minimise
+    s().openBuild(false);
+    s().setBuildMinimised(true);
+    expect(s().buildMinimised).toBe(true);
+    s().openBuild(true);
+    expect(s().buildMinimised).toBe(false);
+    s().setBuildMinimised(true);
+    s().closeBuild();
+    expect(s().buildMinimised).toBe(false);
+    s().openBuild(false);
+    s().setBuildMinimised(true);
+    s().setTool('flipbook');
+    expect(s().buildMinimised).toBe(false);
+    // The rail's 3D viewer then opens the build fresh, never already minimised.
+    s().setTool('viewer');
+    expect(s().build.open).toBe(true);
+    expect(s().buildMinimised).toBe(false);
+  });
+});

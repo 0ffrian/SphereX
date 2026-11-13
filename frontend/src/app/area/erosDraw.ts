@@ -173,6 +173,8 @@ export interface TrackState {
   step: number;
   sel: number;
   disc: DiscoveryResult | null;
+  /** The object's name for the marker's label (default "Eros", the demo's). */
+  name?: string;
 }
 
 const label = (g: CanvasRenderingContext2D, text: string, x: number, y: number, colour: string, font: string) => {
@@ -301,7 +303,7 @@ export function drawTrackWindow(
     for (const p of T) {
       if (isoToMjd(p.t) > now) break;
       const [x, y] = P(p.px);
-      if (started) g.lineTo(x, y);
+      if (started && !p.gap) g.lineTo(x, y);
       else g.moveTo(x, y);
       started = true;
     }
@@ -321,15 +323,22 @@ export function drawTrackWindow(
     for (const p of T) {
       if (isoToMjd(p.t) <= now) continue;
       const [x, y] = P(p.px);
-      g.lineTo(x, y);
+      if (p.gap) g.moveTo(x, y);
+      else g.lineTo(x, y);
     }
     g.stroke();
     g.setLineDash([]);
     g.globalAlpha = 1;
+    // One dot and label per 6-hour mark, whatever the sampling step: the demo track is hourly, the
+    // real `/path` samples every SX_MOVING_EPHEM_STEP_MIN (10 min by default), so a mark's hour holds
+    // several samples and only its first is labelled.
+    let lastHour = Number.NaN;
     for (const p of T) {
       const m = isoToMjd(p.t);
       const hr = mjdHour(m);
-      if (hr % 6) continue;
+      const hourIndex = Math.floor(Date.parse(p.t) / 3_600_000);
+      if (hr % 6 || hourIndex === lastHour) continue;
+      lastHour = hourIndex;
       const [x, y] = P(p.px);
       g.fillStyle = phys;
       g.beginPath();
@@ -350,7 +359,7 @@ export function drawTrackWindow(
     g.stroke();
     g.globalAlpha = 1;
     g.font = '600 12px Inter, system-ui, sans-serif';
-    const lab = `Eros · ${mjdHM(now)} UTC`;
+    const lab = `${st.name ?? 'Eros'} · ${mjdHM(now)} UTC`;
     const lw = g.measureText(lab).width + 12;
     g.fillStyle = tok('--bg', '#08090b');
     g.globalAlpha = 0.85;

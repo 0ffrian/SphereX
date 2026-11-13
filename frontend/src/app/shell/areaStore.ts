@@ -2,9 +2,10 @@
 // on the sky (any aspect), which flow started it and where that flow is. It is kept in sky coordinates
 // (two opposite corners), so it stays on the same patch of sky while the view moves.
 //
-// Known objects read the real `/v1/areas` (issue #130, Q-455); Discovery and the cutouts, mask and
-// brightness of the Eros card are still the demo of app/area/areaService.ts, marked `demo: true` or
-// shown under the Demo tag.
+// The results come from app/area/areaService.ts: a prepared area's precomputed replies when one holds
+// the square (Q-205), else the demo, which is marked `demo: true` and is not a search of the area.
+// Track it on a known object reads its `/frames` and `/path` (issue #130, Q-455); the Eros card's
+// cutouts, mask and brightness stay the demo's, under the Demo tag.
 import { create } from 'zustand';
 import { ApiError } from '@/app/api/errors';
 import {
@@ -71,6 +72,8 @@ export function refusalOf(e: unknown): AreaRefusal {
 
 /** The backend's id of 433 Eros, whose frames the demo file holds (issue #130). */
 export const DEMO_OBJECT_ID = 'sbdb-20000433';
+/** `/path` codes that mean "not ready yet, ask again" rather than "no path" (A19.5). */
+const PATH_PENDING: readonly string[] = ['path:deferred', 'path:frames_incomplete'];
 
 export interface AreaState {
   /** Which dock tool started this (the dock highlight follows it). */
@@ -94,6 +97,8 @@ export interface AreaState {
   trackSource: 'real' | 'demo';
   /** True when the real `/path` was read, so the sky path is the Horizons path. */
   trackPath: boolean;
+  /** True when `/path` answered "not ready yet" (`path:deferred`, `path:frames_incomplete`, A19.5). */
+  pathPending: boolean;
   /** Set when the area has no answer; the cards say so and draw nothing. */
   refusal: AreaRefusal | null;
   /** The demo file could not be loaded. */
@@ -103,6 +108,8 @@ export interface AreaState {
   running: boolean;
   /** The mover whose card is open (or ringed on the sky), -1 for none. */
   sel: number;
+  /** A prepared area's visit whose dots are drawn (null: the first visit). */
+  visit: number | null;
   /** Eros exposure shown (an index into the detector-filtered list) and the player's state. */
   index: number;
   playing: boolean;
@@ -124,6 +131,7 @@ export interface AreaState {
   openMover(i: number): void;
   setMinimised(on: boolean): void;
   setIndex(i: number): void;
+  setVisit(visit: number | null): void;
   setPlaying(on: boolean): void;
   setDet(det: number | null): void;
   toggleOv(k: keyof ErosOverlays): void;
@@ -168,6 +176,7 @@ const FRESH = {
   step: -1,
   running: false,
   sel: -1,
+  visit: null as number | null,
   index: 0,
   playing: false,
   det: null,
@@ -199,18 +208,20 @@ export const useAreaStore = create<AreaState>()((set, get) => {
         const eros = mergeReal(demo, real.frames, real.path);
         if (eros.hops.length === 0) throw new ApiError('bad_response', 'No frames for this object.');
         // A path reply with no points (`path:not_cached`) is no path: nothing is drawn or claimed.
-        set({ eros, erosFailed: false, trackSource: 'real', trackPath: (real.path?.points.length ?? 0) > 0 });
+        const hasPath = (real.path?.points.length ?? 0) > 0;
+        const pending = !hasPath && (real.path?.missing ?? []).some((c) => PATH_PENDING.includes(c));
+        set({ eros, erosFailed: false, trackSource: 'real', trackPath: hasPath, pathPending: pending });
         return eros;
       } catch (e) {
         if (ctl.signal.aborted || (e instanceof ApiError && e.kind === 'aborted')) return demo;
         // Never blank: 433 Eros falls back to the demo file (Demo tag); another object has no demo.
         if (obj.objectId !== DEMO_OBJECT_ID) {
-          set({ eros: null, erosFailed: true, trackSource: 'demo', trackPath: false });
+          set({ eros: null, erosFailed: true, trackSource: 'demo', trackPath: false, pathPending: false });
           return null;
         }
       }
     }
-    set({ eros: demo, erosFailed: demo === null, trackSource: 'demo', trackPath: false });
+    set({ eros: demo, erosFailed: demo === null, trackSource: 'demo', trackPath: false, pathPending: false });
     return demo;
   };
   const startRun = () => {
@@ -255,7 +266,7 @@ export const useAreaStore = create<AreaState>()((set, get) => {
           }
           const res = a.res;
           const n = res.objects.length;
-          const names = res.objects.map((o) => `${o.id} ${o.name}`.trim()).join(', ');
+          const names = res.objects.map((o) => [o.id, o.name].filter(Boolean).join(' ')).join(', ');
           set({
             say: {
               kind: 'found',
@@ -283,6 +294,7 @@ export const useAreaStore = create<AreaState>()((set, get) => {
     focus: null,
     trackSource: 'demo',
     trackPath: false,
+    pathPending: false,
     refusal: null,
     erosFailed: false,
     fitSeq: 0,
@@ -317,6 +329,7 @@ export const useAreaStore = create<AreaState>()((set, get) => {
         eros: obj ? null : s.eros,
         trackSource: 'demo',
         trackPath: false,
+        pathPending: false,
         erosFailed: false,
       }));
       void loadEros(obj);
@@ -352,6 +365,7 @@ export const useAreaStore = create<AreaState>()((set, get) => {
       const n = erosList(get().eros, get().det).length;
       if (n > 0) set({ index: Math.min(n - 1, Math.max(0, i)) });
     },
+    setVisit: (visit) => set({ visit }),
     setPlaying: (playing) => set({ playing }),
     setDet: (det) => {
       const s = get();
@@ -369,17 +383,22 @@ export const useAreaStore = create<AreaState>()((set, get) => {
 });
 
 /** What the island's pill calls the open card while it is minimised. */
-export function areaMiniTitle(s: Pick<AreaState, 'screen' | 'sel' | 'disc' | 'focus' | 'known' | 'trackSource'>): string {
+export function areaMiniTitle(
+  s: Pick<AreaState, 'screen' | 'sel' | 'disc' | 'known'> &
+    Partial<Pick<AreaState, 'focus' | 'trackSource'>>,
+): string {
   if (s.screen === 'eros') {
-    const name = s.focus ? `${s.focus.id} ${s.focus.name}`.trim() : '433 Eros';
+    const name = s.focus ? [s.focus.id, s.focus.name].filter(Boolean).join(' ') : '433 Eros';
     return s.trackSource === 'real' ? name : `${name} (demo)`;
   }
+  // Only an answer known to be the demo says "(demo)"; a prepared area's, one still loading or a
+  // refused one do not.
+  const tag = (s.screen === 'list' ? s.known?.demo : s.disc?.demo) === true ? ' (demo)' : '';
   if (s.screen === 'mover') {
     const m = s.disc?.movers[s.sel];
-    return m ? `${m.known ? `${m.id} · ${m.known}` : m.id} (demo)` : 'Discovery';
+    return m ? `${m.known ? `${m.id} · ${m.known}` : m.id}${tag}` : 'Discovery';
   }
-  if (s.screen === 'list') return s.known && !s.known.demo ? 'Known objects' : 'Known objects (demo)';
-  return 'Discovery (demo)';
+  return s.screen === 'list' ? `Known objects${tag}` : `Discovery${tag}`;
 }
 
 /** The Eros exposure on show, or null. */
@@ -389,8 +408,12 @@ export function currentHop(s: Pick<AreaState, 'eros' | 'det' | 'index'>): ErosHo
 }
 
 /** True while the top-left player drives the Eros exposures (the Eros card is open). */
-export function demoPlayerOn(s: Pick<AreaState, 'screen' | 'sel' | 'eros'>): boolean {
-  return s.eros !== null && (s.screen === 'eros' || (s.screen === 'mover' && s.sel === 0));
+export function demoPlayerOn(s: Pick<AreaState, 'screen' | 'sel' | 'eros' | 'disc'>): boolean {
+  // Mover T1 is Eros only in the demo; a prepared area's movers have no demo frames.
+  return (
+    s.eros !== null &&
+    (s.screen === 'eros' || (s.screen === 'mover' && s.sel === 0 && !s.disc?.real))
+  );
 }
 
 /** One length: "3.2°", "42′" (arcminutes under one degree) or "30″". */

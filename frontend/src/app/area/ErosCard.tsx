@@ -15,7 +15,11 @@ import { wavelengthColor } from '@/app/flipbook/wavelengthColor';
 import type { ErosDemo, ErosHop } from './areaService';
 import { ProvenanceBadge } from '@/app/Badge';
 import { DEMO_CUTOUT_NOTE, DemoTag } from './DemoTag';
+import { HearTheShift } from '@/app/sound/HearTheShift';
 import { drawCutout } from './erosDraw';
+import { useAppStore } from '@/state/store';
+import { effectiveHonesty } from '@/viewer/honesty';
+import { MEASURED_ONLY_NOTE } from './KnownPositionsLayer';
 import { DETECTORS, detectorIndex, detectorsWithFrames, mjdDay, mjdHM, mjdYear } from './erosModel';
 
 const OVERLAYS: { key: keyof ErosOverlays; label: string }[] = [
@@ -24,6 +28,14 @@ const OVERLAYS: { key: keyof ErosOverlays; label: string }[] = [
   { key: 'path', label: 'Path' },
   { key: 'flags', label: 'Flagged pixels' },
 ];
+
+/** The cutout's Horizons overlays (predicted position, path): Estimated, hidden in "Measured only". */
+const ESTIMATED_OVERLAYS: ReadonlySet<keyof ErosOverlays> = new Set(['pred', 'path']);
+
+/** True in "Measured only" (D-21): every Estimated path and overlay is hidden. */
+function useMeasuredOnly(): boolean {
+  return useAppStore((s) => effectiveHonesty(s.honesty) === 'measured');
+}
 
 function Tabs({ title, back }: { title: string; back?: () => void }) {
   const setMinimised = useAreaStore((s) => s.setMinimised);
@@ -76,15 +88,17 @@ function Tabs({ title, back }: { title: string; back?: () => void }) {
 function Cutout({ hop }: { hop: ErosHop }) {
   const ref = useRef<HTMLCanvasElement>(null);
   const ov = useAreaStore((s) => s.ov);
+  const measured = useMeasuredOnly();
   useEffect(() => {
     const c = ref.current;
     if (!c) return;
     const draw = () => {
-      const alt = drawCutout(c, hop, useAreaStore.getState().ov, draw);
+      const cur = useAreaStore.getState().ov;
+      const alt = drawCutout(c, hop, measured ? { ...cur, pred: false, path: false } : cur, draw);
       c.setAttribute('aria-label', alt);
     };
     draw();
-  }, [hop, ov]);
+  }, [hop, ov, measured]);
   return <canvas ref={ref} className="sx-kn-canvas" role="img" aria-label="SPHEREx cutout" data-testid="eros-cutout" />;
 }
 
@@ -179,14 +193,20 @@ function Detectors({ eros, name }: { eros: ErosDemo; name: string }) {
 function CheckGroup({ disabled }: { disabled?: boolean }) {
   const ov = useAreaStore((s) => s.ov);
   const toggle = useAreaStore((s) => s.toggleOv);
+  const measured = useMeasuredOnly();
+  const off = (k: keyof ErosOverlays) => !!disabled || (measured && ESTIMATED_OVERLAYS.has(k));
   return (
     <div className="sx-kn-opts" role="group" aria-label="Show on the image" data-off={disabled ? '' : undefined}>
       {OVERLAYS.map((o) => (
-        <label key={o.key} className="sx-kn-opt">
+        <label
+          key={o.key}
+          className="sx-kn-opt"
+          title={!disabled && off(o.key) ? `${MEASURED_ONLY_NOTE}: hidden in Measured only` : undefined}
+        >
           <input
             type="checkbox"
-            checked={disabled ? false : ov[o.key]}
-            disabled={disabled}
+            checked={off(o.key) ? false : ov[o.key]}
+            disabled={off(o.key)}
             onChange={() => toggle(o.key)}
             data-testid={`eros-ov-${o.key}`}
           />
@@ -225,6 +245,8 @@ export function ErosCard({ title: given, back }: { title?: string; back?: () => 
   const focus = useAreaStore((s) => s.focus);
   const real = useAreaStore((s) => s.trackSource === 'real');
   const hasPath = useAreaStore((s) => s.trackPath);
+  const pathPending = useAreaStore((s) => s.pathPending);
+  const measured = useMeasuredOnly();
   const title = given ?? (focus ? `${focus.id} ${focus.name}`.trim() : '433 Eros');
   const eros = useAreaStore((s) => s.eros);
   const failed = useAreaStore((s) => s.erosFailed);
@@ -284,13 +306,28 @@ export function ErosCard({ title: given, back }: { title?: string; back?: () => 
             </dl>
             {real && (
               <p className="fb-muted sx-kn-real" data-testid="eros-real">
-                <ProvenanceBadge
-                  tag="model_dependent"
-                  tooltip="Estimated: the path is a JPL Horizons prediction seen from SPHEREx, not a measurement."
-                  srText
-                  variant="tag"
-                />
-                {` ${eros?.hops.length ?? 0} frames from the backend${hasPath ? ', path from Horizons' : ', no path for this object'}`}
+                {`${eros?.hops.length ?? 0} frames from the backend`}
+              </p>
+            )}
+            {(real || measured) && (
+              <p className="fb-muted sx-kn-real" role="status" data-testid="eros-path">
+                {measured ? (
+                  `${MEASURED_ONLY_NOTE}: the path is hidden in Measured only`
+                ) : hasPath ? (
+                  <>
+                    <ProvenanceBadge
+                      tag="model_dependent"
+                      tooltip="Estimated: the path is a JPL Horizons prediction seen from SPHEREx, not a measurement."
+                      srText
+                      variant="tag"
+                    />
+                    {' Path from Horizons'}
+                  </>
+                ) : pathPending ? (
+                  'The path is still being prepared. Open the card again shortly.'
+                ) : (
+                  'No path for this object'
+                )}
               </p>
             )}
             {known && (
@@ -301,6 +338,7 @@ export function ErosCard({ title: given, back }: { title?: string; back?: () => 
               </div>
             )}
             <CheckGroup />
+            <HearTheShift />
             <div className="sx-kn-spec">
               <div className="sx-kn-spec-h">
                 <span className="sx-kn-spec-t">

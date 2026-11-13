@@ -8,7 +8,8 @@ import { registerAreaView } from '@/app/sky/areaDraw';
 import { useAreaStore } from '@/app/shell/areaStore';
 import { useShellStore } from '@/app/shell/shellStore';
 import { useAppStore } from '@/state/store';
-import { mapKnown } from './areaService';
+import type { AreaIndexEntry } from '@/contract';
+import { knownRow, type KnownObjectsResult } from './areaService';
 import { KnownList, NO_TRACK_NOTE } from './KnownList';
 import { distinctTimes, KnownPositionsLayer, knownPositionsVisible, MEASURED_ONLY_NOTE } from './KnownPositionsLayer';
 
@@ -19,7 +20,16 @@ declare global {
 const KNOWN = parseAreaKnown(
   JSON.parse(readFileSync(`${process.cwd()}/../shared/fixtures/area/known.json`, 'utf8')),
 );
-const RESULT = mapKnown('fixture:area-main', KNOWN, false);
+const RESULT: KnownObjectsResult = {
+  demo: false,
+  real: {
+    entry: { area_id: 'fixture:area-main', data_release: 'qr2' } as AreaIndexEntry,
+    known: KNOWN,
+    missing: [...KNOWN.missing],
+    synthetic: false,
+  },
+  objects: KNOWN.known.map(knownRow),
+};
 
 let host: HTMLDivElement;
 let root: Root;
@@ -48,12 +58,13 @@ describe('KnownList rows (A18.5)', () => {
     expect(rows[0]!.dataset.track).toBe('yes');
     expect(rows[0]!.textContent).toContain('Track it');
     expect(rows[0]!.textContent).toContain(`${KNOWN.known[0]!.n_frames} frames in ${KNOWN.known[0]!.n_visits} visits`);
-    expect(rows[0]!.textContent).toContain('SkyBoT answered');
     expect(rows[0]!.querySelector('[data-testid="provenance-badge"]')?.getAttribute('data-tag')).toBe('model_dependent');
     expect(rows[1]!.dataset.track).toBe('no');
     expect(rows[1]!.textContent).toContain('Open');
     expect(rows[1]!.textContent).toContain(NO_TRACK_NOTE);
     expect(host.querySelector('[data-testid="demo-tag"]')).toBeNull();
+    // SkyBoT answers per visit of the area, so the date is the card's, said once.
+    expect(host.querySelector('[data-testid="known-skybot"]')?.textContent).toContain('SkyBoT last answered');
   });
   it('Track it opens the Eros card for that object', async () => {
     const open = vi.spyOn(useAreaStore.getState(), 'openEros').mockImplementation(() => {});
@@ -73,11 +84,11 @@ describe('KnownList rows (A18.5)', () => {
     expect(skySearch).toHaveBeenCalledWith({ q: KNOWN.known[1]!.designation, kind: 'name', origin: 'sky' });
   });
   it('lists skybot and horizons codes of `missing` as plain lines', async () => {
-    useAreaStore.setState({ known: { ...RESULT, missing: ['skybot:2', 'horizons:433 Eros'] } });
+    useAreaStore.setState({ known: { ...RESULT, real: { ...RESULT.real!, missing: ['skybot:2', 'horizons:433 Eros'] } } });
     await act(async () => root.render(<KnownList />));
-    const notes = host.querySelector('[data-testid="known-missing"]')!;
-    expect(notes.textContent).toContain('SkyBoT did not answer for visit 2');
-    expect(notes.textContent).toContain('Horizons gave no positions for 433 Eros');
+    const notes = host.querySelector('[data-testid="area-missing"]')!;
+    expect(notes.textContent).toContain('SkyBoT) has no answer for visit 2');
+    expect(notes.textContent).toContain('No predicted path for 433 Eros');
   });
   it('a refusal replaces the list', async () => {
     useAreaStore.setState({ known: null, refusal: { code: 'area:not_prepared', message: 'No prepared data for this area yet.' } });
@@ -87,7 +98,7 @@ describe('KnownList rows (A18.5)', () => {
   });
   it('the fallback demo row wears the Demo tag', async () => {
     useAreaStore.setState({
-      known: { demo: true, objects: [{ id: '433', name: 'Eros', kind: 'asteroid', frames: 16, visits: 2, trackAvailable: true }] },
+      known: { demo: true, real: null, objects: [{ id: '433', name: 'Eros', kind: 'asteroid', frames: 16, visits: 2, trackAvailable: true }] },
     });
     await act(async () => root.render(<KnownList />));
     expect(host.querySelector('[data-testid="demo-tag"]')).not.toBeNull();

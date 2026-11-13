@@ -11,7 +11,16 @@ import {
   FIXTURE_HEADER,
 } from './config';
 import { ApiError } from './errors';
-import type { AreaIndex, AreaKnown, ObjectCard, RenderParams, TrackPath } from '@/contract';
+import type {
+  AreaDots,
+  AreaIndex,
+  AreaKnown,
+  AreaSummary,
+  AreaTracks,
+  ObjectCard,
+  RenderParams,
+  TrackPath,
+} from '@/contract';
 import type {
   CombineInfo,
   CombineOp,
@@ -25,8 +34,11 @@ import type {
 } from './types';
 import {
   parseApiError,
+  parseAreaDots,
   parseAreaIndex,
   parseAreaKnown,
+  parseAreaSummary,
+  parseAreaTracks,
   parseTrackPath,
   parseCombineInfo,
   parseComposite,
@@ -70,12 +82,6 @@ export interface ApiClient {
   card(id: string, signal?: AbortSignal): Promise<ApiResult<ObjectCard>>;
   /** `GET /v1/objects/{id}/render-params` (D-16): what the 3D view may draw (issue #60). */
   renderParams(id: string, signal?: AbortSignal): Promise<ApiResult<RenderParams>>;
-  /** `GET /v1/areas` (A17.8, issue #130): the prepared areas. */
-  areas(signal?: AbortSignal): Promise<ApiResult<AreaIndex>>;
-  /** `GET /v1/areas/{id}/known` (A17.8, issue #130). */
-  areaKnown(areaId: string, signal?: AbortSignal): Promise<ApiResult<AreaKnown>>;
-  /** `GET /v1/objects/{id}/path` (A19.5, issue #130): the Horizons path seen from SPHEREx. */
-  path(id: string, signal?: AbortSignal): Promise<ApiResult<TrackPath>>;
   /** `GET /v1/objects/{id}/overlays` (issue #12). */
   getOverlays(id: string, signal?: AbortSignal): Promise<ApiResult<OverlaysResponse>>;
   /** `GET /v1/objects/{id}/combine.png?op=&a=&b=` (issue #12). The caller owns the object URL. */
@@ -86,6 +92,18 @@ export interface ApiClient {
     b: string,
     signal?: AbortSignal,
   ): Promise<ApiResult<CombineResult>>;
+  /** Area search (A17.8; issue #96): `GET /v1/areas`, the prepared areas. */
+  areaIndex(signal?: AbortSignal): Promise<ApiResult<AreaIndex>>;
+  /** `GET /v1/areas/{area_id}`: the area's box, frames and step counts. */
+  area(id: string, signal?: AbortSignal): Promise<ApiResult<AreaSummary>>;
+  /** `GET /v1/areas/{area_id}/dots`. */
+  areaDots(id: string, signal?: AbortSignal): Promise<ApiResult<AreaDots>>;
+  /** `GET /v1/areas/{area_id}/tracks`. */
+  areaTracks(id: string, signal?: AbortSignal): Promise<ApiResult<AreaTracks>>;
+  /** `GET /v1/areas/{area_id}/known` (P9's Known card). */
+  areaKnown(id: string, signal?: AbortSignal): Promise<ApiResult<AreaKnown>>;
+  /** `GET /v1/objects/{id}/path` (A19.5, issue #130): the Horizons path seen from SPHEREx. */
+  path(id: string, signal?: AbortSignal): Promise<ApiResult<TrackPath>>;
 }
 
 export interface ApiClientOptions {
@@ -216,6 +234,7 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
   }
 
   const objectPath = (id: string) => `/objects/${encodeURIComponent(id)}`;
+  const areaPath = (id: string) => `/areas/${encodeURIComponent(id)}`;
 
   return {
     // Issue #102 (Q-451): only resolve uses the quick timeout. Offline, `/card` waits for the
@@ -230,11 +249,13 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
     card: (id, signal) => getJson(`${objectPath(id)}/card`, parseObjectCard, signal),
     renderParams: (id, signal) =>
       getJson(`${objectPath(id)}/render-params`, parseRenderParams, signal),
-    areas: (signal) => getJson('/areas', parseAreaIndex, signal),
-    areaKnown: (areaId, signal) =>
-      getJson(`/areas/${encodeURIComponent(areaId)}/known`, parseAreaKnown, signal),
-    path: (id, signal) => getJson(`${objectPath(id)}/path`, parseTrackPath, signal),
     getOverlays: (id, signal) => getJson(`${objectPath(id)}/overlays`, parseOverlays, signal),
+    areaIndex: (signal) => getJson('/areas', parseAreaIndex, signal),
+    area: (id, signal) => getJson(areaPath(id), parseAreaSummary, signal),
+    areaDots: (id, signal) => getJson(`${areaPath(id)}/dots`, parseAreaDots, signal),
+    areaTracks: (id, signal) => getJson(`${areaPath(id)}/tracks`, parseAreaTracks, signal),
+    areaKnown: (id, signal) => getJson(`${areaPath(id)}/known`, parseAreaKnown, signal),
+    path: (id, signal) => getJson(`${objectPath(id)}/path`, parseTrackPath, signal),
     getCombine: (id, op, a, b, signal) => {
       const query = new URLSearchParams({ op, a, b }).toString();
       return request(

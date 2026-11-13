@@ -1,30 +1,35 @@
 // The area search service seam (Known objects and Discovery, the dock's two square tools).
 //
-// DUMMY DATA. The area search backend is not built, so every function here returns a fixed,
-// clearly marked demo answer (`demo: true`) and never queries anything. The demo answers only when
+// REAL DATA FIRST (issue #96, Q-205: precomputed results). The drawn square is snapped to a prepared
+// area of `GET /v1/areas`; when one holds it, its stored replies are read and shown as they are
+// (realArea.ts), tagged "Precomputed" and, for synthetic fixtures, "Test data".
+//
+// DEMO FALLBACK. When no prepared area holds the square (or there is no backend), the functions
+// return the fixed, clearly marked demo answer (`demo: true`). The demo answers only when
 // the drawn area overlaps the prepared Eros area (the sky image of public/demo/eros/eros.json);
 // anywhere else it refuses with `area:not_prepared` (Q-414). Eros's frames and path are real
 // SPHEREx demo data (extracted from mockup/chase-the-rock.html); where they sit in the drawn
 // square, the dots, the counts and the two other movers are made up. The UI shows a "Demo data"
 // tag wherever it uses them.
 //
-// Issue #130 (Q-455, Q-414): knownObjectsIn() is real. It picks the prepared area from
-// GET /v1/areas, then reads /v1/areas/{id}/known. Only when the backend cannot be reached does it
-// fall back to the demo answer below (never blank), flagged `demo: true`. discoverIn() is still the
-// demo (Kevin's #109): unchanged.
+// Issue #130 (Q-455): a known object's "Track it" reads its `/frames` and `/path`
+// (loadObjectTrack); the Eros card keeps the demo's cutouts, mask and brightness under the Demo tag.
 import { ApiError } from '@/app/api/errors';
-import { createApiClient, type ApiClient } from '@/app/api/client';
-import type { AreaIndexEntry, AreaKnown, AreaKnownObject, AreaKnownPosition, TrackPath } from '@/contract';
 import type { Frame } from '@/app/api/types';
 import { deltaRa, wrapRa } from '@/viewer/sky/skyMath';
 import type { AreaBox } from '@/app/shell/areaStore';
+import type { AreaKnownObject, AreaKnownPosition, AreaTrack, TrackPath } from '@/contract';
+import { getSkyApi } from '@/state/store';
 import { isoToMjd } from './erosModel';
-
-let api: ApiClient = createApiClient();
-/** Tests swap the client; pass null to restore the default. */
-export function setAreaApi(client: ApiClient | null): void {
-  api = client ?? createApiClient();
-}
+import {
+  findArea,
+  loadDiscovery,
+  loadKnown,
+  matchName,
+  RealAreaFailed,
+  type RealDiscovery,
+  type RealKnown,
+} from './realArea';
 
 /** One exposure of 433 Eros (the demo frames). Fields as in the demo file's `hops`. */
 export interface ErosHop {
@@ -58,6 +63,8 @@ export interface ErosTrackPoint {
   /** ISO time (UTC). */
   t: string;
   px: [number, number];
+  /** First point of a new observing window of `/path` (A19): no line joins it to the point before. */
+  gap?: true;
 }
 /** D-02 provenance of a field of the demo file. */
 export interface ErosProvenance {
@@ -89,21 +96,13 @@ export interface KnownObject {
   trackAvailable?: boolean;
   /** Horizons positions at each frame time, seen from SPHEREx: `model_dependent` (A16.5). */
   positions?: AreaKnownPosition[];
-  /** When SkyBoT last answered for this object's visits (ISO, UTC); null when none did. */
-  skybotAt?: string | null;
 }
 export interface KnownObjectsResult {
-  /** True only for the fixed Eros fallback; the real answer is false. */
+  /** True for the made-up demo answer; false for a prepared area's stored reply. */
   demo: boolean;
   objects: KnownObject[];
-  /** Real answer only. */
-  areaId?: string;
-  /** The reply came from the dev fixture server (synthetic), not the real pack. */
-  fixture?: boolean;
-  /** The reply's `missing` codes (`skybot:<visit>`, `horizons:<designation>`). */
-  missing?: string[];
-  /** The reply's provenance: positions `model_dependent` (Horizons), SkyBoT answer dates. */
-  provenance?: AreaKnown['provenance'];
+  /** The prepared area's reply (null for the demo). */
+  real: RealKnown | null;
 }
 
 export type MoverKind = 'known' | 'unexplained' | 'once';
@@ -112,8 +111,12 @@ export interface DiscoveryMover {
   /** Name when it matches a known object, else null. */
   known: string | null;
   kind: MoverKind;
-  /** Detections on the demo sky image, in its pixels; one per visit. */
+  /** Detections on the demo sky image, in its pixels; one per visit (empty for real tracks). */
   pts: [number, number][];
+  /** Number of visits the mover is seen in. */
+  visits: number;
+  /** The prepared area's track (null for the demo). */
+  track: AreaTrack | null;
 }
 export interface DiscoveryDot {
   p: [number, number];
@@ -125,7 +128,10 @@ export interface DiscoveryStep {
   result: string;
 }
 export interface DiscoveryResult {
-  demo: true;
+  /** True for the made-up demo answer; false for a prepared area's stored replies. */
+  demo: boolean;
+  /** The prepared area's replies (null for the demo). */
+  real: RealDiscovery | null;
   steps: DiscoveryStep[];
   dots: DiscoveryDot[];
   movers: DiscoveryMover[];
@@ -138,8 +144,8 @@ export type AreaSearchResult =
 
 export const NOT_PREPARED = 'No prepared data for this area yet.';
 
-/** A refused area: not prepared (Q-414) or not found by id (A17.8 `area_not_found`). */
-export type AreaRefusalCode = 'area:not_prepared' | 'area_not_found';
+/** The demo refuses an area it has no data for (Q-414); a prepared area that fails to load. */
+export type AreaRefusalCode = 'area:not_prepared' | 'area:failed';
 export class AreaRefused extends Error {
   readonly code: AreaRefusalCode;
   constructor(code: AreaRefusalCode = 'area:not_prepared', message = NOT_PREPARED) {
@@ -181,28 +187,6 @@ export function boxOverlapsEros(box: AreaBox, d: ErosDemo): boolean {
   return e ? boxOverlaps(box, e) : false;
 }
 
-/**
- * The prepared area of `GET /v1/areas` that the drawn box overlaps; with several, the one whose
- * centre is nearest the box centre. Null when none overlaps (`area:not_prepared`).
- */
-export function pickArea(box: AreaBox, areas: readonly AreaIndexEntry[]): AreaIndexEntry | null {
-  const cosD = Math.cos((((box.a.dec + box.b.dec) / 2) * Math.PI) / 180);
-  const bra = wrapRa(box.a.ra + deltaRa(box.b.ra, box.a.ra) / 2);
-  const bdec = (box.a.dec + box.b.dec) / 2;
-  let best: AreaIndexEntry | null = null;
-  let bestD = Infinity;
-  for (const a of areas) {
-    const span: AreaSpan = { ra: a.ra, dec: a.dec, halfW: a.width_deg / 2, halfH: a.height_deg / 2 };
-    if (!boxOverlaps(box, span)) continue;
-    const d = Math.hypot(deltaRa(bra, a.ra) * cosD, bdec - a.dec);
-    if (d < bestD) {
-      best = a;
-      bestD = d;
-    }
-  }
-  return best;
-}
-
 /** The demo file when the box overlaps the prepared area; else refuses with `area:not_prepared`. */
 async function preparedFor(box: AreaBox): Promise<ErosDemo> {
   const d = await erosDemo();
@@ -231,11 +215,12 @@ export function erosDemo(): Promise<ErosDemo | null> {
   return erosPromise;
 }
 
-/** The demo's Eros row: used only when the backend cannot be reached (never blank). */
-async function knownDemoIn(box: AreaBox): Promise<KnownObjectsResult> {
+/** Dummy: the one known object, only for a box that overlaps the prepared Eros area. */
+async function demoKnownIn(box: AreaBox): Promise<KnownObjectsResult> {
   const d = await preparedFor(box);
   return {
     demo: true,
+    real: null,
     objects: [
       { id: '433', name: 'Eros', kind: 'asteroid', frames: d?.hops.length ?? 16, visits: 2, trackAvailable: true },
     ],
@@ -250,17 +235,18 @@ export function splitDesignation(designation: string, number: number | null): { 
   return { id: number !== null ? String(number) : designation, name: number !== null ? designation : '' };
 }
 
-/** The latest SkyBoT answer date of the visits (ISO), null when none answered. */
-export function latestSkybot(known: Pick<AreaKnown, 'skybot'>): string | null {
+/** The latest SkyBoT answer date of the area's visits (ISO), null when none answered. */
+export function latestSkybot(known: Pick<RealKnown['known'], 'skybot'>): string | null {
   let best: string | null = null;
-  for (const s of known.skybot) if (s.fetched_at && (!best || isoToMjd(s.fetched_at) > isoToMjd(best))) best = s.fetched_at;
+  for (const s of known.skybot) {
+    if (s.fetched_at && (!best || isoToMjd(s.fetched_at) > isoToMjd(best))) best = s.fetched_at;
+  }
   return best;
 }
 
-/** Turns the `/known` reply into rows (A18.5). Pure. */
-export function mapKnown(areaId: string, reply: AreaKnown, fixture: boolean): KnownObjectsResult {
-  const skybotAt = latestSkybot(reply);
-  const objects = reply.known.map((k: AreaKnownObject): KnownObject => ({
+/** One `/known` row as the card's row (A18.5): the reply's fields, nothing computed. Pure. */
+export function knownRow(k: AreaKnownObject): KnownObject {
+  return {
     ...splitDesignation(k.designation, k.number),
     kind: k.kind,
     frames: k.n_frames,
@@ -269,41 +255,7 @@ export function mapKnown(areaId: string, reply: AreaKnown, fixture: boolean): Kn
     objectId: k.object_id,
     trackAvailable: k.track_available,
     positions: k.positions,
-    skybotAt,
-  }));
-  return { demo: false, objects, areaId, fixture, missing: reply.missing, provenance: reply.provenance };
-}
-
-/** An error from the API that means "the backend cannot answer now" (the demo may stand in). */
-const isOutage = (e: unknown): boolean =>
-  e instanceof ApiError && e.kind !== 'aborted' && e.kind !== 'not_found' && e.kind !== 'bad_request';
-
-/**
- * Known objects in the drawn area (A18.5, issue #130): the prepared area from `GET /v1/areas`, then
- * its `/known` reply. No overlapping area -> `area:not_prepared`; an unknown id -> `area_not_found`.
- * ASSUMPTION: if the backend is unreachable, a box over the Eros demo area still answers with the
- * demo row (flagged `demo: true`, so the Demo tag stays); elsewhere the error propagates.
- */
-export async function knownObjectsIn(box: AreaBox, signal?: AbortSignal): Promise<KnownObjectsResult> {
-  try {
-    const index = await api.areas(signal);
-    const area = pickArea(box, index.data.areas);
-    if (!area) throw new AreaRefused();
-    const known = await api.areaKnown(area.area_id, signal);
-    return mapKnown(area.area_id, known.data, index.fixture !== null || known.fixture !== null);
-  } catch (e) {
-    if (e instanceof ApiError && e.code === 'area_not_found') {
-      throw new AreaRefused('area_not_found', 'This area is no longer in the prepared set.');
-    }
-    if (isOutage(e)) {
-      try {
-        return await knownDemoIn(box);
-      } catch {
-        /* not over the demo area either: say what failed */
-      }
-    }
-    throw e;
-  }
+  };
 }
 
 /**
@@ -351,9 +303,24 @@ export function mergeReal(demo: ErosDemo | null, frames: readonly Frame[], path:
   };
   const track: ErosTrackPoint[] = [];
   if (path && demo) {
+    // A19: the path is never joined across a gap between windows (or a point the plane cannot show).
+    const windowOf = (iso: string): number => {
+      const t = Date.parse(iso);
+      return path.windows.findIndex((w) => Date.parse(w.start) <= t && t <= Date.parse(w.end));
+    };
+    let prevWindow: number | null = null;
+    let broken = false;
     for (const p of path.points) {
       const px = skyToPx(demo, p.ra, p.dec);
-      if (px) track.push({ t: p.time, px });
+      if (!px) {
+        broken = true;
+        continue;
+      }
+      const w = windowOf(p.time);
+      const gap = track.length > 0 && (broken || (prevWindow !== null && w !== prevWindow));
+      track.push(gap ? { t: p.time, px, gap: true } : { t: p.time, px });
+      prevWindow = w;
+      broken = false;
     }
   }
   return { ...base, hops, track };
@@ -379,6 +346,7 @@ export function skyToPx(d: ErosDemo, ra: number, dec: number): [number, number] 
 
 /** What the Eros card reads for an object: its frames and path from the API. Throws on failure. */
 export async function loadObjectTrack(objectId: string, signal?: AbortSignal): Promise<{ frames: Frame[]; path: TrackPath | null }> {
+  const api = getSkyApi();
   const [frames, path] = await Promise.all([
     api.frames(objectId, signal),
     api.path(objectId, signal).then(
@@ -407,7 +375,7 @@ function rng(seed: number): () => number {
  * Dummy: the mock-up's 212 dots and three movers (T1 is Eros, T2 and T3 are made up), only for a
  * box that overlaps the prepared Eros area. The counts are demo counts, not catalogue results.
  */
-export async function discoverIn(box: AreaBox): Promise<DiscoveryResult> {
+async function demoDiscoverIn(box: AreaBox): Promise<DiscoveryResult> {
   const d = await preparedFor(box);
   const hs = d?.hops ?? [];
   const a: [number, number] = hs[0]?.wide_px ?? [867, 291];
@@ -416,9 +384,9 @@ export async function discoverIn(box: AreaBox): Promise<DiscoveryResult> {
   const X = () => 30 + r() * 1220;
   const Y = () => 30 + r() * 660;
   const movers: DiscoveryMover[] = [
-    { id: 'T1', known: '433 Eros', kind: 'known', pts: [a, z] },
-    { id: 'T2', known: null, kind: 'unexplained', pts: [[430, 540], [700, 330]] },
-    { id: 'T3', known: null, kind: 'once', pts: [[1010, 560]] },
+    { id: 'T1', known: '433 Eros', kind: 'known', pts: [a, z], visits: 2, track: null },
+    { id: 'T2', known: null, kind: 'unexplained', pts: [[430, 540], [700, 330]], visits: 2, track: null },
+    { id: 'T3', known: null, kind: 'once', pts: [[1010, 560]], visits: 1, track: null },
   ];
   const dots: DiscoveryDot[] = [];
   for (let i = 0; i < 58; i++) dots.push({ p: [X(), Y()], k: 'glitch' });
@@ -427,6 +395,7 @@ export async function discoverIn(box: AreaBox): Promise<DiscoveryResult> {
   for (const m of movers) for (const p of m.pts) dots.push({ p, k: 'mover' });
   return {
     demo: true,
+    real: null,
     steps: [
       { label: 'Find dots', result: '212 in 16 frames (demo)' },
       { label: 'Drop one-exposure glitches', result: '−58 (demo)' },
@@ -437,6 +406,63 @@ export async function discoverIn(box: AreaBox): Promise<DiscoveryResult> {
     dots,
     movers,
   };
+}
+
+/** A refusal of the real path, in the demo's refusal type (the cards read only that). */
+function refuse(e: unknown): never {
+  if (e instanceof RealAreaFailed) throw new AreaRefused('area:failed', e.message);
+  throw e;
+}
+
+/** The steps of a prepared area, from its stored counts (A18.3); nothing is computed here. */
+export function realSteps(r: RealDiscovery): DiscoveryStep[] {
+  const n = r.summary.steps;
+  const checked = `${n.n_found_blind} found blind, ${n.n_unexplained} unexplained` +
+    (n.n_unchecked > 0 ? `, ${n.n_unchecked} not checked` : '');
+  return [
+    { label: 'Find dots', result: `${n.n_dots} in ${r.summary.n_frames} frames` },
+    { label: 'Drop one-exposure glitches', result: `−${n.n_glitches}` },
+    { label: 'Drop stars (Gaia DR3, CatWISE)', result: `−${n.n_stars} stars, −${n.n_fixed} fixed` },
+    {
+      label: 'Join what moves across visits',
+      result: `${n.n_tracks} tracks` + (n.n_possible > 0 ? `, ${n.n_possible} possible` : ''),
+    },
+    { label: 'Check known objects (SkyBoT)', result: checked },
+  ];
+}
+
+/** A prepared area's tracks as the card's movers (verdicts as stored, A16.5). */
+export function realMovers(r: RealDiscovery): DiscoveryMover[] {
+  return (r.tracks?.tracks ?? []).map((t) => ({
+    id: t.track_id,
+    known: t.verdict === 'found_blind' && t.match ? matchName(t.match) : null,
+    kind: t.verdict === 'found_blind' ? 'known' : t.visits.length < 2 ? 'once' : 'unexplained',
+    pts: [],
+    visits: t.visits.length,
+    track: t,
+  }));
+}
+
+/**
+ * Known objects (A18.5): a prepared area's stored `/known` reply, else the demo (which refuses
+ * outside Eros's area). The demo also stands in when the index cannot be read (no backend); a
+ * prepared area whose `/known` fails, or breaks the contract, refuses with `area:failed`.
+ */
+export async function knownObjectsIn(box: AreaBox, signal?: AbortSignal): Promise<KnownObjectsResult> {
+  const api = getSkyApi();
+  const hit = await findArea(api, box, signal);
+  if (!hit) return demoKnownIn(box);
+  const real = await loadKnown(api, hit.entry, hit.fixture, signal).catch(refuse);
+  return { demo: false, real, objects: real.known.known.map(knownRow) };
+}
+
+/** Discovery: a prepared area's stored replies, else the demo (which refuses outside Eros's area). */
+export async function discoverIn(box: AreaBox, signal?: AbortSignal): Promise<DiscoveryResult> {
+  const api = getSkyApi();
+  const hit = await findArea(api, box, signal);
+  if (!hit) return demoDiscoverIn(box);
+  const real = await loadDiscovery(api, hit.entry, hit.fixture, signal).catch(refuse);
+  return { demo: false, real, steps: realSteps(real), dots: [], movers: realMovers(real) };
 }
 
 /** One entry point: the flow chosen in the dock decides what is asked. */

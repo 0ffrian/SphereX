@@ -46,6 +46,13 @@ export interface ShellState {
    */
   minimised: boolean;
   setMinimised(on: boolean): void;
+  /**
+   * The build view is minimised into the island's pill (Moon, 13 Nov 2026, Q-457): the pane stays
+   * mounted but hidden, so a click on the pill brings the same body back without a rebuild. Opening
+   * or closing a build clears it.
+   */
+  buildMinimised: boolean;
+  setBuildMinimised(on: boolean): void;
   setTool(tool: ToolId): void;
   closePanel(): void;
   setBody(body: BodyLoad): void;
@@ -66,10 +73,15 @@ export const useShellStore = create<ShellState>()((set) => ({
   cardRequested: false,
   minimised: false,
   setMinimised: (minimised) => set((s) => (s.minimised === minimised ? s : { minimised })),
+  buildMinimised: false,
+  setBuildMinimised: (buildMinimised) =>
+    set((s) => (s.buildMinimised === buildMinimised || !s.build.open ? s : { buildMinimised })),
   setTool: (tool) =>
     set((s) => ({
       tool,
       minimised: false,
+      // A minimised build is over once another tool is chosen (the viewer tool opens it fresh).
+      buildMinimised: false,
       focusSeq: s.focusSeq + 1,
       cardRequested: tool === 'flipbook' || tool === 'spectrum' ? false : s.cardRequested,
       // The rail's 3D viewer is the build pane, with the body already built (no animation).
@@ -96,6 +108,7 @@ export const useShellStore = create<ShellState>()((set) => ({
       // The object panel steps aside: the sky takes the left half and the pane the right.
       tool: animate ? 'sky' : 'viewer',
       minimised: false,
+      buildMinimised: false,
       build: { open: true, animate, seq: s.build.seq + 1, seedOffset: 0 },
     })),
   replayBuild: () => set((s) => ({ build: { ...s.build, animate: true, seq: s.build.seq + 1 } })),
@@ -111,6 +124,7 @@ export const useShellStore = create<ShellState>()((set) => ({
   closeBuild: () =>
     set((s) => ({
       tool: s.tool === 'viewer' ? 'sky' : s.tool,
+      buildMinimised: false,
       build: { ...s.build, open: false, seedOffset: 0 },
     })),
 }));

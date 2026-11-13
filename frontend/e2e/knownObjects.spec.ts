@@ -86,7 +86,7 @@ test('draw over Eros: the Known list shows 433 Eros from /known, with positions 
   await expect(row).toContainText('433');
   await expect(row).toContainText('Eros');
   await expect(row).toContainText('18 frames in 2 visits');
-  await expect(row).toContainText('SkyBoT answered');
+  await expect(page.getByTestId('known-skybot')).toContainText('SkyBoT last answered');
   // No Track offline for this object yet: Open, with the reason.
   await expect(row).toContainText('Open');
   await expect(page.getByTestId('known-no-track')).toHaveText('Track not prepared for this object offline');

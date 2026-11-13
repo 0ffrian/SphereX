@@ -54,7 +54,13 @@ export function Island() {
       ? (sky.resolved ? displayName(sky.resolved.name) || 'Flipbook' : 'Flipbook')
       : null,
   );
-  const areaMiniOn = useAreaStore((s) => s.minimised) || objMini !== null;
+  // Q-457: a minimised build view is a pill too, named after the body; a click brings it back.
+  // Named from the body the build holds (the card), not from the sky's current selection.
+  const buildCardName = useAppStore((s) => s.card?.name);
+  const buildMini = useShellStore((s) =>
+    s.build.open && s.buildMinimised ? displayName(buildCardName) || '3D view' : null,
+  );
+  const areaMiniOn = useAreaStore((s) => s.minimised) || objMini !== null || buildMini !== null;
   const inPanel = panelBox !== null && travels && !areaMiniOn;
   const thinking = panelBox === null && isThinking(sky.status);
   // While the sky view moves, the island shows "Updating" for a moment (a cue only; nothing loads).
@@ -74,9 +80,14 @@ export function Island() {
   // The square tools (Known objects, Discovery): the island says what the dummy search is doing, and
   // it holds the place of a minimised card (a click brings it back).
   const areaSay = useAreaStore((s) => s.say);
-  const areaMini = useAreaStore((s) => (s.minimised ? areaMiniTitle(s) : null)) ?? objMini;
+  const areaCardMini = useAreaStore((s) => (s.minimised ? areaMiniTitle(s) : null));
+  const areaMini = buildMini ?? areaCardMini ?? objMini;
   const areaRunning = useAreaStore((s) => s.running);
   const restore = () => {
+    if (buildMini !== null) {
+      useShellStore.getState().setBuildMinimised(false);
+      return;
+    }
     // The card grows out of the island again, as when it first opened.
     setTravels(true);
     if (objMini !== null) useShellStore.getState().setMinimised(false);
@@ -188,7 +199,7 @@ export function Island() {
       top: bezelH - pill.h - 16,
       width: pill.w,
       height: pill.h,
-      radius: Math.min(pill.h / 2, 24),
+      radius: pill.h / 2, // a true pill: fully round ends at any height
     };
   else if (corner)
     box = {
@@ -204,7 +215,7 @@ export function Island() {
       top,
       width: pill.w,
       height: pill.h,
-      radius: Math.min(pill.h / 2, 24),
+      radius: pill.h / 2, // a true pill: fully round ends at any height
     };
   else
     box = {
