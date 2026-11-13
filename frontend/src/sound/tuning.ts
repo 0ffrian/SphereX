@@ -231,3 +231,23 @@ export const CHORD_SMOOTH_WINDOW_UM = 0.5;
 export const CHORD_AB_FADE_S = 0.15;
 /** Engineering: the seed of the partial and beat phases (determinism). Chosen from 1–12 for headroom: 12 equal partials peak at 0.47 (≤ −6 dBFS) at −18 dBFS RMS. */
 export const CHORD_SEED = 11;
+
+// ---------------------------------------------------------------- Track path sound (R8.9.2, #78)
+
+/**
+ * R8.9.2 exposure tick: the strength of each note (0–1, before the volume). R8.9.2 and Q-194 give no
+ * tick level. CREATIVE placeholder — Atish to decide (D-13). [verify on the A15]
+ */
+export const TRACK_TICK_STRENGTH = 0.8;
+/** SPEC R8.9.2 (Q-194 item 1, proposed): the path voice's fixed pitch on the Q-70 scale. */
+export const PATH_VOICE_PITCH = 0.5;
+/**
+ * SPEC R8.9.2 (Q-194 item 1): the path voice's fixed strength, "well below the exposure ticks".
+ * The value is a CREATIVE placeholder — Atish to decide (D-13). [verify on the A15]
+ */
+export const PATH_VOICE_STRENGTH = 0.25;
+/**
+ * Engineering: frames whose midpoints are this close (s) belong to one exposure. Eros's D1 and D4
+ * frames of one exposure differ by about 1 ms; exposures are about 2 minutes apart.
+ */
+export const EXPOSURE_MATCH_S = 2;

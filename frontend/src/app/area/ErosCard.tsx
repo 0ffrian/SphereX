@@ -13,6 +13,7 @@ import { wavelengthColor } from '@/app/flipbook/wavelengthColor';
 import type { ErosDemo, ErosHop } from './areaService';
 import { ProvenanceBadge } from '@/app/Badge';
 import { DemoTag } from './DemoTag';
+import { HearTheShift } from '@/app/sound/HearTheShift';
 import { drawCutout } from './erosDraw';
 import { DETECTORS, detectorIndex, detectorsWithFrames, mjdDay, mjdHM, mjdYear } from './erosModel';
 
@@ -271,6 +272,7 @@ export function ErosCard({ title = '433 Eros', back }: { title?: string; back?: 
               </div>
             )}
             <CheckGroup />
+            <HearTheShift />
             <div className="sx-kn-spec">
               <div className="sx-kn-spec-h">
                 <span className="sx-kn-spec-t">
