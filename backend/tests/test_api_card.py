@@ -273,13 +273,15 @@ def test_pipeline_without_catalogue_answer_is_a_sketch(fixture_cache: Path) -> N
 
 
 def test_asset_key_tracks_generator_version_and_release() -> None:
-    """A stage 7 or baker rule change (GENERATOR_VERSION) or a new data release must not serve
-    an asset saved under the old rules or data."""
+    """A stage 7 or baker rule change (GENERATOR_VERSION), a Stage 2 rule change (MEASURE_VERSION,
+    Q-460) or a new data release must not serve an asset saved under the old rules or data."""
     from app.core.card.assets import asset_key
+    from app.core.measure.config import MEASURE_VERSION
 
     base = asset_key("x-1", "QR2")
     assert base != asset_key("x-1", "QR3")
     assert ("generator", GENERATOR_VERSION) in base.query
+    assert ("measure", MEASURE_VERSION) in base.query
 
 
 def test_mismatched_or_invalid_saved_assets_are_not_served(

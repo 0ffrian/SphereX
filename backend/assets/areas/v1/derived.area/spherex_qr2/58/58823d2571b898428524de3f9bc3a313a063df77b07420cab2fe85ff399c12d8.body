@@ -26,8 +26,8 @@
 # - {observer: 500@-163182}
 # - {assumption: 'orbit solutions from SkyBoT (candidates) and JPL Horizons (positions) as of fetched_at, seen from SPHEREx (500@-163182)'}
 # - {area_version: area-2}
-# - {measure_version: measure-1}
-# - {params_hash: 72e58c5d579b470b6e949fafa24082696a80724255c6d93c794a75972e14cecd}
+# - {measure_version: measure-2}
+# - {params_hash: a51541632a7152b570b8a191e56ff19d19ab6b32529f7c561512bab06ba56840}
 # - {linker: pairs}
 # - {generated_at: '2026-11-12T08:59:13.327Z'}
 # - {cached_at: '2026-11-11T18:27:26.421Z'}
@@ -51,7 +51,7 @@
 #       inputs: recorded_eros_fixture, k_detect: 5.0, k_visit_max: 3, known_formula: 'SkyBoT cone per visit (area half-diagonal + rate_max
 #         * visit span / 2 + p_max), V <= v_lim; Horizons TLIST from 500@-163182 at every exposure time; a track matches when at least
 #         known_min_frac of its dots lie within max(r_known_min_px, 3 sigma_c + ephemeris 3 sigma)', known_min_frac: 0.666667, linker: pairs,
-#       margin_deg: 0.02, measure_method_sha: ee37fa9c0d73f8f12ea154cd080f882b8e140ac87074893034111359ffc14e5f, measure_version: measure-1,
+#       margin_deg: 0.02, measure_method_sha: 1714d938f3f5f04d2191d016f1641fc5fe419a1baa7aa63271ea3cb260e68c9f, measure_version: measure-2,
 #       min_motion_px: 1.0, min_sep_px: 3.0, overlap_eps_deg2: 1.0e-12, p_max_arcsec: 60.0, pair_formula: 'rate window rate_min = r_match_min_px
 #         / dt_v to rate_max = min(rate_max_deg_day, (diagonal - 2 margin) / dt_v); v_in = v_AB - w u with w the SPHEREx velocity about
 #         the geocentre projected on the sky at the area centre (Horizons VECTORS, one per visit); u >= 0 fitted by least squares; residual
