@@ -6056,6 +6056,8 @@ li[data-state='running'] > .sx-live-mk {
 }
 .sx-sp-points li[data-used] span:first-child {
   color: var(--fg);
+}
+
 /* ---- Scans (issue #157; the live-areas mock-up, states 1, 2, 10 and 11) ----
    State 1: the pointer is the selection rectangle with its label below (no crosshair).
    States 2, 10, 11: the grid over the whole screen, each square in its state, and the objects
