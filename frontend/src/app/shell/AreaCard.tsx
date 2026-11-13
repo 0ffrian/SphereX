@@ -9,7 +9,9 @@ import { boxInBezel, useIslandStore } from '@/app/island/islandStore';
 import { DiscoveryCard, MoverCard } from '@/app/area/DiscoveryCard';
 import { ErosCard } from '@/app/area/ErosCard';
 import { KnownList } from '@/app/area/KnownList';
-import { fitCamera, flyToView, centreRect, safeRect } from '@/app/sky/areaDraw';
+import { LiveAreaCard } from '@/app/area/LiveAreaCard';
+import { fitCamera, flyToView, enterInArea, safeRect } from '@/app/sky/areaDraw';
+import { MAX_SIDE_DEG } from '@/app/area/aim';
 import { formatAreaDims, useAreaStore } from './areaStore';
 import { useShellStore } from './shellStore';
 
@@ -116,6 +118,8 @@ export function AreaCard() {
       return <DiscoveryCard />;
     case 'mover':
       return <MoverCard />;
+    case 'live':
+      return <LiveAreaCard />;
     default:
       return <DrawCard />;
   }
@@ -137,21 +141,27 @@ function DrawCard() {
       const dockTool = !!t?.closest('[data-testid="tool-known"], [data-testid="tool-area"]');
       if (t && !dockTool && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'BUTTON' || t.isContentEditable)) return;
       if (dockTool) e.preventDefault(); // not a second click on the tool
-      const b = centreRect();
-      if (b) useAreaStore.getState().setBox(b);
+      enterInArea();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
+  // Issue #144 (mock-up states 1 and 2): aim, then draw in the picked patch.
+  const coarse = typeof window !== 'undefined' && (window.matchMedia?.('(pointer: coarse)').matches ?? false);
+  const [lead, rest] =
+    stage === 'aiming'
+      ? [`${coarse ? 'Tap' : 'Click'} a patch to zoom in`, 'drag to turn the sky']
+      : ['Drag to draw your area', `up to ${MAX_SIDE_DEG}° a side`];
   return (
-    <div className="sx-area-hint" data-testid="area-card">
+    <div className="sx-area-hint" data-testid="area-card" data-stage={stage}>
       <p className="sr-only" role="status" aria-live="polite" data-testid="area-live">
         {stage === 'set' && box ? `Area set on the sky, ${size}.` : ''}
       </p>
-      <span role="status">
-        {flow === 'known' ? 'Known objects' : 'Discovery'}: drag an area on the sky
+      <span role="status" data-testid="area-hint">
+        <span className="sr-only">{flow === 'known' ? 'Known objects' : 'Discovery'}: </span>
+        {lead} <span className="sx-area-hint-keys">· {rest}</span>
+        <span className="sr-only">. Press Enter for an area in the middle, Escape to leave.</span>
       </span>
-      <span className="sx-area-hint-keys" aria-hidden="true">Enter for the middle · Esc to cancel</span>
     </div>
   );
 }

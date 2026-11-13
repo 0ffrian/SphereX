@@ -35,10 +35,22 @@ const PATHS = {
   details: 'M21 4h-7 M10 4H3 M21 12h-9 M8 12H3 M21 20h-5 M12 20H3 M14 2v4 M8 10v4 M16 18v4',
   zoomOut: 'M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14Z M8 11h6 M21 21l-4.35-4.35',
   zoomIn: 'M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14Z M8 11h6 M11 8v6 M21 21l-4.35-4.35',
+  // Lucide (issue #144, the live area card and the dock): `minus` and `x` for Minimise and Close,
+  // `radar` for Discovery (the dock draws it stroke by stroke, railIcons.tsx; Known objects' orbit
+  // is drawn there already).
+  minus: 'M5 12h14',
+  x: 'M18 6 6 18 M6 6l12 12',
+  radar:
+    'M19.07 4.93A10 10 0 0 0 6.99 3.34 M4 6h.01 M2.29 9.62A10 10 0 1 0 21.31 8.35 M16.24 7.76A6 6 0 1 0 8.23 16.67 M12 18h.01 M17.99 11.66A6 6 0 0 1 15.77 16.67 M12 10a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z M13.41 10.59l5.66-5.66',
   area: 'M5.5 3.5h13a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2v-13a2 2 0 0 1 2-2Z M9 8.3a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4Z M15 12.8a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4Z M10.4 11.1l3.2 2.3',
 } as const;
 
 export type IconName = keyof typeof PATHS;
+
+/** The outline of an icon as separate strokes (the dock draws each one, `railIcons.tsx`). */
+export function iconStrokes(name: IconName): string[] {
+  return PATHS[name].split(/ (?=[Mm])/);
+}
 
 export function Icon({ name, className = 'size-5' }: { name: IconName; className?: string }) {
   const filled = name === 'play' || name === 'pause';

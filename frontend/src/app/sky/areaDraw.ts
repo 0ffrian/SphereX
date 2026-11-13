@@ -10,7 +10,8 @@ import {
   wrapRa,
   type SkyCamera,
 } from '@/viewer/sky/skyMath';
-import type { AreaBox, AreaDrag } from '@/app/shell/areaStore';
+import { useAreaStore, type AreaBox, type AreaDrag } from '@/app/shell/areaStore';
+import { AIM_HEIGHT_DEG, clampCentred, clampDrag } from '@/app/area/aim';
 
 export interface AreaViewAccess {
   getView(): SkyCamera;
@@ -53,14 +54,60 @@ export function rectOf(x0: number, y0: number, x1: number, y1: number): AreaDrag
   return { x0, y0, x1, y1 };
 }
 
-/** The Enter shortcut: a wide default box (about half by a third of the shorter side's span), centred. */
+/** A pixel rectangle's angular width and height now (the clamp's measure), or null off the sky. */
+export function measurePixels(d: AreaDrag): { w: number; h: number } | null {
+  const b = boxFromPixels(d);
+  return b ? { w: b.widthDeg, h: b.heightDeg } : null;
+}
+
+/** A drag from its anchor to the pointer, each side stopped at 2° (issue #144). */
+export function clampedRect(x0: number, y0: number, x1: number, y1: number): AreaDrag {
+  return clampDrag(rectOf(x0, y0, x1, y1), measurePixels);
+}
+
+/**
+ * The Enter shortcut: a wide default box (about half by a third of the shorter side's span),
+ * centred, each side stopped at 2° (issue #144).
+ */
 export function centreRect(): AreaBox | null {
   if (!access) return null;
   const { width, height } = access.getSize();
   const m = Math.min(width, height);
-  const hw = m * 0.3;
-  const hh = m * 0.18;
-  return boxFromPixels({ x0: width / 2 - hw, y0: height / 2 - hh, x1: width / 2 + hw, y1: height / 2 + hh });
+  return boxFromPixels(clampCentred(width / 2, height / 2, m * 0.3, m * 0.18, measurePixels));
+}
+
+/** Aim (issue #144): the view after a click at (x, y): north up, AIM_HEIGHT_DEG tall, centred there. */
+export function aimViewAt(x: number, y: number): SkyCamera | null {
+  if (!access) return null;
+  const { width, height } = access.getSize();
+  const p = screenToRaDec(access.getView(), x, y, width, height, { ra: 0, dec: 0 });
+  return { ra: p.ra, dec: p.dec, fovDeg: clampFov(AIM_HEIGHT_DEG) };
+}
+
+/**
+ * Enter in the area tools (the keyboard way to draw): while aiming at a view much wider than the
+ * next one, it zooms to the middle as a click there would; otherwise it sets a centred box of at
+ * most 2° a side, so a box is never a few pixels on a wide sky.
+ */
+export function enterInArea(): void {
+  if (!access) return;
+  const s = useAreaStore.getState();
+  if (s.stage === 'aiming' && access.getView().fovDeg > 2 * AIM_HEIGHT_DEG) {
+    const { width, height } = access.getSize();
+    const to = aimViewAt(width / 2, height / 2);
+    if (!to) return;
+    s.pickPatch();
+    flyToView(to, reducedMotion());
+    return;
+  }
+  const b = centreRect();
+  if (b) s.setBox(b);
+}
+
+/** The live camera and the pane's size (the aim rectangle's scale), or null with no view. */
+export function viewNow(): { cam: SkyCamera; width: number; height: number } | null {
+  if (!access) return null;
+  return { cam: access.getView(), ...access.getSize() };
 }
 
 /** The set area's screen corners now (it follows the view), or null when a corner is behind. */
@@ -158,6 +205,11 @@ export function fitCamera(box: AreaBox, safe: SafeRect): SkyCamera | null {
     cam = { ...cam, fovDeg: clampFov((2 * Math.atan(t) * 180) / Math.PI) };
   }
   return cam;
+}
+
+/** True when the user asks for reduced motion: flights are then instant. */
+export function reducedMotion(): boolean {
+  return typeof window !== 'undefined' && (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false);
 }
 
 /** Sets the view at once, or flies there in about a second (ease in and out). */
