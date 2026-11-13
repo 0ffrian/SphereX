@@ -81,7 +81,7 @@ def fresh_cell_grids() -> Iterator[None]:
     from app.core.area import geometry
 
     with geometry._GRID_LOCK:
-        geometry._GRIDS.clear()
+        geometry._sized_grid.cache_clear()
     yield
 
 

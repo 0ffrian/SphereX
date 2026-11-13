@@ -20,10 +20,10 @@
    positions (equal weights) and ``u`` the least-squares value over all its legs, clamped at 0
    (``chain_fit``); for two legs this is the pair test's own ``v_AB`` and ``u``. A chain fit
    that fails the pair test's limits (rate window, ``u <= 1/delta_min``, ``v_tol`` with the
-   largest ``sigma_v`` of the chain's legs) is not served: the track keeps the fit of its first
-   pair whose rate also lies in the chain's window (its ``u`` only when every leg has ``w``), or
-   no rate at all when no pair does. ``u`` is fitted only when every leg has ``w``. A 2-leg track
-   is always fitted as a ``"chain"``.
+   largest ``sigma_v`` of the chain's legs), or a chain of three or more legs with ``w`` for
+   only some of them, is not served: the track keeps the ``v_AB`` of its first pair whose rate
+   also lies in the chain's window, with no ``u``, or no rate at all when no pair does. ``u`` is
+   only ever fitted over all of a track's legs. A 2-leg track is always fitted as a ``"chain"``.
 
 Pure: ``w`` comes in as a mapping; ``spherex_w`` fetches it through the cache.
 """
@@ -182,8 +182,9 @@ def chain_fit(
     cfg: AreaConfig = DEFAULT_AREA_CONFIG,
 ) -> tuple[Vec, float | None] | None:
     """``(v_AB, u)`` of a track over all its legs (issue #128 (4)), or ``None`` when that fit fails
-    the pair test's own limits (the caller, ``join``, then serves the first consecutive pair's fit
-    whose rate lies inside the chain's window, or no rate at all when no pair's does).
+    the pair test's own limits (the caller, ``join``, then serves the ``v_AB`` of the first
+    consecutive pair whose rate lies inside the chain's window, without ``u``, or no rate at all
+    when no pair's does).
 
     ``v_AB`` is the slope of the least-squares line through the legs' positions at their
     ``t_ref``, equal weights, and must lie in ``[rate_min, rate_max]`` (the caller passes the
@@ -192,11 +193,12 @@ def chain_fit(
     two, and must pass ``u <= 1/delta_min`` and every leg's perpendicular residual ``<= v_tol``.
     ``v_tol = max(v_tol_min, v_tol_sigma * sigma_v)`` with the largest ``sigma_v`` of all the
     chain's legs (for two legs, the pair test's own ``v_tol``; for three or more it is looser
-    than any single pair's). Unless every leg has ``w``, ``u`` is ``None`` (the rate-window
-    fallback, as in ``pair_fit`` for a pair missing either visit's ``w``): a ``u`` fitted on a
-    subset of the legs would mean something else than on the other tracks of the run. For two
-    legs this is the pair test's own ``v_AB`` and ``u``, so a 2-leg track is always
-    ``"chain"``."""
+    than any single pair's). With ``w`` for no leg, ``u`` is ``None`` (the rate-window fallback,
+    as in ``pair_fit``). With ``w`` for only some of three or more legs, ``None``: the legs with
+    ``w`` cannot be held to the chain test without the others, and a ``u`` fitted on a subset of
+    the legs would mean something else than on the other tracks of the run. For two legs this
+    is the pair test's own ``v_AB`` and ``u``, including its fallback when either visit lacks
+    ``w``, so a 2-leg track is always ``"chain"``."""
     if len(legs) < 2:
         raise ValueError("a track has two or more legs")
     if len(legs) == 2:
@@ -214,8 +216,11 @@ def chain_fit(
         )
     if not rate_min <= math.hypot(*v_ab) <= rate_max:
         return None
-    if any(lg.visit not in w for lg in legs):
+    n_w = sum(lg.visit in w for lg in legs)
+    if n_w == 0 or (len(legs) == 2 and n_w < 2):
         return v_ab, None  # rate window only, as pair_fit for a pair missing either visit's w
+    if n_w < len(legs):
+        return None  # w for only some of three or more legs: refused, see above
     with_w = [(lg, w[lg.visit]) for lg in legs]
     num = den = 0.0
     for lg, wx in with_w:
@@ -232,9 +237,9 @@ def chain_fit(
     return v_ab, u
 
 
-# "chain": chain_fit over all legs. "pair": the chain fit failed the limits, so the first
-# consecutive pair whose fit lies in the chain's own rate window. "none": no pair does either, so
-# the track is served without a rate, PA or u (refused, not guessed).
+# "chain": chain_fit over all legs. "pair": the chain fit was refused, so the v_AB of the first
+# consecutive pair whose fit lies in the chain's own rate window, and no u. "none": no pair does
+# either, so the track is served without a rate, PA or u (refused, not guessed).
 TrackFit = Literal["chain", "pair", "none"]
 
 
@@ -407,10 +412,9 @@ def join(
             if got is not None:
                 out.append(JoinedTrack(members, "track", None, got[0], got[1], "chain"))
                 continue
-            # The whole-chain fit fails the limits: the first pair whose own fit also suits the
-            # chain's window (a pair can pass its window yet break the span's), its u only when
-            # every leg has w (as chain_fit). No such pair: no rate is served.
-            all_w = all(lg.visit in w for lg in members)
+            # The whole-chain fit is refused: the first pair whose own fit also suits the chain's
+            # window (a pair can pass its window yet break the span's), without its u, which is
+            # fitted on two of the legs only (as chain_fit). No such pair: no rate is served.
             pair = next(
                 (f for f in (fits[k] for k in itertools.pairwise(chain)) if rmin <= f[1] <= rmax),
                 None,
@@ -418,8 +422,7 @@ def join(
             if pair is None:
                 out.append(JoinedTrack(members, "track", None, None, None, "none"))
             else:
-                u = pair[2] if all_w else None
-                out.append(JoinedTrack(members, "track", None, pair[0], u, "pair"))
+                out.append(JoinedTrack(members, "track", None, pair[0], None, "pair"))
             continue
         a = legs[i]
         if i in linked.has_candidate:
