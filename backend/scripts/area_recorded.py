@@ -64,29 +64,34 @@ def entries(source: str, root: Path = FIXTURE_CACHE) -> list[tuple[dict[str, Any
     return out
 
 
+@lru_cache(maxsize=1)
+def _eros_cone_entries() -> tuple[tuple[dict[str, Any], bytes], ...]:
+    """The recorded SIA entries of the two Eros cones, in ``EROS_CONES`` order: the one matching
+    rule shared by ``recorded_sia`` and ``recorded_sia_fetched``. Cached, so the fixtures are
+    read once per process; callers must not change the returned metadata."""
+    sia = entries("irsa_sia")
+    return tuple(
+        (meta, body)
+        for ra, dec in EROS_CONES
+        for meta, body in sia
+        if (meta["key"]["query"]["ra"], meta["key"]["query"]["dec"]) == (ra, dec)
+    )
+
+
 def recorded_sia() -> tuple[list[SiaRow], list[str]]:
     """Rows of the two Eros cones, merged by frame id (first kept), and their body SHA-256."""
     rows: dict[str, SiaRow] = {}
     digests: list[str] = []
-    for ra, dec in EROS_CONES:
-        for meta, body in entries("irsa_sia"):
-            q = meta["key"]["query"]
-            if (q["ra"], q["dec"]) == (ra, dec):
-                digests.append(hashlib.sha256(body).hexdigest())
-                for r in irsa_sia.parse_rows(body):
-                    rows.setdefault(r.frame_id, r)
+    for _, body in _eros_cone_entries():
+        digests.append(hashlib.sha256(body).hexdigest())
+        for r in irsa_sia.parse_rows(body):
+            rows.setdefault(r.frame_id, r)
     return list(rows.values()), digests
 
 
 def recorded_sia_fetched() -> list[str]:
     """The ISO-Z ``fetched_at`` of the two Eros cones (``AreaFrames.sia_fetched``)."""
-    out = []
-    for ra, dec in EROS_CONES:
-        for meta, _ in entries("irsa_sia"):
-            q = meta["key"]["query"]
-            if (q["ra"], q["dec"]) == (ra, dec):
-                out.append(iso_utc_z(parse_utc(str(meta["fetched_at"]))))
-    return out
+    return [iso_utc_z(parse_utc(str(meta["fetched_at"]))) for meta, _ in _eros_cone_entries()]
 
 
 @lru_cache(maxsize=1)

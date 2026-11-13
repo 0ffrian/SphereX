@@ -483,7 +483,9 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | Q-461 | Known objects: `track_available` from the cache, Track pre-fetch per Known object (amends Q-420 (8)) | Proposed | [moving-objects](moving-objects.md) |
 | Q-462 | Live areas: Known objects and Discovery for a box drawn anywhere (job, visit pair, 2° cap) | Proposed | [moving-objects](moving-objects.md) |
 | Q-463 | Live areas use DR1; areas of every release are served (amends Q-137 for live areas) | Proposed | [moving-objects](moving-objects.md) |
+| Q-466 | Known list: Detected (matched by a found-blind track) and Predicted rows, detected first, filter, paths on the sky | Decided (as built, #145) | [moving-objects](moving-objects.md) |
 | Q-467 | Provenance of a live area | Proposed | [moving-objects](moving-objects.md) |
+| Q-469 | Track it (on demand) and Build it from area results; placeholder build for an unexplained track (amends R7.6 for area tracks) | Decided (as built, #145) | [moving-objects](moving-objects.md) |
 | Q-470 | Scans: a region scanned square by square (split, order, limits, overlap, pause and stop) | Proposed | [moving-objects](moving-objects.md) |
 | Q-471 | Run records: storage, schema, replay timeline, merged results, restart rule | Proposed | [moving-objects](moving-objects.md) |
 | B-01 to B-04 | Post-event backlog | Backlog | [scope-process](scope-process.md#post-event-backlog) |

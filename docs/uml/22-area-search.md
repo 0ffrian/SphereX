@@ -1,6 +1,6 @@
 # 22 Area search: components and sequences
 
-Area search of [A16](../architecture/moving-objects/area-search.md) (agreed plan, Q-146): a square drawn on the sky, then **Known objects** (hand-off to Track, [A19](../architecture/moving-objects/track.md) and [A20](../architecture/moving-objects/track-ui.md)) or **Discovery** (dots, glitches, stars and fixed dots removed, joined across visits with a parallax-aware test, checked against known objects). Three diagrams: components, the offline precompute, and the sky interaction. Drawn 9 Nov 2026 from A16 to A18 (backend [A17](../architecture/moving-objects/area-backend.md), sky UI [A18](../architecture/moving-objects/area-ui.md), shell [A21](../architecture/sky-shell.md)). **Built:** the backend from frames to the API (issues #97 and #108: `frames.py`, `dots.py`, `clean.py`, `join.py`, `match.py`, `service.py`, `api/areas.py`, `core/export/ecsv.py`) and the committed Eros pack. The frontend reads `/v1/areas` from the sky dock (issue #96, Q-406): a prepared area that holds the drawn box answers first, and the Q-414 demo only where none does. Known objects' rows carry their Horizons positions and **Track it** reads the object's `/frames` and `/path` for the Eros card (issue #130, Q-455). **Live areas (issue #141, Q-462, Q-463):** a box drawn anywhere is planned by `core/area/live.py` and computed by a background job in `core/area/live_jobs.py` (the same pipeline, stored as `derived.area`), on SPHEREx DR1; see the live area job sequence. **Scans and runs (issue #156, Q-470, Q-471):** a region scanned square by square on the same worker, every run recorded with a replay timeline; see the scan and run sequence. The frontend's aim, draw and live card (issue #144) is the last diagram. Not built: the gated extras D4 to D7 (cut). Items marked "proposed" wait on a decision (Q-178 to Q-187 in the spec).
+Area search of [A16](../architecture/moving-objects/area-search.md) (agreed plan, Q-146): a square drawn on the sky, then **Known objects** (hand-off to Track, [A19](../architecture/moving-objects/track.md) and [A20](../architecture/moving-objects/track-ui.md)) or **Discovery** (dots, glitches, stars and fixed dots removed, joined across visits with a parallax-aware test, checked against known objects). Three diagrams: components, the offline precompute, and the sky interaction. Drawn 9 Nov 2026 from A16 to A18 (backend [A17](../architecture/moving-objects/area-backend.md), sky UI [A18](../architecture/moving-objects/area-ui.md), shell [A21](../architecture/sky-shell.md)). **Built:** the backend from frames to the API (issues #97 and #108: `frames.py`, `dots.py`, `clean.py`, `join.py`, `match.py`, `service.py`, `api/areas.py`, `core/export/ecsv.py`) and the committed Eros pack. The frontend reads `/v1/areas` from the sky dock (issue #96, Q-406): a prepared area that holds the drawn box answers first, and the Q-414 demo only where none does. Known objects' rows carry their Horizons positions and **Track it** reads the object's `/frames` and `/path` for the Eros card (issue #130, Q-455). **Live areas (issue #141, Q-462, Q-463):** a box drawn anywhere is planned by `core/area/live.py` and computed by a background job in `core/area/live_jobs.py` (the same pipeline, stored as `derived.area`), on SPHEREx DR1; see the live area job sequence. **Scans and runs (issue #156, Q-470, Q-471):** a region scanned square by square on the same worker, every run recorded with a replay timeline; see the scan and run sequence. The frontend's aim, draw and live card (issue #144) and the results with Track it and Build it (issue #145) are the last two diagrams. Not built: the gated extras D4 to D7 (cut). Items marked "proposed" wait on a decision (Q-178 to Q-187 in the spec).
 
 ## Components
 
@@ -328,7 +328,8 @@ stateDiagram-v2
   Checking --> Job: plan answers the job already queued or running
   Checking --> Failed: no_visit_pair, upstream_unavailable, offline, other area refusals
   Checking --> Refused: no live route (today's not_prepared refusal)
-  Offer --> Job: Compute this area (start=true)
+  Offer --> Checking: pick another visit pair (visits, issue #145)
+  Offer --> Job: Compute this area (start=true, the offer's pair)
   Offer --> Failed: queue_full or a refusal
   Offer --> Aiming: Draw again
   Job --> Offer: Stop or Cancel (DELETE), or the job ends cancelled
@@ -341,4 +342,49 @@ stateDiagram-v2
     Waiting --> Computing: queue position reached
   }
   Results --> [*]
+```
+
+## Results, Track it and Build it (issue #145)
+
+The results views as built ([A18.5](../architecture/moving-objects/area-ui.md#a185-options-and-known-objects), [A18.6](../architecture/moving-objects/area-ui.md#a186-discovery-card), [Q-466](../decisions/moving-objects.md), [Q-469](../decisions/moving-objects.md)). `loadKnown` reads the summary and `/tracks` beside `/known`, and `/dots` only when a track matched a known object. A row is Detected when a found-blind track matched it. Track it on an object the cache cannot Track yet runs the object job of #142 (`trackJobApi.ts`, `trackJobStore.ts`, `TrackJobCard.tsx`). Build it on a catalogued object searches its name; on a track no known object explains it builds a labelled placeholder (`buildFrom.ts`).
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor U as User
+  participant K as KnownList / RealTrackCard
+  participant S as areaStore and trackJobStore
+  participant A as Backend (/v1/areas, /v1/objects)
+  participant B as Build view
+  K->>A: GET /v1/areas/area_id/known, area_id, /tracks
+  opt a found-blind track matched a known object
+    K->>A: GET /v1/areas/area_id/dots
+  end
+  A-->>K: rows marked Detected or Predicted, detected first
+  U->>K: Track it
+  alt track_available (or 433 Eros)
+    K->>S: openEros(object)
+    S->>A: GET /v1/objects/id/frames and /path
+  else object id, Track not ready
+    K->>S: openTrack(object, around = middle of its frame times, release)
+    S->>A: POST /v1/objects/id/track {around, days: 3}
+    A-->>S: 202 job status
+    loop every second until done or failed
+      S->>A: GET /v1/objects/id/job
+      A-->>S: stage, frames_done of frames_total
+    end
+    S->>S: row marked Track-available
+    S->>A: GET /v1/objects/id/frames and /path (the Track view)
+  else no object id, or a track with no match
+    K-->>U: Track it off (No JPL id, Orbit not known)
+  end
+  U->>K: Build it
+  alt catalogued object (a row, or a matched track)
+    K->>A: resolve the name (skySearch)
+    A-->>K: resolved
+    K->>B: openBuild (card and render-params from the backend)
+  else track no known object explains
+    K->>B: setObject(placeholder card and params), openBuild
+    B-->>U: plain sphere, placeholder_shape (artistic), size not drawn
+  end
 ```
