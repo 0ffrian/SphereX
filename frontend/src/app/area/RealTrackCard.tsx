@@ -16,6 +16,9 @@ import { Alert, BoxIcon, RouteIcon } from './areaBits';
 import { buildKnown, buildPlaceholder } from './buildFrom';
 import { areaTrackLabel, matchName } from './realArea';
 import { middleTime } from './trackJobStore';
+import type { AreaSpectra, TrackSpectrum } from './spectraApi';
+import type { DotInfo } from './spectrumWords';
+import { SpectrumFacts, SpectrumHow, SpectrumSection, SpectrumVerdictLine } from './SpectrumCard';
 
 const VERDICT: Record<AreaTrack['verdict'], string> = {
   found_blind: 'Found without looking it up, then matched to a known object',
@@ -67,6 +70,7 @@ export function RealTrackCard({
   areaId,
   release,
   back,
+  spectrum = null,
 }: {
   track: AreaTrack;
   provenance: { tracks: AreaProvenanceEntry; match: AreaProvenanceEntry };
@@ -76,6 +80,16 @@ export function RealTrackCard({
   areaId: string;
   release: string;
   back: () => void;
+  /**
+   * The track's spectrum check (A18.7, issue #162) with the area's reply and a dot lookup; null when
+   * the area has none (not run, not loaded, or the demo).
+   */
+  spectrum?: {
+    track: TrackSpectrum;
+    spectra: Pick<AreaSpectra, 'calibration' | 'method' | 'provenance'>;
+    info: (dotId: string) => DotInfo;
+    measuredOnly: boolean;
+  } | null;
 }) {
   const closePanel = useShellStore((s) => s.closePanel);
   const t = track;
@@ -98,7 +112,20 @@ export function RealTrackCard({
       testId="area-card"
     >
       <div className="sx-live" data-testid="real-track-card">
+        {spectrum && !spectrum.measuredOnly && <SpectrumVerdictLine spectrum={spectrum.track} matched={obj !== null} />}
+        {spectrum && (
+          <SpectrumSection
+            spectrum={spectrum.track}
+            spectra={spectrum.spectra}
+            info={spectrum.info}
+            measuredOnly={spectrum.measuredOnly}
+            fixture={synthetic}
+          />
+        )}
         <dl className="sx-tr">
+          {spectrum && (
+            <SpectrumFacts spectrum={spectrum.track} spectra={spectrum.spectra} measuredOnly={spectrum.measuredOnly} />
+          )}
           <dt>Visits</dt>
           <dd>
             {t.visits.join(' and ')} · {nDots} dot{nDots === 1 ? '' : 's'}
@@ -135,6 +162,7 @@ export function RealTrackCard({
         </div>
         {!obj && <p className="sx-live-m">{NO_ORBIT_NOTE}</p>}
         {obj && !obj.objectId && <Alert tone="warn" title="No JPL id" line="Its Track cannot be computed here." />}
+        {spectrum && <SpectrumHow spectrum={spectrum.track} spectra={spectrum.spectra} info={spectrum.info} />}
         <div className="sx-live-btns">
           <button
             type="button"
