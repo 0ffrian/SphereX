@@ -96,6 +96,7 @@ class Job:
     error: tuple[str, str] | None = None
     cancel: threading.Event = field(default_factory=threading.Event)
     run_id: str | None = None  # the run recording this job (Q-471), if any
+    scan_id: str | None = None  # the scan whose square this job computes (Q-470), if any
 
     def __post_init__(self) -> None:
         self.steps = {s: _StepState() for s in STEP_IDS}
@@ -116,8 +117,15 @@ class Job:
 
     @property
     def active(self) -> bool:
-        """Queued or running and not stopped: the job a new request for the same area joins."""
+        """Queued or running and not stopped."""
         return self.state in ("queued", "running") and not self.cancel.is_set()
+
+    @property
+    def joinable(self) -> bool:
+        """Active and not a scan's square: the job a new request for the same area joins. A
+        square's job is never joined, because stopping its scan cancels it and it has no run
+        record of its own (PR #160 review)."""
+        return self.active and self.scan_id is None
 
 
 class Progress:
@@ -312,15 +320,17 @@ class LiveJobs:
             return self._jobs.get(area_id)
 
     def submit(self, plan: Plan, kind: str | None = None) -> Job:
-        """Queue a plan; an area already queued or running (and not stopped), alone or as a
-        scan's square, is returned as it is. A done job is run again: the caller checks the
-        store first, so a done job reaching here means its stored area is gone. A stopped job
-        that is still winding down is replaced by a fresh job queued after it. With ``kind``,
-        a new job is recorded as a run of one square (Q-471)."""
+        """Queue a plan; a single job for the area already queued or running (and not
+        stopped) is returned as it is. A done job is run again: the caller checks the store
+        first, so a done job reaching here means its stored area is gone. A stopped job that
+        is still winding down, or a scan's square computing the area, is replaced here by a
+        fresh job queued after it: once the square is stored the fresh job is done at once
+        with nothing recomputed, and if the scan is stopped first it computes the area itself.
+        With ``kind``, a new job is recorded as a run of one square (Q-471)."""
         post: list[Snapshot] = []
         with self._lock:
             job = self._jobs.get(plan.area_id)
-            if job is not None and job.active:
+            if job is not None and job.joinable:
                 return job
             if len(self._queue) >= MAX_WAITING:
                 raise QueueFull()
@@ -622,9 +632,10 @@ class LiveJobs:
     def _compute(self, scan: ScanJob, sq: Square, plan: Plan) -> bool:
         """Run the pipeline for one square; True when its area is stored. The square's job is
         listed under its area id while it runs (unless another job for that area is active),
-        so ``/v1/areas/live`` shows it and a request for the same box joins it."""
+        so ``GET /v1/areas/live/{id}`` shows it; a request for the same box does not join it
+        but queues its own job behind it (``submit``)."""
         run_id = scan.run_id
-        inner = Job(plan)
+        inner = Job(plan, scan_id=run_id)
         inner.state = "running"
         inner.started = time.monotonic()
         with self._lock:

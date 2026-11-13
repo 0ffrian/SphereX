@@ -789,10 +789,13 @@ def test_a_stored_square_needs_no_sia_call(tmp_path: Path) -> None:
     assert asked == [p.squares[1].box]  # only the square not stored asked SIA
 
 
-def test_a_scan_square_is_listed_and_a_request_for_it_joins(tmp_path: Path) -> None:
-    """Review #4: while a scan computes a square, ``get`` shows its job and ``submit`` of the
-    same area joins it; a single job queued for an area a scan stored meanwhile is done at
-    once, without running the pipeline again."""
+def test_a_scan_square_is_listed_and_a_request_for_it_queues_its_own_job(
+    tmp_path: Path,
+) -> None:
+    """Review #4 and PR #160: while a scan computes a square, ``get`` shows its job, and
+    ``submit`` of the same area does not join it but queues a job of its own (with its own
+    run), which is done at once when the square is stored, without running the pipeline
+    again."""
     p = scan.plan_scan(180.0, 0.0, 1.5, 1.5)  # one square
     plan = _plan_of(p.squares[0].box)
     store = FakeStore()
@@ -813,14 +816,46 @@ def test_a_scan_square_is_listed_and_a_request_for_it_joins(tmp_path: Path) -> N
     inner = jobs.get(plan.area_id)
     assert inner is not None and inner.state == "running"
     assert jobs.reply(inner)["step"] == "frames"
-    assert jobs.submit(plan) is inner  # joins, nothing queued
+    own = jobs.submit(plan, kind="known")
+    assert own is not inner and own.state == "queued" and own.run_id is not None
+    assert jobs.get(plan.area_id) is own
+    assert jobs.submit(plan) is own  # a second request joins the single job
     gate.set()
     assert jobs.wait(10)
     assert ran == [plan.area_id] and inner.state == "done"
-    # A single job for that area queued anyway (the store lost nothing): done, not rerun.
-    again = jobs.submit(plan, kind="known")
+    assert own.state == "done"  # stored by the square meanwhile: not rerun
+    assert _run(jobs, own.run_id)["state"] == "done"
+
+
+def test_stopping_a_scan_never_loses_a_request_for_its_square(tmp_path: Path) -> None:
+    """PR #160 review: a single request for the box a scan is computing has its own job and
+    run, so stopping the scan cancels only the scan's square; the request computes the area."""
+    p = scan.plan_scan(180.0, 0.0, 1.5, 1.5)  # one square
+    plan = _plan_of(p.squares[0].box)
+    store = FakeStore()
+    started = threading.Event()
+    ran: list[str] = []
+
+    def runner(ctx: Context, pl: Plan, prog: Progress) -> None:
+        ran.append(pl.area_id)
+        if len(ran) == 1:  # the scan's square: runs until stopped
+            prog.step("frames")
+            started.set()
+            while True:
+                prog.check()
+                threading.Event().wait(0.01)
+        store.areas[pl.area_id] = _replies(pl.area_id, eros_at=180.0)
+
+    jobs = _scan_jobs(tmp_path, runner, store=store)
+    run_id = jobs.submit_scan(p, "discovery", RELEASE)
+    assert started.wait(5)
+    own = jobs.submit(plan, kind="known")
+    jobs.stop(run_id)
     assert jobs.wait(10)
-    assert again.state == "done" and ran == [plan.area_id]
+    assert _run(jobs, run_id)["state"] == "stopped"
+    assert own.state == "done" and ran == [plan.area_id, plan.area_id]
+    assert own.run_id is not None and _run(jobs, own.run_id)["state"] == "done"
+    assert plan.area_id in store.areas
 
 
 def test_stopping_a_scan_square_from_the_live_route_fails_only_that_square(
