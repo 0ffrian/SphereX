@@ -1,8 +1,8 @@
 // Issue #162 (A18.7): the verdict words, the card lines, the largest-step rule, the rows and the chart
-// model, on the mock-up's Eros values (spectraMock.json) and small hand-made tracks.
+// model, on the committed Eros pack's spectrum check (#161) and small hand-made tracks.
 import { describe, expect, it } from 'vitest';
+import { erosPackStage } from '@/test/areaFixtures';
 import type { AreaSpectra, SpectrumStep, TrackSpectrum } from './spectraApi';
-import MOCK from './spectraMock.json';
 import {
   chartLabel,
   chartModel,
@@ -16,16 +16,15 @@ import {
   VERDICT_WORDS,
   verdictCounts,
   verdictLine,
-  type DotInfo,
 } from './spectrumWords';
 
-const spectra = MOCK as unknown as AreaSpectra;
+const spectra = erosPackStage<AreaSpectra>('spectra');
 const track = (id: string) => structuredClone(spectra.tracks.find((t) => t.track_id === id)!);
-const visitOf = (dotId: string) => (dotId.includes('_0341_') ? 2 : 1);
-const info = (dotId: string): DotInfo => ({ visit: visitOf(dotId), time: null, detector: null, flags: [] });
 const step = (detector: number, change: number, ok = true): SpectrumStep => ({
   visit: 1,
   detector,
+  dot_id_a: 'a:1',
+  dot_id_b: 'b:1',
   time_a: '2026-03-20T08:33:00Z',
   time_b: '2026-03-20T08:35:09Z',
   change,
@@ -36,8 +35,9 @@ const bare = (over: Partial<TrackSpectrum>): TrackSpectrum => ({
   track_id: 'T0',
   verdict: 'rock',
   heat_glow: null,
-  r_au: null,
+  r_au: 1,
   r_source: 'worst_case',
+  phase_deg: 60,
   pairs: [],
   steps: [],
   points: [],
@@ -91,6 +91,7 @@ describe('the rock line', () => {
     expect(rangeLine(bare({ pairs: [{ ...p, rho: 0.84 }, { ...p, rho: 1.2 }] }))).toBe("0.8 to 1.2 times the Sun's colour.");
     expect(rangeLine(bare({ pairs: [{ ...p, rho: 9, limit: 'lower' }] }))).toBeNull();
     expect(heatGlowLine(bare({ heat_glow: null, r_au: 1.2 }))).toBeNull();
+    expect(heatGlowLine(bare({ heat_glow: false, r_au: 1.2 }))).toBeNull();
   });
 });
 
@@ -121,7 +122,7 @@ describe('chart model', () => {
   const range: [number, number] = [0.6, 3];
 
   it('T3: rel against wavelength, visit 2 open, the range, the heat glow and the Sun', () => {
-    const m = chartModel(track('T3'), info, range, false);
+    const m = chartModel(track('T3'), range, false);
     expect(m.points).toHaveLength(14);
     expect(m.points.filter((p) => p.visitIdx === 1)).toHaveLength(7);
     expect([m.x0, m.x1]).toEqual([0.7, 3.8]);
@@ -136,7 +137,7 @@ describe('chart model', () => {
   it('T8: lower limits as arrows and no heat glow; no short-arm point, so no rel to draw', () => {
     const t8 = track('T8');
     expect(t8.points.every((p) => p.rel === null)).toBe(true);
-    const m = chartModel(t8, info, range, false);
+    const m = chartModel(t8, range, false);
     expect(m.points).toEqual([]);
     expect(m.limits).toHaveLength(3);
     expect(m.glow).toBeNull();
@@ -146,20 +147,20 @@ describe('chart model', () => {
   it('points with used: false are hidden from the chart (listed under Points used)', () => {
     const t = track('T3');
     t.points[0] = { ...t.points[0]!, used: false };
-    expect(chartModel(t, info, range, false).points.map((p) => p.dotId)).not.toContain(t.points[0]!.dot_id);
-    expect(chartModel(t, info, range, true).points).toHaveLength(13);
+    expect(chartModel(t, range, false).points.map((p) => p.dotId)).not.toContain(t.points[0]!.dot_id);
+    expect(chartModel(t, range, true).points).toHaveLength(13);
   });
 
   it('x extends to 5.1 µm when a point is beyond 3.8; y gains ticks when needed', () => {
     const t = track('T1');
     t.points[1] = { ...t.points[1]!, lambda_um: 4.6, rel: 5.2 };
-    const m = chartModel(t, info, range, false);
+    const m = chartModel(t, range, false);
     expect(m.x1).toBe(5.1);
     expect(m.yTicks).toEqual([1, 2, 3, 4, 5, 6]);
   });
 
   it('Measured only: raw µJy points alone, no range, no heat glow, no limits, no verdict in the label', () => {
-    const m = chartModel(track('T3'), info, range, true);
+    const m = chartModel(track('T3'), range, true);
     expect(m.measuredOnly).toBe(true);
     expect(m.band).toBeNull();
     expect(m.glow).toBeNull();

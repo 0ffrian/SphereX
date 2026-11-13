@@ -150,14 +150,6 @@ export function verdictCounts(tracks: readonly TrackSpectrum[]): string {
 
 // ---- Chart -------------------------------------------------------------------------------------
 
-/** Where a dot comes from: its visit, time, detector and flags (from `/dots`, else the frame id). */
-export interface DotInfo {
-  visit: number | null;
-  time: string | null;
-  detector: number | null;
-  flags: readonly string[];
-}
-
 export interface ChartPoint {
   dotId: string;
   x: number;
@@ -181,8 +173,8 @@ export interface ChartModel {
   band: [number, number][] | null;
   /** The heat-glow allowance above R_max, when `heat_glow`; null otherwise. */
   glow: [number, number][] | null;
-  /** The visits in order, for the key ([visit number, first time]). */
-  visits: { visit: number | null; time: string | null }[];
+  /** The visits in order, for the key (visit number, first time). */
+  visits: { visit: number; time: string | null }[];
   yLabel: string;
 }
 
@@ -197,29 +189,23 @@ const niceMax = (v: number) => {
  * The chart in data units (A18.7): `rel` against wavelength, x from 0.7 to 3.8 µm (5.1 when a point
  * is beyond 3.8), y from 0 with ticks at 1× to 4× (more when needed), the reflected range widening
  * from the short arm, the heat-glow allowance above R_max, lower limits. Under Measured only: the
- * raw `flux_uJy` of the points alone. Points with `used: false` are left out.
+ * raw `flux_uJy` of the points alone. Points with `used: false` (and dots below snr_min) are left out.
  */
-export function chartModel(
-  t: TrackSpectrum,
-  info: (dotId: string) => DotInfo,
-  range: [number, number],
-  measuredOnly: boolean,
-): ChartModel {
-  const used = t.points.filter((p) => p.used && (measuredOnly || p.rel !== null));
-  const visitOrder: (number | null)[] = [];
-  const firstTime = new Map<number | null, string | null>();
+export function chartModel(t: TrackSpectrum, range: [number, number], measuredOnly: boolean): ChartModel {
+  // A dot below snr_min (`point: false`) enters only as a limit (an arrow), never as a point.
+  const used = t.points.filter((p) => p.used && p.point && (measuredOnly || p.rel !== null));
+  const visitOrder: number[] = [];
+  const firstTime = new Map<number, string>();
   for (const p of used) {
-    const i = info(p.dot_id);
-    if (!visitOrder.includes(i.visit)) visitOrder.push(i.visit);
-    const ft = firstTime.get(i.visit);
-    if (i.time && (!ft || Date.parse(i.time) < Date.parse(ft))) firstTime.set(i.visit, i.time);
-    else if (!firstTime.has(i.visit)) firstTime.set(i.visit, i.time);
+    if (!visitOrder.includes(p.visit)) visitOrder.push(p.visit);
+    const ft = firstTime.get(p.visit);
+    if (!ft || Date.parse(p.time) < Date.parse(ft)) firstTime.set(p.visit, p.time);
   }
-  visitOrder.sort((a, b) => (a ?? Infinity) - (b ?? Infinity));
+  visitOrder.sort((a, b) => a - b);
   const pt = (p: SpectrumPoint): ChartPoint => {
     const y = measuredOnly ? p.flux_uJy : (p.rel as number);
     const err = measuredOnly ? p.flux_err : p.flux_uJy !== 0 ? Math.abs((p.rel as number) * (p.flux_err / p.flux_uJy)) : 0;
-    return { dotId: p.dot_id, x: p.lambda_um, y, err, visitIdx: Math.min(1, visitOrder.indexOf(info(p.dot_id).visit)) };
+    return { dotId: p.dot_id, x: p.lambda_um, y, err, visitIdx: Math.min(1, visitOrder.indexOf(p.visit)) };
   };
   const points = used.map(pt);
   const limits = measuredOnly ? [] : t.pairs.filter((p) => p.limit === 'lower').map((p) => ({ x: p.lambda_long_um, y: p.rho }));
@@ -299,17 +285,7 @@ export function chartLabel(trackId: string, m: ChartModel, verdict: SpectrumVerd
   return m.measuredOnly ? `${what} ${pts}` : `${what} ${pts}${lim} ${VERDICT_WORDS[verdict].title}.`;
 }
 
-/** A dot's visit, time, detector and flags from `/dots`, else from its frame id (`…_<exp>_D<n>:<k>`). */
-export function dotInfoFrom(
-  dots: ReadonlyMap<string, { visit: number; time: string; detector: number; flags: readonly string[] }>,
-  frames: ReadonlyMap<string, { visit: number; time: string }>,
-): (dotId: string) => DotInfo {
-  return (dotId) => {
-    const d = dots.get(dotId);
-    if (d) return { visit: d.visit, time: d.time, detector: d.detector, flags: d.flags };
-    const frame = dotId.slice(0, dotId.lastIndexOf(':'));
-    const f = frames.get(frame);
-    const det = /_D(\d)$/.exec(frame)?.[1];
-    return { visit: f?.visit ?? null, time: f?.time ?? null, detector: det ? Number(det) : null, flags: [] };
-  };
+/** A dot's flags from the area's `/dots` (Points used); none when the dots did not load. */
+export function flagsFrom(dots: ReadonlyMap<string, readonly string[]>): (dotId: string) => readonly string[] {
+  return (dotId) => dots.get(dotId) ?? [];
 }
