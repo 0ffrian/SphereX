@@ -210,9 +210,30 @@ describe('PathSoundController: start / scrub / stop', () => {
     const p = c.start();
     c.stop();
     out.finishUnlock(true);
-    expect(await p).toBe(false);
+    expect(await p).toBeNull(); // cancelled, not "no audio"
     expect(out.groups).toHaveLength(1);
     expect(out.hasTone('path')).toBe(false);
+  });
+
+  it('a refused unlock resolves false (no audio), not null', async () => {
+    const out = new FakeOut();
+    out.unlockResult = false;
+    const c = new PathSoundController(out);
+    c.scrub({ hop: A1, frames: FRAMES, playing: false });
+    expect(await c.start()).toBe(false);
+  });
+
+  it("never stops another owner's path tone", async () => {
+    const out = new FakeOut();
+    out.startTone('path', pathVoiceParams(A1)); // someone else's tone
+    const c = new PathSoundController(out);
+    c.scrub({ hop: A1, frames: FRAMES, playing: false });
+    await c.start();
+    c.scrub({ hop: B1, frames: FRAMES, playing: false });
+    c.stop();
+    c.scrub({ hop: null, frames: [], playing: false });
+    expect(out.hasTone('path')).toBe(true);
+    expect(out.log).not.toContain('stop:path');
   });
 
   it('the list going away turns the sound off; a new list needs a new click', async () => {

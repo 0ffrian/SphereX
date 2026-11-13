@@ -14,7 +14,7 @@ import { defaultSettings, flushSoundSettings, useSoundSettings } from '@/sound/s
 import { SoundProvider } from '@/sound/SoundProvider';
 import { initialAppData, useAppStore } from '@/state/store';
 import { FakeAudioContext } from '@/test/fakeAudio';
-import { HEAR_SHIFT_HINT, HEAR_SHIFT_LABEL, HearTheShift } from './HearTheShift';
+import { HEAR_SHIFT_HINT, HEAR_SHIFT_LABEL, HEAR_SHIFT_NO_AUDIO, HearTheShift } from './HearTheShift';
 
 declare global {
   var IS_REACT_ACT_ENVIRONMENT: boolean;
@@ -167,6 +167,37 @@ describe('Hear the Shift (R8.9.2, A20.9)', () => {
     await act(async () => root.render(<SoundProvider sound={sound}>{null}</SoundProvider>));
     expect(sound.hasTone('path')).toBe(false);
     expect(duckHolds(ctx.asAudioContext())).toBe(held - 1); // the tone let go of the duck
+  });
+
+  it('press, press, press while the unlock is pending: the cancelled start is not "no audio"', async () => {
+    const pending: ((v: boolean) => void)[] = [];
+    vi.spyOn(sound, 'unlock').mockImplementation(() => new Promise<boolean>((r) => pending.push(r)));
+    await render();
+    await click('hear-shift-toggle'); // start A (pending)
+    await click('hear-shift-toggle'); // stop: cancels A
+    expect(q('hear-shift-toggle')!.getAttribute('aria-pressed')).toBe('false');
+    await click('hear-shift-toggle'); // start B (pending)
+    expect(pending).toHaveLength(2);
+    await act(async () => pending[0]!(false)); // A resolves late, as if no audio
+    expect(q('hear-shift-line')!.textContent).toBe(HEAR_SHIFT_HINT);
+    await act(async () => pending[1]!(true));
+    expect(q('hear-shift-toggle')!.getAttribute('aria-pressed')).toBe('true');
+    expect(q('hear-shift-line')!.textContent).toBe(HEAR_SHIFT_HINT);
+  });
+
+  it('a refused unlock says the sound could not start', async () => {
+    vi.spyOn(sound, 'unlock').mockResolvedValue(false);
+    await render();
+    await click('hear-shift-toggle');
+    expect(q('hear-shift-line')!.textContent).toBe(HEAR_SHIFT_NO_AUDIO);
+  });
+
+  it('the empty status line adds no space; a line gets its margin', async () => {
+    await render();
+    expect(q('hear-shift')!.className).not.toMatch(/gap/);
+    expect(q('hear-shift-line')!.className).not.toMatch(/mt-/);
+    await click('hear-shift-toggle');
+    expect(q('hear-shift-line')!.className).toMatch(/mt-2/);
   });
 
   it('the hop list going away turns it off and hides the toggle', async () => {
