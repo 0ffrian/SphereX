@@ -124,3 +124,5 @@ sequenceDiagram
   ST-->>L: redraw marker and path so far (render on change, D-34)
   Note over L,S: Measured only hides path, marker and ring, keeps pixels and points
 ```
+
+> **As built for the event (#78, Q-459):** there is no TimeBar yet (#82). The Eros card's player drives the sound through `PathSoundController` (`sound/track/pathSound.ts`), behind the card's "Hear the Shift" toggle: a grouped exposure tick per new exposure (Q-458) and the `model_dependent` path voice while the player runs. The reference click is not built.

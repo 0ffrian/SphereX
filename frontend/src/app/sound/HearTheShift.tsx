@@ -52,7 +52,7 @@ export function HearTheShift() {
         className="sx-amb-btn self-start"
         aria-pressed={path.on}
         aria-describedby={line ? lineId : undefined}
-        title={path.on ? 'Stop the notes' : "Hear Eros's frames as notes while the player runs"}
+        title={path.on ? 'Stop the notes' : "Hear this object's frames as notes while the player runs"}
         onClick={toggle}
         data-testid="hear-shift-toggle"
       >
