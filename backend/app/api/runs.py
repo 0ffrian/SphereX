@@ -11,7 +11,7 @@ of every run (a scan, or a single live area) with its timeline for replay.
 Nothing is computed in a request (A16.2): the plan is arithmetic, the results are read from the
 stored areas. Every reply is checked against its schema before it is sent. Errors are
 ``{error, detail}``: 422 ``scan:too_large`` and ``area:bad_box``; 429
-``queue_full``; 503 ``offline``; 404 ``run_not_found``; 409 ``run_not_pausable``,
+``queue_full`` (also on resume); 503 ``offline``; 404 ``run_not_found``; 409 ``run_not_pausable``,
 ``run_not_paused``, ``run_finished``.
 """
 
@@ -28,7 +28,14 @@ from app.api.areas import LIVE_ERRORS, _json, get_area_store, get_live_jobs
 from app.api.models import ErrorResponse
 from app.core.area.live import LiveAreaError
 from app.core.area.live_jobs import MAX_WAITING, LiveJobs, QueueFull, RunConflict
-from app.core.area.runs import RUN_ID, RunNotFound, merge, read_square, results_reply
+from app.core.area.runs import (
+    RUN_ID,
+    RunNotFound,
+    merge,
+    read_square,
+    results_reply,
+    square_boxes,
+)
 from app.core.area.scan import ScanPlan, plan_scan
 from app.core.area.store import AreaStore
 from app.errors import ApiError
@@ -75,12 +82,12 @@ def post_scan(
         scan = plan_scan(req.ra, req.dec, req.width_deg, req.height_deg)
     except LiveAreaError as exc:
         raise ApiError(422, exc.code, exc.detail) from exc
+    if req.start and jobs.ctx.settings.offline:
+        raise ApiError(503, "offline", "Scans need the network (SX_OFFLINE=1).")
     release = jobs.ctx.settings.data_release
     stored = _stored(store, release, scan)
     if not req.start:
         return _json(scan.reply(release, req.kind, stored), "scan-plan.schema.json")
-    if jobs.ctx.settings.offline:
-        raise ApiError(503, "offline", "Scans need the network (SX_OFFLINE=1).")
     try:
         run_id = jobs.submit_scan(scan, req.kind, release, stored)
     except QueueFull as exc:
@@ -116,6 +123,12 @@ def _act(jobs: LiveJobs, run_id: str, action: str) -> Response:
         raise _not_found(run_id) from exc
     except RunConflict as exc:
         raise ApiError(409, exc.code, exc.detail) from exc
+    except QueueFull as exc:  # resume queues the scan again
+        raise ApiError(
+            429,
+            "queue_full",
+            f"{MAX_WAITING} runs are already waiting. Try again in a few minutes.",
+        ) from exc
     if action == "stop":
         return Response(status_code=204)
     return _json(jobs.run_reply(run_id), "run.schema.json")
@@ -127,7 +140,7 @@ def post_pause(run_id: RunIdPath, jobs: Annotated[LiveJobs, Depends(get_live_job
     return _act(jobs, run_id, "pause")
 
 
-@router.post("/runs/{run_id}/resume", responses=RUN_ERRORS)
+@router.post("/runs/{run_id}/resume", responses={**RUN_ERRORS, 429: {"model": ErrorResponse}})
 def post_resume(run_id: RunIdPath, jobs: Annotated[LiveJobs, Depends(get_live_jobs)]) -> Response:
     return _act(jobs, run_id, "resume")
 
@@ -161,4 +174,5 @@ def get_results(
         for s in run["squares"]
         if s["state"] == "done" and s["area_id"] is not None
     ]
-    return _json(results_reply(run, merge(run["region"], finished)), "run-results.schema.json")
+    merged = merge(square_boxes(run), finished)
+    return _json(results_reply(run, merged), "run-results.schema.json")

@@ -16,7 +16,8 @@
     "started_at",
     "finished_at",
     "totals",
-    "events"
+    "events",
+    "provenance"
   ],
   "properties": {
     "run_id": {
@@ -60,6 +61,9 @@
       "items": {
         "$ref": "#/definitions/RunEvent"
       }
+    },
+    "provenance": {
+      "$ref": "#/definitions/RunProvenance"
     },
     "queue_position": {
       "type": "integer",
@@ -195,6 +199,24 @@
         }
       ]
     },
+    "RunProvenance": {
+      "title": "RunProvenance",
+      "description": "Where the positions of the found objects come from (positions_tag names which).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "known_positions",
+        "track_positions"
+      ],
+      "properties": {
+        "known_positions": {
+          "$ref": "area-index.schema.json#/definitions/AreaProvenanceEntry"
+        },
+        "track_positions": {
+          "$ref": "area-index.schema.json#/definitions/AreaProvenanceEntry"
+        }
+      }
+    },
     "RunSquare": {
       "title": "RunSquare",
       "type": "object",
@@ -290,7 +312,8 @@
       "required": [
         "kind",
         "square",
-        "positions"
+        "positions",
+        "positions_tag"
       ],
       "properties": {
         "kind": {
@@ -316,6 +339,13 @@
           "items": {
             "$ref": "#/definitions/RunPosition"
           }
+        },
+        "positions_tag": {
+          "description": "Provenance of positions: model_dependent (JPL Horizons, the Known row) or measured (the track's dots); see the run's provenance block.",
+          "enum": [
+            "measured",
+            "model_dependent"
+          ]
         }
       }
     },

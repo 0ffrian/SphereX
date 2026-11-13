@@ -54,14 +54,16 @@ def _ctx(tmp_path: Path, **kw: Any) -> Context:
 # --- squares ------------------------------------------------------------------------------
 
 
-def test_a_4_by_2_region_is_two_squares_and_3_by_3_is_four_of_1_5() -> None:
-    p = scan.plan_scan(180.0, 0.0, 4.0, 2.0)
-    assert (p.cols, p.rows, len(p.squares)) == (2, 1, 2)
-    # 2 degree squares: padding would pass the 2 degree live cap, so that axis is not padded.
-    assert {(s.box.width_deg, s.box.height_deg) for s in p.squares} == {(2.0, 2.0)}
+def test_a_3_by_3_region_is_four_squares_of_1_5_and_4_by_2_is_six() -> None:
     p = scan.plan_scan(180.0, 0.0, 3.0, 3.0)
     assert (p.cols, p.rows) == (2, 2)
-    assert {(s.box.width_deg, s.box.height_deg) for s in p.squares} == {(1.6, 1.6)}  # 1.5 + 2 pads
+    # 1.5 deg parts, + 0.05 a side, + the snapped centre's offset, rounded up to the grid.
+    assert {(s.box.width_deg, s.box.height_deg) for s in p.squares} == {(1.65, 1.65)}
+    # Q-470: a 2 degree part cannot be padded under the 2 degree live cap, so 4 x 2 degrees
+    # takes one more column and one more row (the ticket's 2 x 1 left gaps between squares).
+    p = scan.plan_scan(180.0, 0.0, 4.0, 2.0)
+    assert (p.cols, p.rows, len(p.squares)) == (3, 2, 6)
+    assert all(max(s.box.width_deg, s.box.height_deg) <= 2.0 for s in p.squares)
 
 
 def test_squares_go_top_row_first_left_to_right() -> None:
@@ -75,7 +77,7 @@ def test_squares_go_top_row_first_left_to_right() -> None:
     one, two, three, _ = (s.box for s in p.squares)
     assert one.ra > two.ra  # left on screen is east: RA grows to the left
     assert one.dec > three.dec  # the top row is north
-    assert one.dec == two.dec and one.ra == three.ra
+    assert one.dec == two.dec  # a row shares its Dec (symmetric about the centre)
 
 
 def test_squares_are_live_boxes_with_the_same_area_id() -> None:
@@ -87,11 +89,36 @@ def test_squares_are_live_boxes_with_the_same_area_id() -> None:
         assert _plan_of(b).area_id == same.area_id
 
 
-def test_squares_cover_the_region_with_overlap() -> None:
-    p = scan.plan_scan(10.0, -30.0, 5.0, 3.0)
-    left, mid = p.squares[0].box, p.squares[1].box
-    gap = (left.ra - mid.ra) * 0.866  # cos(30 deg): RA degrees to sky degrees
-    assert gap < (left.width_deg + mid.width_deg) / 2  # neighbours overlap
+@pytest.mark.parametrize(
+    "region",
+    [
+        (180.0, 0.0, 4.0, 2.0),
+        (10.0, -30.0, 5.0, 3.0),
+        (200.0, 40.0, 4.0, 4.0),
+        (100.0, 60.0, 10.0, 10.0),
+        (359.9, -70.0, 6.0, 6.0),
+        (91.2, 13.4, 1.05, 0.65),
+    ],
+)
+def test_squares_cover_the_whole_region_with_overlap(region: tuple[float, ...]) -> None:
+    """Review #1: every point of the region lies inside some square, at least ``PAD_DEG`` from
+    its edge, on that square's own tangent plane (as the pipeline's ``AreaBox`` tests it)."""
+    p = scan.plan_scan(*region)
+    r = p.region
+    n = 24
+    for i in range(n + 1):
+        for j in range(n + 1):
+            xi = -r.width_deg / 2 + r.width_deg * i / n
+            eta = -r.height_deg / 2 + r.height_deg * j / n
+            ra, dec = scan.deproject(r.ra, r.dec, xi, eta)
+            margins = []
+            for sq in p.squares:
+                q = scan.project(sq.box.ra, sq.box.dec, ra, dec)
+                assert q is not None
+                margins.append(
+                    min(sq.box.width_deg / 2 - abs(q[0]), sq.box.height_deg / 2 - abs(q[1]))
+                )
+            assert max(margins) >= scan.PAD_DEG - 1e-6, (region, xi, eta)
 
 
 @pytest.mark.parametrize(
@@ -100,6 +127,7 @@ def test_squares_cover_the_region_with_overlap() -> None:
         ((10.0, 0.0, 12.5, 1.0), "scan:too_large"),
         ((10.0, 0.0, 1.0, 12.5), "scan:too_large"),
         ((10.0, 80.0, 2.0, 20.0), "scan:too_large"),
+        ((100.0, 0.0, 12.0, 12.0), "scan:too_large"),  # 7 x 7 squares with the overlap
         ((10.0, 84.0, 2.0, 10.0), "area:bad_box"),
         ((10.0, 0.0, 0.0, 1.0), "area:bad_box"),
         ((float("inf"), 0.0, 1.0, 1.0), "area:bad_box"),
@@ -111,14 +139,18 @@ def test_a_bad_region_is_refused(args: tuple[float, float, float, float], code: 
     assert err.value.code == code
 
 
-def test_twelve_degrees_is_thirty_six_squares() -> None:
-    p = scan.plan_scan(100.0, 0.0, 12.0, 12.0)
+def test_ten_degrees_is_thirty_six_squares_and_twelve_by_two_is_fourteen() -> None:
+    p = scan.plan_scan(100.0, 0.0, 10.0, 10.0)
     assert (p.cols, p.rows, len(p.squares)) == (6, 6, 36)
     assert [s.index for s in p.squares] == list(range(1, 37))
+    p = scan.plan_scan(100.0, 0.0, 12.0, 2.0)
+    assert (p.cols, p.rows) == (7, 2)
+    check(p.reply(RELEASE, "known", {}), "scan-plan.schema.json")  # cols may pass 6
 
 
 def test_the_plan_reply_without_stored_squares() -> None:
-    p = scan.plan_scan(180.0, 0.0, 4.0, 2.0)
+    p = scan.plan_scan(180.0, 0.0, 3.0, 1.0)
+    assert len(p.squares) == 2
     reply = p.reply(RELEASE, "discovery", {2: "live-000000000002"})
     check(reply, "scan-plan.schema.json")
     assert [s["area_id"] for s in reply["squares"]] == [None, "live-000000000002"]
@@ -227,7 +259,7 @@ def _run(jobs: LiveJobs, run_id: str) -> dict[str, Any]:
 
 
 def test_a_scan_runs_done_skipped_failed_and_reused_squares(tmp_path: Path) -> None:
-    p = scan.plan_scan(180.0, 0.0, 4.0, 4.0)  # 2 x 2
+    p = scan.plan_scan(180.0, 0.0, 3.0, 3.0)  # 2 x 2
     index_of = {s.box: s.index for s in p.squares}
     store = FakeStore()
     reused = _plan_of(p.squares[3].box).area_id
@@ -282,7 +314,7 @@ def test_a_scan_runs_done_skipped_failed_and_reused_squares(tmp_path: Path) -> N
 
 
 def test_found_events_follow_square_done_with_positions(tmp_path: Path) -> None:
-    p = scan.plan_scan(180.0, 0.0, 2.0, 2.0)
+    p = scan.plan_scan(180.0, 0.0, 1.5, 1.5)  # one square
     store = FakeStore()
 
     def runner(ctx: Context, plan: Plan, prog: Progress) -> None:
@@ -301,10 +333,19 @@ def test_found_events_follow_square_done_with_positions(tmp_path: Path) -> None:
     kinds = {(f["object"]["kind"], f["object"].get("designation")) for f in found}
     assert kinds == {("known", "433 Eros"), ("unexplained", None), ("predicted", "(1) Ceres")}
     assert all(f["object"]["positions"] and f["square"] == 1 for f in found)
+    # Review #10: every object names the provenance of its positions.
+    tags = {f["object"]["kind"]: f["object"]["positions_tag"] for f in found}
+    assert tags == {
+        "known": "model_dependent",
+        "unexplained": "measured",
+        "predicted": "model_dependent",
+    }
+    assert run["provenance"]["known_positions"]["tag"] == "model_dependent"
+    assert run["provenance"]["track_positions"]["tag"] == "measured"
 
 
 def test_a_scan_pauses_after_its_square_and_resumes(tmp_path: Path) -> None:
-    p = scan.plan_scan(180.0, 0.0, 4.0, 2.0)
+    p = scan.plan_scan(180.0, 0.0, 3.0, 1.0)  # 2 squares
     gate, started = threading.Event(), threading.Event()
 
     def runner(ctx: Context, plan: Plan, prog: Progress) -> None:
@@ -337,7 +378,7 @@ def test_a_scan_pauses_after_its_square_and_resumes(tmp_path: Path) -> None:
 
 
 def test_a_stopped_scan_keeps_its_finished_squares(tmp_path: Path) -> None:
-    p = scan.plan_scan(180.0, 0.0, 6.0, 2.0)  # 3 squares
+    p = scan.plan_scan(180.0, 0.0, 4.5, 1.0)  # 3 squares
     index_of = {s.box: s.index for s in p.squares}
     store = FakeStore()
     started = threading.Event()
@@ -495,18 +536,24 @@ def test_the_run_id_format() -> None:
 # --- merged results -----------------------------------------------------------------------
 
 
+def _row_of_three() -> tuple[dict[str, Any], dict[int, dict[str, Any]]]:
+    p = scan.plan_scan(180.0, 0.0, 4.5, 1.0)  # 3 squares in a row, about 1.6 deg apart
+    assert len(p.squares) == 3
+    return p.region.reply(), {s.index: s.box.reply() for s in p.squares}
+
+
 def test_an_object_in_squares_2_and_3_is_one_row() -> None:
-    region = scan.plan_scan(180.0, 0.0, 6.0, 2.0).region.reply()  # 3 squares in a row
+    region, boxes = _row_of_three()
     sq = [
         runs.SquareReplies(i, f"live-00000000000{i}", **_stages(r))
         for i, r in (
-            (1, _replies("a1", mover_at=181.9)),
+            (1, _replies("a1", mover_at=181.4)),
             (2, _replies("a2", eros_at=180.0, mover_at=180.3)),
             # the same mover 10 arcsec away on the same frame, and Eros again
             (3, _replies("a3", eros_at=180.0, mover_at=180.3 + 10 / 3600)),
         )
     ]
-    merged = runs.merge(region, sq)
+    merged = runs.merge(boxes, sq)
     found = [t for t in merged["tracks"] if t["kind"] == "found"]
     unexplained = [t for t in merged["tracks"] if t["kind"] == "unexplained"]
     assert len(found) == 1 and found[0]["squares"] == [2, 3]
@@ -532,13 +579,13 @@ def test_an_object_in_squares_2_and_3_is_one_row() -> None:
 
 
 def test_far_apart_or_non_neighbour_movers_stay_apart() -> None:
-    region = scan.plan_scan(180.0, 0.0, 6.0, 2.0).region.reply()
+    _, boxes = _row_of_three()
     sq = [
         runs.SquareReplies(1, "live-000000000001", **_stages(_replies("a1", mover_at=180.0))),
         runs.SquareReplies(3, "live-000000000003", **_stages(_replies("a3", mover_at=180.0))),
         runs.SquareReplies(2, "live-000000000002", **_stages(_replies("a2", mover_at=180.1))),
     ]
-    merged = runs.merge(region, sq)
+    merged = runs.merge(boxes, sq)
     # 1 and 3 are not neighbours; 2 is 360 arcsec from both.
     assert sorted(t["squares"] for t in merged["tracks"]) == [[1], [2], [3]]
 
@@ -573,7 +620,7 @@ def client(tmp_path: Path) -> Any:
         app.state.live_jobs.wait(10)
 
 
-REGION = {"ra": 180.0, "dec": 0.0, "width_deg": 4.0, "height_deg": 2.0}
+REGION = {"ra": 180.0, "dec": 0.0, "width_deg": 3.0, "height_deg": 1.0}  # 2 squares
 
 
 def test_the_plan_route_needs_no_network(
@@ -634,7 +681,7 @@ def test_run_routes_refuse(client: TestClient, monkeypatch: pytest.MonkeyPatch) 
     assert client.get("/v1/runs/not-a-run").status_code == 400  # request validation
     r = client.post("/v1/scans", json={**REGION, "width_deg": 12.5})
     assert (r.status_code, r.json()["error"]) == (422, "scan:too_large")
-    r = client.post("/v1/scans", json={**REGION, "dec": 88.0})
+    r = client.post("/v1/scans", json={**REGION, "dec": 88.8})
     assert (r.status_code, r.json()["error"]) == (422, "area:bad_box")
     assert client.post("/v1/scans", json={**REGION, "kind": "other"}).status_code == 400
 
@@ -714,3 +761,263 @@ def test_a_one_square_scan_runs_the_pipeline_and_is_served(
         assert len(eros[0]["visits"]) == 2
         area_id = run["squares"][0]["area_id"]
         assert c.get(f"/v1/areas/{area_id}/known").status_code == 200
+
+
+# --- review fixes (#156 code review) -------------------------------------------------------
+
+
+def test_a_stored_square_needs_no_sia_call(tmp_path: Path) -> None:
+    """Review #3: a square the plan found stored is done without the planner, even when the
+    archive is down; a square not stored still fails with the archive's code."""
+    from app.cache.store import UpstreamUnavailable
+
+    p = scan.plan_scan(180.0, 0.0, 3.0, 1.0)  # 2 squares
+    store = FakeStore()
+    store.areas["live-aaaaaaaaaaaa"] = _replies("live-aaaaaaaaaaaa", eros_at=180.0)
+    asked: list[Box] = []
+
+    def planner(ctx: Context, box: Box) -> Plan:
+        asked.append(box)
+        raise UpstreamUnavailable("IRSA down")
+
+    jobs = _scan_jobs(tmp_path, lambda ctx, plan, prog: None, planner=planner, store=store)
+    run_id = jobs.submit_scan(p, "discovery", RELEASE, {1: "live-aaaaaaaaaaaa"})
+    assert jobs.wait(10)
+    run = _run(jobs, run_id)
+    assert [s["state"] for s in run["squares"]] == ["done", "failed"]
+    assert run["squares"][1]["error"]["code"] == "upstream_unavailable"
+    assert asked == [p.squares[1].box]  # only the square not stored asked SIA
+
+
+def test_a_scan_square_is_listed_and_a_request_for_it_joins(tmp_path: Path) -> None:
+    """Review #4: while a scan computes a square, ``get`` shows its job and ``submit`` of the
+    same area joins it; a single job queued for an area a scan stored meanwhile is done at
+    once, without running the pipeline again."""
+    p = scan.plan_scan(180.0, 0.0, 1.5, 1.5)  # one square
+    plan = _plan_of(p.squares[0].box)
+    store = FakeStore()
+    gate, started = threading.Event(), threading.Event()
+    ran: list[str] = []
+
+    def runner(ctx: Context, pl: Plan, prog: Progress) -> None:
+        ran.append(pl.area_id)
+        prog.step("frames")
+        started.set()
+        while not gate.wait(0.01):
+            prog.check()
+        store.areas[pl.area_id] = _replies(pl.area_id, eros_at=180.0)
+
+    jobs = _scan_jobs(tmp_path, runner, store=store)
+    jobs.submit_scan(p, "discovery", RELEASE)
+    assert started.wait(5)
+    inner = jobs.get(plan.area_id)
+    assert inner is not None and inner.state == "running"
+    assert jobs.reply(inner)["step"] == "frames"
+    assert jobs.submit(plan) is inner  # joins, nothing queued
+    gate.set()
+    assert jobs.wait(10)
+    assert ran == [plan.area_id] and inner.state == "done"
+    # A single job for that area queued anyway (the store lost nothing): done, not rerun.
+    again = jobs.submit(plan, kind="known")
+    assert jobs.wait(10)
+    assert again.state == "done" and ran == [plan.area_id]
+
+
+def test_stopping_a_scan_square_from_the_live_route_fails_only_that_square(
+    tmp_path: Path,
+) -> None:
+    p = scan.plan_scan(180.0, 0.0, 3.0, 1.0)  # 2 squares
+    first = _plan_of(p.squares[0].box)
+    started = threading.Event()
+
+    def runner(ctx: Context, pl: Plan, prog: Progress) -> None:
+        if pl.area_id != first.area_id:
+            return
+        started.set()
+        while True:
+            prog.check()
+            threading.Event().wait(0.01)
+
+    jobs = _scan_jobs(tmp_path, runner)
+    run_id = jobs.submit_scan(p, "discovery", RELEASE)
+    assert started.wait(5)
+    assert jobs.cancel(first.area_id)  # DELETE /v1/areas/live/{id} on the square's job
+    assert jobs.wait(10)
+    run = _run(jobs, run_id)
+    assert run["state"] == "done"
+    assert [s["state"] for s in run["squares"]] == ["failed", "done"]
+    assert run["squares"][0]["error"]["code"] == "cancelled"
+
+
+def test_a_failed_single_area_run_is_failed(tmp_path: Path) -> None:
+    """Review #5: the run of one square whose job failed is ``failed``, not ``done``."""
+
+    def runner(ctx: Context, plan: Plan, prog: Progress) -> None:
+        raise LiveAreaError("area:frames_incomplete", "Some frames could not be read.")
+
+    jobs = _scan_jobs(tmp_path, runner)
+    job = jobs.submit(_plan_of(live.snap_box(10.0, 10.0, 0.5, 0.5)), kind="known")
+    assert jobs.wait(10)
+    assert job.run_id is not None
+    run = _run(jobs, job.run_id)
+    assert run["state"] == "failed"
+    assert run["squares"][0]["state"] == "failed"
+    assert run["squares"][0]["error"]["code"] == "area:frames_incomplete"
+
+
+def test_stopping_a_single_run_that_just_finished_is_a_conflict(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Review #6: ``stop`` answers ``run_finished`` when the job ended between the check and
+    the cancel, instead of a silent success."""
+    gate, started = threading.Event(), threading.Event()
+
+    def runner(ctx: Context, plan: Plan, prog: Progress) -> None:
+        started.set()
+        gate.wait(5)
+
+    jobs = _scan_jobs(tmp_path, runner)
+    job = jobs.submit(_plan_of(live.snap_box(10.0, 10.0, 0.5, 0.5)), kind="known")
+    assert started.wait(5) and job.run_id is not None
+    monkeypatch.setattr(jobs, "cancel", lambda area_id: False)  # it finished in between
+    with pytest.raises(RunConflict) as err:
+        jobs.stop(job.run_id)
+    assert err.value.code == "run_finished"
+    gate.set()
+    assert jobs.wait(10)
+
+
+def test_resume_counts_towards_the_queue_limit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Review #7: a resumed scan is queued at the back like a new job, and a full queue
+    refuses it."""
+    from app.core.area import live_jobs
+
+    p = scan.plan_scan(180.0, 0.0, 3.0, 1.0)  # 2 squares
+    gate, started = threading.Event(), threading.Event()
+
+    def runner(ctx: Context, plan: Plan, prog: Progress) -> None:
+        started.set()
+        gate.wait(5)
+
+    jobs = _scan_jobs(tmp_path, runner)
+    run_id = jobs.submit_scan(p, "discovery", RELEASE)
+    assert started.wait(5)
+    jobs.pause(run_id)
+    gate.set()
+    assert jobs.wait(10)
+    assert _run(jobs, run_id)["state"] == "paused"
+    monkeypatch.setattr(live_jobs, "MAX_WAITING", 0)
+    with pytest.raises(live_jobs.QueueFull):
+        jobs.resume(run_id)
+    assert _run(jobs, run_id)["state"] == "paused"
+    monkeypatch.setattr(live_jobs, "MAX_WAITING", 5)
+    gate.clear()
+    started.clear()
+    other = jobs.submit(_plan_of(live.snap_box(10.0, 10.0, 0.5, 0.5)))
+    assert started.wait(5)
+    jobs.resume(run_id)
+    assert _run(jobs, run_id)["queue_position"] == 1  # behind nothing waiting, after `other`
+    gate.set()
+    assert jobs.wait(10)
+    assert other.state == "done" and _run(jobs, run_id)["state"] == "done"
+
+
+def test_a_job_behind_a_scan_waits_for_its_squares_left(tmp_path: Path) -> None:
+    """Review #2: the wait behind a running scan is the squares not started plus what is
+    left of the current one, not the whole scan less the time since it first started."""
+    p = scan.plan_scan(180.0, 0.0, 4.5, 1.0)  # 3 squares
+    gate, started = threading.Event(), threading.Event()
+
+    def runner(ctx: Context, plan: Plan, prog: Progress) -> None:
+        if plan.box == p.squares[0].box:
+            return
+        started.set()
+        gate.wait(5)
+
+    jobs = _scan_jobs(tmp_path, runner)
+    jobs.submit_scan(p, "discovery", RELEASE)
+    assert started.wait(5)
+    job = jobs.submit(_plan_of(live.snap_box(10.0, 10.0, 0.5, 0.5)))
+    left = sum(live.estimate_seconds(s.box) for s in p.squares[1:])
+    eta = jobs.reply(job)["eta_s"]
+    assert left - 5 <= eta - job.plan.estimate_s() <= left
+    gate.set()
+    assert jobs.wait(10)
+
+
+def test_the_duration_leaves_out_pauses() -> None:
+    run = {
+        "started_at": "2026-11-13T10:00:00.000Z",
+        "finished_at": "2026-11-13T10:10:00.000Z",
+        "events": [
+            {"t": 0.0, "type": "run_started"},
+            {"t": 60.0, "type": "run_paused"},
+            {"t": 360.0, "type": "run_resumed"},
+            {"t": 600.0, "type": "run_done"},
+        ],
+    }
+    assert runs.duration_s(run) == 300.0
+    stopped_while_paused = {
+        **run,
+        "events": [*run["events"][:2], {"t": 600.0, "type": "run_stopped"}],
+    }
+    assert runs.duration_s(stopped_while_paused) == 60.0
+
+
+def test_run_record_writes_never_hold_the_read_lock(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Review #8: a slow disk write does not block readers of the run store."""
+    store = runs.RunStore(tmp_path / "runs")
+    box = live.snap_box(1.0, 1.0, 1.0, 1.0)
+    run_id = store.create("known", RELEASE, box, [(1, box, None)])
+    writing, release = threading.Event(), threading.Event()
+    real = runs.write_atomic
+
+    def slow(path: Path, body: bytes) -> None:
+        writing.set()
+        release.wait(5)
+        real(path, body)
+
+    monkeypatch.setattr(runs, "write_atomic", slow)
+    t = threading.Thread(target=store.start, args=(run_id,))
+    t.start()
+    assert writing.wait(5)
+    assert store.get(run_id)["state"] == "running"  # read while the write is still going
+    release.set()
+    t.join(5)
+    on_disk = json.loads((tmp_path / "runs" / f"{run_id}.json").read_text())
+    assert on_disk["state"] == "running" and on_disk["provenance"] == runs.RUN_PROVENANCE
+
+
+def test_a_square_s_replies_are_kept_small(tmp_path: Path) -> None:
+    """Review #9: a finished square keeps only its tracks' dots and its frame times."""
+    r = _replies("a1", eros_at=180.0)
+    r["dots"]["visits"][0]["dots"].append(
+        {"dot_id": "a1:99", "frame_id": "f1", "time": _iso(0), "ra": 1.0, "dec": 0.0}
+    )
+    r["summary"]["frames"][0]["s_region"] = "POLYGON ..."
+    sq = runs.read_square(1, "live-aaaaaaaaaaaa", lambda a, st: r[st])
+    assert sq.dots is not None and sq.summary is not None
+    assert [d["dot_id"] for d in sq.dots["visits"][0]["dots"]] == ["a1:1"]
+    assert sq.summary["frames"][0] == {"visit": 1, "time": _iso(0)}
+
+
+def test_the_store_reads_each_summary_once(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Review nit: ``areas_by_box`` reads every stored summary once."""
+    settings = make_settings(tmp_path / "cache")
+    store = AreaStore(make_context(settings), settings.area_pack_dir)
+    calls: list[str] = []
+    real = store.entry
+
+    def counted(area_id: str, stage: str) -> Any:
+        if stage == "summary":
+            calls.append(area_id)
+        return real(area_id, stage)
+
+    monkeypatch.setattr(store, "entry", counted)
+    by_box = store.areas_by_box("spherex_qr2")
+    assert "eros-2026-03" in by_box.values()
+    assert sorted(calls) == sorted(set(calls))

@@ -32,8 +32,8 @@ class ScanPlan(BaseModel):
     region: run_schema.RunRegion
     release: str = Field(..., min_length=1)
     kind: run_schema.RunKind
-    cols: int = Field(..., ge=1, le=6)
-    rows: int = Field(..., ge=1, le=6)
+    cols: int = Field(..., ge=1, le=36)
+    rows: int = Field(..., ge=1, le=36)
     squares: list[ScanSquare] = Field(..., max_length=36, min_length=1)
     estimate_s: int = Field(..., description="Rough total for the squares not stored yet.", ge=0)
     provenance: ScanPlanProvenance
