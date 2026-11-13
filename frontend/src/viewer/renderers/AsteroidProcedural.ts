@@ -40,10 +40,21 @@ export function displacementActive(tier: 'high' | 'medium' | 'low', scale: numbe
 /** Why the displacement layer is refused on the low quality level (Q-117). */
 export const PHONE_TIER_REASON = 'phone tier: relief shows as shading only';
 
+/**
+ * Q-469 (issue #145): the layer of a placeholder body, Build it on a Discovery track no known
+ * object explains. Its size and shape are not measured, so a plain unit sphere stands in, tagged
+ * `artistic` (the UI's "Assumed" badge), with no scale bar and the size listed as not drawn; at
+ * "Measured only" it is hidden like any artistic layer.
+ */
+export const PLACEHOLDER_LAYER = 'placeholder_shape';
+
 export function planAsteroidProcedural(input: PlanInput): RenderPlan {
   const b = new PlanBuilder(input);
   const tex = input.params.textures;
-  const bodyOk = b.body('diameter_km');
+  const placeholder = input.params.layers.some((l) => l.id === PLACEHOLDER_LAYER);
+  const bodyOk = placeholder
+    ? b.draw(PLACEHOLDER_LAYER) && b.bodyOptionalSize('diameter_km').ok
+    : b.body('diameter_km');
   const tier = input.ctx.qualityTier ?? 'high';
 
   // R6.2: a/b = 10^(0.4 A), c = b (model_dependent). Hidden or refused: plain sphere.
@@ -118,7 +129,10 @@ export function planAsteroidProcedural(input: PlanInput): RenderPlan {
   }
 
   const axes = ellipsoid ? ellipsoidAxes(numberField(input.card, 'lightcurve_amp_mag')) : undefined;
-  if (bodyOk && !ellipsoid) {
+  if (bodyOk && placeholder) {
+    b.notes.push('A placeholder: the size and shape of this object are not measured.');
+    b.legendBody('Plain sphere standing in for a body whose size and shape are not measured.');
+  } else if (bodyOk && !ellipsoid) {
     b.notes.push('Shown as a plain sphere: the ellipsoid shape is an estimate.');
     b.legendBody('Plain sphere at the size on the card.');
   }

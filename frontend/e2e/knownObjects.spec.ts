@@ -31,7 +31,7 @@ const indexBody = {
   cached_at: NOW, computed_at: NOW, missing: [],
   provenance: { areas: { tag: 'derived', source: 'test', formula: 'test' } },
 };
-// An object the pack cannot Track offline (no object id): its row says Open, with the reason.
+// An object with no object id: its Track cannot be computed (Track it off); Build it still works.
 const OTHER = {
   designation: '2026 AB1', number: null, object_id: null, kind: 'asteroid', v_mag: 19.2,
   n_frames: 2, n_visits: 1, track_available: false,
@@ -95,10 +95,10 @@ test('draw over Eros: the Known list shows 433 Eros from /known, with positions 
   // Q-455 (3): the demo object stays trackable while the pack says track_available false (#129).
   await expect(eros).toContainText('Track it');
   await expect(page.getByTestId('known-skybot')).toContainText('SkyBoT last answered');
-  // An object with no Track offline: Open, with the reason.
+  // An object with no JPL id: Track it is off (it cannot be computed), Build it is there (#145).
   const other = page.getByTestId('known-row').filter({ hasText: '2026 AB1' });
-  await expect(other).toContainText('Open');
-  await expect(other.getByTestId('known-no-track')).toHaveText('Track not prepared for this object offline');
+  await expect(other.getByTestId('known-track')).toBeDisabled();
+  await expect(other.getByTestId('known-build')).toBeEnabled();
   await expect(page.getByTestId('demo-tag')).toHaveCount(0);
   await expect(page.getByTestId('known-position').first()).toBeAttached();
 });
@@ -107,7 +107,7 @@ test('Track it opens the card on the backend frame list (18 frames) with the Dem
   await routes(page, true);
   await drawAt(page, { ra: 91.23, dec: 13.43, fovDeg: 3 });
   await expect(page.getByTestId('known-row')).toContainText('Track it', { timeout: 15_000 });
-  await page.getByTestId('known-row').click();
+  await page.getByTestId('known-track').click();
   await expect(page.getByTestId('eros-card')).toBeVisible();
   await expect(page.getByTestId('frame-counter')).toContainText('/ 18');
   await expect(page.getByTestId('eros-real')).toContainText('18 frames from the backend');
@@ -120,6 +120,9 @@ test('a square elsewhere is refused with area:not_prepared', async ({ page }) =>
   const refused = page.getByTestId('area-refused');
   await expect(refused).toBeVisible({ timeout: 15_000 });
   await expect(refused).toHaveAttribute('data-code', 'area:not_prepared');
-  await expect(refused).toHaveText('No prepared data for this area yet.');
+  // Held UI issue 6: a title, one line that says what to do, and Draw again.
+  await expect(refused).toContainText('No data for this area here');
+  await expect(refused).toContainText('Draw again');
+  await expect(page.getByTestId('area-redraw')).toBeVisible();
   await expect(page.getByTestId('known-row')).toHaveCount(0);
 });

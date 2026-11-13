@@ -39,6 +39,7 @@ import type { MouldPhase } from './useMould';
 import { closeBuildPane } from './focus';
 import { displayName } from '@/app/displayName';
 import { loadBodyFor, typeLabel, useSelection } from './selectedBody';
+import { PLACEHOLDER_LAYER } from '@/viewer/renderers/AsteroidProcedural';
 
 export { closeBuildPane };
 
@@ -87,7 +88,10 @@ export function BuildPane() {
   // (the rail's 3D viewer with no selection).
   const name = displayName(selection?.name ?? card?.name ?? null) || null;
   const bodyHere = selection && body.status !== 'idle' && body.id === selection.id ? body : null;
-  const type = typeLabel(params?.type);
+  // Q-469: a placeholder body (Build it on an unidentified Discovery track) is not an asteroid
+  // known to be one: the subtitle says what it is.
+  const placeholder = params?.layers.some((l) => l.id === PLACEHOLDER_LAYER) ?? false;
+  const type = placeholder ? 'Placeholder · size and shape not measured' : typeLabel(params?.type);
   // The mock-up's title (Q-298, amends Q-113): "Building X" for a build that is played, and it stays;
   // the bare name when the body is shown built at once (`B.quick`).
   const title = name ? (build.animate ? `Building ${name}` : name) : '3D view';
