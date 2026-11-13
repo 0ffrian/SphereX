@@ -9,6 +9,9 @@ area is 404 ``area_not_found``. Beyond D-16 (Q-146 (6)).
   area was prepared and stored with it as raw pixels (so it works offline without the cutouts);
   the PNG is encoded when serving.
 - ``GET /v1/areas/{area_id}/export.ecsv``: the A17.7 file.
+- ``GET /v1/areas/{area_id}/spectra``: the spectrum check of every track (A17.13, Q-474), its own
+  ``derived.area`` stage written after the area; 404 ``spectra_not_prepared`` when the area is
+  served but that stage is missing for the running spectrum version and settings.
 - ``POST /v1/areas/live``, ``GET`` and ``DELETE /v1/areas/live/{area_id}`` (Q-462, issue #141):
   a box drawn anywhere. ``start=false`` answers the plan (one SIA cone at the box centre picks
   two visits); ``start=true`` queues a background job (``live_jobs``), which runs the pipeline
@@ -18,7 +21,7 @@ area is 404 ``area_not_found``. Beyond D-16 (Q-146 (6)).
 
 ``/checks`` is not served: D4 and D5 are cut (Q-203 gate); ``summary.missing`` says
 ``checks:not_run``. Errors are ``{error, detail}``: 404 ``area_not_found``, 404 ``dot_not_found``,
-503 ``stamp_unavailable``.
+404 ``spectra_not_prepared``, 503 ``stamp_unavailable``.
 """
 
 from __future__ import annotations
@@ -225,6 +228,21 @@ def get_tracks(
     area_id: AreaIdPath, store: Annotated[AreaStore, Depends(get_area_store)]
 ) -> Response:
     return Response(content=_stage(store, area_id, "tracks"), media_type=JSON)
+
+
+@router.get("/{area_id}/spectra", responses=ERRORS)
+def get_spectra(
+    area_id: AreaIdPath, store: Annotated[AreaStore, Depends(get_area_store)]
+) -> Response:
+    _stage(store, area_id, "summary")  # 404 area_not_found first, as the other routes
+    entry = store.spectra_entry(area_id)
+    if entry is None:
+        raise ApiError(
+            404,
+            "spectra_not_prepared",
+            f"Area '{area_id}' has no spectrum check for the running code and settings.",
+        )
+    return Response(content=entry.body, media_type=JSON)
 
 
 @router.get("/{area_id}/export.ecsv", responses=ERRORS)

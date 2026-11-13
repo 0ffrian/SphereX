@@ -163,6 +163,10 @@ class Job[T]:
         }
 
 
+class QueueFull(Exception):
+    """``ensure`` would start a job while ``max_running`` jobs already run."""
+
+
 class JobRegistry[T]:
     def __init__(self, ttl_s: float) -> None:
         self.ttl_s = ttl_s
@@ -178,10 +182,16 @@ class JobRegistry[T]:
         return now - job.finished < self.ttl_s
 
     def ensure(
-        self, key: str, run: Callable[[Job[T]], T], *, reuse_finished: bool = True
+        self,
+        key: str,
+        run: Callable[[Job[T]], T],
+        *,
+        reuse_finished: bool = True,
+        max_running: int | None = None,
     ) -> Job[T]:
         """The running or recently finished job for ``key``, or a new one running ``run``.
-        ``reuse_finished=False`` joins only a running job."""
+        ``reuse_finished=False`` joins only a running job. ``max_running``: raise ``QueueFull``
+        instead of starting a job when that many already run (joining one is always allowed)."""
         with self._lock:
             now = time.monotonic()
             job = self._jobs.get(key)
@@ -192,6 +202,10 @@ class JobRegistry[T]:
             ):
                 self._jobs.move_to_end(key)
                 return job
+            if max_running is not None:
+                running = sum(1 for j in self._jobs.values() if j.state == "running")
+                if running >= max_running:
+                    raise QueueFull()
             job = Job(key)
             self._jobs[key] = job
             self._prune(now)

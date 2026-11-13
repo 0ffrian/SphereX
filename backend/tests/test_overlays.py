@@ -880,11 +880,11 @@ def test_concurrent_requests_share_one_computation(
     gate = threading.Event()
     runs: list[int] = []
 
-    def slow_compute(obj: Any) -> Any:
+    def slow_compute(obj: Any, window: Any = None) -> Any:
         runs.append(1)
         started.set()
         gate.wait(10)
-        return real(obj)
+        return real(obj, window)
 
     monkeypatch.setattr(service, "_compute", slow_compute)
     results: list[dict[str, Any]] = []

@@ -173,7 +173,7 @@ def run_live_area(ctx: Context, plan: Plan, progress: Progress) -> None:
     ``LiveAreaError`` for a result that must not be stored (as ``area_discovery.failures``)."""
     from app.core.area import dots as area_dots
     from app.core.area import frames as area_frames
-    from app.core.area import service
+    from app.core.area import service, spectrum
     from app.core.area.config import DEFAULT_AREA_CONFIG as cfg
     from app.core.area.match import Candidate
     from app.core.find.resolver import resolve
@@ -217,7 +217,15 @@ def run_live_area(ctx: Context, plan: Plan, progress: Progress) -> None:
     )
     progress.check()
     service.with_track(ctx, result)
-    service.store_area(ctx.cache, result, service.prepare(result))
+    prepared = service.prepare(result)
+    service.store_area(ctx.cache, result, prepared)
+    # The spectrum check (Q-474): milliseconds on the stored replies, so no job step of its own.
+    # The area is already stored and served; a failure here only leaves /spectra answering
+    # spectra_not_prepared (scripts/area_spectra.py fills it), so it does not fail the job.
+    try:
+        spectrum.store_prepared(ctx.cache, spec.data_release, prepared.params_hash, prepared.bodies)
+    except Exception:
+        log.exception("live area %s: the spectrum check failed; /spectra is not prepared", spec.id)
 
 
 def _error_of(exc: BaseException) -> tuple[str, str]:
