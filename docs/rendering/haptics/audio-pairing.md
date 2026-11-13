@@ -43,7 +43,7 @@ At the event the audio driver is the only output (Q-132). After the event it pla
 **Bluetooth latency**
 
 - Bluetooth output adds about 150–250 ms of latency.
-- Read `AudioContext.outputLatency`. When it is above `HIGH_OUTPUT_LATENCY_S` (0.1 s, a placeholder), suggest the laptop speaker or wired earphones. The threshold is **[verify]** in desktop Chrome on the A15; `outputLatency` support in Android Chrome is after the event (R12 #10).
+- Read `AudioContext.outputLatency`. When it is above `HIGH_OUTPUT_LATENCY_S` (0.1 s, a placeholder), suggest the laptop speaker or wired output (shown in the sound settings, #83). The threshold is **[verify]** in desktop Chrome on the A15; `outputLatency` support in Android Chrome is after the event (R12 #10).
 
 **Imagined drive**
 
