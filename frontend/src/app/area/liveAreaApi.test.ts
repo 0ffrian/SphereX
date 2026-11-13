@@ -2,6 +2,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   httpLiveAreaApi,
+  LiveJobGone,
   liveBoxOf,
   mockFromEnv,
   mockLiveAreaApi,
@@ -61,6 +62,11 @@ describe('reply checks', () => {
     expect(s.error).toEqual({ code: 'upstream_unavailable', detail: 'IRSA' });
     expect(() => parseStatusReply({ area_id: 'a', state: 'weird', steps: [], elapsed_s: 0, eta_s: 0 })).toThrow();
   });
+  it('the request box never asks for more than 2° a side (a hair over is the backend\'s area:too_large)', () => {
+    const b = liveBoxOf({ a: { ra: 10, dec: 1 }, b: { ra: 12, dec: -1 }, widthDeg: 2.0004, heightDeg: 1.99 });
+    expect(b.width_deg).toBe(2);
+    expect(b.height_deg).toBe(1.99);
+  });
   it('the request box: centre and sides of the drawn corners, across RA 0', () => {
     expect(liveBoxOf({ a: { ra: 359.5, dec: 11 }, b: { ra: 0.5, dec: 10 }, widthDeg: 1, heightDeg: 1 })).toEqual({
       ra: 0, dec: 10.5, width_deg: 1, height_deg: 1,
@@ -89,6 +95,10 @@ describe('HTTP client', () => {
       throw new TypeError('Failed to fetch');
     }) as unknown as typeof fetch);
     expect(await down.plan(BOX)).toEqual({ kind: 'unavailable' });
+  });
+  it('a job the server no longer knows (404 job_not_found) is LiveJobGone', async () => {
+    const api = httpLiveAreaApi('/v1', (async () => reply({ error: 'job_not_found', detail: 'x' }, 404)) as unknown as typeof fetch);
+    await expect(api.status('a')).rejects.toBeInstanceOf(LiveJobGone);
   });
   it('reads a job and stops it with DELETE', async () => {
     const fetchImpl = vi.fn(async (_u: string, init?: RequestInit) =>

@@ -10,7 +10,7 @@ import { DiscoveryCard, MoverCard } from '@/app/area/DiscoveryCard';
 import { ErosCard } from '@/app/area/ErosCard';
 import { KnownList } from '@/app/area/KnownList';
 import { LiveAreaCard } from '@/app/area/LiveAreaCard';
-import { fitCamera, flyToView, centreRect, safeRect } from '@/app/sky/areaDraw';
+import { fitCamera, flyToView, enterInArea, safeRect } from '@/app/sky/areaDraw';
 import { MAX_SIDE_DEG } from '@/app/area/aim';
 import { formatAreaDims, useAreaStore } from './areaStore';
 import { useShellStore } from './shellStore';
@@ -141,8 +141,7 @@ function DrawCard() {
       const dockTool = !!t?.closest('[data-testid="tool-known"], [data-testid="tool-area"]');
       if (t && !dockTool && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'BUTTON' || t.isContentEditable)) return;
       if (dockTool) e.preventDefault(); // not a second click on the tool
-      const b = centreRect();
-      if (b) useAreaStore.getState().setBox(b);
+      enterInArea();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);

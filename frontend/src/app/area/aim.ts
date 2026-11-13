@@ -54,8 +54,11 @@ export function clampDrag(d: AreaDrag, measure: MeasureDrag, max = MAX_SIDE_DEG)
   const at = (sx: number, sy: number): AreaDrag => ({ x0: d.x0, y0: d.y0, x1: d.x0 + dx * sx, y1: d.y0 + dy * sy });
   const m = measure(d);
   if (!m || (m.w <= max && m.h <= max)) return { ...d, held: false };
-  const sx = m.w > max ? largestScale((s) => (measure(at(s, 1))?.w ?? Infinity) <= max) : 1;
+  let sx = m.w > max ? largestScale((s) => (measure(at(s, 1))?.w ?? Infinity) <= max) : 1;
   const sy = m.h > max ? largestScale((s) => (measure(at(sx, s))?.h ?? Infinity) <= max) : 1;
+  // The width is measured across the box's middle, which moves when the height is held: check the
+  // final box once more, so a curved sky never leaves it a hair over the limit.
+  if ((measure(at(sx, sy))?.w ?? Infinity) > max) sx *= largestScale((s) => (measure(at(sx * s, sy))?.w ?? Infinity) <= max);
   return { ...at(sx, sy), held: true };
 }
 

@@ -65,7 +65,7 @@ import { useAreaStore } from '@/app/shell/areaStore';
 import { AreaOverlay } from './AreaOverlay';
 import { AreaTrackLayer } from '@/app/area/AreaTrackLayer';
 import { KnownPositionsLayer } from '@/app/area/KnownPositionsLayer';
-import { aimViewAt, boxFromPixels, centreRect, clampedRect, flyToView, reducedMotion, registerAreaView } from './areaDraw';
+import { aimViewAt, boxFromPixels, clampedRect, enterInArea, flyToView, reducedMotion, registerAreaView } from './areaDraw';
 import { AimOverlay } from './AimOverlay';
 import { useCachedMarkers } from './useCachedMarkers';
 import { useTargetMarkers, type TargetMarker } from './useTargetMarkers';
@@ -723,8 +723,7 @@ export function SkyPane({ children }: { children?: ReactNode }) {
           // Known objects / Discovery: Enter sets an area in the middle (the keyboard way to draw
           // one), at most 2° a side, from the aim step too.
           if (areaPlacing()) {
-            const mid = centreRect();
-            if (mid) useAreaStore.getState().setBox(mid);
+            enterInArea();
             return;
           }
           pickAt(width / 2, height / 2);

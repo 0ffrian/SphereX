@@ -10,7 +10,7 @@ import {
   wrapRa,
   type SkyCamera,
 } from '@/viewer/sky/skyMath';
-import type { AreaBox, AreaDrag } from '@/app/shell/areaStore';
+import { useAreaStore, type AreaBox, type AreaDrag } from '@/app/shell/areaStore';
 import { AIM_HEIGHT_DEG, clampCentred, clampDrag } from '@/app/area/aim';
 
 export interface AreaViewAccess {
@@ -82,6 +82,26 @@ export function aimViewAt(x: number, y: number): SkyCamera | null {
   const { width, height } = access.getSize();
   const p = screenToRaDec(access.getView(), x, y, width, height, { ra: 0, dec: 0 });
   return { ra: p.ra, dec: p.dec, fovDeg: clampFov(AIM_HEIGHT_DEG) };
+}
+
+/**
+ * Enter in the area tools (the keyboard way to draw): while aiming at a view much wider than the
+ * next one, it zooms to the middle as a click there would; otherwise it sets a centred box of at
+ * most 2° a side, so a box is never a few pixels on a wide sky.
+ */
+export function enterInArea(): void {
+  if (!access) return;
+  const s = useAreaStore.getState();
+  if (s.stage === 'aiming' && access.getView().fovDeg > 2 * AIM_HEIGHT_DEG) {
+    const { width, height } = access.getSize();
+    const to = aimViewAt(width / 2, height / 2);
+    if (!to) return;
+    s.pickPatch();
+    flyToView(to, reducedMotion());
+    return;
+  }
+  const b = centreRect();
+  if (b) s.setBox(b);
 }
 
 /** The live camera and the pane's size (the aim rectangle's scale), or null with no view. */

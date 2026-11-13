@@ -104,7 +104,10 @@ test('aim, zoom, draw at 2° max, offer, compute, then the Known list opens', as
 test('waiting: another area is computing; Cancel goes back to the offer', async ({ page }) => {
   await open(page, '?live=mock-queued&live_hold=0');
   await page.getByTestId('tool-known').click();
-  await page.keyboard.press('Enter'); // the keyboard way: an area in the middle, at most 2° a side
+  // The keyboard way: at a wide view Enter zooms to the middle first, then sets a centred area.
+  await page.keyboard.press('Enter');
+  await expect.poll(() => fov(page), { timeout: 5_000 }).toBeCloseTo(2.2, 3);
+  await page.keyboard.press('Enter');
   const card = page.getByTestId('live-card');
   await expect(card).toHaveAttribute('data-state', 'offer', { timeout: 15_000 });
   await page.getByTestId('live-compute').click();
@@ -123,6 +126,8 @@ test('failures: no visit pair, archive not reachable (Try again), offline', asyn
   ] as const) {
     await open(page, `?live=${q}`);
     await page.getByTestId('tool-area').click();
+    await page.keyboard.press('Enter');
+    await expect.poll(() => fov(page), { timeout: 5_000 }).toBeCloseTo(2.2, 3);
     await page.keyboard.press('Enter');
     const failed = page.getByTestId('live-failed');
     await expect(failed).toHaveAttribute('data-code', code, { timeout: 15_000 });
