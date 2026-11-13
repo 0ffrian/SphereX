@@ -28,7 +28,8 @@ export function PanelCard({
 }: {
   title: string;
   subtitle?: ReactNode;
-  icon: IconName;
+  /** The header's icon on its tile; none for the live area card (no icon tiles, issue #144). */
+  icon?: IconName;
   wide?: boolean;
   onClose(): void;
   /** Shows a minimise button beside close: the card folds into the island's pill. */
@@ -103,12 +104,14 @@ export function PanelCard({
     >
       {!bare && (
       <header className="sx-panel-head">
-        <span
-          className="grid size-9 flex-none place-items-center rounded-xl bg-sx-muted text-sx-green"
-          aria-hidden="true"
-        >
-          <Icon name={icon} />
-        </span>
+        {icon && (
+          <span
+            className="grid size-9 flex-none place-items-center rounded-xl bg-sx-muted text-sx-green"
+            aria-hidden="true"
+          >
+            <Icon name={icon} />
+          </span>
+        )}
         <div className="min-w-0">
           <h2 id={titleId} ref={titleRef} tabIndex={-1}>
             {title}
@@ -129,7 +132,7 @@ export function PanelCard({
             onClick={onMinimise}
             data-testid="area-min"
           >
-            <Icon name="minimise" className="size-4" />
+            <Icon name="minus" className="size-4" />
           </button>
         )}
         <button
@@ -139,7 +142,7 @@ export function PanelCard({
           title="Close (Esc)"
           onClick={close}
         >
-          <Icon name="close" className="size-4" />
+          <Icon name="x" className="size-4" />
         </button>
       </header>
       )}
