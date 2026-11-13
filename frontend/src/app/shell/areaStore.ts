@@ -24,6 +24,7 @@ import {
 } from '@/app/area/areaService';
 import { getLiveAreaApi, liveBoxOf, type PlanAnswer } from '@/app/area/liveAreaApi';
 import { registerLiveHandoff, registerLiveRedraw, useLiveJobStore } from '@/app/area/liveJobStore';
+import { registerTrackDone, useTrackJobStore } from '@/app/area/trackJobStore';
 import { useShellStore } from './shellStore';
 
 export interface SkyCorner {
@@ -49,9 +50,10 @@ export interface AreaDrag {
 }
 /**
  * Where the flow is: the drawing card, the island searching, the list, an Eros card, the steps, or
- * the live card (offer, computing, waiting, failure; issue #144).
+ * the live card (offer, computing, waiting, failure; issue #144), or a Track computed on demand
+ * (issue #145, trackJobStore).
  */
-export type AreaScreen = 'draw' | 'search' | 'list' | 'eros' | 'disc' | 'mover' | 'live';
+export type AreaScreen = 'draw' | 'search' | 'list' | 'eros' | 'disc' | 'mover' | 'live' | 'track';
 
 /** The checkboxes of the Eros card: which layers show on the cutout. */
 export interface ErosOverlays {
@@ -158,6 +160,13 @@ export interface AreaState {
   openEros(obj?: KnownObject | null): void;
   openDisc(): void;
   openMover(i: number): void;
+  /**
+   * Track it on an object the cache cannot Track yet (issue #145): start its Track job around
+   * `around` (ISO) and show its progress; the Track view opens when it is done.
+   */
+  openTrack(obj: KnownObject, around: string, release: string): void;
+  /** Where the Track card's "Back to the results" goes: the Known list, or the Discovery track. */
+  trackBack: 'list' | 'mover';
   setMinimised(on: boolean): void;
   setIndex(i: number): void;
   setVisit(visit: number | null): void;
@@ -331,6 +340,18 @@ export const useAreaStore = create<AreaState>()((set, get) => {
     );
   };
 
+  // A Track job that ends opens its Track view, unless the user has left the area tool or moved to
+  // another card meanwhile; the object is Track-available from then on (its row says so).
+  registerTrackDone((obj) => {
+    const s = get();
+    const key = obj.designation ?? obj.id;
+    const known = s.known
+      ? { ...s.known, objects: s.known.objects.map((o) => ((o.designation ?? o.id) === key ? { ...o, trackAvailable: true } : o)) }
+      : null;
+    set({ known });
+    if (s.screen === 'track' && useShellStore.getState().tool === 'area') get().openEros(obj);
+  });
+
   /** The live card for a box with no prepared area (issue #144). */
   const openLive = (box: AreaBox, flow: AreaFlow, live: Exclude<PlanAnswer, { kind: 'unavailable' }>) => {
     set({ say: null, screen: 'live', minimised: false });
@@ -404,6 +425,7 @@ export const useAreaStore = create<AreaState>()((set, get) => {
     startFlow: (flow) => {
       clearTimers();
       useLiveJobStore.getState().clearView();
+      useTrackJobStore.getState().clear();
       set({ ...FRESH, flow });
     },
     setDrag: (drag) => set({ drag }),
@@ -426,11 +448,14 @@ export const useAreaStore = create<AreaState>()((set, get) => {
     openEros: (obj = null) => {
       set((s) => ({
         screen: 'eros',
+        // Back from the Track view: to the Discovery track it was opened from, else none (Known).
+        trackBack: s.screen === 'mover' ? 'mover' : s.screen === 'track' ? s.trackBack : 'list',
         minimised: false,
         index: 0,
         det: null,
         playing: false,
-        sel: -1,
+        // Kept when it came from a Discovery track, so its back chevron returns to that track.
+        sel: s.screen === 'mover' || (s.screen === 'track' && s.trackBack === 'mover') ? s.sel : -1,
         fitSeq: s.fitSeq + 1,
         focus: obj,
         eros: obj ? null : s.eros,
@@ -442,6 +467,12 @@ export const useAreaStore = create<AreaState>()((set, get) => {
       void loadEros(obj);
     },
     openDisc: () => openDiscFor(false),
+    trackBack: 'list',
+    openTrack: (obj, around, release) => {
+      const from = get().screen;
+      set({ screen: 'track', minimised: false, focus: obj, trackBack: from === 'mover' ? 'mover' : 'list', playing: false });
+      void useTrackJobStore.getState().start(obj, around, release);
+    },
     openMover: (i) =>
       set({ screen: 'mover', sel: i, minimised: false, index: 0, det: null, playing: false }),
     setMinimised: (minimised) => set({ minimised }),
@@ -462,6 +493,7 @@ export const useAreaStore = create<AreaState>()((set, get) => {
     reset: () => {
       clearTimers();
       useLiveJobStore.getState().clearView();
+      useTrackJobStore.getState().clear();
       set({ ...FRESH });
     },
   };
@@ -485,6 +517,10 @@ export function areaMiniTitle(
   }
   // The live card's pill is liveMiniTitle (Island.tsx); this is only its fallback.
   if (s.screen === 'live') return 'Live area';
+  if (s.screen === 'track') {
+    const name = s.focus ? [s.focus.id, s.focus.name].filter(Boolean).join(' ') : 'Track';
+    return `${name} · Preparing Track`;
+  }
   return s.screen === 'list' ? `Known objects${tag}` : `Discovery${tag}`;
 }
 

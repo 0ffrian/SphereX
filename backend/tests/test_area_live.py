@@ -517,7 +517,7 @@ def test_a_waiting_job_counts_a_stopped_job_still_winding_down(tmp_path: Path) -
 def test_a_full_queue_answers_429(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
     from app.core.area import live_jobs
 
-    def full(plan: Plan) -> Any:
+    def full(plan: Plan, kind: str | None = None) -> Any:
         raise live_jobs.QueueFull()
 
     monkeypatch.setattr(client.app.state.live_jobs, "submit", full)  # type: ignore[attr-defined]

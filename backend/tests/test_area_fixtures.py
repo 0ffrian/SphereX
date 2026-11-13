@@ -171,6 +171,10 @@ MUTATIONS: dict[str, Mutation] = {
     "too_few with a chi2_red": lambda a: _t(a, "T4")["sed"].__setitem__("chi2_red", 1.0),
     "one_visit possible with a rate": lambda a: _t(a, "T4").__setitem__("rate_deg_day", 0.3),
     "one_visit possible with a distance": lambda a: _t(a, "T4").__setitem__("u_inv_au", 0.5),
+    "track with a PA but no rate": lambda a: _t(a, "T2").__setitem__("rate_deg_day", None),
+    "track with a u but no rate": lambda a: _t(a, "T2").update(
+        {"rate_deg_day": None, "pa_deg": None, "u_inv_au": 0.5}
+    ),
     "known from another run": lambda a: a["known"].__setitem__(
         "computed_at", "2026-11-10T12:30:00.000Z"
     ),
@@ -201,6 +205,14 @@ def test_consistency_rules_catch(name: str) -> None:
 def test_checks_may_run_later_than_the_area() -> None:
     area = copy.deepcopy(_area("fixture:area-main"))
     area["checks"]["computed_at"] = "2026-11-10T13:00:00.000Z"
+    _run(area, _entry("fixture:area-main"))
+
+
+def test_a_track_may_be_served_without_a_rate() -> None:
+    """A17.4 Output, Q-208 (21): a track whose chain fit and every pair fit fail the chain's
+    window (``fit="none"``) is served with null rate, PA and ``u``, still as a track."""
+    area = copy.deepcopy(_area("fixture:area-main"))
+    _t(area, "T2").update({"rate_deg_day": None, "pa_deg": None, "u_inv_au": None})
     _run(area, _entry("fixture:area-main"))
 
 

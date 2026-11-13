@@ -96,6 +96,16 @@ export interface KnownObject {
   trackAvailable?: boolean;
   /** Horizons positions at each frame time, seen from SPHEREx: `model_dependent` (A16.5). */
   positions?: AreaKnownPosition[];
+  /** Real rows: the number, null for an unnumbered object. */
+  number?: number | null;
+  /** Real rows: SkyBoT's V magnitude, null when it gave none. */
+  vMag?: number | null;
+  /**
+   * Q-466: the Discovery track that found this object blind (`found_blind`, matched to it), with
+   * its median distance from the predicted position; null when Discovery did not detect it, and
+   * undefined when that is not known (the tracks did not load, or the demo).
+   */
+  detection?: { trackId: string; sepPx: number | null; points?: { ra: number; dec: number }[] } | null;
 }
 export interface KnownObjectsResult {
   /** True for the made-up demo answer; false for a prepared area's stored reply. */
@@ -244,8 +254,34 @@ export function latestSkybot(known: Pick<RealKnown['known'], 'skybot'>): string 
   return best;
 }
 
-/** One `/known` row as the card's row (A18.5): the reply's fields, nothing computed. Pure. */
-export function knownRow(k: AreaKnownObject): KnownObject {
+/** True when a track's match names this known object: same object id, else number, else designation. */
+export function matchesKnown(
+  m: { designation: string; number: number | null; object_id: string | null },
+  k: Pick<AreaKnownObject, 'designation' | 'number' | 'object_id'>,
+): boolean {
+  if (m.object_id !== null && k.object_id !== null) return m.object_id === k.object_id;
+  if (m.number !== null && k.number !== null) return m.number === k.number;
+  return m.designation === k.designation;
+}
+
+/**
+ * One `/known` row as the card's row (A18.5): the reply's fields, nothing computed. With the area's
+ * tracks, a row is Detected when a `found_blind` track matched it (Q-466). Pure.
+ */
+export function knownRow(
+  k: AreaKnownObject,
+  tracks: readonly AreaTrack[] | null = null,
+  dots: ReadonlyMap<string, { ra: number; dec: number }> | null = null,
+): KnownObject {
+  let detection: KnownObject['detection'];
+  if (tracks) {
+    const t = tracks.find((x) => x.verdict === 'found_blind' && x.match !== null && matchesKnown(x.match, k));
+    detection = t ? { trackId: t.track_id, sepPx: t.match?.median_sep_px ?? null } : null;
+    if (t && dots) {
+      const points = t.tracklets.flatMap((tl) => tl.dot_ids.map((id) => dots.get(id)).filter((p) => p !== undefined));
+      detection = { ...detection!, points };
+    }
+  }
   return {
     ...splitDesignation(k.designation, k.number),
     kind: k.kind,
@@ -255,7 +291,24 @@ export function knownRow(k: AreaKnownObject): KnownObject {
     objectId: k.object_id,
     trackAvailable: k.track_available,
     positions: k.positions,
+    number: k.number,
+    vMag: k.v_mag,
+    ...(detection !== undefined ? { detection } : {}),
   };
+}
+
+/**
+ * The Known list's order (Q-466): detected first, then by brightness (smaller V first; no V last),
+ * then by designation, so the same reply always lists the same way. Pure; returns a new array.
+ */
+export function sortKnown(objects: readonly KnownObject[]): KnownObject[] {
+  const v = (o: KnownObject) => (o.vMag ?? null) === null ? Infinity : (o.vMag as number);
+  return objects.slice().sort(
+    (a, b) =>
+      Number(!a.detection) - Number(!b.detection) ||
+      v(a) - v(b) ||
+      (a.designation ?? a.id).localeCompare(b.designation ?? b.id),
+  );
 }
 
 /**
@@ -453,7 +506,9 @@ export async function knownObjectsIn(box: AreaBox, signal?: AbortSignal): Promis
   const hit = await findArea(api, box, signal);
   if (!hit) return demoKnownIn(box);
   const real = await loadKnown(api, hit.entry, hit.fixture, signal).catch(refuse);
-  return { demo: false, real, objects: real.known.known.map(knownRow) };
+  const tracks = real.tracks?.tracks ?? null;
+  const dots = real.dots ? new Map(real.dots.visits.flatMap((v) => v.dots.map((d) => [d.dot_id, { ra: d.ra, dec: d.dec }] as const))) : null;
+  return { demo: false, real, objects: sortKnown(real.known.known.map((k) => knownRow(k, tracks, dots))) };
 }
 
 /** Discovery: a prepared area's stored replies, else the demo (which refuses outside Eros's area). */

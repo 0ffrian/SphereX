@@ -10,6 +10,7 @@ import { DiscoveryCard, MoverCard } from '@/app/area/DiscoveryCard';
 import { ErosCard } from '@/app/area/ErosCard';
 import { KnownList } from '@/app/area/KnownList';
 import { LiveAreaCard } from '@/app/area/LiveAreaCard';
+import { TrackJobCard } from '@/app/area/TrackJobCard';
 import { fitCamera, flyToView, enterInArea, safeRect } from '@/app/sky/areaDraw';
 import { MAX_SIDE_DEG } from '@/app/area/aim';
 import { formatAreaDims, useAreaStore } from './areaStore';
@@ -91,6 +92,7 @@ export function AreaCard() {
   const closePanel = useShellStore((s) => s.closePanel);
   const screen = useAreaStore((s) => s.screen);
   const minimised = useAreaStore((s) => s.minimised);
+  const trackBack = useAreaStore((s) => s.trackBack);
   useFitSquare();
   useReportAreaBox();
 
@@ -113,13 +115,15 @@ export function AreaCard() {
     case 'list':
       return <KnownList />;
     case 'eros':
-      return <ErosCard />;
+      return <ErosCard back={trackBack === 'mover' ? () => useAreaStore.getState().openMover(useAreaStore.getState().sel) : undefined} />;
     case 'disc':
       return <DiscoveryCard />;
     case 'mover':
       return <MoverCard />;
     case 'live':
       return <LiveAreaCard />;
+    case 'track':
+      return <TrackJobCard />;
     default:
       return <DrawCard />;
   }

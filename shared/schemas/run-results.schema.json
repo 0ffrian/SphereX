@@ -1,0 +1,276 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "run-results.schema.json",
+  "title": "RunResults",
+  "description": "GET /v1/runs/{run_id}/results (Q-471): the finished squares' stored results with the duplicates merged. Read from the stored areas; nothing is computed.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "run_id",
+    "kind",
+    "release",
+    "region",
+    "state",
+    "squares",
+    "known",
+    "tracks",
+    "provenance"
+  ],
+  "properties": {
+    "run_id": {
+      "$ref": "run.schema.json#/definitions/RunId"
+    },
+    "kind": {
+      "$ref": "run.schema.json#/definitions/RunKind"
+    },
+    "release": {
+      "type": "string",
+      "minLength": 1
+    },
+    "region": {
+      "$ref": "run.schema.json#/definitions/RunRegion"
+    },
+    "state": {
+      "$ref": "run.schema.json#/definitions/RunState"
+    },
+    "squares": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/RunResultSquare"
+      }
+    },
+    "known": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/RunKnownRow"
+      }
+    },
+    "tracks": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/RunTrackRow"
+      }
+    },
+    "provenance": {
+      "$ref": "#/definitions/RunResultsProvenance"
+    }
+  },
+  "definitions": {
+    "RunResultSquare": {
+      "title": "RunResultSquare",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "index",
+        "area_id",
+        "state"
+      ],
+      "properties": {
+        "index": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "area_id": {
+          "$ref": "run.schema.json#/definitions/RunAreaId"
+        },
+        "state": {
+          "$ref": "run.schema.json#/definitions/RunSquareState"
+        }
+      }
+    },
+    "RunKnownRow": {
+      "title": "RunKnownRow",
+      "description": "A known object, merged by designation.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "designation",
+        "number",
+        "object_id",
+        "kind",
+        "v_mag",
+        "detected",
+        "track_available",
+        "squares",
+        "visits",
+        "positions"
+      ],
+      "properties": {
+        "designation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "number": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "object_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "kind": {
+          "enum": [
+            "asteroid",
+            "comet"
+          ]
+        },
+        "v_mag": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "detected": {
+          "type": "boolean",
+          "description": "A merged track carries its designation; false = predicted only."
+        },
+        "track_available": {
+          "type": "boolean"
+        },
+        "squares": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "visits": {
+          "type": "array",
+          "items": {
+            "$ref": "area-index.schema.json#/definitions/AreaUtcTime"
+          },
+          "description": "Visit start times of the squares the row comes from."
+        },
+        "positions": {
+          "type": "array",
+          "items": {
+            "$ref": "run.schema.json#/definitions/RunPosition"
+          }
+        }
+      }
+    },
+    "RunTrackRow": {
+      "title": "RunTrackRow",
+      "description": "A found or unexplained track, merged across neighbouring squares.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "designation",
+        "squares",
+        "tracks",
+        "visits",
+        "positions"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "found",
+            "unexplained"
+          ]
+        },
+        "designation": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "squares": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "tracks": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/definitions/RunTrackRef"
+          }
+        },
+        "visits": {
+          "type": "array",
+          "items": {
+            "$ref": "area-index.schema.json#/definitions/AreaUtcTime"
+          },
+          "description": "Visit start times of the squares the row comes from."
+        },
+        "positions": {
+          "type": "array",
+          "items": {
+            "$ref": "run.schema.json#/definitions/RunPosition"
+          }
+        }
+      }
+    },
+    "RunTrackRef": {
+      "title": "RunTrackRef",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "square",
+        "area_id",
+        "track_id"
+      ],
+      "properties": {
+        "square": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "area_id": {
+          "$ref": "area-index.schema.json#/definitions/AreaId"
+        },
+        "track_id": {
+          "$ref": "area-index.schema.json#/definitions/AreaTrackId"
+        }
+      }
+    },
+    "RunResultsProvenance": {
+      "title": "RunResultsProvenance",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "merge",
+        "known_positions",
+        "track_positions"
+      ],
+      "properties": {
+        "merge": {
+          "$ref": "area-index.schema.json#/definitions/AreaProvenanceEntry"
+        },
+        "known_positions": {
+          "$ref": "area-index.schema.json#/definitions/AreaProvenanceEntry"
+        },
+        "track_positions": {
+          "$ref": "area-index.schema.json#/definitions/AreaProvenanceEntry"
+        }
+      }
+    }
+  }
+}

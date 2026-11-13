@@ -9,7 +9,7 @@ import { PanelCard } from '@/app/shell/PanelCard';
 import { useAreaStore } from '@/app/shell/areaStore';
 import { useShellStore } from '@/app/shell/shellStore';
 import { formatBoxDeg } from './aim';
-import type { LiveJobStatus } from './liveAreaApi';
+import type { LiveJobStatus, LivePlan, LiveVisit } from './liveAreaApi';
 import {
   aboutMinutes,
   clock,
@@ -76,7 +76,7 @@ function Offer({ view, busy }: { view: Extract<LiveView, { kind: 'offer' }>; bus
         <dt>Data</dt>
         <dd>{releaseName(plan.release)}</dd>
         <dt>Visits</dt>
-        <dd>{visitsText(plan)}</dd>
+        <dd>{plan.alternatives.length > 0 ? <VisitPicker plan={plan} busy={busy} /> : visitsText(plan)}</dd>
         <dt>Frames</dt>
         <dd>about {plan.n_frames}</dd>
         <dt>Time</dt>
@@ -96,6 +96,37 @@ function Offer({ view, busy }: { view: Extract<LiveView, { kind: 'offer' }>; bus
         <DrawAgain />
       </div>
     </>
+  );
+}
+
+/**
+ * The visit pair picker (issue #145; #141's optional pair): the closest pair is chosen first; the
+ * others at most 6 h apart are offered, closest first. Another pair is another area (its own id).
+ */
+function VisitPicker({ plan, busy }: { plan: LivePlan; busy: boolean }) {
+  const pairs = [plan.visits, ...plan.alternatives.map((a) => a.visits)];
+  const key = (p: readonly LiveVisit[]) => `${p[0]!.start}|${p[1]!.start}`;
+  return (
+    <select
+      className="sx-live-select"
+      aria-label="Visit pair"
+      value={key(plan.visits)}
+      disabled={busy}
+      onChange={(e) => {
+        const [a, b] = e.target.value.split('|') as [string, string];
+        void useLiveJobStore.getState().choosePair([a, b]);
+      }}
+      data-testid="live-pair"
+    >
+      {pairs
+        .slice()
+        .sort((x, y) => Date.parse(x[0]!.start) - Date.parse(y[0]!.start))
+        .map((p) => (
+          <option key={key(p)} value={key(p)}>
+            {visitsText({ visits: [p[0]!, p[1]!] })}
+          </option>
+        ))}
+    </select>
   );
 }
 
