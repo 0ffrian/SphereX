@@ -204,3 +204,26 @@ def test_label_dots_refuses_a_geometry_from_other_frames_of_the_same_area() -> N
     assert stale.box == clean.area_geometry(frames).box
     with pytest.raises(ValueError, match="not built from these frames"):
         clean.label_dots(frames, bodies, recorded_dots(), recorded_lists(), geo=stale)
+
+
+def test_every_step_refuses_a_geometry_from_other_frames() -> None:
+    """Code review of the PR #140 follow-up: ``join``, ``spherex_w`` and the known check take
+    the same ``geo`` and check it the same way, without rebuilding it."""
+    from app.core.area import join, match
+    from tests.area_recorded import recorded_frames
+
+    frames, _ = recorded_frames()
+    last = max(f.visit for f in frames.frames)
+    fewer = dataclasses.replace(frames, frames=tuple(f for f in frames.frames if f.visit != last))
+    stale = clean.area_geometry(fewer)
+    clean.area_geometry(frames).require(frames, clean.DEFAULT_AREA_CONFIG)  # its own: accepted
+    with pytest.raises(ValueError, match="not built from these frames"):
+        stale.require(frames)
+    empty = clean.Labels([], {}, [], [])
+    with pytest.raises(ValueError, match="not built from these frames"):
+        join.join(empty, frames, stale, {})
+    with pytest.raises(ValueError, match="not built from these frames"):
+        match.known_list(frames, match.KnownStep({}, [], {}, [], []), stale)
+    other_cfg = dataclasses.replace(clean.DEFAULT_AREA_CONFIG, rate_max_deg_day=0.5)
+    with pytest.raises(ValueError, match="not built from these frames"):
+        clean.area_geometry(frames).require(frames, other_cfg)

@@ -67,8 +67,8 @@ def entries(source: str, root: Path = FIXTURE_CACHE) -> list[tuple[dict[str, Any
 @lru_cache(maxsize=1)
 def _eros_cone_entries() -> tuple[tuple[dict[str, Any], bytes], ...]:
     """The recorded SIA entries of the two Eros cones, in ``EROS_CONES`` order: the one matching
-    rule shared by ``recorded_sia`` and ``recorded_sia_fetched``, reading the fixtures once
-    (cached; read only)."""
+    rule shared by ``recorded_sia`` and ``recorded_sia_fetched``. Cached, so the fixtures are
+    read once per process; callers must not change the returned metadata."""
     sia = entries("irsa_sia")
     return tuple(
         (meta, body)

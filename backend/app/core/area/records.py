@@ -114,13 +114,16 @@ class AreaFrames:
     input_digests: tuple[str, ...]  # SHA-256 of every SIA and cutout body used, sorted
     cones: tuple[ConeLog, ...] = ()
     stats: dict[str, Any] = field(default_factory=dict)  # Day 0 timings and sizes, not compared
-    # ISO-Z ``fetched_at`` of every SIA cone body read, sorted and unique, also on a failed cone
-    # (so the field always means "every cone body read"; an incomplete ``AreaFrames`` is never
-    # stored, so only a complete one dates a run, ``AreaResult.times``, Q-420 (9)). Not in
-    # ``frames_jsonable`` on purpose: that form is the byte-compared record (A17.10), and a fetch
-    # date differs between two runs on the same inputs. Nothing rebuilds an ``AreaFrames`` from
-    # that JSON; a stored run keeps its dates in the reply head instead.
+    # ISO-Z ``fetched_at`` of every SIA cone body read, sorted and unique, also on a failed cone:
+    # the run's date when no input after the dots step was read (``AreaResult.times``, Q-420
+    # (9)). Not in ``frames_jsonable`` on purpose: that form is the byte-compared record
+    # (A17.10), and a fetch date differs between two runs on the same inputs. Nothing rebuilds an
+    # ``AreaFrames`` from that JSON; a stored run keeps its dates in the reply head instead.
     sia_fetched: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        # The one place ``sia_fetched`` is made sorted and unique, whichever constructor built it.
+        object.__setattr__(self, "sia_fetched", tuple(sorted(set(self.sia_fetched))))
 
 
 def _mask_rows(mask: NDArray[np.bool_]) -> list[str]:

@@ -19,11 +19,13 @@ afterEach(() => {
 });
 
 describe('area store', () => {
-  it('startFlow goes to drawing for that flow', () => {
+  it('startFlow aims for that flow, and picking the patch goes to drawing (issue #144)', () => {
     useAreaStore.getState().startFlow('known');
     const s = useAreaStore.getState();
     expect(s.flow).toBe('known');
-    expect(s.stage).toBe('drawing');
+    expect(s.stage).toBe('aiming');
+    useAreaStore.getState().pickPatch();
+    expect(useAreaStore.getState().stage).toBe('drawing');
     expect(s.screen).toBe('draw');
     expect(s.box).toBeNull();
   });
@@ -97,7 +99,8 @@ describe('Known flow on the API (issue #130)', () => {
     const s = useAreaStore.getState();
     expect(s.screen).toBe('list');
     expect(s.known?.demo).toBe(false);
-    expect(s.known?.real?.missing).toEqual(['skybot:2']);
+    // The stub serves no summary or tracks: those are named as missing too (issue #145).
+    expect(s.known?.real?.missing).toEqual(['skybot:2', 'area:summary_unavailable', 'area:detections_unavailable']);
     expect(s.refusal).toBeNull();
   });
   it('a newer square aborts the request of the older one', async () => {
