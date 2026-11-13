@@ -6,8 +6,9 @@ import type {
   AreaDot,
   AreaMatch,
   AreaPlantedDot,
-  AreaSed,
   AreaSkybotAnswer,
+  AreaSpectraPair,
+  AreaSpectraTrack,
   AreaTag,
   AreaTrack,
   AreaVerdict,
@@ -59,7 +60,9 @@ describe('the Area search types (A17.8)', () => {
   it('type the enum lists and the nullable fields', () => {
     expectTypeOf(AREA_VERDICTS).toEqualTypeOf<readonly AreaVerdict[]>();
     expectTypeOf<AreaTrack['match']>().toEqualTypeOf<AreaMatch | null>();
-    expectTypeOf<AreaTrack['sed']>().toEqualTypeOf<AreaSed | undefined>();
+    expectTypeOf<AreaTrack>().not.toHaveProperty('sed');
+    expectTypeOf<AreaSpectraTrack['heat_glow']>().toEqualTypeOf<boolean | null>();
+    expectTypeOf<AreaSpectraPair['rho_err']>().toEqualTypeOf<number | null>();
     expectTypeOf<AreaSkybotAnswer['fetched_at']>().toEqualTypeOf<string | null>();
   });
 });

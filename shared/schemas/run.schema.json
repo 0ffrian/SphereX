@@ -1,0 +1,426 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "run.schema.json",
+  "title": "Run",
+  "description": "GET /v1/runs/{run_id}, and POST /v1/scans with start=true (Q-471): a scan or a single live area, with its timeline for replay. Stored as <SX_CACHE_DIR>/runs/<run_id>.json; queue_position and progress are added to the reply only.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "run_id",
+    "kind",
+    "release",
+    "region",
+    "squares",
+    "state",
+    "created_at",
+    "started_at",
+    "finished_at",
+    "totals",
+    "events",
+    "provenance"
+  ],
+  "properties": {
+    "run_id": {
+      "$ref": "#/definitions/RunId"
+    },
+    "kind": {
+      "$ref": "#/definitions/RunKind"
+    },
+    "release": {
+      "type": "string",
+      "minLength": 1
+    },
+    "region": {
+      "$ref": "#/definitions/RunRegion"
+    },
+    "squares": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 36,
+      "items": {
+        "$ref": "#/definitions/RunSquare"
+      }
+    },
+    "state": {
+      "$ref": "#/definitions/RunState"
+    },
+    "created_at": {
+      "$ref": "area-index.schema.json#/definitions/AreaUtcTime"
+    },
+    "started_at": {
+      "$ref": "#/definitions/RunTime"
+    },
+    "finished_at": {
+      "$ref": "#/definitions/RunTime"
+    },
+    "totals": {
+      "$ref": "#/definitions/RunTotals"
+    },
+    "events": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/RunEvent"
+      }
+    },
+    "provenance": {
+      "$ref": "#/definitions/RunProvenance"
+    },
+    "queue_position": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "1 = next; only while queued."
+    },
+    "progress": {
+      "$ref": "#/definitions/RunProgress"
+    }
+  },
+  "definitions": {
+    "RunId": {
+      "title": "RunId",
+      "type": "string",
+      "pattern": "^run-[0-9]{8}T[0-9]{6}-[0-9a-f]{6}$"
+    },
+    "RunKind": {
+      "title": "RunKind",
+      "description": "The tool that started the run.",
+      "enum": [
+        "discovery",
+        "known"
+      ]
+    },
+    "RunState": {
+      "title": "RunState",
+      "enum": [
+        "queued",
+        "running",
+        "paused",
+        "done",
+        "stopped",
+        "failed"
+      ]
+    },
+    "RunSquareState": {
+      "title": "RunSquareState",
+      "enum": [
+        "todo",
+        "running",
+        "done",
+        "skipped",
+        "failed"
+      ]
+    },
+    "RunRegion": {
+      "title": "RunRegion",
+      "description": "The drawn region snapped to a 0.05 degree grid (Q-470).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ra",
+        "dec",
+        "width_deg",
+        "height_deg"
+      ],
+      "properties": {
+        "ra": {
+          "type": "number",
+          "minimum": 0,
+          "exclusiveMaximum": 360
+        },
+        "dec": {
+          "type": "number",
+          "minimum": -90,
+          "maximum": 90
+        },
+        "width_deg": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 12
+        },
+        "height_deg": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 12
+        }
+      }
+    },
+    "RunBox": {
+      "title": "RunBox",
+      "description": "One square: a live area box (Q-462), padded 0.05 degree and snapped (Q-470).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ra",
+        "dec",
+        "width_deg",
+        "height_deg"
+      ],
+      "properties": {
+        "ra": {
+          "type": "number",
+          "minimum": 0,
+          "exclusiveMaximum": 360
+        },
+        "dec": {
+          "type": "number",
+          "minimum": -90,
+          "maximum": 90
+        },
+        "width_deg": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 2
+        },
+        "height_deg": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 2
+        }
+      }
+    },
+    "RunAreaId": {
+      "title": "RunAreaId",
+      "anyOf": [
+        {
+          "$ref": "area-index.schema.json#/definitions/AreaId"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "RunTime": {
+      "title": "RunTime",
+      "anyOf": [
+        {
+          "$ref": "area-index.schema.json#/definitions/AreaUtcTime"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "RunProvenance": {
+      "title": "RunProvenance",
+      "description": "Where the positions of the found objects come from (positions_tag names which).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "known_positions",
+        "track_positions"
+      ],
+      "properties": {
+        "known_positions": {
+          "$ref": "area-index.schema.json#/definitions/AreaProvenanceEntry"
+        },
+        "track_positions": {
+          "$ref": "area-index.schema.json#/definitions/AreaProvenanceEntry"
+        }
+      }
+    },
+    "RunSquare": {
+      "title": "RunSquare",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "index",
+        "box",
+        "area_id",
+        "state"
+      ],
+      "properties": {
+        "index": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 36,
+          "description": "1 = top left; top row first, left to right."
+        },
+        "box": {
+          "$ref": "#/definitions/RunBox"
+        },
+        "area_id": {
+          "$ref": "#/definitions/RunAreaId"
+        },
+        "state": {
+          "$ref": "#/definitions/RunSquareState"
+        },
+        "error": {
+          "$ref": "area-job.schema.json#/definitions/LiveJobError"
+        }
+      }
+    },
+    "RunTotals": {
+      "title": "RunTotals",
+      "description": "known: known objects in the merged known lists; found and unexplained: merged tracks (Q-471).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "known",
+        "found",
+        "unexplained",
+        "squares_done",
+        "squares_skipped"
+      ],
+      "properties": {
+        "known": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "found": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unexplained": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "squares_done": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "squares_skipped": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "RunPosition": {
+      "title": "RunPosition",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ra",
+        "dec",
+        "time"
+      ],
+      "properties": {
+        "ra": {
+          "$ref": "area-index.schema.json#/definitions/AreaRa"
+        },
+        "dec": {
+          "$ref": "area-index.schema.json#/definitions/AreaDec"
+        },
+        "time": {
+          "$ref": "area-index.schema.json#/definitions/AreaUtcTime"
+        }
+      }
+    },
+    "RunObject": {
+      "title": "RunObject",
+      "description": "An object of a finished square: known (a track with a SkyBoT match; Horizons positions), unexplained (a track; its measured dots), predicted (a known-list row no track matched; the UI hides it by default).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "square",
+        "positions",
+        "positions_tag"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "known",
+            "unexplained",
+            "predicted"
+          ]
+        },
+        "designation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "track_id": {
+          "$ref": "area-index.schema.json#/definitions/AreaTrackId"
+        },
+        "square": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "positions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/RunPosition"
+          }
+        },
+        "positions_tag": {
+          "description": "Provenance of positions: model_dependent (JPL Horizons, the Known row) or measured (the track's dots); see the run's provenance block.",
+          "enum": [
+            "measured",
+            "model_dependent"
+          ]
+        }
+      }
+    },
+    "RunEvent": {
+      "title": "RunEvent",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "t",
+        "type"
+      ],
+      "properties": {
+        "t": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Seconds since started_at (ms precision)."
+        },
+        "type": {
+          "enum": [
+            "run_started",
+            "square_started",
+            "square_done",
+            "square_skipped",
+            "square_failed",
+            "found",
+            "run_paused",
+            "run_resumed",
+            "run_done",
+            "run_stopped"
+          ]
+        },
+        "square": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "area_id": {
+          "$ref": "area-index.schema.json#/definitions/AreaId"
+        },
+        "object": {
+          "$ref": "#/definitions/RunObject"
+        }
+      }
+    },
+    "RunProgress": {
+      "title": "RunProgress",
+      "description": "The running square's steps, as a live area job; only while running.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "square",
+        "area_id",
+        "step",
+        "steps"
+      ],
+      "properties": {
+        "square": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "area_id": {
+          "$ref": "area-index.schema.json#/definitions/AreaId"
+        },
+        "step": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "$ref": "area-job.schema.json#/definitions/LiveJobStep"
+          }
+        }
+      }
+    }
+  }
+}

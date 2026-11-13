@@ -43,26 +43,12 @@ class AreaMatch(BaseModel):
     fetched_at: area_index_schema.AreaUtcTime
 
 
-type Chi2Red = Annotated[float, Field(..., ge=0.0)]
-
-
-class AreaSed(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    label: area_index_schema.AreaSedLabel
-    chi2_red: Chi2Red | None
-    n_dots: int = Field(..., ge=0)
-    sigma_floor: float = Field(..., ge=0.0)
-
-
 class AreaTracksProvenance(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
     tracks: area_index_schema.AreaProvenanceEntry
     match: area_index_schema.AreaProvenanceEntry
-    sed: area_index_schema.AreaProvenanceEntry | None = None
 
 
 class AreaTrack(BaseModel):
@@ -81,7 +67,6 @@ class AreaTrack(BaseModel):
     match: AreaMatch | None
     linker: area_index_schema.AreaLinker
     unchecked_by: list[area_index_schema.AreaMissingCode]
-    sed: AreaSed | None = None
 
 
 class AreaTracks(BaseModel):

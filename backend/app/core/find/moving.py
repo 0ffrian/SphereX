@@ -5,9 +5,11 @@ One cone cannot find a body that moves, so (issue #26):
 1. One Horizons ephemeris per search window (A3.4), seen from the SPHEREx spacecraft, through
    the cache (D-25). A target in ``targets.toml`` may list its own ``moving_windows`` (the spans
    where SPHEREx saw it), matched by its ``spkid`` so every spelling of the name gets the same
-   windows; any other object uses the whole release window. Each window is split
-   into several requests when it would pass the Horizons line limit. Windows are never joined,
-   so no position is ever interpolated across the gap between two of them.
+   windows; any other object uses the whole release window. Track on demand (issue #142,
+   Q-468) narrows either to one window around a time, given by the caller (``track``); nothing
+   is stored, so no other caller sees it. Each window is split into several requests when it
+   would pass the Horizons line limit. Windows are never joined, so no position is ever
+   interpolated across the gap between two of them.
 2. A small SIA cone (radius R) at the ephemeris position along the path. The step between cones
    follows the ephemeris rate, ``dt <= R / rate`` (so a frame taken between two cones still
    overlaps one of them), clamped to ``[moving_min_step_h, moving_max_step_h]``. The answers are
@@ -73,7 +75,7 @@ from app.adapters.irsa_sia import SiaRow, frame_time
 from app.cache.keys import CacheKey, norm_float
 from app.cache.store import CacheMissOffline, Served, UpstreamUnavailable
 from app.context import Context
-from app.timefmt import parse_utc
+from app.timefmt import iso_utc_z, parse_utc
 
 log = logging.getLogger("shift_spectrum")
 
@@ -159,6 +161,67 @@ def target_windows(ctx: Context, spkid: str | None) -> tuple[Window, ...] | None
     return _windows_in(str(f), mtime).get(spkid.strip())
 
 
+# --- Track on demand (issue #142, Q-468) -----------------------------------------------------
+#
+# Track for one object can be limited to a window around a given time (``POST
+# /v1/objects/{id}/track`` and the ``around``/``days`` parameters of the Track readers) instead of
+# the whole release. The window is a parameter of each call, never stored: a call without it
+# (card builds, area hashes, the pre-fetch) gets the base windows, so no request changes what
+# another caller reads. It is clipped to the base windows, and the clipped windows are part of
+# the frames key (``MovingConfig.key_fields``), so each window has its own cache entries.
+
+# Half-width of the window, in days: the ticket's +-3 days around the area visit (issue #142).
+TRACK_WINDOW_DAYS = 3.0
+# ASSUMPTION (PR #150 review): at least +-1 day, so a window always holds several SPHEREx visits
+# of the sky around the object (a tiny window is refused, not served empty).
+TRACK_WINDOW_MIN_DAYS = 1.0
+# ASSUMPTION ("wider on request", bounded): at most +-15 days, so the whole window (30 days) stays
+# under the /path span cap (SX_PATH_MAX_SPAN_DAYS, 31 days, A19.5) and one reply serves it.
+TRACK_WINDOW_MAX_DAYS = 15.0
+
+
+def clip_windows(base: tuple[Window, ...], asked: tuple[Window, ...]) -> tuple[Window, ...]:
+    """The parts of ``asked`` inside ``base`` (each sorted, neither overlapping itself)."""
+    out = [
+        (max(a0, b0), min(a1, b1))
+        for a0, a1 in asked
+        for b0, b1 in base
+        if max(a0, b0) < min(a1, b1)
+    ]
+    return tuple(sorted(out))
+
+
+def base_windows(ctx: Context, spkid: str | None) -> tuple[Window, ...]:
+    """The target's own ``moving_windows``, else the release window."""
+    s = ctx.settings
+    return target_windows(ctx, spkid) or (
+        (parse_utc(s.moving_window_start), parse_utc(s.moving_window_end)),
+    )
+
+
+def track_window(around: datetime, days: float) -> Window:
+    """``around`` +- ``days`` (the caller checks the bounds), truncated to whole milliseconds so
+    equal requests give equal keys whatever sub-millisecond digits they carried. Raises
+    ``OverflowError`` past year 1 or 9999."""
+    half = timedelta(days=days)
+    return _to_ms(around - half), _to_ms(around + half)
+
+
+def _to_ms(t: datetime) -> datetime:
+    return t.replace(microsecond=t.microsecond // 1000 * 1000)
+
+
+def track_windows(ctx: Context, spkid: str | None, window: Window) -> tuple[Window, ...]:
+    """The windows a Track search for ``window`` uses: ``window`` clipped to the base windows;
+    empty when it misses all of them (the API refuses that as ``track_window_outside``)."""
+    return clip_windows(base_windows(ctx, spkid), (window,))
+
+
+def window_label(window: Window) -> str:
+    """``<start>/<end>`` (ISO-8601 UTC, milliseconds): the job key part and the reply field."""
+    return f"{iso_utc_z(window[0])}/{iso_utc_z(window[1])}"
+
+
 @dataclass(frozen=True)
 class MovingConfig:
     windows: tuple[Window, ...]
@@ -172,11 +235,15 @@ class MovingConfig:
     margin_arcsec: float
 
     @classmethod
-    def from_context(cls, ctx: Context, spkid: str | None = None) -> MovingConfig:
+    def from_context(
+        cls, ctx: Context, spkid: str | None = None, track: Window | None = None
+    ) -> MovingConfig:
+        """The path-search settings. ``track``: Track on demand's window (Q-468), clipped to the
+        base windows; ``None`` (every caller but the Track readers) keeps the base windows."""
         s = ctx.settings
-        windows = target_windows(ctx, spkid) or (
-            (parse_utc(s.moving_window_start), parse_utc(s.moving_window_end)),
-        )
+        windows = base_windows(ctx, spkid)
+        if track is not None:
+            windows = track_windows(ctx, spkid, track)  # may be empty: search_path refuses it
         return cls(
             windows=windows,
             ephem_step_min=s.moving_ephem_step_min,
@@ -567,7 +634,7 @@ def search_path(
     gate = gate or Gate()
     cfg = cfg or MovingConfig.from_context(ctx, spkid)
     step = timedelta(minutes=cfg.ephem_step_min)
-    if any(stop - start < step for start, stop in cfg.windows):
+    if not cfg.windows or any(stop - start < step for start, stop in cfg.windows):
         return PathSearch([], {}, [WINDOW])
     if not spkid:
         return PathSearch([], {}, [EPHEMERIS])

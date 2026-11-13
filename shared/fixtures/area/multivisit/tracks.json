@@ -66,13 +66,7 @@
       "verdict": "unexplained",
       "match": null,
       "linker": "rate_grid",
-      "unchecked_by": [],
-      "sed": {
-        "label": "smooth",
-        "chi2_red": 1.4,
-        "n_dots": 16,
-        "sigma_floor": 0.15
-      }
+      "unchecked_by": []
     }
   ],
   "skybot": [
@@ -106,11 +100,6 @@
       "tag": "model_dependent",
       "source": "synthetic fixture: made-up known objects",
       "assumption": "orbit solutions from SkyBoT (candidates) and JPL Horizons (positions) as of fetched_at, seen from SPHEREx (500@-163182)"
-    },
-    "sed": {
-      "tag": "derived",
-      "source": "synthetic fixture: made-up scores",
-      "formula": "weighted degree-2 fit of ln F against ln wavelength, chi2_red against sed_chi2_max (A17.13)"
     }
   }
 }

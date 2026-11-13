@@ -12,7 +12,7 @@ from fastapi.responses import Response
 
 from app.api.deps import get_ctx, get_frame_service, require_object
 from app.api.models import ErrorResponse, OverlaysResponse
-from app.api.objects import FrameId, ObjectId
+from app.api.objects import AroundQuery, DaysQuery, FrameId, ObjectId, track_window_of
 from app.context import Context
 from app.core.find import combine, flagmask, wcs
 from app.core.find.cutouts import CutoutUnavailable, cutout_bytes
@@ -36,9 +36,16 @@ def get_overlay_service(request: Request) -> OverlayService:
     return cast(OverlayService, request.app.state.overlays)
 
 
-def _frame(service: FrameService, ctx: Context, object_id: str, frame_id: str) -> FrameRecord:
+def _frame(
+    service: FrameService,
+    ctx: Context,
+    object_id: str,
+    frame_id: str,
+    around: str | None = None,
+    days: float | None = None,
+) -> FrameRecord:
     obj = require_object(ctx, object_id)
-    frame = service.find(obj, frame_id)
+    frame = service.find(obj, frame_id, track_window_of(ctx, obj, around, days))
     if frame is None:
         raise ApiError(404, "frame_not_found", f"No frame '{frame_id}' for '{object_id}'.")
     return frame
@@ -61,9 +68,13 @@ def get_overlays(
     object_id: ObjectId,
     ctx: Annotated[Context, Depends(get_ctx)],
     overlays: Annotated[OverlayService, Depends(get_overlay_service)],
+    around: AroundQuery = None,
+    days: DaysQuery = None,
 ) -> OverlaysResponse:
+    """``around``/``days``: Track on demand (Q-468), the overlays of that window's frames."""
     obj = require_object(ctx, object_id)
-    return OverlaysResponse.model_validate(overlays.get_overlays(obj).body)
+    window = track_window_of(ctx, obj, around, days)
+    return OverlaysResponse.model_validate(overlays.get_overlays(obj, window).body)
 
 
 @router.get(
@@ -76,8 +87,10 @@ def get_flags_png(
     frame_id: FrameId,
     ctx: Annotated[Context, Depends(get_ctx)],
     service: Annotated[FrameService, Depends(get_frame_service)],
+    around: AroundQuery = None,
+    days: DaysQuery = None,
 ) -> Response:
-    frame = _frame(service, ctx, object_id, frame_id)
+    frame = _frame(service, ctx, object_id, frame_id, around, days)
     with wcs.open_fits(_cutout(service, frame)) as hdul:
         try:
             data = flagmask.render_png(hdul)
@@ -100,9 +113,11 @@ def get_combine_png(
     b: FrameQuery,
     ctx: Annotated[Context, Depends(get_ctx)],
     service: Annotated[FrameService, Depends(get_frame_service)],
+    around: AroundQuery = None,
+    days: DaysQuery = None,
 ) -> Response:
-    fa = _frame(service, ctx, object_id, a)
-    fb = _frame(service, ctx, object_id, b)
+    fa = _frame(service, ctx, object_id, a, around, days)
+    fb = _frame(service, ctx, object_id, b, around, days)
     body_a = _cutout(service, fa)
     body_b = body_a if a == b else _cutout(service, fb)
     with wcs.open_fits(body_a) as ha, wcs.open_fits(body_b) as hb:

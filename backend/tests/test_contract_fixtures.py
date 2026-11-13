@@ -23,10 +23,15 @@ from app.contract.area_index_schema import AreaIndex
 from app.contract.area_job_schema import LiveAreaJob
 from app.contract.area_known_schema import AreaKnown
 from app.contract.area_live_plan_schema import LiveAreaPlan
+from app.contract.area_spectra_schema import AreaSpectra
 from app.contract.area_summary_schema import AreaSummary
 from app.contract.area_tracks_schema import AreaTracks
 from app.contract.object_card_schema import ObjectCard
 from app.contract.render_params_schema import RenderParams
+from app.contract.run_list_schema import RunList
+from app.contract.run_results_schema import RunResults
+from app.contract.run_schema import Run
+from app.contract.scan_plan_schema import ScanPlan
 from app.contract.track_path_schema import TrackPath
 from app.settings import BACKEND_DIR
 
@@ -79,9 +84,14 @@ MODELS: dict[str, type[BaseModel]] = {
     "area-dots": AreaDots,
     "area-tracks": AreaTracks,
     "area-checks": AreaChecks,
+    "area-spectra": AreaSpectra,
     "area-job": LiveAreaJob,
     "area-live-plan": LiveAreaPlan,
     "track-path": TrackPath,
+    "run": Run,
+    "run-list": RunList,
+    "run-results": RunResults,
+    "scan-plan": ScanPlan,
 }
 
 

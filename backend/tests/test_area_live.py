@@ -311,6 +311,11 @@ def test_a_live_job_runs_the_pipeline_and_its_area_is_served(
         assert c.get(f"/v1/areas/live/{plan.area_id}").json()["state"] == "done"
         known = c.get(f"/v1/areas/{plan.area_id}/known").json()
         assert "433 Eros" in {k["designation"] for k in known["known"]}
+        # The job stored the spectrum check after the area (Q-474), one entry per track.
+        spectra = c.get(f"/v1/areas/{plan.area_id}/spectra")
+        assert spectra.status_code == 200, spectra.text
+        tracks = c.get(f"/v1/areas/{plan.area_id}/tracks").json()["tracks"]
+        assert [t["track_id"] for t in spectra.json()["tracks"]] == [t["track_id"] for t in tracks]
         # The same box again: answered done at once from the store, nothing queued (#141).
         monkeypatch.setattr(areas_api, "plan_area", lambda ctx, box, pair=None: plan)
         again = c.post("/v1/areas/live", json={**box.reply(), "start": True})
@@ -517,7 +522,7 @@ def test_a_waiting_job_counts_a_stopped_job_still_winding_down(tmp_path: Path) -
 def test_a_full_queue_answers_429(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
     from app.core.area import live_jobs
 
-    def full(plan: Plan) -> Any:
+    def full(plan: Plan, kind: str | None = None) -> Any:
         raise live_jobs.QueueFull()
 
     monkeypatch.setattr(client.app.state.live_jobs, "submit", full)  # type: ignore[attr-defined]
