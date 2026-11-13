@@ -294,6 +294,7 @@ sequenceDiagram
       J->>R: run_paused, the scan leaves the worker
       F->>A: POST /v1/runs/run_id/resume
       A->>J: queued again at the back (run_resumed; 429 when full)
+      Note over J,R: the pause ends at the next square_started (duration_s)
     end
   end
   J->>R: run_done

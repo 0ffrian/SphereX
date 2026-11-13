@@ -1317,6 +1317,10 @@ export interface LiveAreaJob {
    */
   queue_position?: number;
   error?: LiveJobError;
+  /**
+   * The run recording this job (Q-471): only for a job started with kind; GET, DELETE /v1/runs/{run_id}.
+   */
+  run_id?: string;
 }
 export interface LiveJobStep {
   id: 'visits' | 'frames' | 'dots' | 'labels' | 'join' | 'known';

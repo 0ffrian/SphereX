@@ -99,8 +99,10 @@ class LiveAreaRequest(BaseModel):
     height_deg: float
     start: bool = False
     visits: list[str] | None = Field(default=None, min_length=2, max_length=2)
-    # Issue #156 (Q-471): the tool used; a started job is recorded as a run of one square.
-    kind: Literal["discovery", "known"] = "known"
+    # Issue #156 (Q-471): the tool used; a job started with it is recorded as a run of one
+    # square (its id is in the reply). No default: a client that does not say which tool it
+    # is records no run, rather than one under the wrong tool (PR #160 review).
+    kind: Literal["discovery", "known"] | None = None
 
 
 _LIVE_JOBS_LOCK = threading.Lock()
