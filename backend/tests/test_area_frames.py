@@ -356,7 +356,14 @@ def test_find_frames_refuses_another_release(tmp_path: Path) -> None:
 
 
 # The read side the API may import (A17.8, issue #108); everything else in app.core.area computes.
-AREA_READ_SIDE = ["app.core.area", "app.core.area.config", "app.core.area.store"]
+# Q-462: the live-area plan and job queue are light too; the worker imports the pipeline lazily.
+AREA_READ_SIDE = [
+    "app.core.area",
+    "app.core.area.config",
+    "app.core.area.live",
+    "app.core.area.live_jobs",
+    "app.core.area.store",
+]
 
 
 def test_app_api_never_imports_the_area_pipeline() -> None:
