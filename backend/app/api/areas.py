@@ -13,7 +13,8 @@ area is 404 ``area_not_found``. Beyond D-16 (Q-146 (6)).
   a box drawn anywhere. ``start=false`` answers the plan (one SIA cone at the box centre picks
   two visits); ``start=true`` queues a background job (``live_jobs``), which runs the pipeline
   and stores the area, then served by the routes above like a prepared one. The request never
-  computes the area itself (A16.2).
+  computes the area itself (A16.2). A started job is recorded as a run of one square
+  (issue #156, Q-471; ``kind`` names the tool), listed by ``/v1/runs`` (``api/runs.py``).
 
 ``/checks`` is not served: D4 and D5 are cut (Q-203 gate); ``summary.missing`` says
 ``checks:not_run``. Errors are ``{error, detail}``: 404 ``area_not_found``, 404 ``dot_not_found``,
@@ -26,7 +27,7 @@ import base64
 import json
 import math
 import threading
-from typing import Annotated, Any, cast
+from typing import Annotated, Any, Literal, cast
 
 import numpy as np
 from fastapi import APIRouter, Depends, Path, Request
@@ -98,6 +99,8 @@ class LiveAreaRequest(BaseModel):
     height_deg: float
     start: bool = False
     visits: list[str] | None = Field(default=None, min_length=2, max_length=2)
+    # Issue #156 (Q-471): the tool used; a started job is recorded as a run of one square.
+    kind: Literal["discovery", "known"] = "known"
 
 
 _LIVE_JOBS_LOCK = threading.Lock()
@@ -109,7 +112,7 @@ def get_live_jobs(request: Request) -> LiveJobs:
     with _LIVE_JOBS_LOCK:
         jobs = getattr(request.app.state, "live_jobs", None)
         if jobs is None:
-            jobs = LiveJobs(cast(Context, request.app.state.ctx))
+            jobs = LiveJobs(cast(Context, request.app.state.ctx), store=get_area_store(request))
             request.app.state.live_jobs = jobs
     return cast(LiveJobs, jobs)
 
@@ -163,7 +166,7 @@ def post_live(
     if jobs.ctx.settings.offline:
         raise ApiError(503, "offline", "Live areas need the network (SX_OFFLINE=1).")
     try:
-        job = jobs.submit(plan)
+        job = jobs.submit(plan, kind=req.kind)
     except QueueFull as exc:
         raise ApiError(
             429,

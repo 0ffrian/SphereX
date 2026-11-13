@@ -500,6 +500,15 @@ export type LiveAreaId = string;
  */
 export type LiveUtcTime = string;
 export type LiveJobAreaId = string;
+/**
+ * The tool that started the run.
+ */
+export type RunKind = 'discovery' | 'known';
+export type RunAreaId = AreaId | null;
+export type RunId = string;
+export type RunSquareState = 'todo' | 'running' | 'done' | 'skipped' | 'failed';
+export type RunState = 'queued' | 'running' | 'paused' | 'done' | 'stopped' | 'failed';
+export type RunTime = AreaUtcTime | null;
 
 /**
  * Bundle root: exists only so that every schema compiles into this one file.
@@ -517,6 +526,10 @@ export interface ContractSchemas {
   trackPath: TrackPath;
   liveAreaPlan: LiveAreaPlan;
   liveAreaJob: LiveAreaJob;
+  scanPlan: ScanPlan;
+  run: Run;
+  runList: RunList;
+  runResults: RunResults;
 }
 /**
  * What is known about one object (R3.2). Served by GET /v1/objects/{id}/card (D-16). Single source of the contract (D-18).
@@ -1315,6 +1328,242 @@ export interface LiveJobStep {
 export interface LiveJobError {
   code: string;
   detail: string;
+}
+/**
+ * POST /v1/scans with start=false (Q-470): the region cut into squares, in scan order. No SIA call: area_id is a stored area of the same box, else null; the job picks each square's visit pair.
+ */
+export interface ScanPlan {
+  region: RunRegion;
+  release: string;
+  kind: RunKind;
+  cols: number;
+  rows: number;
+  /**
+   * @minItems 1
+   * @maxItems 36
+   */
+  squares: [ScanSquare, ...ScanSquare[]];
+  /**
+   * Rough total for the squares not stored yet.
+   */
+  estimate_s: number;
+  provenance: ScanPlanProvenance;
+}
+/**
+ * The drawn region snapped to a 0.05 degree grid (Q-470).
+ */
+export interface RunRegion {
+  ra: number;
+  dec: number;
+  width_deg: number;
+  height_deg: number;
+}
+export interface ScanSquare {
+  index: number;
+  /**
+   * 0 = top.
+   */
+  row: number;
+  /**
+   * 0 = left on screen (east).
+   */
+  col: number;
+  box: RunBox;
+  area_id: RunAreaId;
+}
+/**
+ * One square: a live area box (Q-462), padded 0.05 degree and snapped (Q-470).
+ */
+export interface RunBox {
+  ra: number;
+  dec: number;
+  width_deg: number;
+  height_deg: number;
+}
+export interface ScanPlanProvenance {
+  squares: AreaProvenanceEntry;
+}
+/**
+ * GET /v1/runs/{run_id}, and POST /v1/scans with start=true (Q-471): a scan or a single live area, with its timeline for replay. Stored as <SX_CACHE_DIR>/runs/<run_id>.json; queue_position and progress are added to the reply only.
+ */
+export interface Run {
+  run_id: RunId;
+  kind: RunKind;
+  release: string;
+  region: RunRegion;
+  /**
+   * @minItems 1
+   * @maxItems 36
+   */
+  squares: [RunSquare, ...RunSquare[]];
+  state: RunState;
+  created_at: AreaUtcTime;
+  started_at: RunTime;
+  finished_at: RunTime;
+  totals: RunTotals;
+  events: RunEvent[];
+  /**
+   * 1 = next; only while queued.
+   */
+  queue_position?: number;
+  progress?: RunProgress;
+}
+export interface RunSquare {
+  /**
+   * 1 = top left; top row first, left to right.
+   */
+  index: number;
+  box: RunBox;
+  area_id: RunAreaId;
+  state: RunSquareState;
+  error?: LiveJobError;
+}
+/**
+ * known: known objects in the merged known lists; found and unexplained: merged tracks (Q-471).
+ */
+export interface RunTotals {
+  known: number;
+  found: number;
+  unexplained: number;
+  squares_done: number;
+  squares_skipped: number;
+}
+export interface RunEvent {
+  /**
+   * Seconds since started_at (ms precision).
+   */
+  t: number;
+  type:
+    | 'run_started'
+    | 'square_started'
+    | 'square_done'
+    | 'square_skipped'
+    | 'square_failed'
+    | 'found'
+    | 'run_paused'
+    | 'run_resumed'
+    | 'run_done'
+    | 'run_stopped';
+  square?: number;
+  area_id?: AreaId;
+  object?: RunObject;
+}
+/**
+ * An object of a finished square: known (a track with a SkyBoT match; Horizons positions), unexplained (a track; its measured dots), predicted (a known-list row no track matched; the UI hides it by default).
+ */
+export interface RunObject {
+  kind: 'known' | 'unexplained' | 'predicted';
+  designation?: string;
+  track_id?: AreaTrackId;
+  square: number;
+  positions: RunPosition[];
+}
+export interface RunPosition {
+  ra: AreaRa;
+  dec: AreaDec;
+  time: AreaUtcTime;
+}
+/**
+ * The running square's steps, as a live area job; only while running.
+ */
+export interface RunProgress {
+  square: number;
+  area_id: AreaId;
+  step: string | null;
+  steps: LiveJobStep[];
+}
+/**
+ * GET /v1/runs (Q-471): every recorded run, newest first.
+ */
+export interface RunList {
+  runs: RunSummary[];
+}
+export interface RunSummary {
+  run_id: RunId;
+  kind: RunKind;
+  region: RunRegion;
+  state: RunState;
+  created_at: AreaUtcTime;
+  /**
+   * started_at to finished_at (or now); null before it starts.
+   */
+  duration_s: number | null;
+  totals: RunTotals;
+  squares_done: number;
+  squares_total: number;
+}
+/**
+ * GET /v1/runs/{run_id}/results (Q-471): the finished squares' stored results with the duplicates merged. Read from the stored areas; nothing is computed.
+ */
+export interface RunResults {
+  run_id: RunId;
+  kind: RunKind;
+  release: string;
+  region: RunRegion;
+  state: RunState;
+  squares: RunResultSquare[];
+  known: RunKnownRow[];
+  tracks: RunTrackRow[];
+  provenance: RunResultsProvenance;
+}
+export interface RunResultSquare {
+  index: number;
+  area_id: RunAreaId;
+  state: RunSquareState;
+}
+/**
+ * A known object, merged by designation.
+ */
+export interface RunKnownRow {
+  designation: string;
+  number: number | null;
+  object_id: string | null;
+  kind: 'asteroid' | 'comet';
+  v_mag: number | null;
+  /**
+   * A merged track carries its designation; false = predicted only.
+   */
+  detected: boolean;
+  track_available: boolean;
+  /**
+   * @minItems 1
+   */
+  squares: [number, ...number[]];
+  /**
+   * Visit start times of the squares the row comes from.
+   */
+  visits: AreaUtcTime[];
+  positions: RunPosition[];
+}
+/**
+ * A found or unexplained track, merged across neighbouring squares.
+ */
+export interface RunTrackRow {
+  kind: 'found' | 'unexplained';
+  designation: string | null;
+  /**
+   * @minItems 1
+   */
+  squares: [number, ...number[]];
+  /**
+   * @minItems 1
+   */
+  tracks: [RunTrackRef, ...RunTrackRef[]];
+  /**
+   * Visit start times of the squares the row comes from.
+   */
+  visits: AreaUtcTime[];
+  positions: RunPosition[];
+}
+export interface RunTrackRef {
+  square: number;
+  area_id: AreaId;
+  track_id: AreaTrackId;
+}
+export interface RunResultsProvenance {
+  merge: AreaProvenanceEntry;
+  known_positions: AreaProvenanceEntry;
+  track_positions: AreaProvenanceEntry;
 }
 
 export const TAGS: readonly Tag[] = [
