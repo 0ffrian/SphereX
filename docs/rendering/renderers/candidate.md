@@ -10,3 +10,4 @@
 - **Honesty:** the track and the spectrum keep their own tags and badges (R4 items 1 and 2).
 - **Haptics and sound:** spectrum haptics only (R8.6). The flipbook `detections` ticks are refused (`detections` in `missing`) because frames carry no detection field (Q-86).
 - **Alt text:** the panel's text says the type and the reason above; there is no 3D canvas to label (R9).
+- **Amended for area tracks ([Q-469](../../decisions/moving-objects.md), issue #145):** *Build it* on a Discovery track that no known object explains shows a labelled placeholder (a plain unit sphere, layer `placeholder_shape`, `artistic`, no scale bar, size not drawn) through `asteroid_procedural`, not through `candidate`. A `candidate` found by search keeps this section unchanged.

@@ -4127,13 +4127,39 @@ body {
 .sx-area-pos-line {
   fill: none;
   stroke: var(--p-phys);
-  stroke-width: 1;
-  stroke-opacity: 0.8;
+  stroke-width: 1.4;
+  stroke-opacity: 0.85;
+  /* Predicted only (issue #145, mock-up state 6): dashed blue. */
+  stroke-dasharray: 4 3;
+}
+.sx-area-pos-line.sx-det {
+  stroke: var(--p-meas);
+  stroke-dasharray: none;
 }
 .sx-area-pos-dot {
   fill: var(--p-phys);
   stroke: var(--bg);
   stroke-width: 0.75;
+}
+.sx-area-pos-dot.sx-det {
+  fill: var(--p-meas);
+}
+/* Discovery's measured dots of a detected object: rings, as the mock-up's. */
+.sx-area-pos-meas {
+  fill: none;
+  stroke: var(--p-meas);
+  stroke-width: 1.5;
+}
+.sx-area-pos-lbl {
+  font: 500 11px/1 var(--font-sans, Inter, system-ui, sans-serif);
+  fill: var(--p-phys);
+  paint-order: stroke;
+  stroke: rgba(0, 0, 0, 0.7);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+}
+.sx-area-pos-lbl.sx-det {
+  fill: var(--p-meas);
 }
 .sx-area-pos-tag {
   top: 40px;
@@ -5628,4 +5654,161 @@ li[data-state='running'] > .sx-live-mk {
   .sx-live-bar i {
     transition: none;
   }
+}
+
+/* Area results (issue #145; mock-up states 6 to 9): the live card's look for the Known list, the
+   Discovery card, the Track job and a Discovery track. */
+.sx-live-alert[data-tone='warn']::before {
+  background: var(--warn);
+}
+.sx-area-prov {
+  display: grid;
+  gap: 3px;
+  font-size: 12.5px;
+  color: var(--muted);
+  border-top: 1px solid var(--glass-edge);
+  border-bottom: 1px solid var(--glass-edge);
+  padding: 8px 0;
+}
+.sx-area-prov b {
+  color: var(--fg);
+  font-weight: 500;
+}
+.sx-seg {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-self: start;
+  padding: 3px;
+  gap: 2px;
+  background: var(--glass-inner);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.sx-seg button {
+  padding: 4px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+.sx-seg button:hover {
+  color: var(--fg);
+}
+.sx-seg button[aria-pressed='true'] {
+  background: var(--ac);
+  color: var(--on-ac);
+}
+.sx-seg button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.sx-kr-list {
+  display: grid;
+  gap: 6px;
+}
+/* Held UI issue 3: the number column takes the number's own width ("100214"), never clipped. */
+.sx-kr {
+  display: grid;
+  grid-template-columns: minmax(3.2em, max-content) minmax(0, 1fr) auto;
+  gap: 6px 10px;
+  align-items: center;
+  padding: 9px 10px;
+  border-radius: 8px;
+  background: var(--glass-inner);
+  border: 1px solid var(--glass-edge);
+  font-size: 13.5px;
+}
+.sx-kr-num {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.sx-kr-nm {
+  display: grid;
+  min-width: 0;
+}
+.sx-kr-nm > span {
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.sx-kr-nm small {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+.sx-kr-acts {
+  grid-column: 2 / 4;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.sx-live .sx-btn-outline.sx-btn-sm {
+  min-height: 32px;
+  height: 32px;
+  padding: 0 10px;
+  font-size: 13px;
+  gap: 6px;
+}
+.sx-btn-ico {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex: none;
+}
+.sx-chip-dot {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--fg);
+}
+.sx-chip-dot::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--dot, var(--p-asm));
+}
+.sx-live .sx-tr {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 14px;
+  margin: 0;
+  font-size: 13px;
+}
+.sx-live .sx-tr dt {
+  color: var(--muted);
+}
+.sx-live .sx-tr dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+.sx-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.sx-live-select {
+  max-width: 100%;
+  min-height: 32px;
+  padding: 0 8px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--glass-inner);
+  color: var(--fg);
+  font: inherit;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.sx-live-select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }

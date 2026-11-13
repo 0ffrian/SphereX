@@ -81,12 +81,16 @@ export class LiveJobGone extends Error {
 
 export interface LiveAreaApi {
   /** Coverage check: the plan, without starting anything. */
-  plan(box: LiveBox, signal?: AbortSignal): Promise<PlanAnswer>;
-  start(box: LiveBox, signal?: AbortSignal): Promise<StartAnswer>;
+  /** `visits`: the visit pair picked (the two visit starts, #141's optional pair), else the closest. */
+  plan(box: LiveBox, signal?: AbortSignal, visits?: VisitPick): Promise<PlanAnswer>;
+  start(box: LiveBox, signal?: AbortSignal, visits?: VisitPick): Promise<StartAnswer>;
   /** Throws LiveJobGone when the server has no such job, another error when it cannot be read. */
   status(areaId: string, signal?: AbortSignal): Promise<LiveJobStatus>;
   stop(areaId: string): Promise<void>;
 }
+
+/** A visit pair, by the two visit starts (ISO UTC), as the request's `visits` (issue #145). */
+export type VisitPick = readonly [string, string];
 
 /** A drawn box (two opposite corners and its sides) as the request's centre and sides. */
 export function liveBoxOf(b: {
@@ -180,28 +184,28 @@ export function httpLiveAreaApi(base = API_BASE, fetchImpl: typeof fetch = (i, i
     if (!type.includes('json')) return null;
     return res.json().catch(() => null);
   };
-  const post = async (box: LiveBox, start: boolean, signal?: AbortSignal): Promise<unknown> => {
+  const post = async (box: LiveBox, start: boolean, signal?: AbortSignal, visits?: VisitPick): Promise<unknown> => {
     const res = await fetchImpl(`${base}/areas/live`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ ...box, start }),
+      body: JSON.stringify({ ...box, start, ...(visits ? { visits: [...visits] } : {}) }),
       signal,
     });
     return json(res);
   };
   const aborted = (e: unknown) => e instanceof DOMException && e.name === 'AbortError';
   return {
-    async plan(box, signal) {
+    async plan(box, signal, visits) {
       try {
-        return parsePlanReply(await post(box, false, signal));
+        return parsePlanReply(await post(box, false, signal, visits));
       } catch (e) {
         if (aborted(e)) throw e;
         return { kind: 'unavailable' };
       }
     },
-    async start(box, signal) {
+    async start(box, signal, visits) {
       try {
-        return parseStartReply(await post(box, true, signal));
+        return parseStartReply(await post(box, true, signal, visits));
       } catch (e) {
         if (aborted(e)) throw e;
         return { kind: 'unavailable' };
@@ -244,16 +248,30 @@ const MOCK_VISITS: [LiveVisit, LiveVisit] = [
   { start: '2026-06-12T11:11:00Z', end: '2026-06-12T11:24:00Z', n_frames: 7 },
   { start: '2026-06-12T12:49:00Z', end: '2026-06-12T13:02:00Z', n_frames: 7 },
 ];
-const MOCK_PLAN = (areaId: string, box: LiveBox = { ra: 0, dec: 0, width_deg: 1, height_deg: 1 }): LivePlan => ({
-  area_id: areaId,
+/** A second visit pair of the mock, for the visit pair picker (invented test values). */
+const MOCK_ALT: [LiveVisit, LiveVisit] = [
+  { start: '2026-06-18T02:05:00Z', end: '2026-06-18T02:18:00Z', n_frames: 6 },
+  { start: '2026-06-18T05:40:00Z', end: '2026-06-18T05:53:00Z', n_frames: 6 },
+];
+const gapH = (p: readonly [LiveVisit, LiveVisit]) => (Date.parse(p[1].start) - Date.parse(p[0].end)) / 3_600_000;
+const MOCK_PLAN = (
+  areaId: string,
+  box: LiveBox = { ra: 0, dec: 0, width_deg: 1, height_deg: 1 },
+  pick: VisitPick | null = null,
+): LivePlan => {
+  const alt = pick !== null && pick[0] === MOCK_ALT[0].start;
+  const [visits, other] = alt ? [MOCK_ALT, MOCK_VISITS] : [MOCK_VISITS, MOCK_ALT];
+  return {
+  area_id: alt ? `${areaId}-b` : areaId,
   release: 'spherex_dr1',
   box,
-  visits: MOCK_VISITS,
-  n_frames: 14,
+  visits,
+  n_frames: visits[0].n_frames + visits[1].n_frames,
   estimate_s: 540,
-  alternatives: [],
+  alternatives: [{ visits: other, gap_h: Math.round(gapH(other) * 100) / 100 }],
   provenance: { visits: { tag: 'measured', source: 'mock (invented test values)', formula: 'mock' } },
-});
+  };
+};
 
 /** The mock job's progress at fraction `f` (0..1) of its run. Pure, so tests can check it. */
 export function mockStatusAt(areaId: string, f: number, plan: LivePlan): LiveJobStatus {
@@ -299,17 +317,17 @@ export function mockLiveAreaApi(
           ? { kind: 'error', code: 'offline', detail: 'SX_OFFLINE=1: only stored areas.' }
           : null;
   return {
-    async plan(box) {
+    async plan(box, _signal, visits) {
       const f = failure();
       if (f) return f;
       const id = idOf(box);
       if (scenario === 'stored') return { kind: 'stored', areaId: id };
-      return { kind: 'plan', plan: MOCK_PLAN(id, box) };
+      return { kind: 'plan', plan: MOCK_PLAN(id, box, visits ?? null) };
     },
-    async start(box) {
+    async start(box, _signal, visits) {
       const f = failure();
       if (f) return f as StartAnswer;
-      const id = idOf(box);
+      const id = MOCK_PLAN(idOf(box), box, visits ?? null).area_id;
       jobs.set(id, { t0: now(), stopped: false });
       return { kind: 'started', areaId: id, state: scenario === 'queued' ? 'queued' : 'running' };
     },
