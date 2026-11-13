@@ -17,11 +17,14 @@ const PLAN = {
   area_id: 'live-1',
   release: 'spherex_dr1',
   visits: [
-    { start: '2026-06-12T11:11:00Z', end: '2026-06-12T11:24:00Z' },
-    { start: '2026-06-12T12:49:00Z', end: '2026-06-12T13:02:00Z' },
+    { start: '2026-06-12T11:11:00Z', end: '2026-06-12T11:24:00Z', n_frames: 7 },
+    { start: '2026-06-12T12:49:00Z', end: '2026-06-12T13:02:00Z', n_frames: 7 },
   ],
   n_frames: 14,
   estimate_s: 540,
+  box: { ra: 30, dec: 10, width_deg: 1, height_deg: 0.6 },
+  alternatives: [],
+  provenance: { visits: { tag: 'measured', source: 'test', formula: 'test' } },
 };
 const BOX = { ra: 30, dec: 10, width_deg: 1, height_deg: 0.6 };
 
@@ -45,6 +48,12 @@ describe('reply checks', () => {
     expect(parsePlanReply({ area_id: 'a', state: 'running', steps: [], elapsed_s: 3, eta_s: null })).toEqual({ kind: 'running', areaId: 'a', state: 'running' });
     expect(parsePlanReply({ error: 'area:too_large', detail: 'x' })).toEqual({ kind: 'error', code: 'area:too_large', detail: 'x' });
     expect(parseStatusReply({ area_id: 'a', state: 'done', step: null, steps: [], elapsed_s: 9, eta_s: null }).eta_s).toBeNull();
+  });
+  it('start: 429 queue_full is an error the card can name, not "unavailable"', () => {
+    expect(parseStartReply({ error: 'queue_full', detail: 'x' })).toEqual({ kind: 'error', code: 'queue_full', detail: 'x' });
+  });
+  it('status: an unknown step id breaks the contract', () => {
+    expect(() => parseStatusReply({ area_id: 'a', state: 'running', step: null, steps: [{ id: 'pair', label: 'x', state: 'done' }], elapsed_s: 0, eta_s: 1 })).toThrow();
   });
   it('start: queued or running', () => {
     expect(parseStartReply({ area_id: 'a', state: 'queued' })).toEqual({ kind: 'started', areaId: 'a', state: 'queued' });
