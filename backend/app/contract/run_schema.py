@@ -57,6 +57,14 @@ type RunAreaId = Annotated[area_index_schema.AreaId | None, Field(..., title="Ru
 type RunTime = Annotated[area_index_schema.AreaUtcTime | None, Field(..., title="RunTime")]
 
 
+class RunProvenance(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    known_positions: area_index_schema.AreaProvenanceEntry
+    track_positions: area_index_schema.AreaProvenanceEntry
+
+
 class RunSquare(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -97,6 +105,10 @@ class RunObject(BaseModel):
     track_id: area_index_schema.AreaTrackId | None = None
     square: int = Field(..., ge=1)
     positions: list[RunPosition]
+    positions_tag: Literal["measured", "model_dependent"] = Field(
+        ...,
+        description="Provenance of positions: model_dependent (JPL Horizons, the Known row) or measured (the track's dots); see the run's provenance block.",
+    )
 
 
 class RunEvent(BaseModel):
@@ -146,5 +158,6 @@ class Run(BaseModel):
     finished_at: RunTime
     totals: RunTotals
     events: list[RunEvent]
+    provenance: RunProvenance
     queue_position: int | None = Field(None, description="1 = next; only while queued.", ge=1)
     progress: RunProgress | None = None

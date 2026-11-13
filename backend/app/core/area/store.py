@@ -125,6 +125,10 @@ class AreaStore:
         return None
 
     def area_ids(self) -> list[str]:
+        return sorted(self.summaries())
+
+    def summaries(self) -> dict[str, dict[str, Any]]:
+        """Every servable area's summary by id, each read once."""
         ids: set[str] = set()
         for root in self.roots:
             for release in self._releases(root):
@@ -136,7 +140,12 @@ class AreaStore:
                         continue
                     if q.get("stage") == HEAD and q.get("v") == AREA_VERSION:
                         ids.add(str(q["id"]))
-        return sorted(i for i in ids if self.entry(i, "summary") is not None)
+        out: dict[str, dict[str, Any]] = {}
+        for i in sorted(ids):
+            got = self.entry(i, "summary")
+            if got is not None:
+                out[i] = json.loads(got.body)
+        return out
 
     def areas_by_box(self, release: str) -> dict[tuple[float, float, float, float], str]:
         """Stored areas of ``release`` by their box ``(ra, dec, width, height)``, rounded to the
@@ -144,11 +153,7 @@ class AreaStore:
         an SIA call). Several areas of one box (other visit pairs): the latest computed, then
         the smallest id."""
         found: list[tuple[tuple[float, float, float, float], str, str]] = []
-        for area_id in self.area_ids():
-            got = self.entry(area_id, "summary")
-            if got is None:
-                continue
-            s = json.loads(got.body)
+        for area_id, s in self.summaries().items():
             if s.get("data_release") != release:
                 continue
             ra, dec, w, h = (
@@ -163,9 +168,4 @@ class AreaStore:
         return out
 
     def index(self) -> dict[str, Any]:
-        out = []
-        for area_id in self.area_ids():
-            got = self.entry(area_id, "summary")
-            if got is not None:
-                out.append(index_entry(json.loads(got.body)))
-        return index_reply(out)
+        return index_reply([index_entry(s) for s in self.summaries().values()])

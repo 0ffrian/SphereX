@@ -254,7 +254,7 @@ sequenceDiagram
 
 ## Scan and run (issue #156)
 
-> **As built (issue #156, [Q-470](../decisions/moving-objects.md), Q-471):** a region of up to 12° a side is cut into equal squares of at most 2° (`core/area/scan.py`), each a live area. The scan is one job on the same worker; every square is saved as it finishes, and the run is recorded with its timeline (`core/area/runs.py`, `<SX_CACHE_DIR>/runs/<run_id>.json`). A single live area started with `kind` is a run of one square. The UI is #157 (scan) and #158 (runs and replay).
+> **As built (issue #156, [Q-470](../decisions/moving-objects.md), Q-471):** a region of up to 12° a side is cut into equal squares of at most 2° that cover it with overlap (`core/area/scan.py`), each a live area. The scan is one job on the same worker; every square is saved as it finishes, and the run is recorded with its timeline (`core/area/runs.py`, `<SX_CACHE_DIR>/runs/<run_id>.json`). A single live area started with `kind` is a run of one square. The UI is #157 (scan) and #158 (runs and replay).
 
 ```mermaid
 sequenceDiagram
@@ -275,7 +275,10 @@ sequenceDiagram
   A-->>F: 202 the run
   loop each square, top row first, left to right
     J->>R: square_started
-    alt no visit pair
+    alt stored area found by the plan
+      J->>C: read the stored replies (no SIA call)
+      J->>R: square_done, found events, totals
+    else no visit pair
       J->>R: square_skipped (area:no_visit_pair)
     else already stored
       J->>C: read the stored replies
@@ -290,7 +293,7 @@ sequenceDiagram
     opt Pause (after this square)
       J->>R: run_paused, the scan leaves the worker
       F->>A: POST /v1/runs/run_id/resume
-      A->>J: back to the front of the queue (run_resumed)
+      A->>J: queued again at the back (run_resumed; 429 when full)
     end
   end
   J->>R: run_done

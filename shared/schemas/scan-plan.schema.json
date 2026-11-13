@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "scan-plan.schema.json",
   "title": "ScanPlan",
-  "description": "POST /v1/scans with start=false (Q-470): the region cut into squares, in scan order. No SIA call: area_id is a stored area of the same box, else null; the job picks each square's visit pair.",
+  "description": "POST /v1/scans with start=false (Q-470): the region cut into squares that cover it with overlap, in scan order. No SIA call: area_id is a stored area of the same box, else null; the job picks each square's visit pair.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -29,12 +29,12 @@
     "cols": {
       "type": "integer",
       "minimum": 1,
-      "maximum": 6
+      "maximum": 36
     },
     "rows": {
       "type": "integer",
       "minimum": 1,
-      "maximum": 6
+      "maximum": 36
     },
     "squares": {
       "type": "array",

@@ -32,7 +32,6 @@ from pathlib import Path
 from typing import Any
 
 from app.core.area.live import Box
-from app.core.area.scan import grid_shape
 from app.timefmt import iso_utc_z, parse_utc, utc_now
 
 log = logging.getLogger(__name__)
@@ -51,6 +50,18 @@ KNOWN_POSITIONS_ASSUMPTION = (
     "orbit solutions from SkyBoT (candidates) and JPL Horizons (positions), seen from SPHEREx, "
     "as stored with each area"
 )
+
+
+# Provenance of the positions a run record carries (CLAUDE.md: provenance on everything).
+# Each found object also names its own ``positions_tag``.
+RUN_PROVENANCE: dict[str, dict[str, str]] = {
+    "known_positions": {
+        "tag": "model_dependent",
+        "source": "JPL Horizons, as stored with each area",
+        "assumption": KNOWN_POSITIONS_ASSUMPTION,
+    },
+    "track_positions": {"tag": "measured", "source": TRACK_POSITIONS_SOURCE},
+}
 
 
 def new_run_id() -> str:
@@ -84,6 +95,9 @@ def write_atomic(path: Path, body: bytes) -> None:
             tmp.unlink()
 
 
+Snapshot = tuple[str, int, bytes]  # run id, change number, serialised record
+
+
 class RunNotFound(KeyError):
     """No run with this id; the API answers 404 ``run_not_found``."""
 
@@ -93,7 +107,10 @@ class RunStore:
 
     def __init__(self, root: Path) -> None:
         self.root = root
-        self._lock = threading.RLock()
+        self._lock = threading.RLock()  # the records in memory
+        self._io = threading.Lock()  # the files: a write never holds ``_lock`` (readers)
+        self._seq: dict[str, int] = {}  # change number of each record...
+        self._written: dict[str, int] = {}  # ...and the last one on disk
         self._runs: dict[str, dict[str, Any]] = {}
         self._t0: dict[str, float] = {}  # monotonic start of each run started in this process
         self._load()
@@ -103,9 +120,26 @@ class RunStore:
     def _path(self, run_id: str) -> Path:
         return self.root / f"{run_id}.json"
 
+    @staticmethod
+    def _body(run: Mapping[str, Any]) -> bytes:
+        return json.dumps(run, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
+
     def _write(self, run: Mapping[str, Any]) -> None:
-        body = json.dumps(run, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
-        write_atomic(self._path(str(run["run_id"])), body)
+        write_atomic(self._path(str(run["run_id"])), self._body(run))
+
+    def _snapshot(self, run: Mapping[str, Any]) -> tuple[str, int, bytes]:
+        """Serialise a record after a change (call with ``_lock`` held)."""
+        run_id = str(run["run_id"])
+        seq = self._seq.get(run_id, 0) + 1
+        self._seq[run_id] = seq
+        return run_id, seq, self._body(run)
+
+    def _flush(self, run_id: str, seq: int, body: bytes) -> None:
+        """Write a snapshot unless a newer one is already on disk (call without ``_lock``)."""
+        with self._io:
+            if seq > self._written.get(run_id, 0):
+                write_atomic(self._path(run_id), body)
+                self._written[run_id] = seq
 
     def _load(self) -> None:
         if not self.root.is_dir():
@@ -119,8 +153,12 @@ class RunStore:
             if not ok or not RUN_ID.match(path.stem):
                 log.warning("runs: skipping unreadable run record %s", path)
                 continue
+            changed = "provenance" not in run
+            run.setdefault("provenance", RUN_PROVENANCE)
             if run.get("state") in LIVE_STATES:
                 self._stop_on_load(run)
+                changed = True
+            if changed:
                 self._write(run)
             self._runs[path.stem] = run
 
@@ -148,8 +186,10 @@ class RunStore:
         release: str,
         region: Box,
         squares: Sequence[tuple[int, Box, str | None]],
+        defer: list[Snapshot] | None = None,
     ) -> str:
-        """A new ``queued`` run; returns its id."""
+        """A new ``queued`` run; returns its id. With ``defer``, the file write is appended
+        there for the caller to ``flush`` once it has released its own lock."""
         with self._lock:
             run_id = new_run_id()
             while run_id in self._runs:
@@ -169,18 +209,37 @@ class RunStore:
                 "finished_at": None,
                 "totals": empty_totals(),
                 "events": [],
+                "provenance": RUN_PROVENANCE,
             }
             self._runs[run_id] = run
-            self._write(run)
-            return run_id
+            snap = self._snapshot(run)
+        self._flush_or_defer(snap, defer)
+        return run_id
 
-    def _mutate(self, run_id: str, fn: Callable[[dict[str, Any]], None]) -> None:
+    def _flush_or_defer(self, snap: Snapshot, defer: list[Snapshot] | None) -> None:
+        if defer is None:
+            self._flush(*snap)
+        else:
+            defer.append(snap)
+
+    def flush(self, snaps: Iterable[Snapshot]) -> None:
+        """Write deferred snapshots (call without any lock held)."""
+        for snap in snaps:
+            self._flush(*snap)
+
+    def _mutate(
+        self,
+        run_id: str,
+        fn: Callable[[dict[str, Any]], None],
+        defer: list[Snapshot] | None = None,
+    ) -> None:
         with self._lock:
             run = self._runs.get(run_id)
             if run is None:
                 raise RunNotFound(run_id)
             fn(run)
-            self._write(run)
+            snap = self._snapshot(run)
+        self._flush_or_defer(snap, defer)
 
     def _event(self, run: dict[str, Any], type_: str, **fields: Any) -> None:
         t0 = self._t0.get(str(run["run_id"]))
@@ -205,7 +264,13 @@ class RunStore:
     def event(self, run_id: str, type_: str, **fields: Any) -> None:
         self._mutate(run_id, lambda run: self._event(run, type_, **fields))
 
-    def set_state(self, run_id: str, state: str, event: str | None = None) -> None:
+    def set_state(
+        self,
+        run_id: str,
+        state: str,
+        event: str | None = None,
+        defer: list[Snapshot] | None = None,
+    ) -> None:
         def fn(run: dict[str, Any]) -> None:
             run["state"] = state
             if state in FINISHED_STATES:
@@ -216,7 +281,7 @@ class RunStore:
             if event is not None:
                 self._event(run, event)
 
-        self._mutate(run_id, fn)
+        self._mutate(run_id, fn, defer)
 
     def square(
         self,
@@ -272,12 +337,29 @@ class RunStore:
             return [summary(r) for r in runs]
 
 
+def paused_s(events: Sequence[Mapping[str, Any]], until: float) -> float:
+    """Seconds spent paused: from each ``run_paused`` to the next ``run_resumed`` or
+    ``run_stopped``, or to ``until`` (seconds since the start) while still paused."""
+    total, since = 0.0, None
+    for e in events:
+        if e["type"] == "run_paused":
+            since = float(e["t"])
+        elif since is not None and e["type"] in ("run_resumed", "run_stopped"):
+            total += float(e["t"]) - since
+            since = None
+    if since is not None:
+        total += max(0.0, until - since)
+    return total
+
+
 def duration_s(run: Mapping[str, Any]) -> float | None:
+    """Time the run was running: ``started_at`` to ``finished_at`` (or now), less its pauses."""
     started = run.get("started_at")
     if started is None:
         return None
     end = run.get("finished_at") or _now()
-    return round(max(0.0, _seconds(str(started), str(end))), 3)
+    span = max(0.0, _seconds(str(started), str(end)))
+    return round(max(0.0, span - paused_s(run.get("events", []), span)), 3)
 
 
 def summary(run: Mapping[str, Any]) -> dict[str, Any]:
@@ -314,14 +396,31 @@ ReadStage = Callable[[str, str], Mapping[str, Any] | None]
 
 
 def read_square(index: int, area_id: str, read: ReadStage) -> SquareReplies:
-    return SquareReplies(
-        index,
-        area_id,
-        read(area_id, "summary"),
-        read(area_id, "known"),
-        read(area_id, "tracks"),
-        read(area_id, "dots"),
-    )
+    """One finished square's replies, kept small: the summary's frame times only and the
+    dots of its tracks only (an area holds tens of thousands of dots), so a scan can keep
+    every finished square in memory instead of reading them again after each square."""
+    summary, tracks, dots = read(area_id, "summary"), read(area_id, "tracks"), read(area_id, "dots")
+    if summary is not None:
+        summary = {
+            "frames": [{"visit": f["visit"], "time": f["time"]} for f in summary.get("frames", [])]
+        }
+    if dots is not None:
+        wanted = {
+            i
+            for t in (tracks or {}).get("tracks", [])
+            for tl in t.get("tracklets", [])
+            for i in tl.get("dot_ids", [])
+        }
+        dots = {
+            "visits": [
+                {
+                    "visit": v.get("visit"),
+                    "dots": [d for d in v.get("dots", []) if d["dot_id"] in wanted],
+                }
+                for v in dots.get("visits", [])
+            ]
+        }
+    return SquareReplies(index, area_id, summary, read(area_id, "known"), tracks, dots)
 
 
 def _pos(p: Mapping[str, Any]) -> dict[str, Any]:
@@ -373,6 +472,8 @@ def square_objects(sq: SquareReplies) -> list[dict[str, Any]]:
             des = str(match["designation"])
             matched.add(des)
             row = known.get(des)
+            # Horizons positions from the Known row; without one, the track's measured dots,
+            # tagged as such (never a Horizons label on a measured position).
             src = row["positions"] if row is not None else _track_dots(t, dots)
             out.append(
                 {
@@ -381,6 +482,7 @@ def square_objects(sq: SquareReplies) -> list[dict[str, Any]]:
                     "track_id": t["track_id"],
                     "square": sq.index,
                     "positions": [_pos(p) for p in src],
+                    "positions_tag": "model_dependent" if row is not None else "measured",
                 }
             )
         elif t.get("verdict") == "unexplained":
@@ -390,6 +492,7 @@ def square_objects(sq: SquareReplies) -> list[dict[str, Any]]:
                     "track_id": t["track_id"],
                     "square": sq.index,
                     "positions": [_pos(d) for d in _track_dots(t, dots)],
+                    "positions_tag": "measured",
                 }
             )
     for des, row in known.items():
@@ -400,6 +503,7 @@ def square_objects(sq: SquareReplies) -> list[dict[str, Any]]:
                     "designation": des,
                     "square": sq.index,
                     "positions": [_pos(p) for p in row["positions"]],
+                    "positions_tag": "model_dependent",
                 }
             )
     return out
@@ -437,11 +541,16 @@ class _Union:
             self.parent[max(ra, rb)] = min(ra, rb)
 
 
-def neighbours(a: int, b: int, cols: int) -> bool:
-    """Two different squares (1-based indexes) side by side or corner to corner."""
-    ra, ca = divmod(a - 1, cols)
-    rb, cb = divmod(b - 1, cols)
-    return a != b and abs(ra - rb) <= 1 and abs(ca - cb) <= 1
+def neighbours(a: Mapping[str, Any], b: Mapping[str, Any]) -> bool:
+    """Two square boxes that overlap or touch (side by side or corner to corner): the padded
+    squares of a scan overlap their neighbours (Q-470). Small-angle test, with 0.01 degree
+    of slack."""
+    d_dec = abs(float(a["dec"]) - float(b["dec"]))
+    d_ra = abs((float(a["ra"]) - float(b["ra"]) + 180.0) % 360.0 - 180.0)
+    cos_dec = math.cos(math.radians((float(a["dec"]) + float(b["dec"])) / 2.0))
+    half_w = (float(a["width_deg"]) + float(b["width_deg"])) / 2.0
+    half_h = (float(a["height_deg"]) + float(b["height_deg"])) / 2.0
+    return d_ra * cos_dec <= half_w + 0.01 and d_dec <= half_h + 0.01
 
 
 @dataclass(frozen=True)
@@ -465,9 +574,11 @@ def _same_mover(a: _Cand, b: _Cand) -> bool:
     return False
 
 
-def merge(region: Mapping[str, Any], squares: Sequence[SquareReplies]) -> dict[str, Any]:
-    """Known objects and tracks of the finished squares with the duplicates merged (Q-471)."""
-    cols, _ = grid_shape(float(region["width_deg"]), float(region["height_deg"]))
+def merge(
+    boxes: Mapping[int, Mapping[str, Any]], squares: Sequence[SquareReplies]
+) -> dict[str, Any]:
+    """Known objects and tracks of the finished squares with the duplicates merged (Q-471);
+    ``boxes`` maps a square index to its box."""
     ordered = sorted(squares, key=lambda s: s.index)
 
     cands: list[_Cand] = []
@@ -493,7 +604,8 @@ def merge(region: Mapping[str, Any], squares: Sequence[SquareReplies]) -> dict[s
         for j in range(i + 1, len(cands)):
             b = cands[j]
             same_name = a.designation is not None and a.designation == b.designation
-            if same_name or (neighbours(a.square, b.square, cols) and _same_mover(a, b)):
+            near = a.square != b.square and neighbours(boxes[a.square], boxes[b.square])
+            if same_name or (near and _same_mover(a, b)):
                 u.join(i, j)
     groups: dict[int, list[_Cand]] = {}
     for i, c in enumerate(cands):
@@ -543,6 +655,10 @@ def merge(region: Mapping[str, Any], squares: Sequence[SquareReplies]) -> dict[s
     return {"known": known, "tracks": tracks}
 
 
+def square_boxes(run: Mapping[str, Any]) -> dict[int, Mapping[str, Any]]:
+    return {int(s["index"]): s["box"] for s in run["squares"]}
+
+
 def totals_of(merged: Mapping[str, Any], squares: Sequence[Mapping[str, Any]]) -> dict[str, int]:
     """``known`` = merged known objects, ``found`` and ``unexplained`` = merged tracks."""
     return {
@@ -585,6 +701,7 @@ __all__ = [
     "RUN_ID",
     "RunNotFound",
     "RunStore",
+    "Snapshot",
     "SquareReplies",
     "duration_s",
     "merge",
@@ -592,6 +709,7 @@ __all__ = [
     "read_square",
     "results_reply",
     "sep_arcsec",
+    "square_boxes",
     "square_objects",
     "summary",
     "totals_of",

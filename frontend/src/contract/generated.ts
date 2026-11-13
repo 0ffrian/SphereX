@@ -1330,7 +1330,7 @@ export interface LiveJobError {
   detail: string;
 }
 /**
- * POST /v1/scans with start=false (Q-470): the region cut into squares, in scan order. No SIA call: area_id is a stored area of the same box, else null; the job picks each square's visit pair.
+ * POST /v1/scans with start=false (Q-470): the region cut into squares that cover it with overlap, in scan order. No SIA call: area_id is a stored area of the same box, else null; the job picks each square's visit pair.
  */
 export interface ScanPlan {
   region: RunRegion;
@@ -1402,6 +1402,7 @@ export interface Run {
   finished_at: RunTime;
   totals: RunTotals;
   events: RunEvent[];
+  provenance: RunProvenance;
   /**
    * 1 = next; only while queued.
    */
@@ -1457,11 +1458,22 @@ export interface RunObject {
   track_id?: AreaTrackId;
   square: number;
   positions: RunPosition[];
+  /**
+   * Provenance of positions: model_dependent (JPL Horizons, the Known row) or measured (the track's dots); see the run's provenance block.
+   */
+  positions_tag: 'measured' | 'model_dependent';
 }
 export interface RunPosition {
   ra: AreaRa;
   dec: AreaDec;
   time: AreaUtcTime;
+}
+/**
+ * Where the positions of the found objects come from (positions_tag names which).
+ */
+export interface RunProvenance {
+  known_positions: AreaProvenanceEntry;
+  track_positions: AreaProvenanceEntry;
 }
 /**
  * The running square's steps, as a live area job; only while running.
