@@ -154,12 +154,14 @@ def post_live(
     jobs: Annotated[LiveJobs, Depends(get_live_jobs)],
 ) -> Response:
     """The plan of a box (``start=false``), or its job (``start=true``). A box already stored
-    answers ``done``; one already queued or running answers its job, whatever ``start`` is."""
+    answers ``done``; one already queued or running answers its job, whatever ``start`` is,
+    except a scan's square with ``start=true``: that queues a job of its own behind the square,
+    so stopping the scan never loses this request (PR #160 review, Q-470)."""
     plan = _plan(request, req)
     if store.entry(plan.area_id, "summary") is not None:
         return _json(done_reply(plan.area_id), "area-job.schema.json")
     job = jobs.get(plan.area_id)
-    if job is not None and job.active:
+    if job is not None and job.active and (job.joinable or not req.start):
         return _json(jobs.reply(job), "area-job.schema.json")
     if not req.start:
         return _json(plan.reply(), "area-live-plan.schema.json")
