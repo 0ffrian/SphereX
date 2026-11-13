@@ -44,7 +44,6 @@ from datetime import datetime
 from typing import Any
 
 from app.cache.store import CacheMissOffline, UpstreamUnavailable
-from app.core.area import track
 from app.core.card.assets import Asset, AssetStatus, AssetStore
 from app.core.card.build import SPECTRUM_FIELDS, build_card
 from app.core.card.catalogue import (
@@ -58,7 +57,7 @@ from app.core.card.reference import reference_card
 from app.core.card.stars import STAR_TYPES
 from app.core.card.validate import ContractViolation, check_card, check_params
 from app.core.classify import Classification, classify
-from app.core.find import moving
+from app.core.find import moving, track
 from app.core.find.frames import DEFERRED, FrameEvent, FrameService, FramesResult, is_complete
 from app.core.find.resolver import ResolvedObject
 from app.core.jobs import Job, JobRegistry, QueueFull
@@ -245,6 +244,8 @@ class ObjectPipeline:
             job.update(stage="queued")
             while not slots.acquire(timeout=1.0):
                 if self._closed.is_set():
+                    # Shutting down before a slot was free: nothing to release, so return
+                    # before the try. The check only reads the cache, so it reports what is there.
                     return track.check(self.ctx, obj.id, window=window)
         try:
             job.update(stage="frames")

@@ -51,11 +51,11 @@ from app.core.area.store import (
     index_reply,
     settings_sha,
 )
-from app.core.area.track import TrackCheck
-from app.core.area.track import check as track_check
 from app.core.card.validate import check
 from app.core.export.ecsv import EcsvColumn, write_ecsv
 from app.core.find.stars import StarCone
+from app.core.find.track import TrackCheck
+from app.core.find.track import check as track_check
 from app.core.measure.config import MEASURE_VERSION
 from app.timefmt import MJD_OFFSET, iso_utc_z, parse_utc, utc_to_jd
 

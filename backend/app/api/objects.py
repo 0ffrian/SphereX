@@ -31,7 +31,6 @@ from app.context import Context
 from app.contract.object_card_schema import ObjectCard
 from app.contract.render_params_schema import RenderParams
 from app.contract.track_path_schema import TrackPath
-from app.core.area.track import TrackCheck
 from app.core.card.service import ObjectPipeline, ObjectResult, track_job_key
 from app.core.find import moving, png
 from app.core.find import path as track_path
@@ -41,6 +40,7 @@ from app.core.find.ids import ID_RE
 from app.core.find.propagate import FORMULA as PM_FORMULA
 from app.core.find.propagate import NEGLECTED as PM_NEGLECTED
 from app.core.find.resolver import ResolvedObject
+from app.core.find.track import TrackCheck
 from app.core.find.wcs import NORTH_ANGLE_FORMULA
 from app.core.jobs import Job, QueueFull
 from app.errors import ApiError
