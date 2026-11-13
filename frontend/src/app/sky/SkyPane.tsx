@@ -65,7 +65,8 @@ import { useAreaStore } from '@/app/shell/areaStore';
 import { AreaOverlay } from './AreaOverlay';
 import { AreaTrackLayer } from '@/app/area/AreaTrackLayer';
 import { KnownPositionsLayer } from '@/app/area/KnownPositionsLayer';
-import { aimViewAt, boxFromPixels, clampedRect, enterInArea, flyToView, reducedMotion, registerAreaView } from './areaDraw';
+import { boxFromPixels, clampedRect, enterInArea, pickRegionAt, registerAreaView, restoreSavedScan } from './areaDraw';
+import { ScanOverlay, scanClickAt } from './ScanOverlay';
 import { AimOverlay } from './AimOverlay';
 import { useCachedMarkers } from './useCachedMarkers';
 import { useTargetMarkers, type TargetMarker } from './useTargetMarkers';
@@ -531,6 +532,8 @@ export function SkyPane({ children }: { children?: ReactNode }) {
       flyCancel.current?.();
       flyCancel.current = c;
     });
+    // A scan left running in this browser comes back after a reload (issue #157).
+    restoreSavedScan();
     let drawing: { id: number; x: number; y: number } | null = null;
     // Issue #144: aiming (a drag turns the sky, a click zooms to the patch), then drawing (a drag
     // draws the box, each side stopped at 2°).
@@ -661,15 +664,13 @@ export function SkyPane({ children }: { children?: ReactNode }) {
         start = rest;
       }
       if (e.type === 'pointerup' && wasSingle && isClick(maxMove)) {
-        // Aim: a click (or a tap) zooms north up to the patch, and the drag then draws (issue #144).
+        // Select: a click (or a tap) zooms north up so the region fills the screen (issue #157).
         if (areaStage() === 'aiming') {
-          const to = aimViewAt(p.x, p.y);
-          if (to) {
-            useAreaStore.getState().pickPatch();
-            flyToView(to, reducedMotion());
-          }
+          pickRegionAt(p.x, p.y);
           return;
         }
+        // A scan's finished square opens its results (mock-up state 10).
+        if (scanClickAt(p.x, p.y)) return;
         pickAt(p.x, p.y);
       }
     };
@@ -813,6 +814,7 @@ export function SkyPane({ children }: { children?: ReactNode }) {
 
       <AreaOverlay view={view} />
       <AimOverlay view={view} />
+      <ScanOverlay view={view} />
       <AreaTrackLayer view={view} />
       <KnownPositionsLayer view={view} />
       {/* Panels sit right after the canvas in the tab order. */}

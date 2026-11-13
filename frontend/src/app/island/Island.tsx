@@ -5,6 +5,7 @@
 //
 // It is decorative apart from the status line while it thinks, and it takes no clicks. Its box is
 // state (px) so the move is one CSS transition; the panel reports where it is (islandStore).
+import { scanMiniTitle, useScanStore } from '@/app/area/scanStore';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useAppStore } from '@/state/store';
 import { useShellStore } from '@/app/shell/shellStore';
@@ -85,8 +86,16 @@ export function Island() {
   const liveTitle = useLiveJobStore((s) =>
     s.view ? liveMiniTitle(s, s.view.flow === 'known' ? 'Known objects' : 'Discovery') : null,
   );
+  // A scan (issue #157) says its square: "Discovery · Square 7 of 15".
+  const scanTitle = useScanStore((s) => scanMiniTitle(s.view));
   const areaCardMini = useAreaStore((s) =>
-    s.minimised ? (s.screen === 'live' && liveTitle !== null ? liveTitle : areaMiniTitle(s)) : null,
+    s.minimised
+      ? s.screen === 'live' && liveTitle !== null
+        ? liveTitle
+        : s.screen === 'scan' && scanTitle !== null
+          ? scanTitle
+          : areaMiniTitle(s)
+      : null,
   );
   const areaMini = buildMini ?? areaCardMini ?? objMini;
   const areaRunning = useAreaStore((s) => s.running);
