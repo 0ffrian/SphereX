@@ -11,7 +11,15 @@ import {
   FIXTURE_HEADER,
 } from './config';
 import { ApiError } from './errors';
-import type { ObjectCard, RenderParams } from '@/contract';
+import type {
+  AreaDots,
+  AreaIndex,
+  AreaKnown,
+  AreaSummary,
+  AreaTracks,
+  ObjectCard,
+  RenderParams,
+} from '@/contract';
 import type {
   CombineInfo,
   CombineOp,
@@ -25,6 +33,11 @@ import type {
 } from './types';
 import {
   parseApiError,
+  parseAreaDots,
+  parseAreaIndex,
+  parseAreaKnown,
+  parseAreaSummary,
+  parseAreaTracks,
   parseCombineInfo,
   parseComposite,
   parseFrames,
@@ -77,6 +90,16 @@ export interface ApiClient {
     b: string,
     signal?: AbortSignal,
   ): Promise<ApiResult<CombineResult>>;
+  /** Area search (A17.8; issue #96): `GET /v1/areas`, the prepared areas. */
+  areaIndex(signal?: AbortSignal): Promise<ApiResult<AreaIndex>>;
+  /** `GET /v1/areas/{area_id}`: the area's box, frames and step counts. */
+  area(id: string, signal?: AbortSignal): Promise<ApiResult<AreaSummary>>;
+  /** `GET /v1/areas/{area_id}/dots`. */
+  areaDots(id: string, signal?: AbortSignal): Promise<ApiResult<AreaDots>>;
+  /** `GET /v1/areas/{area_id}/tracks`. */
+  areaTracks(id: string, signal?: AbortSignal): Promise<ApiResult<AreaTracks>>;
+  /** `GET /v1/areas/{area_id}/known` (P9's Known card). */
+  areaKnown(id: string, signal?: AbortSignal): Promise<ApiResult<AreaKnown>>;
 }
 
 export interface ApiClientOptions {
@@ -207,6 +230,7 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
   }
 
   const objectPath = (id: string) => `/objects/${encodeURIComponent(id)}`;
+  const areaPath = (id: string) => `/areas/${encodeURIComponent(id)}`;
 
   return {
     // Issue #102 (Q-451): only resolve uses the quick timeout. Offline, `/card` waits for the
@@ -222,6 +246,11 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
     renderParams: (id, signal) =>
       getJson(`${objectPath(id)}/render-params`, parseRenderParams, signal),
     getOverlays: (id, signal) => getJson(`${objectPath(id)}/overlays`, parseOverlays, signal),
+    areaIndex: (signal) => getJson('/areas', parseAreaIndex, signal),
+    area: (id, signal) => getJson(areaPath(id), parseAreaSummary, signal),
+    areaDots: (id, signal) => getJson(`${areaPath(id)}/dots`, parseAreaDots, signal),
+    areaTracks: (id, signal) => getJson(`${areaPath(id)}/tracks`, parseAreaTracks, signal),
+    areaKnown: (id, signal) => getJson(`${areaPath(id)}/known`, parseAreaKnown, signal),
     getCombine: (id, op, a, b, signal) => {
       const query = new URLSearchParams({ op, a, b }).toString();
       return request(

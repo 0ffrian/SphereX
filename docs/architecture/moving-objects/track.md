@@ -72,7 +72,7 @@ Built once and shared with Discovery's star step ([A17.3](area-backend.md#a173-g
 ### A19.7 Photometry for movers
 
 - Stage 2 measures each kept frame at the predicted pixel, with no re-centring ([A4.2](../pipeline.md#a42-stage-2-measure-brightness-and-spectrum)).
-- **OUTLIER on the core** (Q-139; the rule's owner is A4.2, ticket T4, Moon): for `moving = true` only, `OUTLIER` within the 1.5 px core is recorded, not refused: the point is `flagged: true` and `flag_reasons` gains `outlier_core`. Hardware flags in the core still refuse (`aperture_flags:<frame_id>`). `MEASURE_VERSION` is bumped (`measure-2`). On Eros: 14 of 16 points (13 with `outlier_core`); the 2 refused frames carry `NONFUNC`, `SUR_ERROR`, `TRANSIENT`. Built in issue #72 ([Q-459](../../decisions/moving-objects.md)).
+- **OUTLIER on the core** (Q-139; the rule's owner is A4.2, ticket T4, Moon): for `moving = true` only, `OUTLIER` within the 1.5 px core is recorded, not refused: the point is `flagged: true` and `flag_reasons` gains `outlier_core`. Hardware flags in the core still refuse (`aperture_flags:<frame_id>`). `MEASURE_VERSION` is bumped (`measure-2`). On Eros: 14 of 16 points (13 with `outlier_core`); the 2 refused frames carry `NONFUNC`, `SUR_ERROR`, `TRANSIENT`. Built in issue #72 ([Q-460](../../decisions/moving-objects.md)).
 - **Tags:** the spectrum and light curve stay `measured`; the aperture centre is `model_dependent` ([Q-125](../../decisions/moving-frames.md)).
 - Each spectrum and light-curve point carries `frame_id`, so the zoom and the spectrum can follow the same exposure ([A19.13](track-contract.md#a1913-contract)).
 

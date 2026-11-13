@@ -13,7 +13,7 @@ from dataclasses import dataclass, replace
 from typing import Any
 
 # Bump when the measurement code changes in a way that changes results.
-MEASURE_VERSION = "measure-2"  # measure-2: OUTLIER on a mover's core is a flag (Q-139, Q-459)
+MEASURE_VERSION = "measure-2"  # measure-2: OUTLIER on a mover's core is a flag (Q-139, Q-460)
 
 # V1, checked 5 Nov 2026: the IRSA tutorial "SPHEREx Source Discovery Tool demo" bad_flags list
 # (https://caltech-ipac.github.io/irsa-tutorials/spherex-source-discovery-tool-demo/). Names and

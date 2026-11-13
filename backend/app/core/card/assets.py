@@ -6,7 +6,7 @@ A saved asset holds the ObjectCard, the RenderParams, the texture URLs, ``genera
 1. **Generated:** assets this backend built and saved, kept as ``derived.asset`` entries in the
    D-25 cache. The key holds ``ASSET_VERSION``, the stage 7 ``GENERATOR_VERSION`` (which holds
    the baker's rules version), ``MEASURE_VERSION`` (the asset carries the measured spectrum, so a
-   Stage 2 rule change must not serve one measured the old way, Q-459) and the data release, so a
+   Stage 2 rule change must not serve one measured the old way, Q-460) and the data release, so a
    rule or release change never serves a stale asset. Saved only from final inputs, so it
    carries the measured spectrum.
 2. **Pre-baked:** JSON files in the repo, ``<assets_dir>/<type>/<id>.json`` (A5.4). Read only.
