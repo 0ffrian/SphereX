@@ -92,6 +92,11 @@ export function ScanOverlay({ view }: { view: SkyView | null }) {
   );
   const foundAt = useMemo(() => (replayRun ? foundAtOf(replayRun) : null), [replayRun]);
   const replaying = replayView !== null;
+  /** The label's second line as drawn: during a replay, when the object was found. */
+  const lineOf = (o: ScanObject) => {
+    const at = replaying ? foundAt?.get(o.key) : undefined;
+    return at !== undefined ? `found at ${clock(at)}` : o.line;
+  };
   const scan = replayView ?? scanView;
   const region = viewRegion(scan);
   const shown = region !== null && (replaying || (areaTool && onScan));
@@ -189,13 +194,14 @@ export function ScanOverlay({ view }: { view: SkyView | null }) {
       const label = g.querySelector('text');
       if (label) {
         // Width from the text length (11 px Inter is about 6 px a character).
-        const w = Math.max(o.title.length, o.line.length) * 6 + 4;
+        const line = lineOf(o);
+        const w = Math.max(o.title.length, line.length) * 6 + 4;
         const spots = [
           { x: end.x + 14, anchor: 'start', x0: end.x + 12, x1: end.x + 14 + w },
           { x: end.x - 14, anchor: 'end', x0: end.x - 14 - w, x1: end.x - 12 },
         ];
         const y0 = end.y - 13;
-        const y1 = end.y + (o.line ? 14 : 2);
+        const y1 = end.y + (line ? 14 : 2);
         const hit = (
           sp: { x0: number; x1: number },
           r: { x0: number; y0: number; x1: number; y1: number },
@@ -275,8 +281,7 @@ export function ScanOverlay({ view }: { view: SkyView | null }) {
         ))}
       </g>
       {objects.map((o) => {
-        const at = foundAt?.get(o.key);
-        const line = replaying && at !== undefined ? `found at ${clock(at)}` : o.line;
+        const line = lineOf(o);
         return (
           <g
             key={o.key}
