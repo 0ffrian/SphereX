@@ -55,13 +55,7 @@
         "fetched_at": "2026-11-10T11:57:00.000Z"
       },
       "linker": "pairs",
-      "unchecked_by": [],
-      "sed": {
-        "label": "smooth",
-        "chi2_red": 1.2,
-        "n_dots": 16,
-        "sigma_floor": 0.15
-      }
+      "unchecked_by": []
     },
     {
       "track_id": "T2",
@@ -111,13 +105,7 @@
       "verdict": "unexplained",
       "match": null,
       "linker": "pairs",
-      "unchecked_by": [],
-      "sed": {
-        "label": "rough",
-        "chi2_red": 7.8,
-        "n_dots": 16,
-        "sigma_floor": 0.15
-      }
+      "unchecked_by": []
     },
     {
       "track_id": "T3",
@@ -169,13 +157,7 @@
       "linker": "pairs",
       "unchecked_by": [
         "horizons:Synthetic fixture A2"
-      ],
-      "sed": {
-        "label": "smooth",
-        "chi2_red": 1.9,
-        "n_dots": 16,
-        "sigma_floor": 0.15
-      }
+      ]
     },
     {
       "track_id": "T4",
@@ -204,13 +186,7 @@
       "verdict": "possible",
       "match": null,
       "linker": "pairs",
-      "unchecked_by": [],
-      "sed": {
-        "label": "too_few",
-        "chi2_red": null,
-        "n_dots": 4,
-        "sigma_floor": 0.15
-      }
+      "unchecked_by": []
     }
   ],
   "skybot": [
@@ -239,11 +215,6 @@
       "tag": "model_dependent",
       "source": "synthetic fixture: made-up known objects",
       "assumption": "orbit solutions from SkyBoT (candidates) and JPL Horizons (positions) as of fetched_at, seen from SPHEREx (500@-163182)"
-    },
-    "sed": {
-      "tag": "derived",
-      "source": "synthetic fixture: made-up scores",
-      "formula": "weighted degree-2 fit of ln F against ln wavelength, chi2_red against sed_chi2_max (A17.13)"
     }
   }
 }

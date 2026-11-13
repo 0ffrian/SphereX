@@ -5,7 +5,6 @@ import { describe, expect, it } from 'vitest';
 import {
   AREA_DOT_LABELS,
   AREA_LINKERS,
-  AREA_SED_LABELS,
   AREA_VERDICTS,
   type AreaChecks,
   type AreaDots,
@@ -52,6 +51,7 @@ describe('Area search fixtures (A17.9)', () => {
     const expected = [
       'index.json',
       ...Object.values(DIRS).flatMap((dir) => KINDS.map((k) => `${dir}${k}.json`)),
+      'spectra.json', // the spectrum check (A17.13), on the main area only
     ];
     expect(paths.sort()).toEqual(expected.sort());
   });
@@ -70,7 +70,6 @@ describe('Area search fixtures (A17.9)', () => {
     const defs = areaIndexSchema.definitions;
     expect([...AREA_DOT_LABELS]).toEqual(defs.AreaDotLabel.enum);
     expect([...AREA_VERDICTS]).toEqual(defs.AreaVerdict.enum);
-    expect([...AREA_SED_LABELS]).toEqual(defs.AreaSedLabel.enum);
     expect([...AREA_LINKERS]).toEqual(defs.AreaLinker.enum);
   });
 

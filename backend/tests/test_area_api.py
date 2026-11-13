@@ -25,7 +25,13 @@ from PIL import Image
 from app.cache.store import LiveResponse, ReadThroughCache
 from app.context import make_context
 from app.core.area import service
-from app.core.area.config import AREA_SOURCE, DEFAULT_AREA_CONFIG, area_key, method_settings
+from app.core.area.config import (
+    AREA_SOURCE,
+    DEFAULT_AREA_CONFIG,
+    SPECTRA_STAGE,
+    area_key,
+    method_settings,
+)
 from app.core.area.service import run_area
 from app.core.card.validate import errors
 from app.main import create_app
@@ -289,7 +295,8 @@ def test_two_runs_give_the_same_bytes(fixture_cache: Path, tmp_path: Path) -> No
 
 def test_the_pack_holds_every_stage_and_the_head(tmp_path: Path) -> None:
     """A17.10: ``summary``, ``known``, ``dots``, ``tracks``, ``export`` (and the internal
-    ``stamps``), then the head that names the params_hash."""
+    ``stamps``), then the head that names the params_hash; then the spectrum check's own
+    ``spectra`` stage (Q-474)."""
     out = tmp_path / "pack"
     assert (
         area_discovery.main(
@@ -301,7 +308,7 @@ def test_the_pack_holds_every_stage_and_the_head(tmp_path: Path) -> None:
     stages = set()
     for meta in (out / "v1" / AREA_SOURCE / "spherex_qr2").glob("*/*.json"):
         stages.add(json.loads(meta.read_text("utf-8"))["key"]["query"]["stage"])
-    assert stages == {*service.STAGES, service.HEAD}
+    assert stages == {*service.STAGES, service.HEAD, SPECTRA_STAGE}
 
 
 def test_steps_must_be_in_order(tmp_path: Path) -> None:

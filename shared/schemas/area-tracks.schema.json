@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "area-tracks.schema.json",
   "title": "AreaTracks",
-  "description": "GET /v1/areas/{area_id}/tracks (A17.8): tracks and possibles (A17.4) with match and verdict (A17.5), sed (A17.13) and linker (A17.12).",
+  "description": "GET /v1/areas/{area_id}/tracks (A17.8): tracks and possibles (A17.4) with match and verdict (A17.5) and linker (A17.12); the spectrum check is /spectra (A17.13).",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -153,9 +153,6 @@
           "items": {
             "$ref": "area-index.schema.json#/definitions/AreaMissingCode"
           }
-        },
-        "sed": {
-          "$ref": "#/definitions/AreaSed"
         }
       }
     },
@@ -252,41 +249,6 @@
         }
       }
     },
-    "AreaSed": {
-      "title": "AreaSed",
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "label",
-        "chi2_red",
-        "n_dots",
-        "sigma_floor"
-      ],
-      "properties": {
-        "label": {
-          "$ref": "area-index.schema.json#/definitions/AreaSedLabel"
-        },
-        "chi2_red": {
-          "anyOf": [
-            {
-              "type": "number",
-              "minimum": 0
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "n_dots": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "sigma_floor": {
-          "type": "number",
-          "minimum": 0
-        }
-      }
-    },
     "AreaTracksProvenance": {
       "title": "AreaTracksProvenance",
       "type": "object",
@@ -300,9 +262,6 @@
           "$ref": "area-index.schema.json#/definitions/AreaProvenanceEntry"
         },
         "match": {
-          "$ref": "area-index.schema.json#/definitions/AreaProvenanceEntry"
-        },
-        "sed": {
           "$ref": "area-index.schema.json#/definitions/AreaProvenanceEntry"
         }
       }
