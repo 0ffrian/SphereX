@@ -1,0 +1,73 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "run-list.schema.json",
+  "title": "RunList",
+  "description": "GET /v1/runs (Q-471): every recorded run, newest first.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "runs"
+  ],
+  "properties": {
+    "runs": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/RunSummary"
+      }
+    }
+  },
+  "definitions": {
+    "RunSummary": {
+      "title": "RunSummary",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "run_id",
+        "kind",
+        "region",
+        "state",
+        "created_at",
+        "duration_s",
+        "totals",
+        "squares_done",
+        "squares_total"
+      ],
+      "properties": {
+        "run_id": {
+          "$ref": "run.schema.json#/definitions/RunId"
+        },
+        "kind": {
+          "$ref": "run.schema.json#/definitions/RunKind"
+        },
+        "region": {
+          "$ref": "run.schema.json#/definitions/RunRegion"
+        },
+        "state": {
+          "$ref": "run.schema.json#/definitions/RunState"
+        },
+        "created_at": {
+          "$ref": "area-index.schema.json#/definitions/AreaUtcTime"
+        },
+        "duration_s": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "description": "started_at to finished_at (or now); null before it starts."
+        },
+        "totals": {
+          "$ref": "run.schema.json#/definitions/RunTotals"
+        },
+        "squares_done": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "squares_total": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    }
+  }
+}

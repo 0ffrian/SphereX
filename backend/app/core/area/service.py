@@ -268,6 +268,17 @@ def _skybot_reply(known: match.KnownStep) -> list[dict[str, Any]]:
     return [{"visit": v, "fetched_at": at} for v, at in sorted(known.skybot.items())]
 
 
+def track_rate_fields(t: join.JoinedTrack) -> dict[str, float | None]:
+    """``rate_deg_day``, ``pa_deg`` and ``u_inv_au`` of one ``/tracks`` entry: null for a
+    possible and for a track served without a rate (``fit == "none"``, or ``u`` when the track's
+    ``u`` was not fitted over all its legs)."""
+    return {
+        "rate_deg_day": _r(math.hypot(*t.v_ab), 4) if t.v_ab is not None else None,
+        "pa_deg": _pa(*t.v_ab) if t.v_ab is not None else None,
+        "u_inv_au": _r(t.u, 3) if t.u is not None else None,
+    }
+
+
 def _tracklet_reply(lg: join.Leg) -> dict[str, Any]:
     ve, vn = lg.v
     return {
@@ -321,9 +332,7 @@ def build_replies(result: AreaResult) -> dict[str, dict[str, Any]]:
                 "track_id": f"T{i}",
                 "visits": sorted({lg.visit for lg in t.legs}),
                 "tracklets": [_tracklet_reply(lg) for lg in t.legs],
-                "rate_deg_day": _r(math.hypot(*t.v_ab), 4) if t.v_ab else None,
-                "pa_deg": _pa(*t.v_ab) if t.v_ab else None,
-                "u_inv_au": _r(t.u, 3) if t.u is not None else None,
+                **track_rate_fields(t),
                 "status": t.status,
                 "reason": t.reason,
                 "verdict": v.verdict,

@@ -36,6 +36,10 @@ const ROOT = {
     'trackPath',
     'liveAreaPlan',
     'liveAreaJob',
+    'scanPlan',
+    'run',
+    'runList',
+    'runResults',
   ],
   properties: {
     card: { $ref: 'object-card.schema.json' },
@@ -50,6 +54,10 @@ const ROOT = {
     trackPath: { $ref: 'track-path.schema.json' },
     liveAreaPlan: { $ref: 'area-live-plan.schema.json' },
     liveAreaJob: { $ref: 'area-job.schema.json' },
+    scanPlan: { $ref: 'scan-plan.schema.json' },
+    run: { $ref: 'run.schema.json' },
+    runList: { $ref: 'run-list.schema.json' },
+    runResults: { $ref: 'run-results.schema.json' },
   },
 };
 
