@@ -27,7 +27,7 @@ The log is split by topic so a task loads only what it needs. **Load this index 
 | [rendering-layers.md](rendering-layers.md) | the per-layer body fixes of issue #62 (PR #63): gas giant five tiered layers, brown dwarf limb and infrared bands, asteroid sphere and displacement, the flared T Tauri disc | 0 D, 4 Q, 11 KB |
 | [gemini.md](gemini.md) | the Gemini layer: scope, offline behaviour and its contract | 1 D, 2 Q, 7 KB |
 | [sky-shell.md](sky-shell.md) | the sky view, sky endpoints and sky tiles, the flipbook UI | 1 D, 10 Q, 12 KB |
-| [shell-surfaces.md](shell-surfaces.md) | the tool rail and the island, the object panel and card, the Build split view, the full-bleed layout | 1 D, 28 Q, 43 KB |
+| [shell-surfaces.md](shell-surfaces.md) | the tool rail and the island, the object panel and card, the Build split view, the full-bleed layout | 1 D, 28 Q, 49 KB |
 | [shell-proposals.md](shell-proposals.md) | open shell proposals that Track and Area search need: pane kinds, feature cards, hash keys, Escape order | 0 D, 9 Q, 15 KB |
 | [haptics-design.md](haptics-design.md) | haptics design rules, creative ownership, the haptics API, the shared field on shader kinds, texture and data sources per type | 5 D, 12 Q, 20 KB |
 | [haptics-sound.md](haptics-sound.md) | audio pairing (D-10), spectrum pitch and voice hints, the body tone and the Track path sound | 1 D, 10 Q, 13 KB |

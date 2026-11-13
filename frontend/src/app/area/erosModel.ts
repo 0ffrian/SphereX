@@ -19,7 +19,6 @@ export const mjdDay = (m: number): string => {
   return `${d.getUTCDate()} ${MON[d.getUTCMonth()]}`;
 };
 export const mjdYear = (m: number): number => mjdDate(m).getUTCFullYear();
-export const mjdHour = (m: number): number => mjdDate(m).getUTCHours();
 
 /**
  * The six SPHEREx detectors and their bands in micrometres, as the mock-up lists them.
