@@ -1,0 +1,476 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "area-spectra.schema.json",
+  "title": "AreaSpectra",
+  "description": "GET /v1/areas/{area_id}/spectra (A17.8, A17.13, Q-474): the spectrum check of every track of /tracks, in the same order. Colours are taken only within one exposure (short arm below the 2.42 um dichroic, long arm at or above it); the check never changes a track or its verdict (A17.5).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "area_id",
+    "cached_at",
+    "computed_at",
+    "missing",
+    "provenance",
+    "method",
+    "calibration",
+    "tracks"
+  ],
+  "properties": {
+    "area_id": {
+      "$ref": "area-index.schema.json#/definitions/AreaId"
+    },
+    "cached_at": {
+      "$ref": "area-index.schema.json#/definitions/AreaUtcTime"
+    },
+    "computed_at": {
+      "$ref": "area-index.schema.json#/definitions/AreaUtcTime"
+    },
+    "missing": {
+      "type": "array",
+      "items": {
+        "$ref": "area-index.schema.json#/definitions/AreaMissingCode"
+      }
+    },
+    "provenance": {
+      "$ref": "#/definitions/AreaSpectraProvenance"
+    },
+    "method": {
+      "$ref": "#/definitions/AreaSpectraMethod"
+    },
+    "calibration": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/AreaSpectraCalibration"
+      }
+    },
+    "tracks": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/AreaSpectraTrack"
+      }
+    }
+  },
+  "definitions": {
+    "AreaSpectraVerdict": {
+      "title": "AreaSpectraVerdict",
+      "description": "A17.13 step 7: the first row that applies.",
+      "type": "string",
+      "enum": [
+        "rock",
+        "very_red",
+        "too_red",
+        "too_blue",
+        "flickers",
+        "too_faint",
+        "one_colour"
+      ]
+    },
+    "AreaSpectraRSource": {
+      "title": "AreaSpectraRSource",
+      "description": "parallax: r from u_inv_au (derived); worst_case: the closest the line of sight comes to the Sun (model_dependent).",
+      "type": "string",
+      "enum": [
+        "parallax",
+        "worst_case"
+      ]
+    },
+    "AreaSpectraArm": {
+      "title": "AreaSpectraArm",
+      "type": "string",
+      "enum": [
+        "short",
+        "long"
+      ]
+    },
+    "AreaSpectraLimit": {
+      "title": "AreaSpectraLimit",
+      "description": "null: a measured ratio; lower or upper: a limit, one dot below snr_min.",
+      "anyOf": [
+        {
+          "type": "string",
+          "enum": [
+            "lower",
+            "upper"
+          ]
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "AreaSpectraProvenance": {
+      "title": "AreaSpectraProvenance",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "points",
+        "rel",
+        "calibration",
+        "colour",
+        "distance",
+        "distance_worst_case",
+        "verdict",
+        "sun"
+      ],
+      "properties": {
+        "points": {
+          "$ref": "area-index.schema.json#/definitions/AreaProvenanceEntry"
+        },
+        "rel": {
+          "$ref": "area-index.schema.json#/definitions/AreaProvenanceEntry"
+        },
+        "calibration": {
+          "$ref": "area-index.schema.json#/definitions/AreaProvenanceEntry"
+        },
+        "colour": {
+          "$ref": "area-index.schema.json#/definitions/AreaProvenanceEntry"
+        },
+        "distance": {
+          "$ref": "area-index.schema.json#/definitions/AreaProvenanceEntry"
+        },
+        "distance_worst_case": {
+          "$ref": "area-index.schema.json#/definitions/AreaProvenanceEntry"
+        },
+        "verdict": {
+          "$ref": "area-index.schema.json#/definitions/AreaProvenanceEntry"
+        },
+        "sun": {
+          "$ref": "area-index.schema.json#/definitions/AreaProvenanceEntry"
+        }
+      }
+    },
+    "AreaSpectraMethod": {
+      "title": "AreaSpectraMethod",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "spectrum_version",
+        "settings",
+        "formulas",
+        "sun"
+      ],
+      "properties": {
+        "spectrum_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "settings": {
+          "$ref": "area-index.schema.json#/definitions/AreaSettings"
+        },
+        "formulas": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "sun": {
+          "title": "AreaSpectraSun",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "source",
+            "sha256",
+            "join_um"
+          ],
+          "properties": {
+            "source": {
+              "type": "string",
+              "minLength": 1
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "join_um": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          }
+        }
+      }
+    },
+    "AreaSpectraCalibration": {
+      "title": "AreaSpectraCalibration",
+      "description": "A17.13 step 2: the calibration floor of one visit and detector (derived).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "visit",
+        "detector",
+        "sigma_sys",
+        "n_pairs",
+        "source"
+      ],
+      "properties": {
+        "visit": {
+          "$ref": "area-index.schema.json#/definitions/AreaVisit"
+        },
+        "detector": {
+          "$ref": "area-index.schema.json#/definitions/AreaDetector"
+        },
+        "sigma_sys": {
+          "type": "number",
+          "minimum": 0
+        },
+        "n_pairs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "source": {
+          "type": "string",
+          "enum": [
+            "stars",
+            "default"
+          ]
+        }
+      }
+    },
+    "AreaSpectraTrack": {
+      "title": "AreaSpectraTrack",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "track_id",
+        "verdict",
+        "heat_glow",
+        "r_au",
+        "r_source",
+        "phase_deg",
+        "pairs",
+        "steps",
+        "points"
+      ],
+      "properties": {
+        "track_id": {
+          "$ref": "area-index.schema.json#/definitions/AreaTrackId"
+        },
+        "verdict": {
+          "$ref": "#/definitions/AreaSpectraVerdict"
+        },
+        "heat_glow": {
+          "description": "true: a parallax rock with a pair above r_max; null: the distance is unknown (worst case); false otherwise.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "r_au": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "r_source": {
+          "$ref": "#/definitions/AreaSpectraRSource"
+        },
+        "phase_deg": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 180
+        },
+        "pairs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/AreaSpectraPair"
+          }
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/AreaSpectraStep"
+          }
+        },
+        "points": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/AreaSpectraPoint"
+          }
+        }
+      }
+    },
+    "AreaSpectraPair": {
+      "title": "AreaSpectraPair",
+      "description": "A17.13 step 3: one short-arm and one long-arm dot of the same exposure; rho is the colour relative to the Sun (model_dependent).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "visit",
+        "exposure",
+        "time",
+        "short_dot_id",
+        "long_dot_id",
+        "lambda_short_um",
+        "lambda_long_um",
+        "rho",
+        "rho_err",
+        "limit",
+        "rho_max"
+      ],
+      "properties": {
+        "visit": {
+          "$ref": "area-index.schema.json#/definitions/AreaVisit"
+        },
+        "exposure": {
+          "$ref": "area-index.schema.json#/definitions/AreaExposure"
+        },
+        "time": {
+          "$ref": "area-index.schema.json#/definitions/AreaUtcTime"
+        },
+        "short_dot_id": {
+          "$ref": "area-index.schema.json#/definitions/AreaDotId"
+        },
+        "long_dot_id": {
+          "$ref": "area-index.schema.json#/definitions/AreaDotId"
+        },
+        "lambda_short_um": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "lambda_long_um": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "rho": {
+          "type": "number"
+        },
+        "rho_err": {
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "limit": {
+          "$ref": "#/definitions/AreaSpectraLimit"
+        },
+        "rho_max": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "AreaSpectraStep": {
+      "title": "AreaSpectraStep",
+      "description": "A17.13 step 6: consecutive points of one visit and detector; ok when |change| <= allowed.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "visit",
+        "detector",
+        "dot_id_a",
+        "dot_id_b",
+        "time_a",
+        "time_b",
+        "change",
+        "allowed",
+        "ok"
+      ],
+      "properties": {
+        "visit": {
+          "$ref": "area-index.schema.json#/definitions/AreaVisit"
+        },
+        "detector": {
+          "$ref": "area-index.schema.json#/definitions/AreaDetector"
+        },
+        "dot_id_a": {
+          "$ref": "area-index.schema.json#/definitions/AreaDotId"
+        },
+        "dot_id_b": {
+          "$ref": "area-index.schema.json#/definitions/AreaDotId"
+        },
+        "time_a": {
+          "$ref": "area-index.schema.json#/definitions/AreaUtcTime"
+        },
+        "time_b": {
+          "$ref": "area-index.schema.json#/definitions/AreaUtcTime"
+        },
+        "change": {
+          "type": "number"
+        },
+        "allowed": {
+          "type": "number",
+          "minimum": 0
+        },
+        "ok": {
+          "type": "boolean"
+        }
+      }
+    },
+    "AreaSpectraPoint": {
+      "title": "AreaSpectraPoint",
+      "description": "A17.13 step 1 and 8: every dot of the track (measured), with rel for the chart (derived).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dot_id",
+        "visit",
+        "detector",
+        "exposure",
+        "time",
+        "lambda_um",
+        "flux_uJy",
+        "flux_err",
+        "snr",
+        "arm",
+        "point",
+        "rel",
+        "used"
+      ],
+      "properties": {
+        "dot_id": {
+          "$ref": "area-index.schema.json#/definitions/AreaDotId"
+        },
+        "visit": {
+          "$ref": "area-index.schema.json#/definitions/AreaVisit"
+        },
+        "detector": {
+          "$ref": "area-index.schema.json#/definitions/AreaDetector"
+        },
+        "exposure": {
+          "$ref": "area-index.schema.json#/definitions/AreaExposure"
+        },
+        "time": {
+          "$ref": "area-index.schema.json#/definitions/AreaUtcTime"
+        },
+        "lambda_um": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "flux_uJy": {
+          "type": "number"
+        },
+        "flux_err": {
+          "type": "number",
+          "minimum": 0
+        },
+        "snr": {
+          "type": "number"
+        },
+        "arm": {
+          "$ref": "#/definitions/AreaSpectraArm"
+        },
+        "point": {
+          "description": "snr >= snr_min; below it the dot is used only as a limit.",
+          "type": "boolean"
+        },
+        "rel": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "used": {
+          "description": "The dot entered a colour pair or a steadiness step.",
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}
