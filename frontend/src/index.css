@@ -5812,3 +5812,200 @@ li[data-state='running'] > .sx-live-mk {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+
+/* ---- Scans (issue #157; the live-areas mock-up, states 1, 2, 10 and 11) ----
+   State 1: the pointer is the selection rectangle with its label below (no crosshair).
+   States 2, 10, 11: the grid over the whole screen, each square in its state, and the objects
+   circled on finished squares with their trajectory and an arrow. Pinned to the sky (ScanOverlay). */
+.sx-select::before,
+.sx-select::after {
+  display: none;
+}
+.sx-select[data-held] b {
+  color: var(--fg);
+}
+.sx-scan {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 4;
+  pointer-events: none;
+  overflow: visible;
+}
+.sx-scan-cell {
+  fill: none;
+  stroke: rgba(154, 164, 171, 0.35);
+  stroke-width: 1;
+}
+[data-state='todo'] > .sx-scan-cell {
+  fill: rgba(230, 233, 235, 0.03);
+  stroke: rgba(230, 233, 235, 0.5);
+  stroke-dasharray: 4 3;
+}
+[data-state='running'] > .sx-scan-cell {
+  fill: rgba(137, 207, 240, 0.08);
+  stroke: var(--accent);
+  stroke-width: 1.5;
+}
+[data-state='done'] > .sx-scan-cell {
+  fill: rgba(74, 222, 128, 0.1);
+  stroke: rgba(74, 222, 128, 0.6);
+}
+:is([data-state='skipped'], [data-state='failed']) > .sx-scan-cell {
+  fill: rgba(255, 77, 79, 0.06);
+  stroke: rgba(255, 77, 79, 0.6);
+}
+.sx-scan-pulse {
+  fill: none;
+  stroke: rgba(137, 207, 240, 0.35);
+  stroke-width: 1;
+  animation: sx-scan-pulse 1.6s ease-in-out infinite;
+}
+@keyframes sx-scan-pulse {
+  50% {
+    opacity: 0.2;
+  }
+}
+.sx-scan [data-sq] text {
+  font: 500 11px/1 var(--font-sans, Inter, system-ui, sans-serif);
+  font-variant-numeric: tabular-nums;
+  fill: rgba(230, 233, 235, 0.55);
+  paint-order: stroke;
+  stroke: rgba(0, 0, 0, 0.6);
+  stroke-width: 2px;
+}
+.sx-scan [data-state='todo'] text {
+  fill: var(--fg);
+}
+.sx-scan [data-state='running'] text {
+  fill: var(--accent);
+}
+.sx-scan [data-state='done'] text {
+  fill: var(--p-meas);
+}
+.sx-scan :is([data-state='skipped'], [data-state='failed']) text {
+  fill: var(--fail);
+}
+.sx-scan-obj {
+  --obj: var(--p-meas);
+  cursor: pointer;
+  outline: none;
+}
+.sx-scan-obj[data-kind='unexplained'] {
+  --obj: var(--warn);
+}
+.sx-scan-obj[data-kind='predicted'] {
+  --obj: var(--p-phys);
+}
+.sx-scan-obj path {
+  fill: none;
+  stroke: var(--obj);
+  stroke-width: 1.6;
+}
+.sx-scan-obj circle {
+  fill: transparent;
+  stroke: var(--obj);
+  stroke-width: 1.6;
+  pointer-events: all;
+}
+.sx-scan-obj[data-kind='predicted'] :is(path, circle) {
+  stroke-dasharray: 4 3;
+  stroke-width: 1.4;
+}
+.sx-scan-obj:focus-visible circle {
+  stroke-width: 3;
+}
+.sx-scan-obj text {
+  font: 500 11px/1.2 var(--font-sans, Inter, system-ui, sans-serif);
+  fill: var(--obj);
+  paint-order: stroke;
+  stroke: rgba(0, 0, 0, 0.6);
+  stroke-width: 2px;
+  pointer-events: none;
+}
+.sx-scan-obj .sx-scan-sub {
+  fill: var(--muted);
+  font-size: 10px;
+}
+.sx-scan-arr-known {
+  fill: var(--p-meas);
+}
+.sx-scan-arr-unexplained {
+  fill: var(--warn);
+}
+.sx-scan-arr-predicted {
+  fill: var(--p-phys);
+}
+.sx-scan-mini {
+  display: grid;
+  gap: 3px;
+}
+.sx-scan-mini > * {
+  height: 10px;
+  padding: 0;
+  border-radius: 2px;
+  background: var(--glass-inner);
+  border: 1px solid var(--line);
+}
+.sx-scan-mini [data-state='done'] {
+  background: rgba(74, 222, 128, 0.35);
+  border-color: rgba(74, 222, 128, 0.6);
+  cursor: pointer;
+}
+.sx-scan-mini button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.sx-scan-mini [data-state='running'] {
+  background: rgba(137, 207, 240, 0.35);
+  border-color: var(--accent);
+}
+.sx-scan-mini :is([data-state='skipped'], [data-state='failed']) {
+  background: rgba(255, 77, 79, 0.3);
+  border-color: rgba(255, 77, 79, 0.6);
+}
+.sx-scan-totals {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.sx-scan-totals div {
+  display: grid;
+  gap: 1px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--glass-inner);
+  border: 1px solid var(--glass-edge);
+}
+.sx-scan-totals b {
+  font-size: 17px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.sx-scan-totals span {
+  font-size: 12px;
+  color: var(--muted);
+}
+.sx-scan-rows {
+  display: grid;
+  gap: 6px;
+}
+.sx-scan-where {
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.sx-scan-pred {
+  justify-self: start;
+}
+.sx-panel[data-testid='area-card']:has(.sx-scan-done) {
+  top: 12px;
+  overflow: auto;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sx-scan-pulse {
+    animation: none;
+  }
+}

@@ -208,7 +208,12 @@ export function inQuad(q: readonly { x: number; y: number }[], x: number, y: num
 }
 
 /** A region as the area tools' box: its top-left and bottom-right corners on the sky, and its sides. */
-export function regionBox(region: Region): { a: RaDec; b: RaDec; widthDeg: number; heightDeg: number } {
+export function regionBox(region: Region): {
+  a: RaDec;
+  b: RaDec;
+  widthDeg: number;
+  heightDeg: number;
+} {
   const X = Math.tan((region.width_deg / 2) * D2R);
   const Y = Math.tan((region.height_deg / 2) * D2R);
   return {

@@ -40,14 +40,18 @@ const KIND_TEXT: Record<ScanObject['kind'], string> = {
 
 /** The look of each square: plain while offered, else the record's state. */
 function looks(v: ScanView | null, n: number): Look[] {
-  if (v?.kind !== 'run' || !v.record) return Array.from({ length: n }, () => (v?.kind === 'run' ? 'todo' : 'plain'));
+  if (v?.kind !== 'run' || !v.record)
+    return Array.from({ length: n }, () => (v?.kind === 'run' ? 'todo' : 'plain'));
   const by = new Map(v.record.squares.map((s) => [s.index, s.state]));
   return Array.from({ length: n }, (_, i) => by.get(i + 1) ?? 'todo');
 }
 
 /** A quad moved `d` px toward its middle (so neighbouring borders do not overlap). */
 function inset(p: Pt[], d: number): Pt[] {
-  const c = { x: p.reduce((a, q) => a + q.x, 0) / p.length, y: p.reduce((a, q) => a + q.y, 0) / p.length };
+  const c = {
+    x: p.reduce((a, q) => a + q.x, 0) / p.length,
+    y: p.reduce((a, q) => a + q.y, 0) / p.length,
+  };
   return p.map((q) => {
     const dx = c.x - q.x;
     const dy = c.y - q.y;
@@ -69,11 +73,17 @@ export function ScanOverlay({ view }: { view: SkyView | null }) {
   const grid = useMemo(() => (region ? splitRegion(region) : null), [region]);
   const squareLooks = looks(scan, grid?.squares.length ?? 0);
   const events = scan?.kind === 'run' ? scan.record?.events : undefined;
-  const objects = useMemo(() => visibleObjects(objectsFromEvents(events ?? []), showPredicted), [events, showPredicted]);
+  const objects = useMemo(
+    () => visibleObjects(objectsFromEvents(events ?? []), showPredicted),
+    [events, showPredicted],
+  );
   const record = scan?.kind === 'run' ? scan.record : null;
   const flow = scan?.flow ?? 'discovery';
 
-  const openSquare = (index: number, focus: Parameters<ReturnType<typeof useAreaStore.getState>['openSquare']>[2] = null) => {
+  const openSquare = (
+    index: number,
+    focus: Parameters<ReturnType<typeof useAreaStore.getState>['openSquare']>[2] = null,
+  ) => {
     const sq = record?.squares.find((s) => s.index === index);
     if (!sq || sq.state !== 'done') return false;
     useAreaStore.getState().openSquare(regionBox(sq.box), flow, focus);
@@ -82,14 +92,16 @@ export function ScanOverlay({ view }: { view: SkyView | null }) {
   const openObject = (o: ScanObject) => {
     const index = o.squares[0];
     if (index === undefined) return;
-    openSquare(index, o.designation !== undefined ? { designation: o.designation } : { trackId: o.trackId ?? '' });
+    openSquare(
+      index,
+      o.designation !== undefined ? { designation: o.designation } : { trackId: o.trackId ?? '' },
+    );
   };
   const openRef = useRef(openSquare);
-  openRef.current = openSquare;
 
   // Re-projected on every sky render: the grid and the objects stay pinned to the sky.
   const place = useRef<() => void>(() => {});
-  place.current = () => {
+  const placeNow = () => {
     const svg = svgRef.current;
     if (!svg || !grid) return;
     const quads: { index: number; pts: Pt[] }[] = [];
@@ -104,7 +116,10 @@ export function ScanOverlay({ view }: { view: SkyView | null }) {
       const q = p as Pt[];
       g.style.display = '';
       const plain = squareLooks[i] === 'plain';
-      g.querySelector('polygon.sx-scan-cell')?.setAttribute('points', pts(plain ? q : inset(q, 1.5)));
+      g.querySelector('polygon.sx-scan-cell')?.setAttribute(
+        'points',
+        pts(plain ? q : inset(q, 1.5)),
+      );
       g.querySelector('polygon.sx-scan-pulse')?.setAttribute('points', pts(inset(q, 4.5)));
       const t = g.querySelector('text');
       if (t) {
@@ -125,7 +140,10 @@ export function ScanOverlay({ view }: { view: SkyView | null }) {
       g.style.display = '';
       const q = p as Pt[];
       const end = q[q.length - 1]!;
-      g.querySelector('path')?.setAttribute('d', q.length > 1 ? `M${q.map((r) => `${r.x.toFixed(1)} ${r.y.toFixed(1)}`).join(' L')}` : '');
+      g.querySelector('path')?.setAttribute(
+        'd',
+        q.length > 1 ? `M${q.map((r) => `${r.x.toFixed(1)} ${r.y.toFixed(1)}`).join(' L')}` : '',
+      );
       const ring = g.querySelector('circle');
       ring?.setAttribute('cx', end.x.toFixed(1));
       ring?.setAttribute('cy', end.y.toFixed(1));
@@ -133,12 +151,17 @@ export function ScanOverlay({ view }: { view: SkyView | null }) {
       if (label) {
         label.setAttribute('x', (end.x + 14).toFixed(1));
         label.setAttribute('y', (end.y - 2).toFixed(1));
-        label.querySelectorAll('tspan').forEach((ts) => ts.setAttribute('x', (end.x + 14).toFixed(1)));
+        label
+          .querySelectorAll('tspan')
+          .forEach((ts) => ts.setAttribute('x', (end.x + 14).toFixed(1)));
       }
     }
   };
+  // The latest closures for the render loop and the click test, then a placement at once.
   useLayoutEffect(() => {
-    if (shown) place.current();
+    place.current = placeNow;
+    openRef.current = openSquare;
+    if (shown) placeNow();
   });
   useEffect(() => {
     if (!view || !shown) {
@@ -155,17 +178,37 @@ export function ScanOverlay({ view }: { view: SkyView | null }) {
 
   if (!shown || !grid) return null;
   return (
-    <svg ref={svgRef} className="sx-scan" data-testid="scan-overlay" data-cols={grid.cols} data-rows={grid.rows}>
+    <svg
+      ref={svgRef}
+      className="sx-scan"
+      data-testid="scan-overlay"
+      data-cols={grid.cols}
+      data-rows={grid.rows}
+    >
       <defs>
         {(['known', 'unexplained', 'predicted'] as const).map((k) => (
-          <marker key={k} id={`sx-arr-${k}`} viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+          <marker
+            key={k}
+            id={`sx-arr-${k}`}
+            viewBox="0 0 10 10"
+            refX="8"
+            refY="5"
+            markerWidth="6"
+            markerHeight="6"
+            orient="auto"
+          >
             <path d="M0 1 L9 5 L0 9z" className={`sx-scan-arr-${k}`} />
           </marker>
         ))}
       </defs>
       <g aria-hidden="true">
         {grid.squares.map((s, i) => (
-          <g key={s.index} data-sq={s.index} data-state={squareLooks[i]} data-testid={`scan-square-${s.index}`}>
+          <g
+            key={s.index}
+            data-sq={s.index}
+            data-state={squareLooks[i]}
+            data-testid={`scan-square-${s.index}`}
+          >
             <polygon className="sx-scan-cell" />
             {squareLooks[i] === 'running' && <polygon className="sx-scan-pulse" />}
             <text>{s.index}</text>

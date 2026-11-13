@@ -65,7 +65,7 @@ import { useAreaStore } from '@/app/shell/areaStore';
 import { AreaOverlay } from './AreaOverlay';
 import { AreaTrackLayer } from '@/app/area/AreaTrackLayer';
 import { KnownPositionsLayer } from '@/app/area/KnownPositionsLayer';
-import { boxFromPixels, clampedRect, enterInArea, pickRegionAt, registerAreaView } from './areaDraw';
+import { boxFromPixels, clampedRect, enterInArea, pickRegionAt, registerAreaView, restoreSavedScan } from './areaDraw';
 import { ScanOverlay, scanClickAt } from './ScanOverlay';
 import { AimOverlay } from './AimOverlay';
 import { useCachedMarkers } from './useCachedMarkers';
@@ -532,6 +532,8 @@ export function SkyPane({ children }: { children?: ReactNode }) {
       flyCancel.current?.();
       flyCancel.current = c;
     });
+    // A scan left running in this browser comes back after a reload (issue #157).
+    restoreSavedScan();
     let drawing: { id: number; x: number; y: number } | null = null;
     // Issue #144: aiming (a drag turns the sky, a click zooms to the patch), then drawing (a drag
     // draws the box, each side stopped at 2°).

@@ -306,3 +306,16 @@ export function skippedText(
         : 'It could not be computed.';
   return { title: `Square ${index} ${failed ? 'failed' : 'skipped'}`, line };
 }
+
+/** The island's pill for a minimised scan card: "Discovery · Square 7 of 15", or its end. */
+export function scanMiniTitle(v: ScanView | null): string | null {
+  if (!v) return null;
+  const flow = v.flow === 'known' ? 'Known objects' : 'Discovery';
+  if (v.kind !== 'run' || !v.record) return `${flow} · Scan`;
+  const r = v.record;
+  const n = r.squares.length;
+  if (isFinished(r.state)) return `${flow} · Scan ${r.state === 'done' ? 'done' : r.state}`;
+  if (r.state === 'paused') return `${flow} · Paused`;
+  const cur = r.squares.find((s) => s.state === 'running');
+  return cur ? `${flow} · Square ${cur.index} of ${n}` : `${flow} · Scanning`;
+}

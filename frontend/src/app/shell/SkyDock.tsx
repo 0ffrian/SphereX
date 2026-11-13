@@ -6,11 +6,13 @@
 // click on the sky, and the object panel and the selected object's card hold Spectrum and Build it.
 import { useEffect, useLayoutEffect, useRef } from 'react';
 import { SearchBar } from '@/app/search/SearchBar';
-import { RailIcon } from './railIcons';
+import { OrbitIcon } from '@/components/animate-ui/icons/hugeicons/orbit';
+import { ViewIcon } from '@/components/animate-ui/icons/hugeicons/view';
 import { openTool } from './ToolRail';
 import { useAreaStore } from './areaStore';
 import { useShellStore } from './shellStore';
 import type { AreaFlow } from '@/app/area/areaService';
+import { reopenScan } from '@/app/sky/areaDraw';
 
 const TOOLS: { id: 'known' | 'area'; flow: AreaFlow; label: string; hint: string }[] = [
   {
@@ -27,7 +29,11 @@ const TOOLS: { id: 'known' | 'area'; flow: AreaFlow; label: string; hint: string
   },
 ];
 
+/** The icons do not animate when the user asks for reduced motion. */
+const prefersStill = () => typeof window !== 'undefined' && (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false);
+
 export function SkyDock() {
+  const still = prefersStill();
   const tool = useShellStore((s) => s.tool);
   const flow = useAreaStore((s) => s.flow);
   const buildOpen = useShellStore((s) => s.build.open);
@@ -80,12 +86,18 @@ export function SkyDock() {
                     aria-label={t.label}
                     aria-description={t.hint}
                     onClick={() => {
-                      useAreaStore.getState().startFlow(t.flow);
+                      // A scan of this tool that is still held comes back (issue #157); else select.
+                      if (!reopenScan(t.flow)) useAreaStore.getState().startFlow(t.flow);
                       openTool('area');
                     }}
                     data-testid={`tool-${t.id}`}
                   >
-                    <RailIcon id={t.id} />
+                    {/* Hugeicons from Animate UI (mock-up section 0): orbit and view, animated on hover. */}
+                    {t.id === 'known' ? (
+                      <OrbitIcon size={20} strokeWidth={1.8} animateOnHover={!still} className="sx-ico size-5" aria-hidden="true" />
+                    ) : (
+                      <ViewIcon size={20} strokeWidth={1.8} animateOnHover={!still} className="sx-ico size-5" aria-hidden="true" />
+                    )}
                     <span className="sx-tool-tip" aria-hidden="true">
                       {t.label}
                     </span>

@@ -10,10 +10,22 @@ const csv = (v: string | number | null | undefined): string => {
 };
 
 const COLUMNS: { name: string; datatype: string; description: string }[] = [
-  { name: 'kind', datatype: 'string', description: 'known (on file), or track (found by Discovery)' },
-  { name: 'designation', datatype: 'string', description: 'SkyBoT designation; empty for an unexplained track' },
+  {
+    name: 'kind',
+    datatype: 'string',
+    description: 'known (on file), or track (found by Discovery)',
+  },
+  {
+    name: 'designation',
+    datatype: 'string',
+    description: 'SkyBoT designation; empty for an unexplained track',
+  },
   { name: 'track_id', datatype: 'string', description: 'Discovery track id in its square' },
-  { name: 'status', datatype: 'string', description: 'detected or predicted (known); the track verdict' },
+  {
+    name: 'status',
+    datatype: 'string',
+    description: 'detected or predicted (known); the track verdict',
+  },
   { name: 'v_mag', datatype: 'float64', description: 'SkyBoT V magnitude' },
   { name: 'rate_deg_day', datatype: 'float64', description: 'motion of the track, deg/day' },
   { name: 'squares', datatype: 'string', description: 'scan squares, space separated' },
@@ -26,7 +38,9 @@ export function scanEcsv(res: RunResults, region: ScanBox): string {
     '# %ECSV 1.0',
     '# ---',
     '# datatype:',
-    ...COLUMNS.map((c) => `# - {name: ${c.name}, datatype: ${c.datatype}, description: '${c.description}'}`),
+    ...COLUMNS.map(
+      (c) => `# - {name: ${c.name}, datatype: ${c.datatype}, description: '${c.description}'}`,
+    ),
     '# meta:',
     `#   run_id: ${res.run_id}`,
     `#   data_release: ${res.release}`,
@@ -39,10 +53,34 @@ export function scanEcsv(res: RunResults, region: ScanBox): string {
   ];
   const rows = [
     ...res.known.map((k) =>
-      ['known', k.designation, '', k.detected ? 'detected' : 'predicted', k.v_mag, null, k.squares.join(' '), k.dates.join(' '), ''].map(csv).join(','),
+      [
+        'known',
+        k.designation,
+        '',
+        k.detected ? 'detected' : 'predicted',
+        k.v_mag,
+        null,
+        k.squares.join(' '),
+        k.dates.join(' '),
+        '',
+      ]
+        .map(csv)
+        .join(','),
     ),
     ...res.tracks.map((t) =>
-      ['track', t.designation, t.track_id, t.verdict, null, t.rate_deg_day, t.squares.join(' '), t.dates.join(' '), t.area_id].map(csv).join(','),
+      [
+        'track',
+        t.designation,
+        t.track_id,
+        t.verdict,
+        null,
+        t.rate_deg_day,
+        t.squares.join(' '),
+        t.dates.join(' '),
+        t.area_id,
+      ]
+        .map(csv)
+        .join(','),
     ),
   ];
   return [...head, ...rows].join('\n') + '\n';

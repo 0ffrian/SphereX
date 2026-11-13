@@ -12,7 +12,8 @@ import { useShellStore } from '@/app/shell/shellStore';
 import { selectionLabel } from '@/app/area/scanGrid';
 import { selectionNow, viewNow } from './areaDraw';
 
-const coarse = () => typeof window !== 'undefined' && (window.matchMedia?.('(pointer: coarse)').matches ?? false);
+const coarse = () =>
+  typeof window !== 'undefined' && (window.matchMedia?.('(pointer: coarse)').matches ?? false);
 
 export function AimOverlay({ view }: { view: SkyView | null }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -72,7 +73,13 @@ export function AimOverlay({ view }: { view: SkyView | null }) {
   }, [view, aiming]);
 
   return (
-    <div ref={ref} className="sx-aim sx-select" style={{ display: 'none' }} aria-hidden="true" data-testid="area-aim">
+    <div
+      ref={ref}
+      className="sx-aim sx-select"
+      style={{ display: 'none' }}
+      aria-hidden="true"
+      data-testid="area-aim"
+    >
       <b ref={labelRef} />
     </div>
   );

@@ -13,7 +13,9 @@ import {
 import { useAreaStore, type AreaBox, type AreaDrag } from '@/app/shell/areaStore';
 import { clampCentred, clampDrag } from '@/app/area/aim';
 import { regionBox, selectionAt, type Selection } from '@/app/area/scanGrid';
-import { useScanStore } from '@/app/area/scanStore';
+import { useScanStore, viewRegion } from '@/app/area/scanStore';
+import { getScanApi, RunGone } from '@/app/area/scanApi';
+import { useShellStore } from '@/app/shell/shellStore';
 
 export interface AreaViewAccess {
   getView(): SkyCamera;
@@ -102,6 +104,43 @@ export function pickRegionAt(x: number, y: number): void {
   }
   s.openScan(s.flow, box);
   void useScanStore.getState().plan(s.flow, sel.region);
+}
+
+/**
+ * The dock button of a tool with a scan still held (running, or finished and not closed): the
+ * scan card comes back and the sky flies to its region. False when there is none.
+ */
+export function reopenScan(flow: 'known' | 'discovery'): boolean {
+  const v = useScanStore.getState().view;
+  const region = viewRegion(v);
+  if (!v || v.kind !== 'run' || v.flow !== flow || !region) return false;
+  useAreaStore.getState().openScan(flow, regionBox(region));
+  flyToView({ ra: region.ra, dec: region.dec, fovDeg: clampFov(region.height_deg) }, reducedMotion());
+  return true;
+}
+
+/**
+ * A scan saved in this browser that is not finished (a page reload mid-scan): follow it again,
+ * open its tool and fly to its region. Its squares redraw from GET /v1/runs/{id}.
+ */
+export function restoreSavedScan(): void {
+  const s = useScanStore.getState();
+  const saved = s.saved();
+  if (!saved || s.view) return;
+  // A run the server no longer has, or one that cannot be read now, is not brought back.
+  void getScanApi()
+    .run(saved.runId)
+    .then(
+      (record) => {
+        if (useScanStore.getState().view) return;
+        useScanStore.getState().follow(saved.runId, saved.flow, record.region, record);
+        useShellStore.getState().setTool('area');
+        reopenScan(saved.flow);
+      },
+      (e: unknown) => {
+        if (e instanceof RunGone) useScanStore.getState().clear();
+      },
+    );
 }
 
 /**
