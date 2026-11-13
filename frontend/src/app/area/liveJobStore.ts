@@ -59,6 +59,12 @@ export function registerLiveHandoff(fn: Handoff | null): void {
   handoff = fn;
 }
 
+/** Back to aiming when the card has nothing to show (registered by the area store). */
+let redraw: (() => void) | null = null;
+export function registerLiveRedraw(fn: (() => void) | null): void {
+  redraw = fn;
+}
+
 let pollTimer: ReturnType<typeof setTimeout> | null = null;
 /** Bumped when the followed job changes, so a late poll of an older job is dropped. */
 let jobToken = 0;
@@ -89,9 +95,15 @@ export const useLiveJobStore = create<LiveJobStoreState>()((set, get) => {
       return;
     }
     const err = status.error ?? { code: 'area:failed', detail: '' };
-    // Stopped (here, or in another tab): back to the offer, not a failure.
-    if (err.code === 'cancelled' && showing && job.plan) {
-      set({ job: null, view: { kind: 'offer', box: job.box, flow: job.flow, plan: job.plan } });
+    // Stopped (here, or in another tab): back to the offer, not a failure; with no offer to go
+    // back to (a job joined while already running), back to aiming.
+    if (err.code === 'cancelled' && showing) {
+      if (job.plan) {
+        set({ job: null, view: { kind: 'offer', box: job.box, flow: job.flow, plan: job.plan } });
+      } else {
+        set({ job: null, view: null });
+        redraw?.();
+      }
       return;
     }
     set({ job: null, view: showing ? failView(job.box, job.flow, err.code, err.detail, true) : get().view });
@@ -190,13 +202,26 @@ export const useLiveJobStore = create<LiveJobStoreState>()((set, get) => {
       if (!job || get().busy) return;
       set({ busy: true });
       stopPolling();
-      await getLiveAreaApi()
+      const stopped = await getLiveAreaApi()
         .stop(job.areaId)
-        .catch(() => undefined);
-      set({ busy: false, job: null });
-      // Back to the offer, so the same area can be computed again or redrawn.
+        .then(
+          () => true,
+          () => false,
+        );
+      set({ busy: false });
+      // The server did not take the Stop: the job still runs, so keep following it.
+      if (!stopped) {
+        follow(job);
+        return;
+      }
+      set({ job: null });
+      // Back to the offer, so the same area can be computed again or redrawn; with no offer (a job
+      // joined while already running), back to aiming rather than an empty card.
       if (get().view?.kind === 'job' && job.plan) set({ view: { kind: 'offer', box: job.box, flow: job.flow, plan: job.plan } });
-      else if (get().view?.kind === 'job') set({ view: null });
+      else if (get().view?.kind === 'job') {
+        set({ view: null });
+        redraw?.();
+      }
     },
     retry: async () => {
       const view = get().view;

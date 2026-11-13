@@ -4,6 +4,7 @@
 //   waiting    another area is computing; this one starts next.
 //   failure    a status dot, a short title and one muted line; Try again (when it can help) or Draw again.
 // Closing the card does not stop the job (liveJobStore): the area opens when it is ready.
+import { useEffect, useRef } from 'react';
 import { PanelCard } from '@/app/shell/PanelCard';
 import { useAreaStore } from '@/app/shell/areaStore';
 import { useShellStore } from '@/app/shell/shellStore';
@@ -28,6 +29,15 @@ export function LiveAreaCard() {
   const job = useLiveJobStore((s) => s.job);
   const busy = useLiveJobStore((s) => s.busy);
   const closePanel = useShellStore((s) => s.closePanel);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const stateKey = view ? `${view.kind}:${view.kind === 'job' ? (job?.status?.state ?? 'starting') : ''}` : '';
+  // The card changes state under the button just pressed (Compute, Stop, Try again), which goes
+  // away: focus moves to the card's title instead of being lost to the page (WCAG 2.4.3).
+  useEffect(() => {
+    const a = document.activeElement;
+    if (a && a !== document.body) return;
+    bodyRef.current?.closest('section')?.querySelector<HTMLElement>('h2')?.focus({ preventScroll: true });
+  }, [stateKey]);
   if (!view) return null;
   const title = flowTitle(view.flow);
   const status = view.kind === 'job' ? (job?.status ?? null) : null;
@@ -48,7 +58,7 @@ export function LiveAreaCard() {
       returnFocusTo={view.flow === 'known' ? '[data-testid="tool-known"]' : '[data-testid="tool-area"]'}
       testId="area-card"
     >
-      <div className="sx-live" data-testid="live-card" data-state={view.kind === 'job' ? (status?.state ?? 'starting') : view.kind}>
+      <div ref={bodyRef} className="sx-live" data-testid="live-card" data-state={view.kind === 'job' ? (status?.state ?? 'starting') : view.kind}>
         {view.kind === 'offer' && <Offer view={view} busy={busy} />}
         {view.kind === 'job' && <Job job={job} status={status} busy={busy} onMinimise={minimise} />}
         {view.kind === 'failed' && <Failed view={view} busy={busy} />}

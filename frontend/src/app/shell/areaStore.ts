@@ -23,7 +23,7 @@ import {
   type KnownObjectsResult,
 } from '@/app/area/areaService';
 import { getLiveAreaApi, liveBoxOf, type PlanAnswer } from '@/app/area/liveAreaApi';
-import { registerLiveHandoff, useLiveJobStore } from '@/app/area/liveJobStore';
+import { registerLiveHandoff, registerLiveRedraw, useLiveJobStore } from '@/app/area/liveJobStore';
 import { useShellStore } from './shellStore';
 
 export interface SkyCorner {
@@ -337,11 +337,16 @@ export const useAreaStore = create<AreaState>()((set, get) => {
     useLiveJobStore.getState().showPlan(box, flow, live);
   };
   // A done live area (or a stored one) opens in the existing results views, unchanged.
+  // The live card has nothing left to show (a followed job stopped, with no offer to go back to).
+  registerLiveRedraw(() => {
+    if (get().screen === 'live') get().redraw();
+  });
   registerLiveHandoff((box, flow, { ifIdle }) => {
     const shell = useShellStore.getState();
     const s = get();
-    // Never over another area the user is busy with: only on the plain sky or while aiming.
-    if (ifIdle && shell.tool === 'area' && s.stage === 'set' && s.screen !== 'live') return;
+    // Never over another area the user is busy with (any card of a set box, the live card of
+    // another box included, or a box being dragged): only on the plain sky or while aiming.
+    if (ifIdle && shell.tool === 'area' && (s.stage === 'set' || s.drag !== null)) return;
     if (ifIdle && shell.tool !== 'area' && shell.tool !== 'sky') return;
     clearTimers();
     set({ ...FRESH, flow });

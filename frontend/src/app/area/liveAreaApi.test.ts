@@ -100,6 +100,21 @@ describe('HTTP client', () => {
     const api = httpLiveAreaApi('/v1', (async () => reply({ error: 'job_not_found', detail: 'x' }, 404)) as unknown as typeof fetch);
     await expect(api.status('a')).rejects.toBeInstanceOf(LiveJobGone);
   });
+  it('Stop: 204 and 404 (already ended) are fine; a 500 is not stopped', async () => {
+    const at = (status: number) => httpLiveAreaApi('/v1', (async () => new Response(null, { status })) as unknown as typeof fetch);
+    await expect(at(204).stop('a')).resolves.toBeUndefined();
+    await expect(at(404).stop('a')).resolves.toBeUndefined();
+    await expect(at(500).stop('a')).rejects.toThrow('Stop failed (500).');
+  });
+  it('a job poll carries a timeout, so a hung reply cannot stall polling', async () => {
+    let sig: AbortSignal | undefined;
+    const api = httpLiveAreaApi('/v1', (async (_u: string, init?: RequestInit) => {
+      sig = init?.signal ?? undefined;
+      return reply({ area_id: 'a', state: 'running', step: null, steps: [], elapsed_s: 1, eta_s: 9 });
+    }) as unknown as typeof fetch);
+    await api.status('a');
+    expect(sig).toBeInstanceOf(AbortSignal);
+  });
   it('reads a job and stops it with DELETE', async () => {
     const fetchImpl = vi.fn(async (_u: string, init?: RequestInit) =>
       init?.method === 'DELETE' ? new Response(null, { status: 204 }) : reply({ area_id: 'a b', state: 'running', step: null, steps: [], elapsed_s: 1, eta_s: 9 }),

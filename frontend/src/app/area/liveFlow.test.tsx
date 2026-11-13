@@ -239,6 +239,50 @@ describe('a job that cannot be followed (review of PR #148)', () => {
   });
 });
 
+describe('self-review fixes', () => {
+  it('a job finishing with its card closed never replaces another box\'s live card', async () => {
+    setLiveAreaApi(mockLiveAreaApi('ok', { durationMs: 3000 }));
+    await draw('known');
+    await useLiveJobStore.getState().compute();
+    // Close A's card, then draw box B: its offer shows.
+    useAreaStore.getState().reset();
+    await draw('known');
+    expect(useLiveJobStore.getState().view?.kind).toBe('offer');
+    stored = true;
+    await vi.advanceTimersByTimeAsync(3000 + 2 * POLL_MS);
+    expect(useLiveJobStore.getState().job).toBeNull();
+    expect(useAreaStore.getState().screen).toBe('live');
+    expect(useLiveJobStore.getState().view?.kind).toBe('offer');
+  });
+  it('a Stop the server does not take keeps following the job', async () => {
+    const api = mockLiveAreaApi('ok', { durationMs: 60_000 });
+    setLiveAreaApi({ ...api, stop: async () => Promise.reject(new Error('Stop failed (500).')) });
+    await draw('known');
+    await useLiveJobStore.getState().compute();
+    await useLiveJobStore.getState().stop();
+    expect(useLiveJobStore.getState().view?.kind).toBe('job');
+    expect(useLiveJobStore.getState().job).not.toBeNull();
+    await vi.advanceTimersByTimeAsync(POLL_MS);
+    expect(useLiveJobStore.getState().job?.status?.state).toBe('running');
+  });
+  it('Cancel on a joined job (no offer to go back to) returns to aiming, not an empty card', async () => {
+    const api = mockLiveAreaApi('ok', { durationMs: 60_000 });
+    setLiveAreaApi({
+      ...api,
+      plan: async (b) => {
+        const st = await api.start(b);
+        return st.kind === 'started' ? { kind: 'running', areaId: st.areaId, state: 'running' } : { kind: 'unavailable' };
+      },
+    });
+    await draw('discovery');
+    expect(useLiveJobStore.getState().view?.kind).toBe('job');
+    await useLiveJobStore.getState().stop();
+    expect(useLiveJobStore.getState().view).toBeNull();
+    expect(useAreaStore.getState().stage).toBe('aiming');
+    expect(useAreaStore.getState().screen).toBe('draw');
+  });
+});
+
 describe('waiting (state 5)', () => {
   it('a queued job waits, Cancel stops it', async () => {
     setLiveAreaApi(mockLiveAreaApi('queued', { durationMs: 10_000 }));
@@ -372,6 +416,15 @@ describe('LiveAreaCard', () => {
     expect(q('live-failed')?.textContent).toBe('No two visits close in timeNothing can be seen moving here. Try a nearby patch.');
     expect(q('live-retry')).toBeNull();
     expect(host.querySelector('.sx-panel-head p')?.textContent).toBe('Area · 0.98° × 0.61°');
+  });
+  it('focus moves to the card title when the pressed button goes away (Compute)', async () => {
+    useLiveJobStore.setState({ view: { kind: 'offer', box, flow: 'known', plan } });
+    await act(async () => root.render(<LiveAreaCard />));
+    q('live-compute')!.focus();
+    await act(async () => {
+      useLiveJobStore.setState({ view: { kind: 'job', box, flow: 'known' }, job: { areaId: 'a', box, flow: 'known', plan, status: mockStatusAt('a', 0.2, plan) } });
+    });
+    expect(document.activeElement?.tagName).toBe('H2');
   });
   it('Draw again goes back to aiming and closes the card', async () => {
     useLiveJobStore.setState({ view: { kind: 'failed', box, flow: 'known', code: 'upstream_unavailable', detail: '' } });
