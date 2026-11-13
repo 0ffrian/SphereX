@@ -124,6 +124,8 @@ export interface AppSound {
   updateTone(id: ToneId, changes: Partial<ToneParams>): boolean;
   /** Fade the tone out and release it. */
   stopTone(id: ToneId): void;
+  /** Whether the tone `id` is held (false after `stop()`, a hidden page or a honesty change: restart it). */
+  hasTone(id: ToneId): boolean;
   /**
    * Q-458: the notes of one moment (an exposure's frames, R8.9.2) as one event through the 25 ms
    * tick gap and the 40 events/s cap. Returns how many notes played.
@@ -307,6 +309,7 @@ export function createAppSound(options: AppSoundOptions = {}): AppSound {
     startTone: (id, params) => engine.startTone(id, params),
     updateTone: (id, changes) => engine.updateTone(id, changes),
     stopTone: (id) => engine.stopTone(id),
+    hasTone: (id) => engine.hasTone(id),
     emitTogether: (notes) => engine.emitTogether(notes),
     getStatus,
     subscribe(fn) {

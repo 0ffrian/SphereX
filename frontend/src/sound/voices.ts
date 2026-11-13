@@ -314,8 +314,12 @@ export class AudioDriver implements TrainCapableDriver, ToneCapableDriver {
   startTone(id: ToneId, t: ToneOutput): void {
     if (!this.supported) return;
     const ctx = this.ready();
-    if (!ctx) return;
     const old = this.tones.get(id);
+    if (!ctx) {
+      // An old voice must not come back at its old pitch and timbre on resume: cut it now.
+      if (old) this.fadeOutTone(id, old);
+      return;
+    }
     if (old) this.fadeOutTone(id, old);
     this.tones.set(id, this.makeTone(ctx, t));
     this.syncToneDuck();
@@ -418,7 +422,14 @@ export class AudioDriver implements TrainCapableDriver, ToneCapableDriver {
     } else {
       const now = ctx.currentTime;
       const g = live.env.gain;
-      g.cancelScheduledValues(now);
+      // Hold the current level: a plain cancel could drop the fade-in still inside the lookahead
+      // and jump the gain (a click).
+      const held = g as AudioParam & { cancelAndHoldAtTime?: (t: number) => AudioParam };
+      if (typeof held.cancelAndHoldAtTime === 'function') held.cancelAndHoldAtTime(now);
+      else {
+        g.cancelScheduledValues(now);
+        g.setValueAtTime(g.value, now);
+      }
       g.setTargetAtTime(0, now, TONE_FADE_OUT_S / DUCK_TAU_DIVISOR);
       this.fading.add(live);
       live.src.onended = () => {
