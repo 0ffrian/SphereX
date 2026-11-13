@@ -160,6 +160,10 @@ def test_a_two_leg_chain_fit_is_the_pair_fit_exactly() -> None:
     assert got is not None
     assert join.chain_fit((a, b), W, 0.0034, 1.16, CFG) == (got[0], got[2])
     assert join.chain_fit((a, b), {}, 0.0034, 1.16, CFG) == (got[0], None)
+    # w for one visit only: pair_fit's rate-window fallback, so the track stays "chain" (PR #140).
+    one = join.pair_fit(a, b, {1: W[1]}, 0.0034, 1.16, CFG)
+    assert one is not None and one[2] is None
+    assert join.chain_fit((a, b), {1: W[1]}, 0.0034, 1.16, CFG) == (one[0], None)
 
 
 # Three visits, one day apart, of a mover that speeds up: 0.45 deg/day from visit 1 to 2 and

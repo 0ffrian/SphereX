@@ -19,8 +19,9 @@
 5. **Track fit:** a track's ``v_AB`` is the least-squares straight line through its legs'
    positions (equal weights) and ``u`` the least-squares value over all its legs, clamped at 0
    (``chain_fit``); for two legs this is the pair test's own ``v_AB`` and ``u``. A chain fit
-   that fails the pair test's limits (rate window, ``u <= 1/delta_min``, ``v_tol``) is not
-   served: the track keeps its first pair's fit, which passed.
+   that fails the pair test's limits (rate window, ``u <= 1/delta_min``, ``v_tol`` with the
+   largest ``sigma_v`` of the chain's legs) is not served: the track keeps its first pair's fit,
+   which passed. A 2-leg track is always fitted as a ``"chain"``.
 
 Pure: ``w`` comes in as a mapping; ``spherex_w`` fetches it through the cache.
 """
@@ -185,9 +186,12 @@ def chain_fit(
     window that every pair of the chain, and its whole span, allow). With ``w`` for every leg,
     ``u`` minimises ``sum |v_in_k - v_AB + w_k u|^2``, clamped at 0, as ``pair_fit`` does for
     two, and must pass ``u <= 1/delta_min`` and every leg's perpendicular residual ``<= v_tol``.
-    With ``w`` for no leg, ``u`` is ``None`` (the rate-window fallback, as in ``pair_fit``). With
-    ``w`` for only some legs, ``None``: the chain would mix the two tests. For two legs this is
-    the pair test's own ``v_AB`` and ``u``."""
+    ``v_tol = max(v_tol_min, v_tol_sigma * sigma_v)`` with the largest ``sigma_v`` of all the
+    chain's legs (for two legs, the pair test's own ``v_tol``; for three or more it is looser
+    than any single pair's). With ``w`` for no leg, ``u`` is ``None`` (the rate-window fallback,
+    as in ``pair_fit``). With ``w`` for only some of three or more legs, ``None``: the chain would
+    mix the two tests. For two legs this is the pair test's own ``v_AB`` and ``u``, including
+    its fallback when either visit lacks ``w``, so a 2-leg track is always ``"chain"``."""
     if len(legs) < 2:
         raise ValueError("a track has two or more legs")
     if len(legs) == 2:
@@ -206,6 +210,8 @@ def chain_fit(
     if not rate_min <= math.hypot(*v_ab) <= rate_max:
         return None
     with_w = [(lg, w[lg.visit]) for lg in legs if lg.visit in w]
+    if len(legs) == 2 and len(with_w) < 2:
+        with_w = []  # pair_fit's fallback: a pair missing either visit's w is rate window only
     if not with_w:
         return v_ab, None
     if len(with_w) < len(legs):

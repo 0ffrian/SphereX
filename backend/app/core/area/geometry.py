@@ -295,8 +295,10 @@ def cell_grid(box: AreaBox, cell_arcsec: float) -> CellGrid:
     """``CellGrid.of`` built once per box size and cell size, so every step of a run shares one
     grid and its centres (issue #128 (2)). The key is the box's half sizes, not its centre (the
     plane is centred on the box), so two areas of the same size share one grid. Only the latest
-    grid is kept: a 10 x 10 deg box at 30" holds about 23 MB of centres. The lock makes the
-    lookup and the first build of the centres happen once, even from several threads."""
+    grid is kept: a 10 x 10 deg box at 30" holds about 23 MB of centres. Two areas of different
+    sizes run at once would rebuild it in turn: correct but slower; raise ``maxsize`` if areas
+    are ever served live. The lock makes the lookup and the first build of the centres happen
+    once, even from several threads."""
     with _GRID_LOCK:
         grid = _sized_grid(box.half_w, box.half_h, cell_arcsec)
         grid.centres()
