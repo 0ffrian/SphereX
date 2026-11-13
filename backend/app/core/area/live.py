@@ -40,10 +40,11 @@ WINDOW_PAD_MIN = 5.0
 CENTRE_RADIUS_DEG = 0.001
 CENTRE_MAXREC = 5000
 MAX_ALTERNATIVES = 10
-# Rough run time, fitted by eye to the 13 Nov 2026 QR3 field test (0.15 deg2: ~1.5 min,
-# 0.66 deg2: ~8 min, 2.4 deg2: ~21 min). Shown as an estimate only.
-ESTIMATE_BASE_S = 60.0
-ESTIMATE_PER_DEG2_S = 500.0
+# Rough run time, kept on the high side: the known-object step (one Horizons request per
+# SkyBoT candidate) dominates and varies. 13 Nov 2026 runs: QR3 0.66 deg2 ~9 min and
+# 2.4 deg2 ~21 min; DR1 0.15 deg2 (14 candidates) 10.6 min. Shown as an estimate only.
+ESTIMATE_BASE_S = 540.0
+ESTIMATE_PER_DEG2_S = 600.0
 VISITS_FORMULA = (
     "frames of one SIA cone at the box centre grouped into visits (gap over visit_gap_h); the "
     "pair of consecutive visits with the smallest gap at most max_gap_h apart, earliest on a tie"
