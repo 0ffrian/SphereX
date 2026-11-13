@@ -2,6 +2,7 @@
 // track of the merged results, with the square(s), visit dates and area ids it came from. Written
 // from the results reply as it is (#156); a value the reply does not carry is left empty. Pure.
 import type { RunResults, ScanBox } from './scanApi';
+import { rateOf } from './scanObjects';
 
 const csv = (v: string | number | null | undefined): string => {
   if (v === null || v === undefined) return '';
@@ -20,17 +21,29 @@ const COLUMNS: { name: string; datatype: string; description: string }[] = [
     datatype: 'string',
     description: 'SkyBoT designation; empty for an unexplained track',
   },
-  { name: 'track_id', datatype: 'string', description: 'Discovery track id in its square' },
+  {
+    name: 'track_id',
+    datatype: 'string',
+    description: 'Discovery track id(s), one per square, space separated',
+  },
   {
     name: 'status',
     datatype: 'string',
-    description: 'detected or predicted (known); the track verdict',
+    description: 'detected or predicted (known); found or unexplained (track)',
   },
   { name: 'v_mag', datatype: 'float64', description: 'SkyBoT V magnitude' },
-  { name: 'rate_deg_day', datatype: 'float64', description: 'motion of the track, deg/day' },
+  {
+    name: 'rate_deg_day',
+    datatype: 'float64',
+    description: 'motion over the merged dots, deg/day (derived)',
+  },
   { name: 'squares', datatype: 'string', description: 'scan squares, space separated' },
-  { name: 'dates', datatype: 'string', description: 'visit dates (UTC), space separated' },
-  { name: 'area_id', datatype: 'string', description: 'stored area of the track' },
+  { name: 'dates', datatype: 'string', description: 'visit start times (UTC), space separated' },
+  {
+    name: 'area_id',
+    datatype: 'string',
+    description: 'stored area(s) of the track, space separated',
+  },
 ];
 
 export function scanEcsv(res: RunResults, region: ScanBox): string {
@@ -45,9 +58,12 @@ export function scanEcsv(res: RunResults, region: ScanBox): string {
     `#   run_id: ${res.run_id}`,
     `#   data_release: ${res.release}`,
     `#   region: {ra: ${region.ra}, dec: ${region.dec}, width_deg: ${region.width_deg}, height_deg: ${region.height_deg}}`,
-    `#   squares_done: ${res.squares_done}`,
-    `#   squares_total: ${res.squares_total}`,
-    `#   squares_skipped: [${res.skipped.map((s) => s.index).join(', ')}]`,
+    `#   squares_done: ${res.squares.filter((s) => s.state === 'done').length}`,
+    `#   squares_total: ${res.squares.length}`,
+    `#   squares_skipped: [${res.squares
+      .filter((s) => s.state === 'skipped' || s.state === 'failed')
+      .map((s) => s.index)
+      .join(', ')}]`,
     '# schema: astropy-2.0',
     COLUMNS.map((c) => c.name).join(','),
   ];
@@ -61,7 +77,7 @@ export function scanEcsv(res: RunResults, region: ScanBox): string {
         k.v_mag,
         null,
         k.squares.join(' '),
-        k.dates.join(' '),
+        k.visits.join(' '),
         '',
       ]
         .map(csv)
@@ -71,13 +87,13 @@ export function scanEcsv(res: RunResults, region: ScanBox): string {
       [
         'track',
         t.designation,
-        t.track_id,
-        t.verdict,
+        t.tracks.map((r) => r.track_id).join(' '),
+        t.kind,
         null,
-        t.rate_deg_day,
+        rateOf(t.positions.slice().sort((a, b) => Date.parse(a.time) - Date.parse(b.time))),
         t.squares.join(' '),
-        t.dates.join(' '),
-        t.area_id,
+        t.visits.join(' '),
+        t.tracks.map((r) => r.area_id).join(' '),
       ]
         .map(csv)
         .join(','),

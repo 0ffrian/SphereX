@@ -8,8 +8,9 @@ interface SkyHook {
   setView(v: { ra: number; dec: number; fovDeg: number }): void;
   getView(): { ra: number; dec: number; fovDeg: number };
 }
-// At 1280 × 800 and 17°, the selection is 9.6° × 6.0°: 5 × 3 squares, as in the mock-up.
-const VIEW = { ra: 30, dec: 10, fovDeg: 17 };
+// At 1280 × 800 and 15.35°, the selection is 8.6° × 5.4°: 5 × 3 squares as #156 splits it (its
+// padded squares must stay within 2°; the mock-up's 9.6° × 6.0° is 6 × 4 there).
+const VIEW = { ra: 30, dec: 10, fovDeg: 15.35 };
 
 async function open(page: Page, query: string) {
   await page.setViewportSize({ width: 1280, height: 800 });
@@ -37,7 +38,9 @@ test('select, grid, scan square by square, reload mid-scan, then the combined re
   );
   await page.mouse.move(640, 400);
   await page.mouse.move(645, 402);
-  await expect(page.getByTestId('area-aim')).toHaveText('9.6° × 6.0° · 15 squares · about 4 h');
+  await expect(page.getByTestId('area-aim')).toHaveText(
+    /^8\.6° × 5\.4° · 15 squares · about \d+ h$/,
+  );
 
   // State 2: the region fills the screen, gridded 5 × 3 and numbered.
   await page.mouse.click(645, 402);

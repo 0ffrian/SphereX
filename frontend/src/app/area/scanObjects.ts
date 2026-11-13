@@ -19,6 +19,7 @@ export interface ScanObject {
   squares: number[];
   /** The trajectory, oldest first (duplicate times dropped). */
   positions: RunPosition[];
+  /** Not in the run's events (#156): null; the results card shows V from the merged rows. */
   vMag: number | null;
   /** Motion over the trajectory (deg/day, derived), null with fewer than two times. */
   rateDegDay: number | null;
@@ -80,7 +81,7 @@ export function objectsFromEvents(events: readonly RunEvent[]): ScanObject[] {
         ...(o.track_id !== undefined ? { trackId: o.track_id } : {}),
         squares: [o.square],
         positions: [...o.positions],
-        vMag: o.v_mag ?? null,
+        vMag: null,
         rateDegDay: null,
       });
       continue;
@@ -88,7 +89,6 @@ export function objectsFromEvents(events: readonly RunEvent[]): ScanObject[] {
     if (!prev.squares.includes(o.square)) prev.squares.push(o.square);
     prev.positions.push(...o.positions);
     if (o.kind === 'known') prev.kind = 'known';
-    if (prev.vMag === null && o.v_mag != null) prev.vMag = o.v_mag;
   }
   const out: ScanObject[] = [];
   for (const o of byKey.values()) {

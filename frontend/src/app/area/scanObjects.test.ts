@@ -5,13 +5,17 @@ import { objectsFromEvents, rateOf, squaresText, visibleObjects } from './scanOb
 
 const found = (
   square: number,
-  object: Omit<NonNullable<RunEvent['object']>, 'square'>,
+  object: Omit<NonNullable<RunEvent['object']>, 'square' | 'positions_tag'>,
   t = square,
 ): RunEvent => ({
   t,
   type: 'found',
   square,
-  object: { ...object, square },
+  object: {
+    ...object,
+    square,
+    positions_tag: object.kind === 'unexplained' ? 'measured' : 'model_dependent',
+  },
 });
 const P = (ra: number, dec: number, time: string) => ({ ra, dec, time });
 
@@ -22,13 +26,11 @@ describe('objectsFromEvents', () => {
     found(2, {
       kind: 'known',
       designation: '7051 Sean',
-      v_mag: 17.7,
       positions: [P(30.4, 10, '2026-06-27T03:00:00Z'), P(30.2, 10, '2026-06-27T09:00:00Z')],
     }),
     found(2, {
       kind: 'predicted',
       designation: '2014 HX482',
-      v_mag: 21.9,
       positions: [P(30.5, 9.8, '2026-06-27T03:00:00Z'), P(30.49, 9.79, '2026-06-27T09:00:00Z')],
     }),
     found(2, {
@@ -57,7 +59,7 @@ describe('objectsFromEvents', () => {
     expect(sean.squares).toEqual([2, 3]);
     expect(sean.positions.map((p) => p.ra)).toEqual([30.4, 30.2, 29.9]);
     expect(sean.title).toBe('7051 Sean');
-    expect(sean.line).toBe('V 17.7 · squares 2–3');
+    expect(sean.line).toBe('squares 2–3');
   });
 
   it('keeps tracks per square, labels kinds, drops objects without positions', () => {
@@ -67,7 +69,7 @@ describe('objectsFromEvents', () => {
     expect(t7.line).toMatch(/^0\.\d\d°\/day$/);
     expect(objs.find((o) => o.key === '2014 HX482')).toMatchObject({
       kind: 'predicted',
-      line: 'predicted · V 21.9',
+      line: 'predicted',
     });
   });
 

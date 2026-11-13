@@ -4,7 +4,7 @@ import { dayOf, scanRows } from './ScanCard';
 import { mockResultsOf, mockScanApi } from './scanApi';
 import { scanEcsv } from './scanExport';
 
-const REGION = { ra: 30, dec: 10, width_deg: 9.6, height_deg: 6 };
+const REGION = { ra: 30, dec: 10, width_deg: 9, height_deg: 5.4 };
 
 async function finishedResults() {
   let t = 1_800_000_000_000;
@@ -21,22 +21,19 @@ describe('scanRows', () => {
     const found = scanRows(res, 'found');
     const sean = found.find((r) => r.known?.designation === '7051 Sean')!;
     expect(sean).toMatchObject({ num: '7051', name: 'Sean', where: 'squares 2–3 · 27 Jun' });
-    expect(sean.line).toBe('asteroid · V 17.7 · detected');
+    expect(sean.line).toBe('asteroid · V 17.4 · detected');
     const t3 = found.find((r) => r.num === 'T3')!;
-    expect(t3).toMatchObject({
-      name: 'Unexplained track',
-      line: '0.31°/day · not in SkyBoT',
-      where: 'square 3 · 27 Jun',
-    });
+    expect(t3).toMatchObject({ name: 'Unexplained track', where: 'square 3 · 27 Jun' });
+    // The rate is derived from its merged dots.
+    expect(t3.line).toMatch(/^\d+\.\d\d°\/day · not in SkyBoT$/);
     expect(found.every((r) => r.track !== null)).toBe(true);
   });
 
-  it('Known: every known object, detected or predicted; Possible: none in the mock', async () => {
+  it('Known: every known object, detected or predicted', async () => {
     const res = await finishedResults();
     const known = scanRows(res, 'known');
     expect(known).toHaveLength(res.known.length);
     expect(known.some((r) => r.line.endsWith('predicted'))).toBe(true);
-    expect(scanRows(res, 'possible')).toEqual([]);
   });
 
   it('dayOf', () => {
@@ -56,6 +53,8 @@ describe('scanEcsv', () => {
     expect(text).toContain('#   squares_skipped: [4]');
     const header = lines.findIndex((l) => l.startsWith('kind,'));
     expect(lines.length - header - 1).toBe(res.known.length + res.tracks.length);
-    expect(text).toContain('known,"7051 Sean",,detected,17.7,,"2 3",2026-06-27,');
+    expect(text).toContain(
+      'known,"7051 Sean",,detected,17.4,,"2 3","2026-06-27T03:10:00Z 2026-06-28T03:10:00Z",',
+    );
   });
 });

@@ -380,6 +380,9 @@ AREA_READ_SIDE = [
     "app.core.area.config",
     "app.core.area.live",
     "app.core.area.live_jobs",
+    # Issue #156: run records and the scan split, plain JSON and math (no numpy, no pipeline).
+    "app.core.area.runs",
+    "app.core.area.scan",
     "app.core.area.store",
 ]
 

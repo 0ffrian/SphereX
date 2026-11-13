@@ -116,7 +116,7 @@ describe('restore after a reload', () => {
       JSON.stringify({
         runId,
         flow: 'discovery',
-        region: { ra: 30, dec: 10, width_deg: 9.6, height_deg: 6 },
+        region: { ra: 30, dec: 10, width_deg: 9, height_deg: 5.4 },
       }),
     );
 
@@ -126,8 +126,8 @@ describe('restore after a reload', () => {
     const started = await api.start({
       ra: 30,
       dec: 10,
-      width_deg: 9.6,
-      height_deg: 6,
+      width_deg: 9,
+      height_deg: 5.4,
       kind: 'discovery',
     });
     if (started.kind !== 'started') throw new Error('not started');
@@ -147,8 +147,8 @@ describe('restore after a reload', () => {
     const started = await api.start({
       ra: 30,
       dec: 10,
-      width_deg: 9.6,
-      height_deg: 6,
+      width_deg: 9,
+      height_deg: 5.4,
       kind: 'discovery',
     });
     if (started.kind !== 'started') throw new Error('not started');

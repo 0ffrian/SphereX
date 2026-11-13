@@ -7,7 +7,7 @@
 // mid-scan finds the run again and redraws every square from its record. The record is the truth:
 // nothing about a square is guessed here.
 import { create } from 'zustand';
-import type { LiveJobStatus } from './liveAreaApi';
+import type { RunProgress } from '@/contract';
 import { failureText } from './liveJobStore';
 import {
   getScanApi,
@@ -34,10 +34,12 @@ export type ScanView =
       region: Region;
       record: RunRecord | null;
       /** The running square's live job (steps, counts), when it can be read. */
-      square: LiveJobStatus | null;
+      square: RunProgress | null;
       results: RunResults | null;
       /** Polls have failed SCAN_MAX_MISSED times in a row (still trying). */
       stale: boolean;
+      /** Stop was accepted; a running square stops at its next check (Q-470), so this can take a while. */
+      stopping: boolean;
     }
   | { kind: 'failed'; flow: ScanFlow; region: Region; code: string; detail: string };
 
@@ -96,10 +98,8 @@ export const useScanStore = create<ScanState>()((set, get) => {
     try {
       const record = await api.run(v.runId, ctl.signal);
       if (mine !== token) return;
-      const running = record.squares.find((s) => s.state === 'running');
-      const square = running?.area_id
-        ? await api.squareStatus(running.area_id, ctl.signal).catch(() => null)
-        : null;
+      // The running square's steps come with the record (#156 `progress`, only while running).
+      const square = record.progress ?? null;
       if (mine !== token) return;
       const prev = get().view;
       if (prev?.kind !== 'run') return;
@@ -107,7 +107,8 @@ export const useScanStore = create<ScanState>()((set, get) => {
       // The merged results of a finished run (state 11); read once, and again if it ends later.
       if (
         isFinished(record.state) &&
-        (!results || results.squares_done !== record.totals.squares_done)
+        (!results ||
+          results.squares.filter((s) => s.state === 'done').length !== record.totals.squares_done)
       )
         results = await api.results(v.runId, ctl.signal).catch(() => results);
       if (mine !== token) return;
@@ -218,7 +219,12 @@ export const useScanStore = create<ScanState>()((set, get) => {
     },
     pause: () => act((id) => getScanApi().pause(id)),
     resume: () => act((id) => getScanApi().resume(id)),
-    stop: () => act((id) => getScanApi().stop(id)),
+    stop: () =>
+      act(async (id) => {
+        await getScanApi().stop(id);
+        const cur = get().view;
+        if (cur?.kind === 'run' && cur.runId === id) set({ view: { ...cur, stopping: true } });
+      }),
     follow(runId, flow, region, record = null) {
       stopPolling();
       const mine = ++token;
@@ -232,6 +238,7 @@ export const useScanStore = create<ScanState>()((set, get) => {
           square: null,
           results: null,
           stale: false,
+          stopping: false,
         },
         busy: false,
       });

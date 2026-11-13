@@ -13,7 +13,8 @@ area is 404 ``area_not_found``. Beyond D-16 (Q-146 (6)).
   a box drawn anywhere. ``start=false`` answers the plan (one SIA cone at the box centre picks
   two visits); ``start=true`` queues a background job (``live_jobs``), which runs the pipeline
   and stores the area, then served by the routes above like a prepared one. The request never
-  computes the area itself (A16.2).
+  computes the area itself (A16.2). A started job is recorded as a run of one square
+  (issue #156, Q-471; ``kind`` names the tool), listed by ``/v1/runs`` (``api/runs.py``).
 
 ``/checks`` is not served: D4 and D5 are cut (Q-203 gate); ``summary.missing`` says
 ``checks:not_run``. Errors are ``{error, detail}``: 404 ``area_not_found``, 404 ``dot_not_found``,
@@ -26,7 +27,7 @@ import base64
 import json
 import math
 import threading
-from typing import Annotated, Any, cast
+from typing import Annotated, Any, Literal, cast
 
 import numpy as np
 from fastapi import APIRouter, Depends, Path, Request
@@ -98,6 +99,10 @@ class LiveAreaRequest(BaseModel):
     height_deg: float
     start: bool = False
     visits: list[str] | None = Field(default=None, min_length=2, max_length=2)
+    # Issue #156 (Q-471): the tool used; a job started with it is recorded as a run of one
+    # square (its id is in the reply). No default: a client that does not say which tool it
+    # is records no run, rather than one under the wrong tool (PR #160 review).
+    kind: Literal["discovery", "known"] | None = None
 
 
 _LIVE_JOBS_LOCK = threading.Lock()
@@ -109,7 +114,7 @@ def get_live_jobs(request: Request) -> LiveJobs:
     with _LIVE_JOBS_LOCK:
         jobs = getattr(request.app.state, "live_jobs", None)
         if jobs is None:
-            jobs = LiveJobs(cast(Context, request.app.state.ctx))
+            jobs = LiveJobs(cast(Context, request.app.state.ctx), store=get_area_store(request))
             request.app.state.live_jobs = jobs
     return cast(LiveJobs, jobs)
 
@@ -151,19 +156,21 @@ def post_live(
     jobs: Annotated[LiveJobs, Depends(get_live_jobs)],
 ) -> Response:
     """The plan of a box (``start=false``), or its job (``start=true``). A box already stored
-    answers ``done``; one already queued or running answers its job, whatever ``start`` is."""
+    answers ``done``; one already queued or running answers its job, whatever ``start`` is,
+    except a scan's square with ``start=true``: that queues a job of its own behind the square,
+    so stopping the scan never loses this request (PR #160 review, Q-470)."""
     plan = _plan(request, req)
     if store.entry(plan.area_id, "summary") is not None:
         return _json(done_reply(plan.area_id), "area-job.schema.json")
     job = jobs.get(plan.area_id)
-    if job is not None and job.active:
+    if job is not None and job.active and (job.joinable or not req.start):
         return _json(jobs.reply(job), "area-job.schema.json")
     if not req.start:
         return _json(plan.reply(), "area-live-plan.schema.json")
     if jobs.ctx.settings.offline:
         raise ApiError(503, "offline", "Live areas need the network (SX_OFFLINE=1).")
     try:
-        job = jobs.submit(plan)
+        job = jobs.submit(plan, kind=req.kind)
     except QueueFull as exc:
         raise ApiError(
             429,
