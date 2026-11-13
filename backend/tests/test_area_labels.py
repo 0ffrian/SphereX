@@ -3,9 +3,11 @@ recorded Eros area for the real outcome. Network blocked."""
 
 from __future__ import annotations
 
+import dataclasses
 from datetime import UTC, datetime, timedelta
 
 import numpy as np
+import pytest
 
 from app.core.area import clean
 from app.core.area.clean import AreaGeometry, DotPoint
@@ -176,3 +178,15 @@ def test_fixed_needs_the_other_visit_to_cover_the_dot() -> None:
     assert not clean.covered_by(cov, grid, BOX, 91.0, 13.4)
     mask[grid.ny // 2, grid.nx // 2] = True
     assert clean.covered_by(cov, grid, BOX, 91.0, 13.4)
+
+
+def test_label_dots_refuses_a_geometry_built_for_another_area() -> None:
+    """``geo`` must be the run's own ``area_geometry(frames)`` (PR #140 review)."""
+    from tests.area_recorded import recorded_dots, recorded_frames
+    from tests.test_area_join import recorded_lists
+
+    frames, bodies = recorded_frames()
+    geo = clean.area_geometry(frames)
+    other = dataclasses.replace(geo, box=dataclasses.replace(geo.box, half_w=geo.box.half_w * 2))
+    with pytest.raises(ValueError, match="another area"):
+        clean.label_dots(frames, bodies, recorded_dots(), recorded_lists(), geo=other)

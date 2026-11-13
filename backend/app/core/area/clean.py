@@ -523,7 +523,9 @@ def label_dots(
     geo: AreaGeometry,
 ) -> Labels:
     """A17.3 on one area. ``geo`` is the run's ``area_geometry(frames, cfg)``, built once by the
-    caller (issue #128 (2))."""
+    caller (issue #128 (2)); a ``geo`` built for another area raises ``ValueError``."""
+    if geo.box != AreaBox.of(frames.spec):
+        raise ValueError("geo was built for another area than frames")
     pts = dot_points(per_frame, frames, geo, cfg)
     label: dict[int, str] = {}
     cover = covering_frames(frames, bodies, pts, cfg)
