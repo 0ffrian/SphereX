@@ -311,6 +311,12 @@ def test_a_live_job_runs_the_pipeline_and_its_area_is_served(
         assert c.get(f"/v1/areas/live/{plan.area_id}").json()["state"] == "done"
         known = c.get(f"/v1/areas/{plan.area_id}/known").json()
         assert "433 Eros" in {k["designation"] for k in known["known"]}
+        # The same box again: answered done at once from the store, nothing queued (#141).
+        monkeypatch.setattr(areas_api, "plan_area", lambda ctx, box, pair=None: plan)
+        again = c.post("/v1/areas/live", json={**box.reply(), "start": True})
+        assert again.status_code == 200 and again.json()["state"] == "done"
+        assert again.json()["area_id"] == plan.area_id
+        assert c.app.state.live_jobs.get(plan.area_id) is None  # type: ignore[attr-defined]
 
 
 # --- review follow-ups: stopping mid-download, refusals, the routes ------------------------
