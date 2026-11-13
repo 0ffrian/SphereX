@@ -82,7 +82,7 @@ class LiveAreaPlan(BaseModel):
     )
     estimate_s: int = Field(
         ...,
-        description="Rough run time: 60 s + 500 s per square degree, from the 13 Nov 2026 QR3 runs.",
+        description="Rough run time, kept on the high side: 540 s + 600 s per square degree (13 Nov 2026 QR3 and DR1 runs).",
         ge=1,
     )
     alternatives: list[LiveVisitPair] = Field(

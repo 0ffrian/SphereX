@@ -7,8 +7,10 @@ prepared area. The pipeline modules are imported inside the worker only, so impo
 module (and ``app.main``) loads none of them.
 
 States: ``queued`` → ``running`` → ``done`` or ``failed`` (``error.code`` says why; a stopped
-job fails with ``cancelled``). Jobs live in memory: after a restart a stored area still answers
-``done`` through the store, and a lost job is simply asked for again.
+job fails with ``cancelled``). A queued job stops at once; a running one at its next check (each
+step and each cutout), so it reads ``running`` for a moment after ``DELETE``, and a job past its
+last check before storing finishes ``done``. Jobs live in memory: after a restart a stored
+area still answers ``done`` through the store, and a lost job is simply asked for again.
 """
 
 from __future__ import annotations

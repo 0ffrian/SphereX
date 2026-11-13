@@ -112,7 +112,7 @@ def test_the_plan_reply_and_spec() -> None:
     plan = live.plan_from_times("spherex_dr1", box, _three_visits())
     reply = plan.reply()
     check(reply, "area-live-plan.schema.json")
-    assert reply["estimate_s"] == 60 + 300
+    assert reply["estimate_s"] == 540 + 360
     spec = plan.spec()
     assert spec.id == plan.area_id and spec.data_release == "spherex_dr1"
     assert [w[0] for w in spec.windows] == [v.start - timedelta(minutes=5) for v in plan.visits]

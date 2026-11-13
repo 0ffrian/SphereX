@@ -1195,7 +1195,7 @@ export interface LiveAreaPlan {
    */
   n_frames: number;
   /**
-   * Rough run time: 60 s + 500 s per square degree, from the 13 Nov 2026 QR3 runs.
+   * Rough run time, kept on the high side: 540 s + 600 s per square degree (13 Nov 2026 QR3 and DR1 runs).
    */
   estimate_s: number;
   /**
