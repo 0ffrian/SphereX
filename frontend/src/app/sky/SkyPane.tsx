@@ -65,7 +65,8 @@ import { useAreaStore } from '@/app/shell/areaStore';
 import { AreaOverlay } from './AreaOverlay';
 import { AreaTrackLayer } from '@/app/area/AreaTrackLayer';
 import { KnownPositionsLayer } from '@/app/area/KnownPositionsLayer';
-import { boxFromPixels, centreRect, registerAreaView, rectOf } from './areaDraw';
+import { aimViewAt, boxFromPixels, centreRect, clampedRect, flyToView, reducedMotion, registerAreaView } from './areaDraw';
+import { AimOverlay } from './AimOverlay';
 import { useCachedMarkers } from './useCachedMarkers';
 import { useTargetMarkers, type TargetMarker } from './useTargetMarkers';
 
@@ -531,8 +532,20 @@ export function SkyPane({ children }: { children?: ReactNode }) {
       flyCancel.current = c;
     });
     let drawing: { id: number; x: number; y: number } | null = null;
-    const areaDrawing = () =>
-      useShellStore.getState().tool === 'area' && useAreaStore.getState().stage === 'drawing';
+    // Issue #144: aiming (a drag turns the sky, a click zooms to the patch), then drawing (a drag
+    // draws the box, each side stopped at 2°).
+    const areaStage = () => (useShellStore.getState().tool === 'area' ? useAreaStore.getState().stage : null);
+    const areaDrawing = () => areaStage() === 'drawing';
+    const areaPlacing = () => areaStage() === 'aiming' || areaStage() === 'drawing';
+    // The pointer: the aim rectangle (the canvas hides its own) or a + while drawing (index.css).
+    const setMode = () => {
+      const st = areaStage();
+      const mode = st === 'aiming' ? 'aim' : st === 'drawing' ? 'draw' : '';
+      if (canvas.dataset.areaMode !== mode) canvas.dataset.areaMode = mode;
+    };
+    setMode();
+    const offShell = useShellStore.subscribe(setMode);
+    const offArea = useAreaStore.subscribe(setMode);
 
     const local = (e: PointerEvent | WheelEvent) => {
       const r = canvas.getBoundingClientRect();
@@ -592,7 +605,7 @@ export function SkyPane({ children }: { children?: ReactNode }) {
     const onMove = (e: PointerEvent) => {
       const p = local(e);
       if (drawing && drawing.id === e.pointerId) {
-        useAreaStore.getState().setDrag(rectOf(drawing.x, drawing.y, p.x, p.y));
+        useAreaStore.getState().setDrag(clampedRect(drawing.x, drawing.y, p.x, p.y));
         return;
       }
       const prev = pointers.get(e.pointerId);
@@ -626,7 +639,7 @@ export function SkyPane({ children }: { children?: ReactNode }) {
     const onUp = (e: PointerEvent) => {
       if (drawing && drawing.id === e.pointerId) {
         const p = local(e);
-        const d = rectOf(drawing.x, drawing.y, p.x, p.y);
+        const d = clampedRect(drawing.x, drawing.y, p.x, p.y);
         drawing = null;
         // The tool may have been left mid-drag (Escape): then nothing is set and no search starts.
         const box =
@@ -647,7 +660,18 @@ export function SkyPane({ children }: { children?: ReactNode }) {
         const [rest] = [...pointers.values()] as [{ x: number; y: number }];
         start = rest;
       }
-      if (e.type === 'pointerup' && wasSingle && isClick(maxMove)) pickAt(p.x, p.y);
+      if (e.type === 'pointerup' && wasSingle && isClick(maxMove)) {
+        // Aim: a click (or a tap) zooms north up to the patch, and the drag then draws (issue #144).
+        if (areaStage() === 'aiming') {
+          const to = aimViewAt(p.x, p.y);
+          if (to) {
+            useAreaStore.getState().pickPatch();
+            flyToView(to, reducedMotion());
+          }
+          return;
+        }
+        pickAt(p.x, p.y);
+      }
     };
     const onLeave = (e: PointerEvent) => {
       if (e.pointerType !== 'mouse' || pointers.size > 0) return;
@@ -696,8 +720,9 @@ export function SkyPane({ children }: { children?: ReactNode }) {
         case 'Enter':
         case ' ':
           e.preventDefault();
-          // Known objects / Discovery: Enter sets an area in the middle (the keyboard way to draw one).
-          if (areaDrawing()) {
+          // Known objects / Discovery: Enter sets an area in the middle (the keyboard way to draw
+          // one), at most 2° a side, from the aim step too.
+          if (areaPlacing()) {
             const mid = centreRect();
             if (mid) useAreaStore.getState().setBox(mid);
             return;
@@ -724,6 +749,9 @@ export function SkyPane({ children }: { children?: ReactNode }) {
     queueReadout();
     return () => {
       registerAreaView(null);
+      offShell();
+      offArea();
+      delete canvas.dataset.areaMode;
       offRender();
       if (readoutFrame !== null) cancelAnimationFrame(readoutFrame);
       canvas.removeEventListener('pointerdown', onDown);
@@ -785,6 +813,7 @@ export function SkyPane({ children }: { children?: ReactNode }) {
       </p>
 
       <AreaOverlay view={view} />
+      <AimOverlay view={view} />
       <AreaTrackLayer view={view} />
       <KnownPositionsLayer view={view} />
       {/* Panels sit right after the canvas in the tab order. */}

@@ -5342,3 +5342,290 @@ body {
   color: var(--fg);
   text-shadow: var(--glass-text-shadow);
 }
+
+/* ---- Live areas (issue #144, Q-462; the live-areas mock-up, states 1 to 6) ----
+   Aim: the pointer is the next view's rectangle (the canvas hides its own); draw: a + pointer, the
+   box stops at 2° a side with a readout over it. The live card: offer, computing, waiting, failure.
+   Messages are a status dot, a short title and one muted line: no coloured border, no tint. */
+.sx-sky-pane canvas[data-area-mode='aim'] {
+  cursor: none;
+}
+.sx-sky-pane canvas[data-area-mode='draw'] {
+  /* An 18 px + in --fg (#e6e9eb) with a dark edge, as the mock-up's; the system crosshair otherwise. */
+  cursor:
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='19' height='19'><path d='M9.5 0v19M0 9.5h19' stroke='%23000' stroke-opacity='.75' stroke-width='4'/><path d='M9.5 0v19M0 9.5h19' stroke='%23e6e9eb' stroke-width='2'/></svg>")
+      9 9,
+    crosshair;
+}
+.sx-aim {
+  position: absolute;
+  z-index: 5;
+  pointer-events: none;
+  box-sizing: border-box;
+  border: 1.5px solid var(--p-meas);
+}
+.sx-aim::before,
+.sx-aim::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  background: var(--p-meas);
+  transform: translate(-50%, -50%);
+}
+.sx-aim::before {
+  width: 9px;
+  height: 1.5px;
+}
+.sx-aim::after {
+  width: 1.5px;
+  height: 9px;
+}
+.sx-aim b,
+.sx-area-size {
+  font: 500 11px/1 var(--font-sans, Inter, system-ui, sans-serif);
+  letter-spacing: 0.02em;
+  color: var(--p-meas);
+  text-shadow: var(--glass-text-shadow);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.sx-aim b {
+  position: absolute;
+  left: 0;
+  top: calc(100% + 6px);
+}
+.sx-area-size {
+  top: -18px;
+}
+.sx-area-size[data-held] {
+  color: var(--fg);
+}
+/* The + on the corner being dragged. */
+.sx-area-plus {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  pointer-events: none;
+}
+.sx-area-plus[data-corner^='b'] {
+  bottom: -9px;
+}
+.sx-area-plus[data-corner^='t'] {
+  top: -9px;
+}
+.sx-area-plus[data-corner$='r'] {
+  right: -9px;
+}
+.sx-area-plus[data-corner$='l'] {
+  left: -9px;
+}
+.sx-area-plus::before,
+.sx-area-plus::after {
+  content: '';
+  position: absolute;
+  background: var(--fg);
+  box-shadow: 0 0 2px rgba(0, 0, 0, 0.8);
+}
+.sx-area-plus::before {
+  left: 8px;
+  top: 0;
+  width: 2px;
+  height: 18px;
+}
+.sx-area-plus::after {
+  top: 8px;
+  left: 0;
+  width: 18px;
+  height: 2px;
+}
+/* The hint sits at the top centre of the sky on a desktop width (mock-up `.hint`). */
+@media (min-width: 641px) {
+  .sx-area-hint {
+    position: absolute;
+    top: 16px;
+    bottom: auto;
+    border-radius: 8px;
+    padding: 7px 12px;
+    max-width: calc(100% - 24px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+.sx-area-hint .sx-area-hint-keys {
+  font-size: 13px;
+}
+
+/* The live card: the mock-up's 360 px card. */
+.sx-panel[data-testid='area-card']:has(.sx-live) {
+  width: min(360px, calc(100% - 32px));
+}
+.sx-live {
+  display: grid;
+  gap: 14px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.sx-live-p {
+  margin: 0;
+  color: var(--fg);
+}
+.sx-live-m {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+.sx-live-facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 14px;
+  margin: 0;
+  font-size: 13px;
+}
+.sx-live-facts dt {
+  color: var(--muted);
+}
+.sx-live-facts dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+.sx-live-btns {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.sx-live .sx-btn-outline {
+  padding: 0 14px;
+}
+.sx-live .sx-btn-outline:hover:not(:disabled) {
+  background: var(--glass-veil-hover);
+}
+.sx-live .sx-btn-outline:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.sx-live .sx-live-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--bg);
+}
+.sx-live .sx-live-primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 88%, var(--fg));
+}
+.sx-live .sx-btn-outline:disabled {
+  cursor: not-allowed;
+  background: var(--s3);
+  border-color: var(--s3);
+  color: var(--muted);
+}
+.sx-live-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 7px;
+}
+.sx-live-steps li {
+  display: grid;
+  grid-template-columns: 18px 1fr auto;
+  gap: 8px;
+  align-items: center;
+  font-size: 13.5px;
+}
+.sx-live-steps li[data-state='done'] {
+  color: var(--muted);
+}
+.sx-live-steps li[data-state='todo'] {
+  color: var(--muted);
+  opacity: 0.7;
+}
+.sx-live-n {
+  color: var(--muted);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+.sx-live-mk {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1.5px solid var(--line);
+  position: relative;
+}
+li[data-state='done'] > .sx-live-mk {
+  background: var(--ok);
+  border-color: var(--ok);
+}
+li[data-state='done'] > .sx-live-mk::after {
+  content: '';
+  position: absolute;
+  left: 3.5px;
+  top: 1.5px;
+  width: 3.5px;
+  height: 6.5px;
+  border: solid var(--bg);
+  border-width: 0 1.6px 1.6px 0;
+  transform: rotate(45deg);
+}
+li[data-state='running'] > .sx-live-mk {
+  border-color: var(--accent);
+  border-top-color: transparent;
+  animation: sx-live-spin 1s linear infinite;
+}
+@keyframes sx-live-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.sx-live-bar {
+  grid-column: 2 / 4;
+  height: 4px;
+  background: var(--glass-inner);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.sx-live-bar i {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transform-origin: left center;
+  transition: transform 0.3s var(--ease);
+}
+.sx-live-time {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.sx-live-alert {
+  display: grid;
+  grid-template-columns: 6px 1fr;
+  gap: 1px 10px;
+  font-size: 13.5px;
+}
+.sx-live-alert::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--fail);
+  margin-top: 7px;
+  grid-row: span 2;
+}
+.sx-live-alert b {
+  font-weight: 500;
+  color: var(--fg);
+}
+.sx-live-alert span {
+  color: var(--muted);
+}
+@media (prefers-reduced-motion: reduce) {
+  li[data-state='running'] > .sx-live-mk {
+    animation: none;
+    border-top-color: var(--accent);
+  }
+  .sx-live-bar i {
+    transition: none;
+  }
+}
