@@ -346,10 +346,10 @@ def test_mover_and_fixed_results_do_not_share_a_cache_entry(ctx: Context) -> Non
     assert not svc.get_spectrum(OBJ).from_cache  # different method sha, so a different key
 
 
-def test_premeasured_with_another_method_is_not_reused(ctx: Context) -> None:
+def test_premeasured_is_reused_only_under_the_same_method(ctx: Context, tmp_path: Path) -> None:
     from concurrent.futures import Future
 
-    from app.core.measure.config import DEFAULT_CONFIG, method_sha
+    from app.core.measure.config import DEFAULT_CONFIG, method_sha, mover_config
     from app.core.measure.photometry import Refusal
     from app.core.measure.spectrum import Premeasured
 
@@ -365,3 +365,9 @@ def test_premeasured_with_another_method_is_not_reused(ctx: Context) -> None:
     # Made with the fixed-object config but read for a mover: ignored, measured afresh.
     stale = svc.get_spectrum(MOVER, premeasured=pre(method_sha(DEFAULT_CONFIG))).body
     assert len(stale["spectrum"]) == 1 and stale["missing"] == []
+    # Made with the mover config: reused (the sentinel refusal comes back). A fresh cache, so the
+    # first result is not served from the derived cache.
+    other = make_context(make_settings(tmp_path / "other"))
+    svc2 = service(other, frames, {"A": OUTLIER_CORE})
+    reused = svc2.get_spectrum(MOVER, premeasured=pre(method_sha(mover_config()))).body
+    assert reused["spectrum"] == [] and reused["missing"] == ["measure:A"]
