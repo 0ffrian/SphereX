@@ -1,0 +1,308 @@
+// A scan of a region, square by square (issue #157; backend #156; mock-up states 2, 10 and 11).
+//   offer   the region fills the screen, gridded: the plan (squares, time), Start scan or Select again;
+//   run     the run being followed (polled every SCAN_POLL_MS from GET /v1/runs/{id}), with the
+//           running square's steps (#141's live job) and, once it ends, the merged results;
+//   failed  the plan or the start was refused: a status dot, a short title and one muted line.
+// The run id is kept in this browser (localStorage, a per-viewer convenience) so a page reload
+// mid-scan finds the run again and redraws every square from its record. The record is the truth:
+// nothing about a square is guessed here.
+import { create } from 'zustand';
+import type { LiveJobStatus } from './liveAreaApi';
+import { failureText } from './liveJobStore';
+import {
+  getScanApi,
+  RunGone,
+  type RunRecord,
+  type RunResults,
+  type ScanKind,
+  type ScanPlan,
+} from './scanApi';
+import type { Region } from './scanGrid';
+
+export const SCAN_POLL_MS = 1500;
+/** Polls missed in a row before the card says it lost touch (it keeps trying). */
+export const SCAN_MAX_MISSED = 20;
+const SAVED_KEY = 'sx-scan-run';
+
+export type ScanFlow = ScanKind;
+export type ScanView =
+  | { kind: 'offer'; flow: ScanFlow; region: Region; plan: ScanPlan | null }
+  | {
+      kind: 'run';
+      flow: ScanFlow;
+      runId: string;
+      region: Region;
+      record: RunRecord | null;
+      /** The running square's live job (steps, counts), when it can be read. */
+      square: LiveJobStatus | null;
+      results: RunResults | null;
+      /** Polls have failed SCAN_MAX_MISSED times in a row (still trying). */
+      stale: boolean;
+    }
+  | { kind: 'failed'; flow: ScanFlow; region: Region; code: string; detail: string };
+
+export interface ScanState {
+  view: ScanView | null;
+  /** A request of the card is on its way (Start, Pause, Resume, Stop). */
+  busy: boolean;
+  /** Predicted-only known objects are drawn (hidden by default, mock-up state 10). */
+  showPredicted: boolean;
+  /** The region is chosen: ask for its plan (no network calls on the backend). */
+  plan(flow: ScanFlow, region: Region): Promise<void>;
+  start(): Promise<void>;
+  pause(): Promise<void>;
+  resume(): Promise<void>;
+  stop(): Promise<void>;
+  /** Follow a run by id (after a reload, or from the runs list of #158). */
+  follow(runId: string, flow: ScanFlow, region: Region, record?: RunRecord | null): void;
+  /** The saved run of this browser, if any: { runId, flow, region }. */
+  saved(): { runId: string; flow: ScanFlow; region: Region } | null;
+  togglePredicted(): void;
+  /** Forget the scan (Select again, Scan again, closing a finished one). */
+  clear(): void;
+}
+
+let pollTimer: ReturnType<typeof setTimeout> | null = null;
+let abort: AbortController | null = null;
+/** Bumped by every new view, so a late answer of an older one is dropped. */
+let token = 0;
+const stopPolling = () => {
+  if (pollTimer !== null) clearTimeout(pollTimer);
+  pollTimer = null;
+  abort?.abort();
+  abort = null;
+};
+
+/** The states a run no longer changes from. */
+export const isFinished = (s: RunRecord['state']): boolean =>
+  s === 'done' || s === 'stopped' || s === 'failed';
+
+function save(v: { runId: string; flow: ScanFlow; region: Region } | null): void {
+  try {
+    if (v) localStorage.setItem(SAVED_KEY, JSON.stringify(v));
+    else localStorage.removeItem(SAVED_KEY);
+  } catch {
+    /* storage blocked: a reload forgets the scan, which keeps running on the server */
+  }
+}
+
+export const useScanStore = create<ScanState>()((set, get) => {
+  const poll = async (mine: number, missed = 0): Promise<void> => {
+    const v = get().view;
+    if (mine !== token || v?.kind !== 'run') return;
+    const ctl = new AbortController();
+    abort = ctl;
+    const api = getScanApi();
+    try {
+      const record = await api.run(v.runId, ctl.signal);
+      if (mine !== token) return;
+      const running = record.squares.find((s) => s.state === 'running');
+      const square = running?.area_id
+        ? await api.squareStatus(running.area_id, ctl.signal).catch(() => null)
+        : null;
+      if (mine !== token) return;
+      const prev = get().view;
+      if (prev?.kind !== 'run') return;
+      let results = prev.results;
+      // The merged results of a finished run (state 11); read once, and again if it ends later.
+      if (
+        isFinished(record.state) &&
+        (!results || results.squares_done !== record.totals.squares_done)
+      )
+        results = await api.results(v.runId, ctl.signal).catch(() => results);
+      if (mine !== token) return;
+      set({ view: { ...prev, record, square, results, stale: false } });
+      if (!isFinished(record.state) || !results)
+        pollTimer = setTimeout(() => void poll(mine), SCAN_POLL_MS);
+    } catch (e) {
+      if (mine !== token || ctl.signal.aborted) return;
+      if (e instanceof RunGone) {
+        save(null);
+        set({
+          view: {
+            kind: 'failed',
+            flow: v.flow,
+            region: v.region,
+            code: 'run_not_found',
+            detail: '',
+          },
+        });
+        return;
+      }
+      const n = missed + 1;
+      const cur = get().view;
+      if (cur?.kind === 'run' && n >= SCAN_MAX_MISSED && !cur.stale)
+        set({ view: { ...cur, stale: true } });
+      pollTimer = setTimeout(() => void poll(mine, n), SCAN_POLL_MS);
+    }
+  };
+  const act = async (fn: (id: string) => Promise<RunRecord | void>) => {
+    const v = get().view;
+    if (v?.kind !== 'run' || get().busy) return;
+    set({ busy: true });
+    try {
+      const rec = await fn(v.runId);
+      const cur = get().view;
+      if (rec && cur?.kind === 'run' && cur.runId === rec.run_id)
+        set({ view: { ...cur, record: rec } });
+    } catch {
+      /* the next poll shows the run as the server has it */
+    } finally {
+      set({ busy: false });
+    }
+    // Poll at once so the card follows (and a finished run reads its results).
+    stopPolling();
+    void poll(token);
+  };
+  return {
+    view: null,
+    busy: false,
+    showPredicted: false,
+    async plan(flow, region) {
+      stopPolling();
+      const mine = ++token;
+      set({ view: { kind: 'offer', flow, region, plan: null }, busy: false });
+      const ctl = new AbortController();
+      abort = ctl;
+      const answer = await getScanApi()
+        .plan({ ...region, kind: flow }, ctl.signal)
+        .catch(() => ({ kind: 'unavailable' as const }));
+      if (mine !== token) return;
+      if (answer.kind === 'plan') set({ view: { kind: 'offer', flow, region, plan: answer.plan } });
+      else if (answer.kind === 'error')
+        set({ view: { kind: 'failed', flow, region, code: answer.code, detail: answer.detail } });
+      else set({ view: { kind: 'failed', flow, region, code: 'scan:unavailable', detail: '' } });
+    },
+    async start() {
+      const v = get().view;
+      if (v?.kind !== 'offer' || get().busy) return;
+      set({ busy: true });
+      const answer = await getScanApi()
+        .start({ ...v.region, kind: v.flow })
+        .catch(() => ({ kind: 'unavailable' as const }));
+      set({ busy: false });
+      if (get().view !== v) return;
+      if (answer.kind === 'started') {
+        save({ runId: answer.run.run_id, flow: v.flow, region: answer.run.region });
+        get().follow(answer.run.run_id, v.flow, answer.run.region, answer.run);
+      } else if (answer.kind === 'error')
+        set({
+          view: {
+            kind: 'failed',
+            flow: v.flow,
+            region: v.region,
+            code: answer.code,
+            detail: answer.detail,
+          },
+        });
+      else
+        set({
+          view: {
+            kind: 'failed',
+            flow: v.flow,
+            region: v.region,
+            code: 'scan:unavailable',
+            detail: '',
+          },
+        });
+    },
+    pause: () => act((id) => getScanApi().pause(id)),
+    resume: () => act((id) => getScanApi().resume(id)),
+    stop: () => act((id) => getScanApi().stop(id)),
+    follow(runId, flow, region, record = null) {
+      stopPolling();
+      const mine = ++token;
+      set({
+        view: {
+          kind: 'run',
+          flow,
+          runId,
+          region,
+          record,
+          square: null,
+          results: null,
+          stale: false,
+        },
+        busy: false,
+      });
+      void poll(mine);
+    },
+    saved() {
+      try {
+        const raw = localStorage.getItem(SAVED_KEY);
+        if (!raw) return null;
+        const v = JSON.parse(raw) as { runId?: unknown; flow?: unknown; region?: Region };
+        if (
+          typeof v.runId !== 'string' ||
+          (v.flow !== 'known' && v.flow !== 'discovery') ||
+          !v.region
+        )
+          return null;
+        return { runId: v.runId, flow: v.flow, region: v.region };
+      } catch {
+        return null;
+      }
+    },
+    togglePredicted: () => set((s) => ({ showPredicted: !s.showPredicted })),
+    clear() {
+      stopPolling();
+      token++;
+      save(null);
+      set({ view: null, busy: false });
+    },
+  };
+});
+
+/** Tests: forget everything (timers, the saved run). */
+export function resetScans(): void {
+  useScanStore.getState().clear();
+  useScanStore.setState({ showPredicted: false });
+}
+
+/** The region on screen: the offer's, or the run's (from its record once read). */
+export function viewRegion(v: ScanView | null): Region | null {
+  if (!v) return null;
+  if (v.kind === 'run') return v.record?.region ?? v.region;
+  return v.region;
+}
+
+/** What a refused plan or start says (status dot, title, one line). */
+export function scanFailureText(code: string): { title: string; line: string } {
+  switch (code) {
+    case 'scan:too_large':
+      return {
+        title: 'Region too large',
+        line: 'At most 12° a side and 36 squares. Zoom in and select again.',
+      };
+    case 'area:bad_box':
+      return { title: 'Too close to a pole', line: 'Select a region further from the pole.' };
+    case 'queue_full':
+      return { title: 'Too many areas waiting', line: 'Try again in a few minutes.' };
+    case 'run_not_found':
+      return { title: 'Scan not found', line: 'The server no longer has this scan.' };
+    case 'scan:unavailable':
+      return {
+        title: 'Scans not available',
+        line: 'This server cannot scan a region yet. Zoom in to one square.',
+      };
+    default: {
+      const t = failureText(code);
+      return { title: t.title, line: t.line };
+    }
+  }
+}
+
+/** Why a square was skipped or failed, as the card's status-dot message. */
+export function skippedText(
+  index: number,
+  code: string | undefined,
+  failed: boolean,
+): { title: string; line: string } {
+  const line =
+    code === 'area:no_visit_pair'
+      ? 'No two visits close in time there.'
+      : code
+        ? failureText(code).title + '.'
+        : 'It could not be computed.';
+  return { title: `Square ${index} ${failed ? 'failed' : 'skipped'}`, line };
+}
