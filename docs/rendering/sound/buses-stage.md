@@ -37,7 +37,7 @@
 **Sound check before going on stage.**
 - A dev-only page `sound-check.html`, excluded from the build like `gpu-probe.html` (`scripts/check-dist.js`).
 - It plays each demo world's beds at presentation level for 5 s each, then thunder, then the chord, with a level meter (RMS and peak) from an `AnalyserNode`.
-- It shows the A15's `outputLatency` and warns on Bluetooth.
+- It shows the A15's `outputLatency` and warns on Bluetooth. The app's sound settings (the Ambience dropdown) show the same warning (R8.9, #83).
 
 **Captions on stage:** at least 18 px, high contrast, readable from the back of the room.
 

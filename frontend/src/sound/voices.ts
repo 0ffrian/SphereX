@@ -165,7 +165,8 @@ export class AudioDriver implements TrainCapableDriver {
 
   /**
    * `AudioContext.outputLatency` in seconds, or null where it is missing (R12 #10). Its old UI
-   * (UnlockButton) went with D-39; kept for the sound-check page (#116, R13.9).
+   * (UnlockButton) went with D-39; read by the sound-check page (#116, R13.9) and the app's
+   * sound settings hint (SoundControls, #83).
    */
   outputLatency(): number | null {
     const ctx = this.getContext();
