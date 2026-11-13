@@ -10,6 +10,7 @@ Plane coordinates are in degrees (tangent-plane units times 180/pi).
 
 from __future__ import annotations
 
+import collections
 import functools
 import math
 import threading
@@ -283,24 +284,35 @@ class CellGrid:
         return (self.x0 + col * self.cell_deg, self.y0 + row * self.cell_deg)
 
 
-_GRID_LOCK = threading.Lock()
-
-
-@functools.lru_cache(maxsize=1)
-def _sized_grid(half_w: float, half_h: float, cell_arcsec: float) -> CellGrid:
-    return CellGrid.sized(half_w, half_h, cell_arcsec)
+# Grids by (half_w, half_h, cell_arcsec), least recently used first, each with the lock that
+# guards the first build of its centres. A 10 x 10 deg box at 30" holds about 23 MB of centres,
+# so a few sizes at once (two areas served side by side) stay cached without growing unbounded.
+_GRID_MAX = 4
+_GRIDS: collections.OrderedDict[tuple[float, float, float], tuple[CellGrid, threading.Lock]] = (
+    collections.OrderedDict()
+)
+_GRID_LOCK = threading.Lock()  # guards _GRIDS only; never held while centres are built
 
 
 def cell_grid(box: AreaBox, cell_arcsec: float) -> CellGrid:
     """``CellGrid.of`` built once per box size and cell size, so every step of a run shares one
     grid and its centres (issue #128 (2)). The key is the box's half sizes, not its centre (the
-    plane is centred on the box), so two areas of the same size share one grid. Only the latest
-    grid is kept: a 10 x 10 deg box at 30" holds about 23 MB of centres. Two areas of different
-    sizes run at once would rebuild it in turn: correct but slower; raise ``maxsize`` if areas
-    are ever served live. The lock makes the lookup and the first build of the centres happen
-    once, even from several threads."""
+    plane is centred on the box), so two areas of the same size share one grid. The latest
+    ``_GRID_MAX`` sizes are kept, so areas of different sizes run in turn or at once do not
+    evict each other. The global lock covers only the lookup; each grid's own lock makes its
+    centres build once, so a large grid being built never holds up a run on another size."""
+    key = (box.half_w, box.half_h, cell_arcsec)
     with _GRID_LOCK:
-        grid = _sized_grid(box.half_w, box.half_h, cell_arcsec)
+        got = _GRIDS.get(key)
+        if got is None:
+            got = (CellGrid.sized(*key), threading.Lock())
+            _GRIDS[key] = got
+            while len(_GRIDS) > _GRID_MAX:
+                _GRIDS.popitem(last=False)
+        else:
+            _GRIDS.move_to_end(key)
+    grid, build = got
+    with build:
         grid.centres()
     return grid
 

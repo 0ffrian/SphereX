@@ -20,8 +20,10 @@
    positions (equal weights) and ``u`` the least-squares value over all its legs, clamped at 0
    (``chain_fit``); for two legs this is the pair test's own ``v_AB`` and ``u``. A chain fit
    that fails the pair test's limits (rate window, ``u <= 1/delta_min``, ``v_tol`` with the
-   largest ``sigma_v`` of the chain's legs) is not served: the track keeps its first pair's fit,
-   which passed. A 2-leg track is always fitted as a ``"chain"``.
+   largest ``sigma_v`` of the chain's legs) is not served: the track keeps the fit of its first
+   pair whose rate also lies in the chain's window (its ``u`` only when every leg has ``w``), or
+   no rate at all when no pair does. ``u`` is fitted only when every leg has ``w``. A 2-leg track
+   is always fitted as a ``"chain"``.
 
 Pure: ``w`` comes in as a mapping; ``spherex_w`` fetches it through the cache.
 """
@@ -33,6 +35,7 @@ import math
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import timedelta
+from typing import Literal
 
 import numpy as np
 
@@ -188,10 +191,11 @@ def chain_fit(
     two, and must pass ``u <= 1/delta_min`` and every leg's perpendicular residual ``<= v_tol``.
     ``v_tol = max(v_tol_min, v_tol_sigma * sigma_v)`` with the largest ``sigma_v`` of all the
     chain's legs (for two legs, the pair test's own ``v_tol``; for three or more it is looser
-    than any single pair's). With ``w`` for no leg, ``u`` is ``None`` (the rate-window fallback,
-    as in ``pair_fit``). With ``w`` for only some of three or more legs, ``None``: the chain would
-    mix the two tests. For two legs this is the pair test's own ``v_AB`` and ``u``, including
-    its fallback when either visit lacks ``w``, so a 2-leg track is always ``"chain"``."""
+    than any single pair's). Unless every leg has ``w``, ``u`` is ``None`` (the rate-window
+    fallback, as in ``pair_fit`` for a pair missing either visit's ``w``): a ``u`` fitted on a
+    subset of the legs would mean something else than on the other tracks of the run. For two
+    legs this is the pair test's own ``v_AB`` and ``u``, so a 2-leg track is always
+    ``"chain"``."""
     if len(legs) < 2:
         raise ValueError("a track has two or more legs")
     if len(legs) == 2:
@@ -209,13 +213,9 @@ def chain_fit(
         )
     if not rate_min <= math.hypot(*v_ab) <= rate_max:
         return None
-    with_w = [(lg, w[lg.visit]) for lg in legs if lg.visit in w]
-    if len(legs) == 2 and len(with_w) < 2:
-        with_w = []  # pair_fit's fallback: a pair missing either visit's w is rate window only
-    if not with_w:
-        return v_ab, None
-    if len(with_w) < len(legs):
-        return None
+    if any(lg.visit not in w for lg in legs):
+        return v_ab, None  # rate window only, as pair_fit for a pair missing either visit's w
+    with_w = [(lg, w[lg.visit]) for lg in legs]
     num = den = 0.0
     for lg, wx in with_w:
         num += wx.east * (v_ab[0] - lg.v[0]) + wx.north * (v_ab[1] - lg.v[1])
@@ -231,6 +231,12 @@ def chain_fit(
     return v_ab, u
 
 
+# "chain": chain_fit over all legs. "pair": the chain fit failed the limits, so the first
+# consecutive pair whose fit lies in the chain's own rate window. "none": no pair does either, so
+# the track is served without a rate, PA or u (refused, not guessed).
+TrackFit = Literal["chain", "pair", "none"]
+
+
 @dataclass(frozen=True)
 class JoinedTrack:
     """One entry of ``/tracks`` before the known check: a track (2 or more legs) or a possible
@@ -241,10 +247,9 @@ class JoinedTrack:
     reason: str | None  # ambiguous | no_partner | one_visit
     v_ab: Vec | None
     u: float | None
-    # A track's v_ab and u: "chain" (chain_fit over all legs) or "first_pair" (the chain fit
-    # failed the limits, so its first pair's fit). Internal: the /tracks reply has no field for
-    # it (Q-420 (5)). None for a possible.
-    fit: str | None = None
+    # How a track's v_ab and u were fitted (``TrackFit``). Internal: the /tracks reply has no
+    # field for it (Q-420 (5)). None for a possible.
+    fit: TrackFit | None = None
 
     @property
     def first(self) -> int:
@@ -306,7 +311,7 @@ Fit = tuple[Vec, float, float | None, float, bool]
 
 @dataclass(frozen=True)
 class Links:
-    # (earlier leg, later leg) inside the rate window; ``join`` keeps a chain's first pair fit
+    # (earlier leg, later leg) inside the rate window; ``join`` falls back to a chain's pair fit
     # when the whole-chain fit fails the limits (``chain_fit``)
     fits: dict[tuple[int, int], Fit]
     links: dict[int, int]  # earlier leg -> later leg (consecutive visits, mutual best)
@@ -398,11 +403,22 @@ def join(
             ]
             rmin, rmax = max(r[0] for r in windows), min(r[1] for r in windows)
             got = chain_fit(members, w, rmin, rmax, cfg)
-            fit = "chain"
-            if got is None:  # the whole-chain fit fails the limits: keep the first pair's
-                first = fits[(chain[0], chain[1])]
-                got, fit = (first[0], first[2]), "first_pair"
-            out.append(JoinedTrack(members, "track", None, got[0], got[1], fit))
+            if got is not None:
+                out.append(JoinedTrack(members, "track", None, got[0], got[1], "chain"))
+                continue
+            # The whole-chain fit fails the limits: the first pair whose own fit also suits the
+            # chain's window (a pair can pass its window yet break the span's), its u only when
+            # every leg has w (as chain_fit). No such pair: no rate is served.
+            all_w = all(lg.visit in w for lg in members)
+            pair = next(
+                (f for f in (fits[k] for k in itertools.pairwise(chain)) if rmin <= f[1] <= rmax),
+                None,
+            )
+            if pair is None:
+                out.append(JoinedTrack(members, "track", None, None, None, "none"))
+            else:
+                u = pair[2] if all_w else None
+                out.append(JoinedTrack(members, "track", None, pair[0], u, "pair"))
             continue
         a = legs[i]
         if i in linked.has_candidate:
