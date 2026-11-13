@@ -52,10 +52,11 @@ class Measurement:
     n_annulus: int
     omega_sr: float
     reject_flags_absent: tuple[str, ...] = ()  # configured reject names the header lacks
+    core_flagged: tuple[str, ...] = ()  # core_flag_only names found in the core (kept, Q-139)
 
     @property
     def flagged(self) -> bool:
-        return bool(self.dropped_flags)
+        return bool(self.dropped_flags or self.core_flagged)
 
 
 @dataclass(frozen=True)
@@ -127,6 +128,17 @@ def measure_frame(
     if (sat & core).any() or ((~np.isfinite(image) & core).any() and (sat_ctx & in_ap).any()):
         names = flags.names_set(flag_arr[in_ap], cfg.saturation_context_flags, bits)
         return Refusal("saturated", "saturated core: " + ", ".join(names))
+    # Q-139: a core pixel whose only problem is a core_flag_only name (OUTLIER, movers only) is
+    # kept in the sum and recorded; any other bad core pixel still refuses.
+    core_flag_names: list[str] = []
+    if cfg.core_flag_only:
+        only, _ = flags.mask_of(flag_arr, cfg.core_flag_only, bits)
+        other, _ = flags.mask_of(
+            flag_arr, tuple(n for n in cfg.reject_flags if n not in cfg.core_flag_only), bits
+        )
+        kept = core & only & ~other & ~nonfinite & ~nonpositive
+        core_flag_names = flags.names_set(flag_arr[kept], cfg.core_flag_only, bits)
+        bad = bad & ~kept
     if (bad & core).any():
         names = _drop_names(
             flag_arr[bad & core], nonfinite[bad & core], nonpositive[bad & core], cfg, bits
@@ -172,6 +184,7 @@ def measure_frame(
         n_annulus=bg.n,
         omega_sr=omega,
         reject_flags_absent=tuple(sorted(reject_absent)),
+        core_flagged=tuple(sorted(core_flag_names)),
     )
 
 

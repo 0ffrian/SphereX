@@ -69,7 +69,7 @@ The honesty toggle is the app's global one (D-21); Track adds no second toggle. 
 ### A20.7 Spectrum, hop by hop
 
 - Wavelength (µm) against flux (µJy) with error bars, one point per frame (A20.3). An exposure's points appear when the slider passes it; the current exposure's points are ringed. A count reads "n of N frames".
-- **Flagged points are hollow** with the note naming the reason: "flagged OUTLIER" for `outlier_core` (Q-139). On Eros 13 of the 14 points are hollow **[verify]**.
+- **Flagged points are hollow** with the note naming the reason: "flagged OUTLIER" for `outlier_core` (Q-139). On Eros all 14 points are hollow: 13 for `outlier_core`, and the 14th because it also carries `OUTLIER` and `PERSIST` dropped off the core (flagged, no `outlier_core`); checked offline on the recorded frames (issue #72, [Q-460](../../decisions/moving-objects.md)).
 - **Refused frames** are listed under the plot with their reasons ("2 frames not measured: hardware flags NONFUNC, SUR_ERROR, TRANSIENT on the object"), never drawn.
 - **Caption:** "Each point is one frame. Points mix wavelength with time: the two visits are a day apart and Eros spins every 5.27 h, so a dip is not automatically chemistry." The period comes from SBDB; without one the sentence drops it.
 - **3I/ATLAS** (stretch): the caption "aperture, not total flux; background taken from inside the coma" (A19.8).
