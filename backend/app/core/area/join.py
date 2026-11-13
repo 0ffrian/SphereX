@@ -16,6 +16,12 @@
    **possible**: ``ambiguous`` (a candidate passed), ``no_partner`` (a neighbour visit covers the
    reachable ring) or ``one_visit`` (none does). A possible without a partner that moves less than
    ``min_motion_px`` is dropped and counted as ``static_one_visit``.
+5. **Track fit:** a track's ``v_AB`` is the least-squares straight line through its legs'
+   positions (equal weights) and ``u`` the least-squares value over all its legs, clamped at 0
+   (``chain_fit``); for two legs this is the pair test's own ``v_AB`` and ``u``. A chain fit
+   that fails the pair test's limits (rate window, ``u <= 1/delta_min``, ``v_tol`` with the
+   largest ``sigma_v`` of the chain's legs) is not served: the track keeps its first pair's fit,
+   which passed. A 2-leg track is always fitted as a ``"chain"``.
 
 Pure: ``w`` comes in as a mapping; ``spherex_w`` fetches it through the cache.
 """
@@ -24,7 +30,7 @@ from __future__ import annotations
 
 import itertools
 import math
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import timedelta
 
@@ -42,7 +48,7 @@ from app.core.area.clean import (
     fit_line,
 )
 from app.core.area.config import DEFAULT_AREA_CONFIG, AreaConfig
-from app.core.area.geometry import CellGrid
+from app.core.area.geometry import CellGrid, cell_grid
 from app.core.area.records import AreaFrames, Coverage
 
 DEG_PER_RAD = 180.0 / math.pi
@@ -165,6 +171,66 @@ def pair_fit(
     return v_ab, rate, u, res, passed
 
 
+def chain_fit(
+    legs: Sequence[Leg],
+    w: Mapping[int, SkyVelocity],
+    rate_min: float,
+    rate_max: float,
+    cfg: AreaConfig = DEFAULT_AREA_CONFIG,
+) -> tuple[Vec, float | None] | None:
+    """``(v_AB, u)`` of a track over all its legs (issue #128 (4)), or ``None`` when that fit fails
+    the pair test's own limits (the caller then keeps the first pair's fit, which passed).
+
+    ``v_AB`` is the slope of the least-squares line through the legs' positions at their
+    ``t_ref``, equal weights, and must lie in ``[rate_min, rate_max]`` (the caller passes the
+    window that every pair of the chain, and its whole span, allow). With ``w`` for every leg,
+    ``u`` minimises ``sum |v_in_k - v_AB + w_k u|^2``, clamped at 0, as ``pair_fit`` does for
+    two, and must pass ``u <= 1/delta_min`` and every leg's perpendicular residual ``<= v_tol``.
+    ``v_tol = max(v_tol_min, v_tol_sigma * sigma_v)`` with the largest ``sigma_v`` of all the
+    chain's legs (for two legs, the pair test's own ``v_tol``; for three or more it is looser
+    than any single pair's). With ``w`` for no leg, ``u`` is ``None`` (the rate-window fallback,
+    as in ``pair_fit``). With ``w`` for only some of three or more legs, ``None``: the chain would
+    mix the two tests. For two legs this is the pair test's own ``v_AB`` and ``u``, including
+    its fallback when either visit lacks ``w``, so a 2-leg track is always ``"chain"``."""
+    if len(legs) < 2:
+        raise ValueError("a track has two or more legs")
+    if len(legs) == 2:
+        a, b = legs  # the pair test's own expression, so a 2-visit track keeps its exact value
+        dt = b.t - a.t
+        v_ab = ((b.pos[0] - a.pos[0]) / dt, (b.pos[1] - a.pos[1]) / dt)
+    else:
+        tm = sum(lg.t for lg in legs) / len(legs)
+        xm = sum(lg.pos[0] for lg in legs) / len(legs)
+        ym = sum(lg.pos[1] for lg in legs) / len(legs)
+        stt = sum((lg.t - tm) ** 2 for lg in legs)
+        v_ab = (
+            sum((lg.t - tm) * (lg.pos[0] - xm) for lg in legs) / stt,
+            sum((lg.t - tm) * (lg.pos[1] - ym) for lg in legs) / stt,
+        )
+    if not rate_min <= math.hypot(*v_ab) <= rate_max:
+        return None
+    with_w = [(lg, w[lg.visit]) for lg in legs if lg.visit in w]
+    if len(legs) == 2 and len(with_w) < 2:
+        with_w = []  # pair_fit's fallback: a pair missing either visit's w is rate window only
+    if not with_w:
+        return v_ab, None
+    if len(with_w) < len(legs):
+        return None
+    num = den = 0.0
+    for lg, wx in with_w:
+        num += wx.east * (v_ab[0] - lg.v[0]) + wx.north * (v_ab[1] - lg.v[1])
+        den += wx.east**2 + wx.north**2
+    u = max(0.0, num / den) if den > 0.0 else 0.0
+    if u > 1.0 / cfg.delta_min_au:
+        return None
+    v_tol = max(cfg.v_tol_min_deg_day, cfg.v_tol_sigma * max(lg.sigma_v for lg in legs))
+    for lg, wx in with_w:
+        r = (lg.v[0] - v_ab[0] + wx.east * u, lg.v[1] - v_ab[1] + wx.north * u)
+        if _perp(r, wx) > v_tol:
+            return None
+    return v_ab, u
+
+
 @dataclass(frozen=True)
 class JoinedTrack:
     """One entry of ``/tracks`` before the known check: a track (2 or more legs) or a possible
@@ -175,6 +241,10 @@ class JoinedTrack:
     reason: str | None  # ambiguous | no_partner | one_visit
     v_ab: Vec | None
     u: float | None
+    # A track's v_ab and u: "chain" (chain_fit over all legs) or "first_pair" (the chain fit
+    # failed the limits, so its first pair's fit). Internal: the /tracks reply has no field for
+    # it (Q-420 (5)). None for a possible.
+    fit: str | None = None
 
     @property
     def first(self) -> int:
@@ -216,14 +286,17 @@ def _reachable(
     grid: CellGrid,
     rate_min: float,
     rate_max: float,
+    centres: Callable[[int], tuple[np.ndarray, np.ndarray]],
 ) -> bool:
-    """True when a covered cell of ``visit`` lies in the ring the tracklet could reach."""
+    """True when a covered cell of ``visit`` lies in the ring the tracklet could reach.
+    ``centres(visit)`` gives that visit's masked cell centres; ``join`` builds each one only when
+    a possible first needs it, then reuses it (issue #128 (2))."""
     cov = coverage.get(visit)
     if cov is None or not cov.mask.any():
         return False
     dt = abs(geo.visit_mid_d[visit] - a.t)
-    gx, gy = grid.centres()
-    d = np.hypot(gx - a.pos[0], gy - a.pos[1])[cov.mask]
+    gx, gy = centres(visit)
+    d = np.hypot(gx - a.pos[0], gy - a.pos[1])
     half_cell = grid.cell_deg * math.sqrt(0.5)
     return bool(np.any((d >= rate_min * dt - half_cell) & (d <= rate_max * dt + half_cell)))
 
@@ -233,7 +306,9 @@ Fit = tuple[Vec, float, float | None, float, bool]
 
 @dataclass(frozen=True)
 class Links:
-    fits: dict[tuple[int, int], Fit]  # (earlier leg, later leg) inside the rate window
+    # (earlier leg, later leg) inside the rate window; ``join`` keeps a chain's first pair fit
+    # when the whole-chain fit fails the limits (``chain_fit``)
+    fits: dict[tuple[int, int], Fit]
     links: dict[int, int]  # earlier leg -> later leg (consecutive visits, mutual best)
     has_candidate: frozenset[int]  # legs with a passing pair in either direction
 
@@ -291,7 +366,14 @@ def join(
     legs, static = _mover_legs(labels)
     visits = sorted(geo.visit_mid_d)
     coverage = {c.visit: c for c in frames.coverage}
-    grid = CellGrid.of(geo.box, cfg.coverage_cell_arcsec)
+    grid = cell_grid(geo.box, cfg.coverage_cell_arcsec)
+    masked: dict[int, tuple[np.ndarray, np.ndarray]] = {}
+
+    def centres(v: int) -> tuple[np.ndarray, np.ndarray]:
+        if v not in masked:
+            masked[v] = grid.masked_centres(coverage[v].mask)
+        return masked[v]
+
     rates: dict[tuple[int, int], tuple[float, float]] = {}
     for v1, v2 in itertools.pairwise(visits):
         dt_v = geo.visit_mid_d[v2] - geo.visit_mid_d[v1]
@@ -307,8 +389,20 @@ def join(
             chain = [i]
             while chain[-1] in links:
                 chain.append(links[chain[-1]])
-            f = fits[(chain[0], chain[1])]
-            out.append(JoinedTrack(tuple(legs[k] for k in chain), "track", None, f[0], f[2]))
+            members = tuple(legs[k] for k in chain)
+            # The chain's rate must suit every pair's window and the whole span's.
+            span = geo.visit_mid_d[members[-1].visit] - geo.visit_mid_d[members[0].visit]
+            windows = [
+                *(rates[(x.visit, y.visit)] for x, y in itertools.pairwise(members)),
+                (cfg.r_match_min_px * PIXEL_DEG / span, geo.rate_max_for(span, cfg)),
+            ]
+            rmin, rmax = max(r[0] for r in windows), min(r[1] for r in windows)
+            got = chain_fit(members, w, rmin, rmax, cfg)
+            fit = "chain"
+            if got is None:  # the whole-chain fit fails the limits: keep the first pair's
+                first = fits[(chain[0], chain[1])]
+                got, fit = (first[0], first[2]), "first_pair"
+            out.append(JoinedTrack(members, "track", None, got[0], got[1], fit))
             continue
         a = legs[i]
         if i in linked.has_candidate:
@@ -323,7 +417,7 @@ def join(
             for v in neighbours:
                 key = (min(v, a.visit), max(v, a.visit))
                 rmin, rmax = rates.get(key, (0.0, geo.rate_max_deg_day))
-                covered = covered or _reachable(a, v, geo, coverage, grid, rmin, rmax)
+                covered = covered or _reachable(a, v, geo, coverage, grid, rmin, rmax, centres)
             reason = "no_partner" if covered else "one_visit"
             if a.tracklet.fit.span_px < cfg.min_motion_px:
                 static += 1

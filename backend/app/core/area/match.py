@@ -27,7 +27,7 @@ from __future__ import annotations
 
 import math
 import statistics
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import timedelta
 
@@ -39,9 +39,9 @@ from app.cache.store import CacheMissOffline, Served, UpstreamUnavailable
 from app.context import Context
 from app.core.area.clean import AreaGeometry, covered_by
 from app.core.area.config import DEFAULT_AREA_CONFIG, PIXEL_ARCSEC, AreaConfig
-from app.core.area.geometry import CellGrid, radec_inside
+from app.core.area.geometry import AreaBox, cell_grid, radec_inside
 from app.core.area.join import JoinedTrack
-from app.core.area.records import AreaFrames
+from app.core.area.records import AreaFrames, Dot
 from app.timefmt import iso_utc_z, parse_utc
 
 TLIST_TOLERANCE_S = 1.0  # same as moving.TLIST_TIME_TOLERANCE_S
@@ -125,24 +125,24 @@ def _reach_deg(geo: AreaGeometry, visit: int, err_arcsec: float, cfg: AreaConfig
 
 
 def _near_coverage(
-    frames: AreaFrames,
-    geo: AreaGeometry,
-    visit: int,
+    covered: tuple[np.ndarray, np.ndarray],
+    box: AreaBox,
     ra: float,
     dec: float,
     reach: float,
-    cfg: AreaConfig,
+    cell_deg: float,
 ) -> bool:
-    cov = {c.visit: c for c in frames.coverage}.get(visit)
-    if cov is None or not cov.mask.any():
+    """True when a covered cell centre (``covered``: the visit's masked centres on ``box``'s
+    plane, built once per visit) lies within ``reach`` plus half a cell diagonal of
+    ``(ra, dec)``."""
+    gx, gy = covered
+    if gx.size == 0:
         return False
-    grid = CellGrid.of(geo.box, cfg.coverage_cell_arcsec)
-    p = geo.box.project(ra, dec)
+    p = box.project(ra, dec)
     if p is None:
         return False
-    gx, gy = grid.centres()
-    d = np.hypot(gx - p[0], gy - p[1])[cov.mask]
-    return bool(np.any(d <= reach + grid.cell_deg * math.sqrt(0.5)))
+    d = np.hypot(gx - p[0], gy - p[1])
+    return bool(np.any(d <= reach + cell_deg * math.sqrt(0.5)))
 
 
 def known_candidates(
@@ -157,6 +157,7 @@ def known_candidates(
     answers: dict[int, str | None] = {}
     served: list[Served] = []
     found: dict[str, tuple[skybot.SkybotBody, list[tuple[int, float, float, float]]]] = {}
+    grid = cell_grid(geo.box, cfg.coverage_cell_arcsec)
     for c in frames.coverage:
         visit = c.visit
         when = geo.t0 + timedelta(days=geo.visit_mid_d[visit])
@@ -170,12 +171,13 @@ def known_candidates(
             continue
         served.append(srv)
         answers[visit] = iso_utc_z(srv.entry.fetched_at)
+        covered = grid.masked_centres(c.mask)  # only once SkyBoT answered this visit
         for b in sorted(bodies, key=lambda b: (designation_of(b), b.ra, b.dec)):
             if kind_of(b) is None or (b.v_mag is not None and b.v_mag > cfg.v_lim):
                 continue
             err = b.pos_err_arcsec or 0.0
             if not _near_coverage(
-                frames, geo, visit, b.ra, b.dec, _reach_deg(geo, visit, err, cfg), cfg
+                covered, geo.box, b.ra, b.dec, _reach_deg(geo, visit, err, cfg), grid.cell_deg
             ):
                 continue
             name = designation_of(b)
@@ -266,14 +268,24 @@ def _median(values: Sequence[float]) -> float:
     return float(statistics.median(values))
 
 
+def positions_by_frame(known: KnownStep) -> dict[str, dict[str, Position]]:
+    """Designation -> frame id -> position, sorted by designation; built once per run."""
+    return {name: {p.frame_id: p for p in pos} for name, pos in sorted(known.positions.items())}
+
+
 def match_track(
-    track: JoinedTrack, known: KnownStep, cfg: AreaConfig = DEFAULT_AREA_CONFIG
+    track: JoinedTrack,
+    known: KnownStep,
+    cfg: AreaConfig = DEFAULT_AREA_CONFIG,
+    *,
+    by_frame: Mapping[str, Mapping[str, Position]],
+    by_name: Mapping[str, Candidate],
 ) -> Match | None:
+    """``by_frame`` is ``positions_by_frame(known)`` and ``by_name`` the candidates by
+    designation, both built once by the caller for all tracks (issue #128 (2))."""
     dots = [m.dot for lg in track.legs for m in lg.tracklet.members]
-    by_name = {c.designation: c for c in known.candidates}
     best: tuple[float, str, Match] | None = None
-    for name, pos in sorted(known.positions.items()):
-        at = {p.frame_id: p for p in pos}
+    for name, at in by_frame.items():
         seps: list[float] = []
         near = 0
         for d in dots:
@@ -302,25 +314,28 @@ def verdicts(
     cfg: AreaConfig = DEFAULT_AREA_CONFIG,
 ) -> list[Verdict]:
     by_name = {c.designation: c for c in known.candidates}
+    by_frame = positions_by_frame(known)
     out: list[Verdict] = []
     for t in tracks:
         if t.status != "track":
             out.append(Verdict("possible", None, ()))
             continue
-        m = match_track(t, known, cfg)
+        m = match_track(t, known, cfg, by_frame=by_frame, by_name=by_name)
         if m is not None:
             out.append(Verdict("found_blind", m, ()))
             continue
         visits = {lg.visit for lg in t.legs}
         codes = {f"skybot:{v}" for v in visits if known.skybot.get(v) is None}
+        dots_of: dict[int, list[Dot]] = {}
+        for lg in t.legs:
+            dots_of.setdefault(lg.visit, []).extend(m2.dot for m2 in lg.tracklet.members)
         for name in known.failed:
             c = by_name[name]
             for v, ra, dec, err in c.listed:
                 if v not in visits:
                     continue
                 reach_px = _reach_deg(geo, v, err, cfg) * 3600.0 / PIXEL_ARCSEC
-                dots = [m2.dot for lg in t.legs if lg.visit == v for m2 in lg.tracklet.members]
-                if any(sep_px(d.ra, d.dec, ra, dec) <= reach_px for d in dots):
+                if any(sep_px(d.ra, d.dec, ra, dec) <= reach_px for d in dots_of[v]):
                     codes.add(f"horizons:{name}")
         if codes:
             out.append(Verdict("unchecked", None, tuple(sorted(codes))))
@@ -345,7 +360,7 @@ def known_list(
     geo: AreaGeometry,
     cfg: AreaConfig = DEFAULT_AREA_CONFIG,
 ) -> list[KnownObject]:
-    grid = CellGrid.of(geo.box, cfg.coverage_cell_arcsec)
+    grid = cell_grid(geo.box, cfg.coverage_cell_arcsec)
     cov = {c.visit: c for c in frames.coverage}
     visit_of = {f.frame_id: f.visit for f in frames.frames}
     by_name = {c.designation: c for c in known.candidates}

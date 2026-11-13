@@ -8,6 +8,7 @@ blocked.
 
 from __future__ import annotations
 
+import base64
 import dataclasses
 import io
 import json
@@ -189,6 +190,24 @@ def test_the_head_names_the_settings_the_run_used(fixture_cache: Path, tmp_path:
     _error(c.get(f"/v1/areas/{EROS}/tracks"), 404, "area_not_found")
 
 
+def test_a_run_with_no_input_after_the_dots_step_is_dated_by_its_frame_cones(
+    fixture_cache: Path,
+) -> None:
+    """Every star cone, vector, SkyBoT and Horizons call missed: the replies and the export are
+    still built, dated by the frame cones the dots came from, never the wall clock (Q-420 (9))."""
+    result = dataclasses.replace(run_recorded(fixture_cache), served=[])
+    cones = result.frames.sia_fetched
+    assert cones
+    cached_at, computed_at = result.times()
+    assert (cached_at, computed_at) == (cones[0], cones[-1])
+    replies = service.build_replies(result)
+    assert replies["summary"]["cached_at"] == cached_at
+    assert service.export_ecsv(replies, result.params_hash()).startswith(b"# %ECSV 1.0")
+    no_date = dataclasses.replace(result, frames=dataclasses.replace(result.frames, sia_fetched=()))
+    with pytest.raises(ValueError, match="no date"):
+        no_date.times()
+
+
 # --- stamps and export --------------------------------------------------------------------------
 
 
@@ -201,6 +220,21 @@ def test_stamp_is_a_15_px_png_from_the_cutout(client: TestClient) -> None:
     a = np.asarray(img)
     assert a[7, 7] == a.max() > 0  # Eros is the brightest pixel at the centre
     assert client.get(f"/v1/areas/{EROS}/stamps/{dot}.png").content == r.content
+
+
+def test_the_stamps_stage_stores_raw_pixels_not_png(client: TestClient) -> None:
+    """The stored stage holds each stamp's 225 raw uint8 pixels, so the pack is byte-identical
+    on every platform (PNG bytes depend on the zlib build; PR #110 re-review). The served PNG
+    decodes to exactly those pixels."""
+    root = ReadThroughCache(PACK, offline=True)
+    head = json.loads(root.get(service.head_key("spherex_qr2", EROS)).body)  # type: ignore[union-attr]
+    key = area_key("spherex_qr2", EROS, "stamps", head["params_hash"])
+    stamps = json.loads(root.get(key).body)  # type: ignore[union-attr]
+    assert stamps and all(len(base64.b64decode(v)) == 15 * 15 for v in stamps.values())
+    dot = sorted(eros_dot_ids())[0]
+    stored = np.frombuffer(base64.b64decode(stamps[dot]), dtype=np.uint8).reshape(15, 15)
+    r = client.get(f"/v1/areas/{EROS}/stamps/{dot}.png")
+    assert np.array_equal(np.asarray(Image.open(io.BytesIO(r.content))), stored)
 
 
 def test_export_is_ecsv_with_tags_and_one_row_per_track_dot(client: TestClient) -> None:

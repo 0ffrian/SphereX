@@ -10,20 +10,25 @@ the answer. Network blocked.
 from __future__ import annotations
 
 import math
+from dataclasses import replace
 from functools import lru_cache
 from pathlib import Path
+from types import SimpleNamespace
+from typing import Any, cast
 
 import pytest
 
 from app.adapters import horizons
 from app.context import make_context
 from app.core.area import clean, join
+from app.core.area.clean import PIXEL_DEG, AreaGeometry, DotPoint, Labels, Tracklet, fit_line
 from app.core.area.config import DEFAULT_AREA_CONFIG
-from app.core.area.geometry import CellGrid
+from app.core.area.geometry import AreaBox, CellGrid
 from app.core.area.join import Leg, SkyVelocity
 from app.core.area.match import sep_px
 from app.core.area.service import AreaResult, run_area
 from app.core.find.stars import StarList
+from app.timefmt import parse_utc
 from tests.area_recorded import recorded_dots, recorded_frames, recorded_star_cones
 from tests.conftest import FIXTURE_CACHE, make_settings
 from tests.helpers import entries
@@ -148,6 +153,120 @@ def test_three_visits_with_a_decoy_keep_the_true_chain() -> None:
     assert got.links == {0: 1, 1: 2}
 
 
+def test_a_two_leg_chain_fit_is_the_pair_fit_exactly() -> None:
+    """The Eros gate's track keeps its exact ``v_AB`` and ``u`` (issue #128 (4))."""
+    a, b = _pair(1.7)
+    got = join.pair_fit(a, b, W, 0.0034, 1.16, CFG)
+    assert got is not None
+    assert join.chain_fit((a, b), W, 0.0034, 1.16, CFG) == (got[0], got[2])
+    assert join.chain_fit((a, b), {}, 0.0034, 1.16, CFG) == (got[0], None)
+    # w for one visit only: pair_fit's rate-window fallback, so the track stays "chain" (PR #140).
+    one = join.pair_fit(a, b, {1: W[1]}, 0.0034, 1.16, CFG)
+    assert one is not None and one[2] is None
+    assert join.chain_fit((a, b), {1: W[1]}, 0.0034, 1.16, CFG) == (one[0], None)
+
+
+# Three visits, one day apart, of a mover that speeds up: 0.45 deg/day from visit 1 to 2 and
+# 0.55 from 2 to 3, so its best straight line is 0.5 deg/day east. ``w`` points east, and each
+# in-visit velocity is ``v_chain - w u`` with ``u = 1.7 /au`` for the whole chain; the first
+# pair alone would give 0.45 deg/day and u = 2.60 /au.
+W3 = {1: SkyVelocity(-0.05, 0.0), 2: SkyVelocity(-0.06, 0.0), 3: SkyVelocity(-0.07, 0.0)}
+POS3 = (0.0, 0.45, 1.0)  # deg east of the centre at each visit's mid-time
+
+
+def _three_visit_legs() -> list[Leg]:
+    return [
+        _leg(k + 1, (0.5 - W3[k + 1].east * 1.7, 0.0), (POS3[k], 0.0), float(k)) for k in range(3)
+    ]
+
+
+def test_a_three_visit_chain_is_fitted_over_all_its_legs() -> None:
+    legs = _three_visit_legs()
+    first = join.pair_fit(legs[0], legs[1], W3, 0.0034, 1.16, CFG)
+    assert (
+        first is not None
+        and first[1] == pytest.approx(0.45)
+        and first[2] == pytest.approx(2.6016, abs=1e-4)
+    )
+    got = join.chain_fit(legs, W3, 0.0034, 1.16, CFG)
+    assert got is not None
+    v_ab, u = got
+    assert v_ab == pytest.approx((0.5, 0.0), abs=1e-12)
+    assert u == pytest.approx(1.7, abs=1e-9)
+    # w for only some legs would mix the parallax and rate-window tests: refused.
+    assert join.chain_fit(legs, {1: W3[1], 2: W3[2]}, 0.0034, 1.16, CFG) is None
+    assert join.chain_fit(legs, {2: W3[2], 3: W3[3]}, 0.0034, 1.16, CFG) is None
+    # w for no leg: the rate-window fallback, the chain's line and no u.
+    none = join.chain_fit(legs, {}, 0.0034, 1.16, CFG)
+    assert none is not None and none[1] is None
+
+
+def test_a_chain_fit_outside_the_pair_test_limits_is_refused() -> None:
+    legs = _three_visit_legs()
+    assert join.chain_fit(legs, W3, 0.0034, 0.4, CFG) is None  # 0.5 deg/day > rate_max
+    assert join.chain_fit(legs, W3, 0.6, 1.16, CFG) is None  # below rate_min
+    tight_u = replace(CFG, delta_min_au=1.0)  # u <= 1 /au; the chain's u is 1.7
+    assert join.chain_fit(legs, W3, 0.0034, 1.16, tight_u) is None
+    kicked = [*legs[:2], _leg(3, (legs[2].v[0] + 0.0, 0.3), legs[2].pos, legs[2].t)]
+    assert join.chain_fit(kicked, W3, 0.0034, 1.16, CFG) is None  # residual > v_tol
+
+
+def _three_visit_join_inputs() -> tuple[Labels, AreaGeometry, Any]:
+    """Three tracklets of three dots each, one per visit, from ``_three_visit_legs``."""
+    step = 0.002  # days between the exposures of a visit
+    points: list[DotPoint] = []
+    tracklets: list[Tracklet] = []
+    for k, lg in enumerate(_three_visit_legs()):
+        members: list[DotPoint] = []
+        for j in (-1, 0, 1):
+            x = (lg.pos[0] + lg.v[0] * j * step) / PIXEL_DEG
+            p = DotPoint(len(points), cast(Any, None), x, 0.0, lg.t + j * step, 2.0)
+            points.append(p)
+            members.append(p)
+        tracklets.append(Tracklet(k + 1, tuple(members), fit_line(members)))
+    labels = Labels(points, {p.index: clean.MOVER for p in points}, tracklets, [])
+    box = AreaBox(91.0, 0.0, 1.5, 1.5)
+    t0 = parse_utc("2026-03-20T00:00:00Z")
+    geo = AreaGeometry(box, t0, {1: 0.0, 2: 1.0, 3: 2.0}, {v: 2 * step for v in (1, 2, 3)}, 1.2)
+    frames = cast(Any, SimpleNamespace(coverage=()))
+    return labels, geo, frames
+
+
+def test_join_reports_the_whole_chain_rate_for_three_visits() -> None:
+    """Through ``join``: three tracklets of three dots each become one track whose rate, PA and
+    ``u`` come from all three visits, not from the first pair."""
+    labels, geo, frames = _three_visit_join_inputs()
+    got = join.join(labels, frames, geo, W3, CFG)
+    assert [t.status for t in got.tracks] == ["track"]
+    t = got.tracks[0]
+    assert [lg.visit for lg in t.legs] == [1, 2, 3]
+    assert t.v_ab is not None and math.hypot(*t.v_ab) == pytest.approx(0.5, abs=1e-9)
+    assert t.u == pytest.approx(1.7, abs=1e-6)
+    assert t.fit == "chain"
+    assert got.pair_test == "parallax"
+
+
+def test_join_keeps_the_first_pair_fit_when_the_chain_fit_is_refused(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    labels, geo, frames = _three_visit_join_inputs()
+    monkeypatch.setattr(join, "chain_fit", lambda *_a, **_k: None)
+    t = join.join(labels, frames, geo, W3, CFG).tracks[0]
+    assert t.status == "track" and len(t.legs) == 3
+    assert t.v_ab is not None and math.hypot(*t.v_ab) == pytest.approx(0.45, abs=1e-9)
+    assert t.u == pytest.approx(2.6016, abs=1e-4)
+    assert t.fit == "first_pair"
+
+
+def test_a_chain_with_w_for_only_some_visits_keeps_the_first_pair_fit() -> None:
+    """Visit 3 lost its Horizons vector: the 2-3 link uses the rate window, so the track keeps
+    the 1-2 pair's parallax fit instead of a u from a subset of its legs."""
+    labels, geo, frames = _three_visit_join_inputs()
+    t = join.join(labels, frames, geo, {1: W3[1], 2: W3[2]}, CFG).tracks[0]
+    assert t.status == "track" and len(t.legs) == 3 and t.fit == "first_pair"
+    assert t.u == pytest.approx(2.6016, abs=1e-4)
+
+
 # --- the Eros gate ------------------------------------------------------------------------------
 
 
@@ -203,6 +322,10 @@ def test_reachable_ring_decides_no_partner_or_one_visit(eros: AreaResult) -> Non
     cov = {c.visit: c for c in frames.coverage}
     grid = CellGrid.of(geo.box, CFG.coverage_cell_arcsec)
     lg = next(t.legs[0] for t in eros.joined.tracks if t.status == "track")
-    assert join._reachable(lg, 2, geo, cov, grid, 0.0034, 1.16)
+
+    def centres(v: int) -> tuple[Any, Any]:
+        return grid.masked_centres(cov[v].mask)
+
+    assert join._reachable(lg, 2, geo, cov, grid, 0.0034, 1.16, centres)
     # Visit 2 lies about 0.39 deg east: a 0.1 deg/day limit cannot reach it.
-    assert not join._reachable(lg, 2, geo, cov, grid, 0.0034, 0.1)
+    assert not join._reachable(lg, 2, geo, cov, grid, 0.0034, 0.1, centres)

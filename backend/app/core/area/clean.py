@@ -34,7 +34,7 @@ import numpy as np
 
 from app.context import Context
 from app.core.area.config import DEFAULT_AREA_CONFIG, PIXEL_ARCSEC, AreaConfig
-from app.core.area.geometry import AreaBox, CellGrid
+from app.core.area.geometry import AreaBox, CellGrid, cell_grid
 from app.core.area.records import AreaFrames, Coverage, Dot, FrameDots
 from app.core.find import stars as star_lib
 from app.core.find import wcs
@@ -520,8 +520,12 @@ def label_dots(
     cfg: AreaConfig = DEFAULT_AREA_CONFIG,
     *,
     star_missing: Sequence[str] = (),
+    geo: AreaGeometry,
 ) -> Labels:
-    geo = area_geometry(frames, cfg)
+    """A17.3 on one area. ``geo`` is the run's ``area_geometry(frames, cfg)``, built once by the
+    caller (issue #128 (2)); a ``geo`` built for another area raises ``ValueError``."""
+    if geo.box != AreaBox.of(frames.spec):
+        raise ValueError("geo was built for another area than frames")
     pts = dot_points(per_frame, frames, geo, cfg)
     label: dict[int, str] = {}
     cover = covering_frames(frames, bodies, pts, cfg)
@@ -546,7 +550,7 @@ def label_dots(
             if artefact & set(m.dot.flags):
                 label[m.index] = STAR
     box = geo.box
-    cells = CellGrid.of(box, cfg.coverage_cell_arcsec)
+    cells = cell_grid(box, cfg.coverage_cell_arcsec)
     cover_of = {c.visit: c for c in frames.coverage}
     non_glitch = Grid(clean, max((p.r_match for p in clean), default=cfg.r_match_min_px))
     for p in clean:
