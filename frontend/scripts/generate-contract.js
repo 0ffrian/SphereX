@@ -32,10 +32,15 @@ const ROOT = {
     'areaDots',
     'areaTracks',
     'areaChecks',
+    'areaSpectra',
     'areaError',
     'trackPath',
     'liveAreaPlan',
     'liveAreaJob',
+    'scanPlan',
+    'run',
+    'runList',
+    'runResults',
   ],
   properties: {
     card: { $ref: 'object-card.schema.json' },
@@ -46,10 +51,15 @@ const ROOT = {
     areaDots: { $ref: 'area-dots.schema.json' },
     areaTracks: { $ref: 'area-tracks.schema.json' },
     areaChecks: { $ref: 'area-checks.schema.json' },
+    areaSpectra: { $ref: 'area-spectra.schema.json' },
     areaError: { $ref: 'area-index.schema.json#/definitions/AreaError' },
     trackPath: { $ref: 'track-path.schema.json' },
     liveAreaPlan: { $ref: 'area-live-plan.schema.json' },
     liveAreaJob: { $ref: 'area-job.schema.json' },
+    scanPlan: { $ref: 'scan-plan.schema.json' },
+    run: { $ref: 'run.schema.json' },
+    runList: { $ref: 'run-list.schema.json' },
+    runResults: { $ref: 'run-results.schema.json' },
   },
 };
 
@@ -70,7 +80,6 @@ async function generate() {
     list('OBJECT_TYPES', 'ObjectType', card.definitions.ObjectType.enum) +
     list('AREA_DOT_LABELS', 'AreaDotLabel', area.definitions.AreaDotLabel.enum) +
     list('AREA_VERDICTS', 'AreaVerdict', area.definitions.AreaVerdict.enum) +
-    list('AREA_SED_LABELS', 'AreaSedLabel', area.definitions.AreaSedLabel.enum) +
     list('AREA_LINKERS', 'AreaLinker', area.definitions.AreaLinker.enum);
   const config = await prettier.resolveConfig(outFile);
   return prettier.format(code, { ...config, parser: 'typescript' });

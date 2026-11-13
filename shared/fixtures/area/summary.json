@@ -244,11 +244,7 @@
       "ambiguity_ratio": 0.5,
       "rate_max_deg_day": 1.2,
       "r_known_min_px": 3.0,
-      "v_lim": 22.0,
-      "sed_snr_min": 3.0,
-      "sed_min_dots": 6,
-      "sed_sigma_floor": 0.15,
-      "sed_chi2_max": 3.0
+      "v_lim": 22.0
     }
   },
   "cached_at": "2026-11-10T12:00:00.000Z",

@@ -1,0 +1,19 @@
+{
+ "body_sha256": "90b326949f0d58ddf7ef2457b0c8db3a3a578b14ec8f54adf368ddf5a8c61b0a",
+ "body_size": 29202,
+ "content_type": "application/json",
+ "fetched_at": "2026-11-12T08:59:13.327Z",
+ "key": {
+  "query": {
+   "id": "eros-2026-03",
+   "p": "a51541632a7152b570b8a191e56ff19d19ab6b32529f7c561512bab06ba56840",
+   "s": "94ab7f35e17eb0f11b264dc6ae114b1a29280e13a142e592bf81a50a24f2b3db",
+   "stage": "spectra",
+   "v": "spectrum-1"
+  },
+  "release": "spherex_qr2",
+  "source": "derived.area"
+ },
+ "status": 200,
+ "url": "derived:area:spectra"
+}
