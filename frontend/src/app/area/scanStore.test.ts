@@ -164,6 +164,11 @@ describe('stop while a square is running', () => {
     await flush();
     expect(run().stopping).toBe(true);
     expect(run().record?.state).toBe('running');
+    // A reload while it stops still says so.
+    const saved = useScanStore.getState().saved()!;
+    useScanStore.setState({ view: null });
+    useScanStore.getState().follow(saved.runId, saved.flow, saved.region);
+    expect(run().stopping).toBe(true);
   });
 });
 

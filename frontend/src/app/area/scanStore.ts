@@ -58,7 +58,7 @@ export interface ScanState {
   /** Follow a run by id (after a reload, or from the runs list of #158). */
   follow(runId: string, flow: ScanFlow, region: Region, record?: RunRecord | null): void;
   /** The saved run of this browser, if any: { runId, flow, region }. */
-  saved(): { runId: string; flow: ScanFlow; region: Region } | null;
+  saved(): { runId: string; flow: ScanFlow; region: Region; stopping: boolean } | null;
   togglePredicted(): void;
   /** Forget the scan (Select again, Scan again, closing a finished one). */
   clear(): void;
@@ -79,7 +79,9 @@ const stopPolling = () => {
 export const isFinished = (s: RunRecord['state']): boolean =>
   s === 'done' || s === 'stopped' || s === 'failed';
 
-function save(v: { runId: string; flow: ScanFlow; region: Region } | null): void {
+function save(
+  v: { runId: string; flow: ScanFlow; region: Region; stopping?: boolean } | null,
+): void {
   try {
     if (v) localStorage.setItem(SAVED_KEY, JSON.stringify(v));
     else localStorage.removeItem(SAVED_KEY);
@@ -223,7 +225,12 @@ export const useScanStore = create<ScanState>()((set, get) => {
       act(async (id) => {
         await getScanApi().stop(id);
         const cur = get().view;
-        if (cur?.kind === 'run' && cur.runId === id) set({ view: { ...cur, stopping: true } });
+        if (cur?.kind === 'run' && cur.runId === id) {
+          set({ view: { ...cur, stopping: true } });
+          // Kept with the saved run, so a reload while it stops still says so.
+          const kept = get().saved();
+          if (kept?.runId === id) save({ ...kept, stopping: true });
+        }
       }),
     follow(runId, flow, region, record = null) {
       stopPolling();
@@ -238,7 +245,7 @@ export const useScanStore = create<ScanState>()((set, get) => {
           square: null,
           results: null,
           stale: false,
-          stopping: false,
+          stopping: get().saved()?.runId === runId && get().saved()?.stopping === true,
         },
         busy: false,
       });
@@ -248,14 +255,19 @@ export const useScanStore = create<ScanState>()((set, get) => {
       try {
         const raw = localStorage.getItem(SAVED_KEY);
         if (!raw) return null;
-        const v = JSON.parse(raw) as { runId?: unknown; flow?: unknown; region?: Region };
+        const v = JSON.parse(raw) as {
+          runId?: unknown;
+          flow?: unknown;
+          region?: Region;
+          stopping?: unknown;
+        };
         if (
           typeof v.runId !== 'string' ||
           (v.flow !== 'known' && v.flow !== 'discovery') ||
           !v.region
         )
           return null;
-        return { runId: v.runId, flow: v.flow, region: v.region };
+        return { runId: v.runId, flow: v.flow, region: v.region, stopping: v.stopping === true };
       } catch {
         return null;
       }
