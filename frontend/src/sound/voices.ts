@@ -173,7 +173,7 @@ export class AudioDriver implements TrainCapableDriver {
     return typeof v === 'number' && Number.isFinite(v) ? v : null;
   }
 
-  /** R8.9: high output latency (likely Bluetooth): suggest the phone speaker or wired earphones. */
+  /** R8.9: high output latency (likely Bluetooth): suggest the laptop speaker or wired output (Q-132). */
   isHighLatency(): boolean {
     const l = this.outputLatency();
     return l !== null && l > HIGH_OUTPUT_LATENCY_S;
