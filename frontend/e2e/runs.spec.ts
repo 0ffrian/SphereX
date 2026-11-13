@@ -1,6 +1,7 @@
 // Issue #158 (live-areas mock-up states 12 and 13) on the SYNTHETIC fixture server with RECORDED
 // RUNS routed in: e2e/fixtures/runs/ holds run records written by #156's backend (`<cache>/runs/
-// <run_id>.json`) during real SPHEREx DR1 scans on 13 Nov 2026, and the merged results the backend
+// <run_id>.json`) during real SPHEREx DR1 scans on 13 Nov 2026 (one done with 13 tracks and
+// 8925 Boattini, one with a failed square, one stopped), and the merged results the backend
 // answered for the finished one. The list (`GET /v1/runs`) is built from them as the backend builds
 // it. Nothing here is invented: the replay plays the real events at their real times.
 import { readFileSync } from 'node:fs';
@@ -29,7 +30,7 @@ const RESULTS = JSON.parse(
   readFileSync(new URL('./fixtures/runs/run-dr1-results.json', import.meta.url), 'utf8'),
 ) as unknown;
 const STOPPED = load('run-stopped.json');
-const MIDRUN = load('run-failed-square.json');
+const FAILEDSQ = load('run-failed-square.json');
 
 /** The list row of a run, as `GET /v1/runs` builds it (#156 RunSummary). */
 function summary(r: Run, now = Date.parse('2026-11-14T00:00:00Z')) {
@@ -47,7 +48,7 @@ function summary(r: Run, now = Date.parse('2026-11-14T00:00:00Z')) {
     squares_total: r.squares.length,
   };
 }
-const RUNS = [DONE, MIDRUN, STOPPED].sort((a, b) => b.created_at.localeCompare(a.created_at));
+const RUNS = [DONE, FAILEDSQ, STOPPED].sort((a, b) => b.created_at.localeCompare(a.created_at));
 const json = (body: unknown) => ({
   status: 200,
   contentType: 'application/json',
@@ -96,9 +97,10 @@ test('the runs button lists every run, newest first, with a filter and states in
   const stopped = page.locator(`[data-run="${STOPPED.run_id}"]`);
   await expect(stopped).toContainText('Stopped after 0 of 2 squares');
   await expect(stopped.locator('[data-tone="fail"]')).toHaveText('Stopped');
-  const going = page.locator(`[data-run="${MIDRUN.run_id}"]`);
-  await expect(going.locator('[data-tone="accent"]')).toHaveText('Running');
-  await expect(going).toContainText('square 1 of 2');
+  // A finished run with a failed square still needs no state word (its ticks show it, below).
+  const failed = page.locator(`[data-run="${FAILEDSQ.run_id}"]`);
+  await expect(failed).not.toContainText(/Running|Stopped|Failed/);
+  await expect(failed).toContainText('2 squares');
 
   await page.getByTestId('runs-filter-known').click();
   await expect(rows).toHaveCount(0);
@@ -124,6 +126,7 @@ test('play replays a recorded run on the sky: squares, circles and ticks at thei
   await expect(page.getByTestId('replay-speed-60')).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByTestId('replay-play')).toBeFocused();
   await expect(page.getByTestId('runs-button')).toHaveAccessibleName('End the replay');
+  await page.waitForTimeout(1300); // the flight to the run's region (about a second)
 
   // Pause, then drive the timeline from the keyboard: Home is the start, End is the end.
   await page.getByTestId('replay-play').click();
@@ -151,12 +154,15 @@ test('play replays a recorded run on the sky: squares, circles and ticks at thei
   await page.keyboard.press('Home');
   await page.keyboard.press('PageDown');
   const a = await page.getByTestId('replay-time').textContent();
-  const sqA = await overlay.innerHTML();
+  // The frame: square states, objects and labels (screen coordinates follow the camera).
+  const frame = async () =>
+    (await overlay.innerHTML()).replace(/ (points|d|x|y|cx|cy)="[^"]*"/g, '');
+  const sqA = await frame();
   await page.keyboard.press('End');
   await page.keyboard.press('Home');
   await page.keyboard.press('PageDown');
   expect(await page.getByTestId('replay-time').textContent()).toBe(a);
-  expect(await overlay.innerHTML()).toBe(sqA);
+  expect(await frame()).toBe(sqA);
   await page.screenshot({ path: 'test-results/158-13-replay.png' });
 
   // Escape ends it, focus back on the runs button.
@@ -164,6 +170,17 @@ test('play replays a recorded run on the sky: squares, circles and ticks at thei
   await expect(tag).toBeHidden();
   await expect(overlay).toBeHidden();
   await expect(page.getByTestId('runs-button')).toBeFocused();
+});
+
+test('a failed square is a red tick on the timeline', async ({ page }) => {
+  await open(page);
+  await page.getByTestId('runs-button').click();
+  await page.locator(`[data-run="${FAILEDSQ.run_id}"]`).getByTestId('runs-play').click();
+  await expect(page.locator('[data-testid="replay-tick"][data-kind="skipped"]')).toHaveCount(1);
+  await page.getByTestId('replay-timeline').focus();
+  await page.keyboard.press('End');
+  await expect(page.getByTestId('scan-square-1')).toHaveAttribute('data-state', 'failed');
+  await expect(page.getByTestId('scan-square-2')).toHaveAttribute('data-state', 'done');
 });
 
 test('under reduced motion the replay steps in whole seconds', async ({ page }) => {
