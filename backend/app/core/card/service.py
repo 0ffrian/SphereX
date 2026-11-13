@@ -61,7 +61,7 @@ from app.core.find import moving
 from app.core.find.frames import DEFERRED, FrameEvent, FrameService, FramesResult, is_complete
 from app.core.find.resolver import ResolvedObject
 from app.core.jobs import Job, JobRegistry
-from app.core.measure.config import config_for
+from app.core.measure.config import config_for, method_sha
 from app.core.measure.pool import MeasurePool
 from app.core.measure.spectrum import Premeasured, SpectrumService
 from app.core.render.background import TextureBaker
@@ -405,8 +405,11 @@ class ObjectPipeline:
             rec = ev.record
             if rec.frame_id in premeasured:
                 return  # measured in the first batch; the spectrum checks its bytes again
-            fut = self.measure_pool.submit(body, rec.x_fits0, rec.y_fits0, config_for(obj.moving))
-            premeasured[rec.frame_id] = Premeasured(sha, rec.x_fits0, rec.y_fits0, fut)
+            cfg = config_for(obj.moving)
+            fut = self.measure_pool.submit(body, rec.x_fits0, rec.y_fits0, cfg)
+            premeasured[rec.frame_id] = Premeasured(
+                sha, rec.x_fits0, rec.y_fits0, fut, method_sha(cfg)
+            )
 
         if cap is None:
             result = self.frames.get_frames(obj, unlimited_live=True, on_frame=landed)

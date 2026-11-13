@@ -4,7 +4,7 @@
 // settings (R8.7), the honesty toggle (D-21) and the page lifecycle (R8.8). Creating one has no side
 // effects: no AudioContext and no listeners until `bind()`.
 import type { SpectrumResponse } from '@/app/api/types';
-import type { Tag } from '@/contract';
+import type { HapticEvent, Tag, ToneId, ToneParams } from '@/contract';
 import { isTagShown, type HonestyState } from '@/viewer/honesty';
 import {
   getAudioContext,
@@ -113,6 +113,24 @@ export interface AppSound {
   setChordMode(mode: ChordMode): boolean;
   /** Stop the chord; with `owner`, only when that panel started it. */
   stopChord(owner?: string): void;
+  /**
+   * R8.8 tone stream (Q-189): start, or replace, the sustained tone `id` (`'path'`: Track's path
+   * voice, R8.9.2). Plays on the events bus at the sound volume, ducks the ambience, is silent while
+   * the sound is off and fades in once a click has unlocked output. False when the honesty state
+   * hides `tag` or `strength` is not finite. Call `unlock()` from the click that starts it.
+   */
+  startTone(id: ToneId, params: ToneParams): boolean;
+  /** Glide the tone; coalesced to about one change per frame. False when `id` no longer plays. */
+  updateTone(id: ToneId, changes: Partial<ToneParams>): boolean;
+  /** Fade the tone out and release it. */
+  stopTone(id: ToneId): void;
+  /** Whether the tone `id` is held (false after `stop()`, a hidden page or a honesty change: restart it). */
+  hasTone(id: ToneId): boolean;
+  /**
+   * Q-458: the notes of one moment (an exposure's frames, R8.9.2) as one event through the 25 ms
+   * tick gap and the 40 events/s cap. Returns how many notes played.
+   */
+  emitTogether(notes: readonly HapticEvent[]): number;
   getStatus(): SoundStatus;
   subscribe(listener: () => void): () => void;
   /**
@@ -288,6 +306,11 @@ export function createAppSound(options: AppSoundOptions = {}): AppSound {
       pendingOwner = null;
       chord.stop();
     },
+    startTone: (id, params) => engine.startTone(id, params),
+    updateTone: (id, changes) => engine.updateTone(id, changes),
+    stopTone: (id) => engine.stopTone(id),
+    hasTone: (id) => engine.hasTone(id),
+    emitTogether: (notes) => engine.emitTogether(notes),
     getStatus,
     subscribe(fn) {
       listeners.add(fn);

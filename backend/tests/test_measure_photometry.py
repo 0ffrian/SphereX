@@ -147,6 +147,7 @@ def test_mover_outlier_on_the_core_is_kept_and_recorded() -> None:
     m = measure_frame(s.hdul(), X0, Y0, mover_config())
     assert isinstance(m, Measurement)
     assert m.core_flagged == ("OUTLIER",) and m.dropped_flags == ()
+    assert m.flagged  # agrees with the API's `flagged`
     assert m.flux == pytest.approx(clean.flux, rel=1e-9)  # the pixel stays in the sum
 
 
