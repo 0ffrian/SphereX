@@ -1,6 +1,6 @@
 # 22 Area search: components and sequences
 
-Area search of [A16](../architecture/moving-objects/area-search.md) (agreed plan, Q-146): a square drawn on the sky, then **Known objects** (hand-off to Track, [A19](../architecture/moving-objects/track.md) and [A20](../architecture/moving-objects/track-ui.md)) or **Discovery** (dots, glitches, stars and fixed dots removed, joined across visits with a parallax-aware test, checked against known objects). Three diagrams: components, the offline precompute, and the sky interaction. Drawn 9 Nov 2026 from A16 to A18 (backend [A17](../architecture/moving-objects/area-backend.md), sky UI [A18](../architecture/moving-objects/area-ui.md), shell [A21](../architecture/sky-shell.md)). **Built:** the backend from frames to the API (issues #97 and #108: `frames.py`, `dots.py`, `clean.py`, `join.py`, `match.py`, `service.py`, `api/areas.py`, `core/export/ecsv.py`) and the committed Eros pack. The frontend reads `/v1/areas` from the sky dock (issue #96, Q-406): a prepared area that holds the drawn box answers first, and the Q-414 demo only where none does. Known objects' rows carry their Horizons positions and **Track it** reads the object's `/frames` and `/path` for the Eros card (issue #130, Q-455). Not built: the gated extras D4 to D7 (cut). Items marked "proposed" wait on a decision (Q-178 to Q-187 in the spec).
+Area search of [A16](../architecture/moving-objects/area-search.md) (agreed plan, Q-146): a square drawn on the sky, then **Known objects** (hand-off to Track, [A19](../architecture/moving-objects/track.md) and [A20](../architecture/moving-objects/track-ui.md)) or **Discovery** (dots, glitches, stars and fixed dots removed, joined across visits with a parallax-aware test, checked against known objects). Three diagrams: components, the offline precompute, and the sky interaction. Drawn 9 Nov 2026 from A16 to A18 (backend [A17](../architecture/moving-objects/area-backend.md), sky UI [A18](../architecture/moving-objects/area-ui.md), shell [A21](../architecture/sky-shell.md)). **Built:** the backend from frames to the API (issues #97 and #108: `frames.py`, `dots.py`, `clean.py`, `join.py`, `match.py`, `service.py`, `api/areas.py`, `core/export/ecsv.py`) and the committed Eros pack. The frontend reads `/v1/areas` from the sky dock (issue #96, Q-406): a prepared area that holds the drawn box answers first, and the Q-414 demo only where none does. Known objects' rows carry their Horizons positions and **Track it** reads the object's `/frames` and `/path` for the Eros card (issue #130, Q-455). **Live areas (issue #141, Q-462, Q-463):** a box drawn anywhere is planned by `core/area/live.py` and computed by a background job in `core/area/live_jobs.py` (the same pipeline, stored as `derived.area`), on SPHEREx DR1; see the last diagram. Not built: the gated extras D4 to D7 (cut). Items marked "proposed" wait on a decision (Q-178 to Q-187 in the spec).
 
 ## Components
 
@@ -31,7 +31,11 @@ flowchart TB
     ECSV["core/export/ecsv.py shared writer (A19.9)"]
   end
   CACHE[("Read-through cache D-25<br/>raw replies + derived.area entries")]
-  API["api/areas.py: /v1/areas, /area_id, /known, /dots, /tracks,<br/>/stamps/dot_id.png, /export.ecsv (no /checks: D4 to D7 cut)"]
+  API["api/areas.py: /v1/areas, /area_id, /known, /dots, /tracks,<br/>/stamps/dot_id.png, /export.ecsv (no /checks: D4 to D7 cut),<br/>POST /live, GET and DELETE /live/area_id (Q-462)"]
+  subgraph Live["backend/app/core/area/ live areas (issue #141)"]
+    LIVE["live.py<br/>box rules, visit pair at the centre, plan, area id"]
+    JOBS["live_jobs.py<br/>queue, one worker thread, run_live_area (pipeline imported lazily)"]
+  end
   PACK[("assets/areas pack<br/>derived.area entries, Eros (issue #108)")]
   subgraph FE["frontend/src"]
     RAIL["app/shell SkyDock (Known objects, Discovery)<br/>ToolId area (D-38)"]
@@ -69,6 +73,11 @@ flowchart TB
   SVC --> CACHE
   CACHE --> API
   PACK --> API
+  API --> LIVE
+  API --> JOBS
+  LIVE --> SIA
+  JOBS -.->|"frames, dots, then service.run_area, store_area"| FRM
+  JOBS --> CACHE
   API --> STORE
   RAIL --> CARDS
   DEMO -.->|"Known: /v1/areas and /known (Q-455); Discovery: prepared area (Q-406), else the demo (Q-414)"| CARDS
@@ -198,4 +207,47 @@ sequenceDiagram
   end
   U->>T: Back to the area (or Escape)
   T->>P: close Track, reopen the card the user came from, focus returns
+```
+
+## Live area job
+
+> **As built (issue #141, [Q-462](../decisions/moving-objects.md), Q-463, Q-467):** a box with no prepared area is computed on request. The request only plans (one SIA cone at the box centre); the job runs in a worker thread, one at a time, and its result is served by the same routes as a prepared area. The UI for it is issues #144 and #145.
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor U as User
+  participant F as Frontend (issue #144)
+  participant A as api/areas.py
+  participant L as live.py
+  participant J as live_jobs.py worker
+  participant C as D-25 cache
+  U->>F: draw a box (up to 2 degrees a side)
+  F->>A: POST /v1/areas/live start=false
+  A->>L: snap the box, one SIA cone at its centre
+  L-->>A: plan: two visits at most 6 h apart, frames, estimate, area_id
+  alt already stored
+    A-->>F: state done
+  else no visit pair, too large, offline
+    A-->>F: 422 or 503 with an error code
+  else new area
+    A-->>F: the plan
+    U->>F: Compute this area
+    F->>A: POST /v1/areas/live start=true
+    A->>J: queue the plan
+    A-->>F: 202 queued
+    loop until done or failed
+      F->>A: GET /v1/areas/live/area_id
+      A-->>F: state, step, counts, elapsed, time left
+    end
+    J->>J: frames, dots, labels, join, known
+    J->>C: store_area (derived.area, DR1)
+    F->>A: GET /v1/areas/area_id/known, /tracks, /dots
+    A->>C: read
+    A-->>F: results, as for a prepared area
+  end
+  opt Stop
+    F->>A: DELETE /v1/areas/live/area_id
+    A->>J: cancel at the next check, nothing stored
+  end
 ```

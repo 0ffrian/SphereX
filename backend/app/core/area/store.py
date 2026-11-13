@@ -82,8 +82,9 @@ def index_reply(entries: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
 
 
 class AreaStore:
-    """Reads ``derived.area`` entries: the D-25 cache first, then the committed pack. An entry
-    whose settings differ from the running code is not served (A17.10)."""
+    """Reads ``derived.area`` entries: the D-25 cache first, then the committed pack, the
+    running release first, then any other release present (Q-463). An entry whose settings
+    differ from the running code is not served (A17.10)."""
 
     def __init__(self, ctx: Context, pack_dir: Path | None) -> None:
         self.ctx = ctx
@@ -92,8 +93,16 @@ class AreaStore:
             self.roots.append(ReadThroughCache(pack_dir, offline=True))
         self.sha = settings_sha(method_settings(DEFAULT_AREA_CONFIG))
 
-    def _head(self, root: ReadThroughCache, area_id: str) -> dict[str, Any] | None:
-        entry = root.get(head_key(self.ctx.settings.data_release, area_id))
+    def _releases(self, root: ReadThroughCache) -> list[str]:
+        """The running release first, then every other release with area entries in ``root``
+        (Q-463: the QR2 Eros pack and DR1 live areas are served side by side)."""
+        base = root.root / "v1" / AREA_SOURCE
+        found = sorted(p.name for p in base.iterdir() if p.is_dir()) if base.is_dir() else []
+        first = self.ctx.settings.data_release
+        return [first, *(r for r in found if r != first)]
+
+    def _head(self, root: ReadThroughCache, release: str, area_id: str) -> dict[str, Any] | None:
+        entry = root.get(head_key(release, area_id))
         if entry is None:
             return None
         try:
@@ -105,28 +114,28 @@ class AreaStore:
         return head
 
     def entry(self, area_id: str, stage: str) -> CacheEntry | None:
-        release = self.ctx.settings.data_release
         for root in self.roots:
-            head = self._head(root, area_id)
-            if head is None:
-                continue
-            got = root.get(area_key(release, area_id, stage, str(head["params_hash"])))
-            if got is not None:
-                return got
+            for release in self._releases(root):
+                head = self._head(root, release, area_id)
+                if head is None:
+                    continue
+                got = root.get(area_key(release, area_id, stage, str(head["params_hash"])))
+                if got is not None:
+                    return got
         return None
 
     def area_ids(self) -> list[str]:
         ids: set[str] = set()
-        release = self.ctx.settings.data_release
         for root in self.roots:
-            base = root.root / "v1" / AREA_SOURCE / release
-            for meta_path in sorted(base.glob("*/*.json")) if base.is_dir() else []:
-                try:
-                    q = json.loads(meta_path.read_text(encoding="utf-8"))["key"]["query"]
-                except (OSError, ValueError, KeyError, TypeError):
-                    continue
-                if q.get("stage") == HEAD and q.get("v") == AREA_VERSION:
-                    ids.add(str(q["id"]))
+            for release in self._releases(root):
+                base = root.root / "v1" / AREA_SOURCE / release
+                for meta_path in sorted(base.glob("*/*.json")) if base.is_dir() else []:
+                    try:
+                        q = json.loads(meta_path.read_text(encoding="utf-8"))["key"]["query"]
+                    except (OSError, ValueError, KeyError, TypeError):
+                        continue
+                    if q.get("stage") == HEAD and q.get("v") == AREA_VERSION:
+                        ids.add(str(q["id"]))
         return sorted(i for i in ids if self.entry(i, "summary") is not None)
 
     def index(self) -> dict[str, Any]:
