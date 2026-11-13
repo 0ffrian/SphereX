@@ -463,7 +463,7 @@ def assemble(
         input_digests=tuple(sorted(digests)),
         cones=tuple(cones),
         stats=stats,
-        sia_fetched=tuple(sorted(set(sia_fetched))),
+        sia_fetched=tuple(sia_fetched),
     )
     return result, bodies
 
@@ -503,7 +503,7 @@ def find_frames(
                 input_digests=tuple(sorted(cones.digests)),
                 cones=tuple(cones.logs),
                 stats={"cone_seconds": cone_s},
-                sia_fetched=tuple(sorted(set(cones.fetched))),
+                sia_fetched=tuple(cones.fetched),
             ),
             {},
         )

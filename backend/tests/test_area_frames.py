@@ -10,6 +10,7 @@ import sys
 from dataclasses import fields
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 import httpx
 import jsonschema
@@ -500,19 +501,67 @@ def test_the_cached_grid_shares_read_only_centres_and_keeps_a_few_sizes() -> Non
     assert cell_grid(box, 30.0) is not grid  # evicted once more sizes were used since
 
 
-def test_two_threads_on_one_grid_share_one_build_of_its_centres() -> None:
+def test_two_threads_on_one_grid_share_one_build_of_its_centres(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The per-grid lock makes the centres build once: the build is slowed and the threads start
+    together, so without the lock several of them would run it (``cached_property`` has no lock
+    of its own since Python 3.12)."""
+    import collections
+    import functools
     import threading
+    import time
 
-    from app.core.area.geometry import cell_grid
+    from app.core.area import geometry
+    from app.core.area.geometry import CellGrid, cell_grid
 
+    built: list[int] = []
+    real = CellGrid.__dict__["_centres"].func
+
+    def slow(self: CellGrid) -> Any:
+        built.append(1)
+        time.sleep(0.05)
+        return real(self)
+
+    prop = functools.cached_property(slow)
+    prop.__set_name__(CellGrid, "_centres")
+    monkeypatch.setattr(CellGrid, "_centres", prop)
+    monkeypatch.setattr(geometry, "_GRIDS", collections.OrderedDict())
     box = AreaBox(10.0, 0.0, 0.3, 0.2)
+    start = threading.Barrier(4)
     got: list[object] = []
-    threads = [
-        threading.Thread(target=lambda: got.append(cell_grid(box, 17.0).centres()[0]))
-        for _ in range(4)
-    ]
+
+    def run() -> None:
+        start.wait()
+        got.append(cell_grid(box, 17.0).centres()[0])
+
+    threads = [threading.Thread(target=run) for _ in range(4)]
     for t in threads:
         t.start()
     for t in threads:
         t.join()
     assert len(got) == 4 and all(g is got[0] for g in got)
+    assert built == [1]
+
+
+def test_the_grid_cache_keeps_about_one_large_grid_of_cells(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Code review of the PR #140 follow-up: the cache is bounded by cells, so two large grids
+    are never kept together, while small ones are; the latest grid is always kept."""
+    import collections
+
+    from app.core.area import geometry
+    from app.core.area.geometry import cell_grid
+
+    monkeypatch.setattr(geometry, "_GRIDS", collections.OrderedDict())
+    monkeypatch.setattr(geometry, "_GRID_CELLS_MAX", 100 * 100)
+    small = AreaBox(10.0, 0.0, 0.05, 0.05)  # 0.1 deg at 36" = 10 x 10 cells
+    big = AreaBox(10.0, 0.0, 0.5, 0.5)  # 1 deg at 36" = 100 x 100 cells
+    s1 = cell_grid(small, 36.0)
+    s2 = cell_grid(small, 37.0)
+    assert cell_grid(small, 36.0) is s1 and cell_grid(small, 37.0) is s2  # small ones stay
+    b1 = cell_grid(big, 36.0)  # over the budget with the small ones: they go, it stays
+    assert list(geometry._GRIDS) == [(0.5, 0.5, 36.0)]
+    cell_grid(big, 35.0)  # a second large grid evicts the first
+    assert len(geometry._GRIDS) == 1 and cell_grid(big, 35.0) is not b1
