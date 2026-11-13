@@ -15,7 +15,7 @@ import { DEMO_CUTOUT_NOTE, DemoTag } from './DemoTag';
 import type { SkyView } from '@/viewer/sky/SkyView';
 import { currentHop, useAreaStore } from '@/app/shell/areaStore';
 import { boxToPixels } from '@/app/sky/areaDraw';
-import { drawTrackWindow } from './erosDraw';
+import { drawTrackWindow, trackShown } from './erosDraw';
 
 export function AreaTrackLayer({ view }: { view: SkyView | null }) {
   const ref = useRef<HTMLCanvasElement>(null);
@@ -88,13 +88,11 @@ export function AreaTrackLayer({ view }: { view: SkyView | null }) {
       const hop = currentHop(s);
       const target = hop ? hop.mjd_avg : (s.eros.hops[0]?.mjd_avg ?? 0);
       if (now === null) now = target;
-      // Every path here is Horizons (the real `/path` or the demo file's): Estimated (model_dependent),
-      // so "Measured only" hides it (D-21, R5.3, A18.2).
-      const hidePath = effectiveHonesty(useAppStore.getState().honesty) === 'measured';
+      const measuredOnly = effectiveHonesty(useAppStore.getState().honesty) === 'measured';
       drawTrackWindow(
         g,
         rect,
-        hidePath ? { ...s.eros, track: [] } : s.eros,
+        trackShown(s.eros, measuredOnly),
         {
           mode: s.flow === 'known' ? 'eros' : 'disc',
           now,

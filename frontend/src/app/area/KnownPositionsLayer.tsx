@@ -31,7 +31,9 @@ export function KnownPositionsLayer({ view }: { view: { onRender(l: () => void):
   const honesty = useAppStore((s) => s.honesty);
   const known = useAreaStore((s) =>
     s.flow === 'known' &&
-    (s.screen === 'list' || (s.screen === 'eros' && !((s.eros?.wide.w ?? 0) > 0))) &&
+    // On the Eros card: only once its frames are in and it has no sky image of its own (while
+    // loading, the track window is about to draw; the diamonds would show, then vanish).
+    (s.screen === 'list' || (s.screen === 'eros' && s.eros !== null && !(s.eros.wide.w > 0))) &&
     !s.refusal
       ? s.known
       : null,
