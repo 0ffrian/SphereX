@@ -38,7 +38,7 @@ In one sentence for the public: draw a square, then either follow a rock we alre
 
 - **Completeness and a planted test mover** (A17.6, A18.11): how often the search finds movers we plant in this square's real frames, shown as a grid per brightness and speed.
 - **Shuffled-time control** (A17.6): the same search on frames with permuted times, to count the tracks it makes from chance alignment.
-- **Spectrum smoothness score** (A17.13): a label per track saying whether its flux against wavelength looks like one body.
+- **Spectrum check** (A17.13, Q-474, proposed): per track, whether its light behaves like sunlight off a rock, from colours taken by two detectors at the same instant and its steadiness between exposures. Replaces the cut D6 smoothness score.
 - **Rate-grid linker** (A17.12): for an area with 3 or more visits, links all visits at once.
 
 **As built (issue #141, [Q-462](../../decisions/moving-objects.md), 13 Nov 2026):** live areas anywhere on the sky were pulled forward from Phase 2: a box of up to 2° a side is computed on request in a background job on SPHEREx DR1. **Scans and runs (issue #156, [Q-470](../../decisions/moving-objects.md), Q-471):** a region of up to 12° a side (at most 36 squares) is cut into equal squares of at most 2° that always cover it with overlap, run one after another on the same worker, top row first and left to right. Each square is saved as soon as it finishes. Every run (a scan, or a single live area) is recorded under `<SX_CACHE_DIR>/runs/` with a timeline, so the app can list past runs and replay them (A17.8). **Phase 2 (after the event), kept so the idea is not lost:** ADES export, live areas anywhere on the sky, a larger completeness grid over many areas, and the full THOR or HelioLinC run on many visits.
@@ -55,7 +55,7 @@ In one sentence for the public: draw a square, then either follow a rock we alre
 flowchart LR
   subgraph Offline["Offline precompute (backend/scripts/area_discovery.py)"]
     F[Area frames and visits<br/>A17.1] --> D[Dots<br/>A17.2] --> G[Glitches, stars, fixed<br/>A17.3] --> J[Join across visits<br/>A17.4, A17.12] --> M[Known-object check<br/>A17.5]
-    M --> K[Checks: planted movers, control, spectrum score<br/>A17.6, A17.13]
+    M --> K[Checks: planted movers, control<br/>A17.6; spectrum check A17.13]
     M --> X[ECSV export<br/>A17.7]
   end
   C[(Read-through cache D-25<br/>raw replies + derived.area)]
@@ -80,7 +80,8 @@ flowchart LR
 | Part | Code (proposed, **To build**) | Owner |
 |---|---|---|
 | Discovery pipeline | `backend/app/core/area/` (`frames.py`, `dots.py`, `clean.py`, `join.py`, `match.py`, `service.py`) | Kevin (D-17) |
-| Checks: planted movers and completeness, shuffled-time control, spectrum score, rate-grid linker (gated extras, Q-203) | `backend/app/core/area/` (`inject.py`, `control.py`, `sed.py`, `rategrid.py`) | Kevin |
+| Checks: planted movers and completeness, shuffled-time control, rate-grid linker (gated extras, Q-203) | `backend/app/core/area/` (`inject.py`, `control.py`, `rategrid.py`) | Kevin |
+| Spectrum check (A17.13, Q-474) | `backend/app/core/area/spectrum.py`, `backend/scripts/area_spectra.py`, `backend/scripts/bake_solar.py`, `backend/assets/solar/sun.json` | Moon |
 | Precompute script | `backend/scripts/area_discovery.py` | Kevin |
 | API | `backend/app/api/areas.py`, models generated from the schemas (D-18) | Kevin |
 | Star list for movers (shared by Track's masks and Discovery, Q-143) | `backend/app/core/find/stars.py` (library), `catalogs.py`, `overlays.py` ([A19.6](track.md#a196-star-list-for-movers)); built in #95 | Atish (proposed, Q-404) |
@@ -111,7 +112,7 @@ Reused, not rewritten: `adapters/irsa_sia.py`, `adapters/irsa_cutout.py`, `adapt
 | Known-object positions and the match | `model_dependent` | Estimated | Assumption: "orbit solutions from SkyBoT (candidates) and JPL Horizons (positions) as of `fetched_at`, seen from SPHEREx (`500@-163182`)" (A17.5, Q-138). |
 | Planted test mover and the completeness grid | `model_dependent` | Estimated | Assumption in `provenance`: "synthetic point sources added in memory to this area's recorded cutouts; PSF and distance model in `method.checks`". Every planted source carries the **Injected** badge (A17.6). |
 | Shuffled-time control counts | `derived` | Estimated | Tracks the search made on frames with permuted times; seeds in `method.checks` (A17.6). |
-| Spectrum smoothness label | `derived` | Estimated | Rule and thresholds in `method` (A17.13). A flag, never a statement about composition. |
+| Spectrum check verdict and heat glow | `model_dependent` | Estimated | Bounds and the heat-glow model in `method` (A17.13, Q-475). Never removes or re-labels a track; says nothing about composition. The colour points stay `measured`. |
 | Wavelength colour on the sky | `derived` | Estimated | Hue = wavelength, as Rainbow Trails is built; the tag follows Q-27 (open). In "Measured only" dots are drawn in one colour. |
 
 - **Wording.** "T1 · found blind = 433 Eros"; "T2 · unexplained track"; "T3 · possible · 1 visit". Never "asteroid", "new" or "discovery" for an unmatched track. The Result card says what an unexplained track is: "a lead for follow-up, not a discovery", and dates it: "matches nothing known to SkyBoT as of <date>".
@@ -143,4 +144,4 @@ Facts measured on PR #53's recorded Eros fixtures (16 cutouts, `mockup/chase-the
 | IRSA MOST for frame lists | One question, Q-126 (PR #53's entry); Q-140 asks the same | Open (Kevin), [A19.3](track.md#a193-frame-list) |
 | Areas with 3 or more visits (for the rate-grid linker, D7) | Eros has 2. A cache check reported passes of 0.7 to 88 days, so another spot may have more. If none is found, D7 is tested on a synthetic multi-visit area with the Fixture badge and never shown as real | **[verify]**, Day 0 |
 | PSF model for planted movers (D4) | The SPHEREx PSF changes with wavelength. Use the PSF cube if D1 can read it, else a Gaussian whose width is measured on isolated stars in the area | **[verify]**, D4 |
-| Spectrum smoothness thresholds (D6) | Set so Eros is `smooth` and most chance chains of the shuffled control are `rough`; Eros's rotation changes its brightness between exposures, so an error floor is needed (A17.13) | **[verify]** on Eros and the control |
+| Spectrum check bounds (A17.13) | `R_min` 0.6, `R_max` 3.0, the heat-glow ranges, the spin term and the solar table; V-S1 to V-S5 in A17.13 | **[verify]** before it ships (Q-475) |
