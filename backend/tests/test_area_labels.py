@@ -188,5 +188,19 @@ def test_label_dots_refuses_a_geometry_built_for_another_area() -> None:
     frames, bodies = recorded_frames()
     geo = clean.area_geometry(frames)
     other = dataclasses.replace(geo, box=dataclasses.replace(geo.box, half_w=geo.box.half_w * 2))
-    with pytest.raises(ValueError, match="another area"):
+    with pytest.raises(ValueError, match="not built from these frames"):
         clean.label_dots(frames, bodies, recorded_dots(), recorded_lists(), geo=other)
+
+
+def test_label_dots_refuses_a_geometry_from_other_frames_of_the_same_area() -> None:
+    """Same box, other frames (a later visit dropped): the times differ, so it is refused."""
+    from tests.area_recorded import recorded_dots, recorded_frames
+    from tests.test_area_join import recorded_lists
+
+    frames, bodies = recorded_frames()
+    last = max(f.visit for f in frames.frames)
+    fewer = dataclasses.replace(frames, frames=tuple(f for f in frames.frames if f.visit != last))
+    stale = clean.area_geometry(fewer)
+    assert stale.box == clean.area_geometry(frames).box
+    with pytest.raises(ValueError, match="not built from these frames"):
+        clean.label_dots(frames, bodies, recorded_dots(), recorded_lists(), geo=stale)

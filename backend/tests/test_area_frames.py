@@ -349,6 +349,23 @@ def test_failed_cones_make_the_result_incomplete_before_any_cutout(tmp_path: Pat
     assert result.frames == () and bodies == {}
 
 
+def test_a_failed_cone_keeps_the_dates_of_the_cones_that_answered(tmp_path: Path) -> None:
+    """Issue #140 review: the early return on a failed cone still carries ``sia_fetched``, so
+    ``AreaResult.times`` can date the run from the cones that were read (Q-420 (9))."""
+    ctx = make_context(make_settings(tmp_path, offline=True))
+    _, body = next((m, b) for m, b in entries("irsa_sia") if m["key"]["query"]["ra"] == "90.40961")
+    for ra, dec in cone_grid(AreaBox.of(EROS_AREA), 0.25)[1:]:  # cone 0 is never cached
+        key = irsa_sia.sia_key("spherex_qr2", ra, dec, 0.001)
+        ctx.cache.put(key, LiveResponse(body, "https://x", 200, "text/xml", {"maxrec": 500}))
+
+    def no_fetch(row: SiaRow, plan: object) -> tuple[str, bytes]:
+        raise AssertionError("no cutout after a failed cone")
+
+    result, _ = area_frames.find_frames(ctx, EROS_AREA, fetch=no_fetch)  # type: ignore[arg-type]
+    assert not result.complete and result.missing == ("frames:cone_failed:1",)
+    assert result.sia_fetched and list(result.sia_fetched) == sorted(set(result.sia_fetched))
+
+
 def test_find_frames_refuses_another_release(tmp_path: Path) -> None:
     ctx = make_context(make_settings(tmp_path, data_release="other"))
     with pytest.raises(ValueError, match="spherex_qr2"):
@@ -459,9 +476,11 @@ def test_coverage_needs_a_cutout_and_the_eroded_footprint() -> None:
     assert not (cov & ~loose).any()  # nothing outside the cutout counts as covered
 
 
-def test_the_cached_grid_shares_read_only_centres_and_keeps_one_area() -> None:
+def test_the_cached_grid_shares_read_only_centres_and_keeps_a_few_sizes() -> None:
     """Issue #128 (2): every step of a run shares one grid; its centres cannot be changed in
-    place, and only the latest area's grid stays alive."""
+    place. Two sizes in turn do not evict each other; the least recently used of more than
+    ``_GRID_MAX`` sizes is dropped (PR #140 review)."""
+    from app.core.area import geometry
     from app.core.area.geometry import cell_grid
 
     box = AreaBox.of(EROS_AREA)
@@ -474,5 +493,26 @@ def test_the_cached_grid_shares_read_only_centres_and_keeps_one_area() -> None:
     assert not gy.flags.writeable
     moved = AreaBox(box.ra0 + 5.0, box.dec0, box.half_w, box.half_h)
     assert cell_grid(moved, 30.0) is grid  # same size, other centre: the same grid
-    cell_grid(box, 60.0)
-    assert cell_grid(box, 30.0) is not grid  # only the latest grid is kept
+    other = cell_grid(box, 60.0)
+    assert cell_grid(box, 30.0) is grid and cell_grid(box, 60.0) is other  # both kept
+    for k in range(geometry._GRID_MAX):
+        cell_grid(box, 90.0 + k)
+    assert cell_grid(box, 30.0) is not grid  # evicted once more sizes were used since
+
+
+def test_two_threads_on_one_grid_share_one_build_of_its_centres() -> None:
+    import threading
+
+    from app.core.area.geometry import cell_grid
+
+    box = AreaBox(10.0, 0.0, 0.3, 0.2)
+    got: list[object] = []
+    threads = [
+        threading.Thread(target=lambda: got.append(cell_grid(box, 17.0).centres()[0]))
+        for _ in range(4)
+    ]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert len(got) == 4 and all(g is got[0] for g in got)
