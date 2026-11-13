@@ -106,11 +106,24 @@ def wavelength_at(hdul: Any, x_fits0: float, y_fits0: float) -> tuple[float, flo
 
 
 def flag_names(header: Any) -> dict[int, str]:
-    """Bit number -> name from ``MP_*`` keywords in the FLAGS header (e.g. 10 -> HOT)."""
+    """Bit number -> name from the FLAGS header (e.g. 10 -> HOT).
+
+    Two conventions: QR2 writes ``MP_<NAME> = <bit>``; QR3 and DR1 write mask planes,
+    ``MSKNnnnn = '<NAME>'`` with ``MSKMnnnn = 1 << n`` (same names and bit numbers). ``MP_*``
+    wins when both are present. A ``MSKM`` that is not a single bit is ignored."""
     out: dict[int, str] = {}
     for k, v in header.items():
         if k.startswith("MP_") and isinstance(v, int) and not isinstance(v, bool):
             out[v] = k[3:]
+    if out:
+        return out
+    for k, v in header.items():
+        if not (k.startswith("MSKN") and isinstance(v, str) and v.strip()):
+            continue
+        mask = header.get("MSKM" + k[4:])
+        single_bit = isinstance(mask, int) and not isinstance(mask, bool) and mask > 0
+        if single_bit and mask & (mask - 1) == 0:
+            out[mask.bit_length() - 1] = v.strip()
     return out
 
 
