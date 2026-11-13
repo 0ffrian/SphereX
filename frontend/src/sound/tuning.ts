@@ -9,6 +9,7 @@
 //   CREATIVE placeholder — Atish to decide (D-13)   a neutral stand-in; how it sounds is Atish's call
 
 // ---------------------------------------------------------------- engine (R8.3, R8.8)
+// DUCK_TAU_DIVISOR (below, R13.9) is also the tone stream's fade divisor.
 
 /** SPEC R8.3: at most 40 events in any 1 s window; extra events are dropped, never queued. */
 export const MAX_EVENTS_PER_SECOND = 40;
@@ -26,12 +27,44 @@ export const TRAIN_LATE_TOLERANCE_MS = 40;
 /** Engineering: train rates are clamped to this range so a bad rate cannot stall or flood the motor. */
 export const TRAIN_MIN_RATE_HZ = 0.25;
 export const TRAIN_MAX_RATE_HZ = 40;
+/**
+ * Engineering (Q-458): the most notes one `emitTogether` group may carry (an exposure's frames; 2 on
+ * Eros). A longer group is refused, so it cannot be used to slip a burst past the R8.3 cap.
+ */
+export const MAX_GROUP_NOTES = 4;
+
+// ---------------------------------------------------------------- tone stream (R8.8, Q-189)
+
+/**
+ * SPEC R8.8 (Q-189, proposed values): fade in over this time (s), read as a ~95 % settle time
+ * (`setTargetAtTime` τ = time / DUCK_TAU_DIVISOR, as the duck). [verify on the A15] (R12)
+ */
+export const TONE_FADE_IN_S = 0.03;
+/** SPEC R8.8 (Q-189): the time constant (s) of every pitch, gain and pan glide. [verify on the A15] */
+export const TONE_GLIDE_S = 0.02;
+/** SPEC R8.8 (Q-189): fade out over this time (s), read as TONE_FADE_IN_S is. [verify on the A15] */
+export const TONE_FADE_OUT_S = 0.06;
+/**
+ * Engineering: after the fade out starts, the source stops this many fade-out times later (two
+ * fade-out times = 6 τ, about −52 dB), so the stop itself cannot click.
+ */
+export const TONE_STOP_AFTER_FADES = 2;
+/**
+ * SPEC R8.8 (Q-189): updates are coalesced to about one per animation frame (60 Hz). Engineering: a
+ * timer stands in for the frame, so the engine stays testable without a browser.
+ */
+export const TONE_UPDATE_MIN_MS = 16;
+/**
+ * R8.9 sustained timbre (Q-190, proposed): the Estimated tags' "softer sine … through a low-pass
+ * filter". Cut-off (Hz). CREATIVE placeholder — Atish to decide (D-13).
+ */
+export const TONE_SOFT_LOWPASS_HZ = 1500;
 
 // ---------------------------------------------------------------- audio driver (R8.9, D-10)
 
 /** R8.9: lookahead added to `currentTime` before every scheduled sound. [verify on phones] (R8.9) */
 export const AUDIO_LOOKAHEAD_S = 0.03;
-/** R8.9: `outputLatency` above this suggests Bluetooth; advise the speaker or wired earphones. [verify on phones] R12 #10 */
+/** R8.9: `outputLatency` above this suggests Bluetooth; advise the laptop speaker or wired output (Q-132). [verify on the A15] R12 #10 */
 export const HIGH_OUTPUT_LATENCY_S = 0.1;
 /** pitch 0 → this frequency (the mock-up's Listen sweep base). CREATIVE placeholder — Atish to decide (D-13). */
 export const PITCH_MIN_HZ = 220;
@@ -198,3 +231,23 @@ export const CHORD_SMOOTH_WINDOW_UM = 0.5;
 export const CHORD_AB_FADE_S = 0.15;
 /** Engineering: the seed of the partial and beat phases (determinism). Chosen from 1–12 for headroom: 12 equal partials peak at 0.47 (≤ −6 dBFS) at −18 dBFS RMS. */
 export const CHORD_SEED = 11;
+
+// ---------------------------------------------------------------- Track path sound (R8.9.2, #78)
+
+/**
+ * R8.9.2 exposure tick: the strength of each note (0–1, before the volume). R8.9.2 and Q-194 give no
+ * tick level. CREATIVE placeholder — Atish to decide (D-13). [verify on the A15]
+ */
+export const TRACK_TICK_STRENGTH = 0.8;
+/** SPEC R8.9.2 (Q-194 item 1, proposed): the path voice's fixed pitch on the Q-70 scale. */
+export const PATH_VOICE_PITCH = 0.5;
+/**
+ * SPEC R8.9.2 (Q-194 item 1): the path voice's fixed strength, "well below the exposure ticks".
+ * The value is a CREATIVE placeholder — Atish to decide (D-13). [verify on the A15]
+ */
+export const PATH_VOICE_STRENGTH = 0.25;
+/**
+ * Engineering: frames whose midpoints are this close (s) belong to one exposure. Eros's D1 and D4
+ * frames of one exposure differ by about 1 ms; exposures are about 2 minutes apart.
+ */
+export const EXPOSURE_MATCH_S = 2;

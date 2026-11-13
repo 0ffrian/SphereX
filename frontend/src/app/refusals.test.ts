@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Frame, SpectrumPoint } from '@/app/api/types';
 import {
-  areaMissingNote,
   countedCode,
   FRAME_REASONS,
   groupMissing,
@@ -264,17 +263,5 @@ describe('trackRefusal (A19.2)', () => {
     expect(trackRefusal({ moving: true })).toBeNull();
     const [group] = groupMissing([trackRefusal({ moving: false })!]);
     expect(group?.known).toBe(true);
-  });
-});
-
-describe('areaMissingNote (A17.8, issue #130)', () => {
-  it('words the codes of the Known objects reply', () => {
-    expect(areaMissingNote('area:not_prepared')).toBe('No prepared data for this area yet.');
-    expect(areaMissingNote('area_not_found')).toContain('no longer');
-    expect(areaMissingNote('skybot:2')).toBe('SkyBoT did not answer for visit 2, so objects seen only then may be missing.');
-    expect(areaMissingNote('horizons:433 Eros')).toBe('Horizons gave no positions for 433 Eros, so its path is not drawn.');
-  });
-  it('keeps an unknown code as it is', () => {
-    expect(areaMissingNote('something:else')).toBe('something:else');
   });
 });

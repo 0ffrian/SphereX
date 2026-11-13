@@ -1,18 +1,21 @@
 // Known objects: the right-side card after the island's search (mock-up `openKnownCard`).
-// Real data (issue #130, A18.5): one row per object of `/v1/areas/{id}/known` with its number and
-// name, kind, frames and visits, the Estimated badge (SkyBoT and Horizons, A16.5) and the date of the
-// SkyBoT answer. "Track it" opens the Eros card when the backend can Track the object offline;
-// otherwise "Open" searches it as a marker's left click does. Only the fixed fallback row (backend
-// unreachable) wears the Demo tag. A box with no prepared area says so (Q-414).
+// Known objects: the right-side card after the island's search (mock-up `openKnownCard`).
+// A prepared area's `/v1/areas/{id}/known` reply (Q-205, A18.5; issues #96, #130): one row per object
+// with its number and name, kind, frames and visits and the Estimated badge (SkyBoT and Horizons,
+// A16.5); the card's foot says when the area ran, when SkyBoT last answered, and what is missing.
+// "Track it" opens the Eros card when the backend can Track the object offline; otherwise "Open"
+// searches it as a marker's left click does. Else DEMO DATA: the one object, only for an area over
+// the prepared Eros area, under the Demo tag; anywhere else the card says there is no prepared data
+// (Q-414).
 import { PanelCard } from '@/app/shell/PanelCard';
 import { useAreaStore } from '@/app/shell/areaStore';
 import { useShellStore } from '@/app/shell/shellStore';
 import { useAppStore } from '@/state/store';
 import { ProvenanceBadge } from '@/app/Badge';
-import { areaMissingNote } from '@/app/refusals';
-import type { KnownObject } from './areaService';
+import { latestSkybot, type KnownObject } from './areaService';
 import { DemoTag } from './DemoTag';
 import { isoToMjd, mjdDay, mjdYear } from './erosModel';
+import { RealAreaNotes } from './RealAreaNotes';
 
 export const NO_TRACK_NOTE = 'Track not prepared for this object offline';
 const ESTIMATED_NOTE =
@@ -46,7 +49,6 @@ function Row({ o }: { o: KnownObject }) {
         {!o.designation ? null : (
           <small className="sx-lk-meta" data-testid="known-meta">
             <ProvenanceBadge tag="model_dependent" tooltip={ESTIMATED_NOTE} srText variant="tag" />
-            {o.skybotAt ? <span>SkyBoT answered {dateOf(o.skybotAt)}</span> : <span>No SkyBoT answer</span>}
           </small>
         )}
         {!track && <small data-testid="known-no-track">{NO_TRACK_NOTE}</small>}
@@ -62,7 +64,9 @@ export function KnownList() {
   const known = useAreaStore((s) => s.known);
   const refusal = useAreaStore((s) => s.refusal);
   const closePanel = useShellStore((s) => s.closePanel);
-  const notes = (known?.missing ?? []).filter((c) => c !== 'area:not_prepared');
+  const real = known?.real ?? null;
+  // SkyBoT answers per visit of the area, not per object (A17.5): one date for the whole card.
+  const skybotAt = real ? latestSkybot(real.known) : null;
   return (
     <PanelCard
       title="Known objects"
@@ -77,19 +81,25 @@ export function KnownList() {
         <p className="fb-muted" role="status" data-testid="area-refused" data-code={refusal.code}>
           {refusal.message}
         </p>
-      ) : (
+      ) : real ? (
+        <>
+          <RealAreaNotes
+            computedAt={real.known.computed_at}
+            synthetic={real.synthetic}
+            missing={real.missing}
+          />
+          <p className="fb-muted" data-testid="known-skybot">
+            {skybotAt ? `SkyBoT last answered ${dateOf(skybotAt)}` : 'No SkyBoT answer for this area'}
+          </p>
+        </>
+      ) : known?.demo ? (
         <div className="sx-kn-foot">
-          {known?.demo && <DemoTag />}
-          {known?.fixture && (
-            <span className="sx-tagbadge" data-testid="known-fixture" title="Synthetic fixture data for development, not a SPHEREx result">
-              Fixture
-            </span>
-          )}
+          <DemoTag />
         </div>
-      )}
-      {!refusal && (
+      ) : null}
+      {!refusal && known && (
         <div className="sx-lk-list" data-testid="known-list">
-          {(known?.objects ?? []).map((o) => (
+          {known.objects.map((o) => (
             <Row key={o.designation ?? o.id} o={o} />
           ))}
         </div>
@@ -98,15 +108,6 @@ export function KnownList() {
         <p className="fb-muted" role="status" data-testid="known-none">
           No known objects crossed this area.
         </p>
-      )}
-      {notes.length > 0 && (
-        <ul className="fb-muted sx-lk-notes" data-testid="known-missing">
-          {notes.map((c) => (
-            <li key={c} data-code={c}>
-              {areaMissingNote(c)}
-            </li>
-          ))}
-        </ul>
       )}
       <div className="flex flex-wrap gap-2">
         <button

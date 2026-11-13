@@ -41,7 +41,9 @@ import { ProvenanceBadge } from './Badge';
 import { EmissionsPanel } from './EmissionsPanel';
 import { EPOCH_JD, timeRange } from '@/physics/cometGas';
 import { ConfidenceChip, ConfidenceDetails } from './ConfidencePanel';
+import { useShellStore } from '@/app/shell/shellStore';
 import { HearPanel } from './build/HearPanel';
+import { AmbiencePanel } from './build/AmbiencePanel';
 import { BuildControls, BuildKeyNumbers, BuildSummaryRows } from './build/BuildControls';
 import { MouldOverlay } from './build/MouldAnimation';
 import { useMouldLive } from './build/mouldLive';
@@ -168,6 +170,7 @@ const POP_LABEL: Record<PopId, string> = {
   acc: 'Accuracy',
   feel: 'Feel it', // kept so the PopId type still maps; the Feel UI is not shown (haptics cut, D-39)
   hear: 'Hear it',
+  amb: 'Ambience',
   details: 'Details',
 };
 /** The mock-up's words for a kind it has no score for (`renderAcc`, no rows). */
@@ -177,7 +180,7 @@ export const NO_SCORE_TEXT =
 const PLACEHOLDER_LABEL = 'Viewer placeholder: no object loaded';
 
 /** Issue #71 stream U: the panels the build pane's header buttons open (mock-up `bpPop`, one at a time). */
-export type PopId = 'acc' | 'feel' | 'hear' | 'details';
+export type PopId = 'acc' | 'feel' | 'hear' | 'amb' | 'details';
 
 /** Issue #60: the panel inside the build pane (canvas fills the stage, controls behind Details). */
 export interface PaneOptions {
@@ -620,8 +623,10 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
       announce(spinPaused ? 'Motion is playing.' : 'Motion is paused.');
     }
   }, [viewer, idlePaused, reducedMotion, playAnyway, spinPaused, announce]);
+  // Q-457: a minimised build is hidden: P must not toggle (and announce) motion nobody can see.
+  const buildMinimised = useShellStore((s) => s.buildMinimised);
   useEffect(() => {
-    if (!pane) return;
+    if (!pane || buildMinimised) return;
     const onKey = (e: globalThis.KeyboardEvent) => {
       if (e.key.toLowerCase() !== 'p' || e.altKey || e.ctrlKey || e.metaKey || e.defaultPrevented || isEditableTarget(e.target)) return;
       e.preventDefault();
@@ -629,7 +634,7 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [pane, toggleMotion]);
+  }, [pane, toggleMotion, buildMinimised]);
   const planWith = (patch: Partial<PlanContext>) =>
     card && params ? planRender(card, params, { ...ctx, ...patch }) : null;
 
@@ -814,6 +819,10 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
         </section>
         {/* Hear it (Atish's audio, Q-416): no header button since Q-450; Details opens it ("Hear it"
             row). Keep it mounted: the sound PRs route the sweep and the chord through this panel. */}
+        {/* Q-456: the Ambience dropdown (this body's atmosphere and the sound settings). */}
+        <section hidden={pop !== 'amb'} data-testid="build-pop-amb">
+          {pop === 'amb' && <AmbiencePanel name={plan?.name} />}
+        </section>
         <section hidden={pop !== 'hear'} data-testid="build-pop-hear">
           <HearPanel active={pop === 'hear'} name={displayName(plan?.name)} />
         </section>

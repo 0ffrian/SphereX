@@ -1,8 +1,9 @@
 // Known positions on the sky (A18.2, issue #130): a small diamond per frame time at the Horizons
 // RA/Dec of each known object, joined by a thin line. The positions are `model_dependent` (Estimated):
 // a JPL Horizons prediction seen from SPHEREx, not a measurement, so "Measured only" hides them and
-// says why (D-21). It replaces the demo path of eros.json pixels for the Known flow. Drawn as one SVG
-// repositioned from the sky view's render listener; no pointer events.
+// says why (D-21). Drawn as one SVG repositioned from the sky view's render listener; no pointer
+// events. On the Eros card, while the track window draws the path on its own sky image (fitted to
+// the square), the diamonds step aside, so one object never shows two paths in two places.
 import { useEffect, useReducer } from 'react';
 import { ProvenanceBadge } from '@/app/Badge';
 import { useAreaStore } from '@/app/shell/areaStore';
@@ -29,7 +30,11 @@ export function KnownPositionsLayer({ view }: { view: { onRender(l: () => void):
   const [, tick] = useReducer((n: number) => n + 1, 0);
   const honesty = useAppStore((s) => s.honesty);
   const known = useAreaStore((s) =>
-    s.flow === 'known' && (s.screen === 'list' || s.screen === 'eros') && !s.refusal ? s.known : null,
+    s.flow === 'known' &&
+    (s.screen === 'list' || (s.screen === 'eros' && !((s.eros?.wide.w ?? 0) > 0))) &&
+    !s.refusal
+      ? s.known
+      : null,
   );
   const focus = useAreaStore((s) => s.focus);
   const withPositions = (known?.objects ?? []).filter((o) => (o.positions?.length ?? 0) > 0);

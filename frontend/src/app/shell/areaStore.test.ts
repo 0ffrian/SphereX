@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { AreaRefused, setAreaApi } from '@/app/area/areaService';
-import type { ApiClient } from '@/app/api/client';
+import { AreaRefused } from '@/app/area/areaService';
+import { createApiClient, type ApiClient } from '@/app/api/client';
+import { setSkyApi } from '@/state/store';
 import { ApiError } from '@/app/api/errors';
 import { erosList, formatAreaDims, formatAreaSize, refusalOf, useAreaStore, type AreaBox } from './areaStore';
 
@@ -14,7 +15,7 @@ afterEach(() => {
   useAreaStore.getState().reset();
   vi.useRealTimers();
   vi.unstubAllGlobals();
-  setAreaApi(null);
+  setSkyApi(createApiClient());
 });
 
 describe('area store', () => {
@@ -28,9 +29,9 @@ describe('area store', () => {
   });
   it('Known: setBox starts the island search, and an unprepared area ends in a refusal', async () => {
     // The index lists one prepared area, far from the drawn box.
-    const entry = { area_id: 'far', ra: 200, dec: -30, width_deg: 1, height_deg: 1 };
-    setAreaApi({
-      areas: async () => ({ data: { areas: [entry] }, fixture: null }),
+    const entry = { area_id: 'far', ra: 200, dec: -30, width_deg: 1, height_deg: 1, data_release: 'qr2' };
+    setSkyApi({
+      areaIndex: async () => ({ data: { areas: [entry] }, fixture: null }),
     } as unknown as ApiClient);
     useAreaStore.getState().startFlow('known');
     useAreaStore.getState().setBox(box);
@@ -70,7 +71,7 @@ describe('area store', () => {
 
 describe('Known flow on the API (issue #130)', () => {
   const idx = {
-    areas: [{ area_id: 'a1', ra: 10.5, dec: 4.5, width_deg: 2, height_deg: 2 }],
+    areas: [{ area_id: 'a1', ra: 10.5, dec: 4.5, width_deg: 2, height_deg: 2, data_release: 'qr2' }],
   };
   const known = {
     known: [
@@ -84,8 +85,8 @@ describe('Known flow on the API (issue #130)', () => {
     provenance: {},
   };
   it('lists the object from /known and says so on the island', async () => {
-    setAreaApi({
-      areas: async () => ({ data: idx, fixture: null }),
+    setSkyApi({
+      areaIndex: async () => ({ data: idx, fixture: null }),
       areaKnown: async () => ({ data: known, fixture: null }),
     } as unknown as ApiClient);
     useAreaStore.getState().startFlow('known');
@@ -96,13 +97,13 @@ describe('Known flow on the API (issue #130)', () => {
     const s = useAreaStore.getState();
     expect(s.screen).toBe('list');
     expect(s.known?.demo).toBe(false);
-    expect(s.known?.missing).toEqual(['skybot:2']);
+    expect(s.known?.real?.missing).toEqual(['skybot:2']);
     expect(s.refusal).toBeNull();
   });
   it('a newer square aborts the request of the older one', async () => {
     const signals: AbortSignal[] = [];
-    setAreaApi({
-      areas: async (sig?: AbortSignal) => {
+    setSkyApi({
+      areaIndex: async (sig?: AbortSignal) => {
         signals.push(sig!);
         return { data: idx, fixture: null };
       },
@@ -121,7 +122,7 @@ describe('Known flow on the API (issue #130)', () => {
     const frame = (id: string, m: number) => ({
       frame_id: id, time: `2026-03-20T08:${m}:00.000Z`, wavelength_um: 1, x: 1, y: 1, cutout_url: '', flags: [],
     });
-    setAreaApi({
+    setSkyApi({
       frames: async () => ({ data: { frames: [frame('2026W12_2A_0158_1_D1', 30), frame('2026W12_2A_0158_1_D4', 30), frame('2026W12_2A_0158_2_D1', 31)] }, fixture: null }),
       path: async () => { throw new ApiError('not_found', null, 404); },
     } as unknown as ApiClient);
@@ -136,7 +137,7 @@ describe('Known flow on the API (issue #130)', () => {
     expect(erosList(s.eros, null)).toHaveLength(3);
   });
   it('never blank: 433 Eros falls back to the demo when the API fails, another object says it failed', async () => {
-    setAreaApi({
+    setSkyApi({
       frames: async () => { throw new ApiError('network', 'down'); },
       path: async () => { throw new ApiError('network', 'down'); },
     } as unknown as ApiClient);
@@ -164,7 +165,7 @@ describe('Known flow on the API (issue #130)', () => {
     expect(erosList(s.eros, null)).toHaveLength(1);
   });
   it('a /path reply with no points is no path: the card does not claim one', async () => {
-    setAreaApi({
+    setSkyApi({
       frames: async () => ({
         data: { frames: [{ frame_id: 'x_1_D1', time: '2026-03-20T08:30:00.000Z', wavelength_um: 1, x: 1, y: 1, cutout_url: '', flags: [] }] },
         fixture: null,
@@ -176,9 +177,22 @@ describe('Known flow on the API (issue #130)', () => {
     expect(useAreaStore.getState().trackSource).toBe('real');
     expect(useAreaStore.getState().trackPath).toBe(false);
   });
+  it('a /path that is not ready yet (path:deferred) says so instead of "no path"', async () => {
+    setSkyApi({
+      frames: async () => ({
+        data: { frames: [{ frame_id: 'x_1_D1', time: '2026-03-20T08:30:00.000Z', wavelength_um: 1, x: 1, y: 1, cutout_url: '', flags: [] }] },
+        fixture: null,
+      }),
+      path: async () => ({ data: { points: [], frame_points: [], windows: [], missing: ['path:deferred'] }, fixture: null }),
+    } as unknown as ApiClient);
+    useAreaStore.getState().openEros({ id: '9', name: 'Other', kind: 'asteroid', frames: 1, visits: 1, objectId: 'sbdb-9', trackAvailable: true });
+    await vi.advanceTimersByTimeAsync(50);
+    expect(useAreaStore.getState().trackPath).toBe(false);
+    expect(useAreaStore.getState().pathPending).toBe(true);
+  });
   it('another object never borrows the Eros demo, and leaving the card aborts its request', async () => {
     const signals: AbortSignal[] = [];
-    setAreaApi({
+    setSkyApi({
       frames: async (_id: string, sig?: AbortSignal) => {
         signals.push(sig!);
         return { data: { frames: [{ frame_id: 'x_1_D1', time: '2026-03-20T08:30:00.000Z', wavelength_um: 1, x: 1, y: 1, cutout_url: '', flags: [] }] }, fixture: null };
