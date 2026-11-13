@@ -146,6 +146,21 @@ def spectrum_key(release: str, object_id: str, frames_sha: str, cfg: MeasureConf
     )
 
 
+def cached_spectrum_key(
+    ctx: Context, object_id: str, fr: FramesResult, cfg: MeasureConfig
+) -> CacheKey | None:
+    """The key a complete frame list's spectrum is stored under, from the cutouts' cache meta
+    (no cutout body is read); ``None`` when a cutout of the list is not cached."""
+    meta_shas: dict[str, str] = {}
+    for f in fr.frames:
+        meta = ctx.cache.get_meta(cutout_key(ctx, f))
+        if meta is not None and isinstance(meta.get("body_sha256"), str):
+            meta_shas[f.frame_id] = meta["body_sha256"]
+    if len(meta_shas) != len(fr.frames):
+        return None
+    return spectrum_key(ctx.settings.data_release, object_id, frames_digest(fr, meta_shas), cfg)
+
+
 def _point(f: FrameRecord, m: Measurement) -> tuple[dict[str, Any], dict[str, Any]]:
     reasons = sorted(
         {
@@ -209,13 +224,8 @@ class SpectrumService:
         # Lookup: only a complete frame list may be served from the derived cache. The key comes
         # from the cutouts' cache meta, so a hit reads no cutout body.
         if complete:
-            meta_shas: dict[str, str] = {}
-            for f in fr.frames:
-                meta = self.ctx.cache.get_meta(cutout_key(self.ctx, f))
-                if meta is not None and isinstance(meta.get("body_sha256"), str):
-                    meta_shas[f.frame_id] = meta["body_sha256"]
-            if len(meta_shas) == len(fr.frames):
-                key = spectrum_key(release, obj.id, frames_digest(fr, meta_shas), cfg)
+            key = cached_spectrum_key(self.ctx, obj.id, fr, cfg)
+            if key is not None:
                 hit = self.ctx.cache.get(key)
                 if hit is not None:
                     doc = json.loads(hit.body)
