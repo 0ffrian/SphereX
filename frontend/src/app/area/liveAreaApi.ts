@@ -199,6 +199,9 @@ export function parseStatusReply(body: unknown): LiveJobStatus {
 
 // ---- HTTP --------------------------------------------------------------------------------------
 
+/** One job poll waits at most this long (engineering value). */
+export const STATUS_TIMEOUT_MS = 10_000;
+
 /** The backend (#141). A route it does not serve, a reply that is not JSON or no backend: `unavailable`. */
 export function httpLiveAreaApi(base = API_BASE, fetchImpl: typeof fetch = (i, init) => globalThis.fetch(i, init)): LiveAreaApi {
   const json = async (res: Response): Promise<unknown> => {
@@ -234,14 +237,20 @@ export function httpLiveAreaApi(base = API_BASE, fetchImpl: typeof fetch = (i, i
       }
     },
     async status(areaId, signal) {
-      const res = await fetchImpl(`${base}/areas/live/${encodeURIComponent(areaId)}`, { signal });
+      // A hung reply counts as a missed poll (STATUS_TIMEOUT_MS), so polling never stalls.
+      const timeout = AbortSignal.timeout(STATUS_TIMEOUT_MS);
+      const res = await fetchImpl(`${base}/areas/live/${encodeURIComponent(areaId)}`, {
+        signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
+      });
       const body = await json(res);
       if (res.status === 404 && typeof body === 'object' && body !== null && (body as { error?: unknown }).error === 'job_not_found')
         throw new LiveJobGone(areaId);
       return parseStatusReply(body);
     },
     async stop(areaId) {
-      await fetchImpl(`${base}/areas/live/${encodeURIComponent(areaId)}`, { method: 'DELETE' });
+      const res = await fetchImpl(`${base}/areas/live/${encodeURIComponent(areaId)}`, { method: 'DELETE' });
+      // 404: nothing left to stop (it just ended). Anything else that is not 2xx: not stopped.
+      if (!res.ok && res.status !== 404) throw new Error(`Stop failed (${res.status}).`);
     },
   };
 }

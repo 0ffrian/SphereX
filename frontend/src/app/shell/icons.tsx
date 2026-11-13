@@ -36,13 +36,12 @@ const PATHS = {
   zoomOut: 'M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14Z M8 11h6 M21 21l-4.35-4.35',
   zoomIn: 'M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14Z M8 11h6 M11 8v6 M21 21l-4.35-4.35',
   // Lucide (issue #144, the live area card and the dock): `minus` and `x` for Minimise and Close,
-  // `orbit` (Known objects) and `radar` (Discovery).
+  // `radar` for Discovery (the dock draws it stroke by stroke, railIcons.tsx; Known objects' orbit
+  // is drawn there already).
   minus: 'M5 12h14',
   x: 'M18 6 6 18 M6 6l12 12',
-  orbit:
-    'M20.341 6.484A10 10 0 0 1 10.266 21.85 M3.659 17.516A10 10 0 0 1 13.74 2.152 M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z M19 3a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z M5 17a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z',
   radar:
-    'M19.07 4.93A10 10 0 0 0 6.99 3.34 M4 6h.01 M2.29 9.62A10 10 0 1 0 21.31 8.35 M16.24 7.76A6 6 0 1 0 8.23 16.67 M12 18h.01 M17.99 11.66A6 6 0 0 1 15.77 16.67 M12 10a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z m13.41 10.59 5.66-5.66',
+    'M19.07 4.93A10 10 0 0 0 6.99 3.34 M4 6h.01 M2.29 9.62A10 10 0 1 0 21.31 8.35 M16.24 7.76A6 6 0 1 0 8.23 16.67 M12 18h.01 M17.99 11.66A6 6 0 0 1 15.77 16.67 M12 10a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z M13.41 10.59l5.66-5.66',
   area: 'M5.5 3.5h13a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2v-13a2 2 0 0 1 2-2Z M9 8.3a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4Z M15 12.8a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4Z M10.4 11.1l3.2 2.3',
 } as const;
 
