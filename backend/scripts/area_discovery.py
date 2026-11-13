@@ -14,7 +14,11 @@ Stages, in order, each with its own log line and time:
 2. ``dots``: every cutout (A17.2), on ``SX_MEASURE_WORKERS`` spawn processes.
 3. ``labels``: glitch, star, fixed (A17.3, P4), with the per-visit star cones (A19.6).
 4. ``join``: tracklets paired across visits, parallax-aware (A17.4, P5).
-5. ``known``: SkyBoT candidates, Horizons positions from SPHEREx, verdicts (A17.5, P6).
+5. ``known``: SkyBoT candidates, Horizons positions from SPHEREx, verdicts (A17.5, P6). Then
+   Track is pre-fetched (frames, path, spectrum) for every Known object with an ``object_id``,
+   through ``scripts.prefetch`` (A16.4 step 2, A19.12, issue #129); the ones skipped are listed
+   with the reason and never fail the run. ``track_available`` then reads the cache only.
+   Skipped as a whole under ``SX_OFFLINE=1`` (so ``--recorded``) and with ``--record``.
 6. ``export``: the replies, the ECSV and the ``derived.area`` entries (A17.7 to A17.10, P7),
    written to the D-25 cache, or to ``--pack DIR`` (the committed pack the API also reads).
 
@@ -45,6 +49,7 @@ import sys
 import tempfile
 import time
 from collections.abc import Mapping
+from dataclasses import dataclass
 from pathlib import Path
 
 from app.cache.store import ReadThroughCache
@@ -59,6 +64,7 @@ from app.core.find import moving
 from app.core.find.resolver import resolve
 from app.core.find.stars import StarCone
 from app.settings import Settings
+from scripts import prefetch
 
 log = logging.getLogger("shift_spectrum")
 
@@ -162,6 +168,53 @@ def run_later(
         f"missing {result.known.missing} ({time.perf_counter() - t0:.1f} s)"
     )
     return result
+
+
+@dataclass(frozen=True)
+class TrackPrefetch:
+    """One Known object's Track pre-fetch (A16.4 step 2): ``fetched`` or ``skipped`` + why."""
+
+    designation: str
+    object_id: str | None
+    status: str
+    reason: str = ""
+
+
+def prefetch_track(
+    ctx: Context, result: service.AreaResult, *, refresh: bool, skip_all: str = ""
+) -> list[TrackPrefetch]:
+    """Pre-fetch Track for every Known object of the area through ``scripts.prefetch`` (the
+    path search with its cutouts, the star cones and the spectrum), or list why it was skipped.
+    A failure is a skip: it is reported and never stops the run (A19.12)."""
+    out: list[TrackPrefetch] = []
+    args = argparse.Namespace(refresh=refresh, overlays_only=False)
+    for o in result.known_objects:
+        name = o.candidate.designation
+        oid = result.object_ids.get(name)
+        if oid is None:
+            out.append(TrackPrefetch(name, None, "skipped", "no object_id from the resolver"))
+            continue
+        if skip_all:
+            out.append(TrackPrefetch(name, oid, "skipped", skip_all))
+            continue
+        print(f"[track] pre-fetch {name} ({oid})", flush=True)
+        try:
+            # The query is the designation, as ``object_id_from_resolver`` resolved it.
+            rep = prefetch.prefetch_target(ctx, {"name": name, "query": name}, {}, args)
+        except Exception as exc:  # any failure is a listed skip, never a failed run
+            out.append(TrackPrefetch(name, oid, "skipped", f"{type(exc).__name__}: {exc}"))
+            continue
+        if rep.error:
+            out.append(TrackPrefetch(name, oid, "skipped", rep.error))
+        elif rep.object_id != oid:
+            out.append(TrackPrefetch(name, oid, "skipped", f"resolved to {rep.object_id}"))
+        elif not rep.complete:
+            out.append(
+                TrackPrefetch(name, oid, "skipped", "incomplete: " + ", ".join(rep.missing[:5]))
+            )
+        else:
+            out.append(TrackPrefetch(name, oid, "fetched"))
+    return out
 
 
 def object_positions(ctx: Context, spkid: str) -> dict[str, tuple[float, float]] | None:
@@ -299,6 +352,19 @@ def _run(args: argparse.Namespace, steps: list[str], settings: Settings) -> int:
             sources=sources,
             refresh=args.refresh,
         )
+        if "known" in steps:
+            skip_all = ""
+            if ctx.cache.offline:
+                skip_all = "SX_OFFLINE=1: the pre-fetch needs the network"
+            elif args.record:
+                skip_all = "--record records the area's own inputs only"
+            for t in prefetch_track(ctx, result, refresh=args.refresh, skip_all=skip_all):
+                why = f": {t.reason}" if t.reason else ""
+                print(f"[track] {t.status} {t.designation} ({t.object_id or '-'}){why}")
+            service.with_track(ctx, result)
+            for name, c in sorted(result.track.items()):
+                state = "available" if c.available else f"not available ({c.reason})"
+                print(f"[track] {name}: track {state}")
         if "export" in steps:
             prepared = service.prepare(result)
             target = ReadThroughCache(args.pack, offline=True) if args.pack else ctx.cache

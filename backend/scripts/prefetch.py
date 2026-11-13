@@ -19,7 +19,9 @@ the exit code: overlays are optional layers, and the frames and spectrum do not 
 ``--overlays-only`` resolves, searches SIA and fetches the cones, skipping cutout downloads.
 A moving object gets one Gaia DR3 and one CatWISE2020 (W1 cut) cone per visit after its frame
 list is complete (issue #95, A19.6), with the same keys as ``/overlays`` (``stars.mover_visits``);
-``--overlays-only`` skips movers, whose cones need the frame list.
+``--overlays-only`` skips movers, whose cones need the frame list. A mover whose frame list is
+complete also gets its Stage 2 spectrum measured and stored (A19.12, issue #129), so Track's
+frames, path and spectrum are all final in the cache.
 """
 
 from __future__ import annotations
@@ -42,9 +44,17 @@ from app.core.classify import classify
 from app.core.classify.rules import SIMBAD_PLANET
 from app.core.composite.service import CompositeService
 from app.core.find import stars
-from app.core.find.frames import FrameRecord, FrameService, frame_time, is_complete, position_at
+from app.core.find.frames import (
+    FrameRecord,
+    FrameService,
+    FramesResult,
+    frame_time,
+    is_complete,
+    position_at,
+)
 from app.core.find.overlays import CATALOGS, fetch_catalog, overlay_cone
 from app.core.find.resolver import ResolvedObject, is_comet, load_aliases, resolve
+from app.core.measure.spectrum import SpectrumService
 from app.settings import Settings
 from app.timefmt import parse_utc
 
@@ -62,6 +72,7 @@ class Report:
     composite: str = "-"
     overlays: dict[str, str] = field(default_factory=dict)  # catalog -> "N sources" or error
     frames_skipped: bool = False
+    spectrum: str = "-"  # a mover's spectrum (A19.12): "N points", "refused ..." or "FAILED ..."
 
     @property
     def complete(self) -> bool:
@@ -162,6 +173,19 @@ def prefetch_mover_overlays(
     return out
 
 
+def prefetch_mover_spectrum(fs: FrameService, obj: ResolvedObject, frames: FramesResult) -> str:
+    """Measure a mover's spectrum from its complete frame list and cached cutouts, which stores
+    the ``derived.spectrum`` entry ``/spectrum`` serves (A19.12). Never raises."""
+    try:
+        body = SpectrumService(fs).get_spectrum(obj, frames=frames).body
+    except (CacheMissOffline, UpstreamUnavailable, OSError, ValueError) as exc:
+        out = f"FAILED ({exc})"
+    else:
+        out = f"{len(body['spectrum'])} points, missing={len(body['missing'])}"
+    print(f"  spectrum: {out}", flush=True)
+    return out
+
+
 def prefetch_target(
     ctx: Context, target: dict[str, str], aliases: dict[str, str], args: argparse.Namespace
 ) -> Report:
@@ -227,13 +251,16 @@ def prefetch_target(
         fs = FrameService(ctx)
         try:
             result = fs.get_frames(obj, refresh=args.refresh, rebuild=True, unlimited_live=True)
+            rep.frames, rep.missing = len(result.frames), result.missing
+            print(f"  path search: {rep.frames} frames, missing={result.missing[:5]}", flush=True)
+            if is_complete(result.missing):
+                rep.spectrum = prefetch_mover_spectrum(fs, obj, result)
         finally:
             fs.close()
-        rep.frames, rep.missing = len(result.frames), result.missing
-        print(f"  path search: {rep.frames} frames, missing={result.missing[:5]}", flush=True)
         if is_complete(result.missing):
             rep.overlays = prefetch_mover_overlays(ctx, result.frames, args.refresh)
         else:
+            rep.spectrum = "skipped (frame list incomplete)"
             rep.overlays = {cat: "skipped (frame list incomplete)" for cat in CATALOGS}
         return rep
 
@@ -347,6 +374,8 @@ def main(argv: list[str] | None = None) -> int:
         )
         if r.frames_skipped:
             print("      frames: skipped (--overlays-only)")
+        if r.spectrum != "-":
+            print(f"      spectrum: {r.spectrum}")
         for cat, text in r.overlays.items():
             print(f"      overlays {cat}: {text}")
         for m in r.missing[:5]:
