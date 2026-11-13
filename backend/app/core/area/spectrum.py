@@ -406,7 +406,10 @@ def _pair(
         rel = math.sqrt((lo.err / lo.flux) ** 2 + (s.err / s.flux) ** 2 + sys2)
         return {"rho": rho, "rho_err": rho * rel, "limit": None}
     if not s_ok and lo.snr >= cfg.limit_snr_min:
-        rho = lo.flux / (max(s.flux, 0.0) + cfg.limit_sigma * s.err) / sun_ratio
+        den = max(s.flux, 0.0) + cfg.limit_sigma * s.err
+        if den <= 0.0:  # no flux and no error on the faint arm: no limit to state
+            return None
+        rho = lo.flux / den / sun_ratio
         return {"rho": rho, "rho_err": None, "limit": "lower"}
     if not l_ok and s.snr >= cfg.limit_snr_min:
         rho = (max(lo.flux, 0.0) + cfg.limit_sigma * lo.err) / s.flux / sun_ratio
@@ -437,6 +440,8 @@ def _steps(
                 + slope * abs(math.log(b.lam / a.lam))
                 + cfg.step_sigma * sigma_c
             )
+            # ok is decided on the emitted values, so the reply never contradicts itself.
+            change, allowed = _r(c, 4), _r(allowed, 4)
             out.append(
                 {
                     "visit": key[0],
@@ -445,9 +450,9 @@ def _steps(
                     "dot_id_b": b.dot_id,
                     "time_a": iso_utc_z(a.time),
                     "time_b": iso_utc_z(b.time),
-                    "change": _r(c, 4),
-                    "allowed": _r(allowed, 4),
-                    "ok": abs(c) <= allowed,
+                    "change": change,
+                    "allowed": allowed,
+                    "ok": abs(change) <= allowed,
                 }
             )
     return out
