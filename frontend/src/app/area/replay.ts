@@ -47,16 +47,18 @@ export function recordAt(run: RunRecord, t: number): RunRecord {
     if (st !== 'failed' && st !== 'skipped') delete out.error;
     return out;
   });
+  // One per object, as the circles are (an object found in two squares counts once).
   const known = new Set<string>();
-  let found = 0;
-  let unexplained = 0;
+  const found = new Set<string>();
+  const unexplained = new Set<string>();
   for (const e of events) {
     const o = e.type === 'found' ? e.object : undefined;
     if (!o) continue;
-    if (o.kind === 'unexplained') unexplained++;
+    const k = objectKey(o);
+    if (o.kind === 'unexplained') unexplained.add(k);
     else {
-      if (o.designation !== undefined) known.add(o.designation);
-      if (o.kind === 'known') found++;
+      known.add(k);
+      if (o.kind === 'known') found.add(k);
     }
   }
   const end = durationOf(run);
@@ -69,13 +71,17 @@ export function recordAt(run: RunRecord, t: number): RunRecord {
     events,
     state: finished ? run.state : paused ? 'paused' : 'running',
     finished_at: finished ? run.finished_at : null,
-    totals: {
-      known: known.size,
-      found,
-      unexplained,
-      squares_done: squares.filter((s) => s.state === 'done').length,
-      squares_skipped: squares.filter((s) => s.state === 'skipped').length,
-    },
+    // The end frame is the run itself: its totals are the server's (#156 merges a track found in
+    // two neighbouring squares, which the events alone cannot tell).
+    totals: finished
+      ? run.totals
+      : {
+          known: known.size,
+          found: found.size,
+          unexplained: unexplained.size,
+          squares_done: squares.filter((s) => s.state === 'done').length,
+          squares_skipped: squares.filter((s) => s.state === 'skipped').length,
+        },
   };
 }
 

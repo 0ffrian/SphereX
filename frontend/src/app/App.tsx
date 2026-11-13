@@ -131,7 +131,7 @@ export function App() {
                 className="absolute top-4 right-4 z-50"
               >
                 {/* Issue #158: the runs button right after the readout, the same height (mock-up state 12). */}
-                <div className="sx-tr">
+                <div className="sx-topright">
                   <Readout />
                   <RunsMenu />
                 </div>

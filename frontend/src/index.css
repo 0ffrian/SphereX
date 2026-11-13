@@ -6025,7 +6025,7 @@ li[data-state='running'] > .sx-live-mk {
    The runs button sits right after the RA/Dec readout, the same height, glass like the other
    floating controls; its list drops below it. The replay draws on #157's scan overlay; its tag sits
    under the island and its bar above the dock. */
-.sx-tr {
+.sx-topright {
   display: flex;
   gap: 8px;
   align-items: stretch;

@@ -99,6 +99,14 @@ export const useRunsStore = create<RunsState>()((set, get) => {
     const r = get().replay;
     if (r) anchor = { t: r.t, wall: nowMs() };
   };
+  /** Where the clock is now (not the last tick's position): no progress is lost on a change. */
+  const liveT = (r: Replay) =>
+    r.playing ? advance(anchor.t, nowMs() - anchor.wall, r.speed, r.end, r.stepped) : r.t;
+  const isGoing = (runs: readonly RunSummary[]) =>
+    runs.some((r) => r.state === 'running' || r.state === 'queued' || r.state === 'paused');
+  const pollAgain = () => {
+    pollTimer = setTimeout(() => void get().load(), RUNS_POLL_MS);
+  };
 
   return {
     open: false,
@@ -130,11 +138,13 @@ export const useRunsStore = create<RunsState>()((set, get) => {
         if (ctl.signal.aborted || !get().open) return;
         set({ runs, status: 'ready' });
         // A run still going changes: read the list again while the menu is open.
-        if (runs.some((r) => r.state === 'running' || r.state === 'queued' || r.state === 'paused'))
-          pollTimer = setTimeout(() => void get().load(), RUNS_POLL_MS);
+        if (isGoing(runs)) pollAgain();
       } catch {
         if (ctl.signal.aborted || !get().open) return;
-        set({ status: get().status === 'ready' ? 'ready' : 'error' });
+        const ready = get().status === 'ready';
+        set({ status: ready ? 'ready' : 'error' });
+        // A missed poll of a list that shows a run still going: keep trying.
+        if (ready && isGoing(get().runs)) pollAgain();
       }
     },
     setFilter(filter) {
@@ -197,8 +207,9 @@ export const useRunsStore = create<RunsState>()((set, get) => {
     pause() {
       const r = get().replay;
       if (!r) return;
+      const t = liveT(r);
       stopTick();
-      set({ replay: { ...r, playing: false } });
+      set({ replay: { ...r, t, playing: false } });
     },
     seek(t) {
       const r = get().replay;
@@ -209,7 +220,7 @@ export const useRunsStore = create<RunsState>()((set, get) => {
     setSpeed(speed) {
       const r = get().replay;
       if (!r || !REPLAY_SPEEDS.includes(speed)) return;
-      set({ replay: { ...r, speed } });
+      set({ replay: { ...r, t: liveT(r), speed } });
       reanchor();
     },
     endReplay() {

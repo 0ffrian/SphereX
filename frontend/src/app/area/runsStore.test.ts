@@ -98,6 +98,49 @@ describe('runs menu', () => {
     await vi.advanceTimersByTimeAsync(RUNS_POLL_MS * 3);
     expect(calls).toBe(2);
   });
+  it('keeps polling a run still going after a missed read', async () => {
+    let calls = 0;
+    const going = {
+      run_id: 'run-20261113T210927-411a00',
+      kind: 'discovery' as const,
+      region: REGION,
+      state: 'running' as const,
+      created_at: '2026-11-13T21:09:27Z',
+      duration_s: 10,
+      totals: { known: 0, found: 0, unexplained: 0, squares_done: 0, squares_skipped: 0 },
+      squares_done: 0,
+      squares_total: 4,
+    };
+    setScanApi({
+      ...mockScanApi({ persist: false }),
+      list: async () => {
+        calls++;
+        if (calls === 2) throw new Error('down');
+        return [going];
+      },
+    });
+    useRunsStore.getState().toggleMenu();
+    await flush();
+    await vi.advanceTimersByTimeAsync(RUNS_POLL_MS);
+    expect(calls).toBe(2);
+    expect(useRunsStore.getState().status).toBe('ready');
+    await vi.advanceTimersByTimeAsync(RUNS_POLL_MS);
+    expect(calls).toBe(3);
+  });
+  it('a speed change or a pause keeps the position the clock has reached', async () => {
+    const id = await startMockRun();
+    clock += 4500;
+    await flush();
+    resetScans();
+    await useRunsStore.getState().startReplay(id);
+    useRunsStore.getState().setSpeed(1);
+    wall += 450; // between two ticks: the store still holds the last tick's position
+    useRunsStore.getState().setSpeed(10);
+    expect(useRunsStore.getState().replay!.t).toBeCloseTo(0.45, 6);
+    wall += 50;
+    useRunsStore.getState().pause();
+    expect(useRunsStore.getState().replay!.t).toBeCloseTo(0.95, 6);
+  });
   it('says so when the list cannot be read', async () => {
     setScanApi(
       httpScanApi('/v1', (async () => new Response('down', { status: 502 })) as typeof fetch),
