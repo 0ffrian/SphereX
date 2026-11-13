@@ -2,6 +2,7 @@
 // a count and a bar on the frame search, and the elapsed time; the Track view opens when it is done
 // (trackJobStore). There is no Stop: the object job runner (#41) has none, so "Back to the results"
 // leaves the job running on the server, and the object is Track-available when it ends.
+import { backToScan } from '@/app/sky/areaDraw';
 import { useEffect, useState } from 'react';
 import { PanelCard } from '@/app/shell/PanelCard';
 import { useAreaStore } from '@/app/shell/areaStore';
@@ -32,7 +33,8 @@ export function TrackJobCard() {
     if (back === 'mover') {
       const s = useAreaStore.getState();
       s.openMover(s.sel);
-    } else useAreaStore.getState().openList();
+    } else if (back === 'scan') backToScan();
+    else useAreaStore.getState().openList();
   };
   if (!view) return null;
   const o = view.obj;
