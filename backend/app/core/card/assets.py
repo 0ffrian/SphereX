@@ -5,8 +5,10 @@ A saved asset holds the ObjectCard, the RenderParams, the texture URLs, ``genera
 
 1. **Generated:** assets this backend built and saved, kept as ``derived.asset`` entries in the
    D-25 cache. The key holds ``ASSET_VERSION``, the stage 7 ``GENERATOR_VERSION`` (which holds
-   the baker's rules version) and the data release, so a rule or release change never serves a
-   stale asset. Saved only from final inputs, so it carries the measured spectrum.
+   the baker's rules version), ``MEASURE_VERSION`` (the asset carries the measured spectrum, so a
+   Stage 2 rule change must not serve one measured the old way, Q-460) and the data release, so a
+   rule or release change never serves a stale asset. Saved only from final inputs, so it
+   carries the measured spectrum.
 2. **Pre-baked:** JSON files in the repo, ``<assets_dir>/<type>/<id>.json`` (A5.4). Read only.
    The pack has no spectrum (Q-164 (3)); ``ObjectPipeline`` uses it only as a stand-in when a
    live build cannot measure one.
@@ -25,6 +27,7 @@ from urllib.parse import quote
 
 from app.cache.keys import CacheKey
 from app.cache.store import LiveResponse, ReadThroughCache
+from app.core.measure.config import MEASURE_VERSION
 from app.core.render.card_to_params import GENERATOR_VERSION
 
 log = logging.getLogger("shift_spectrum")
@@ -125,7 +128,12 @@ class Found:
 
 def asset_key(object_id: str, release: str | None = None) -> CacheKey:
     return CacheKey.make(
-        ASSET_SOURCE, release, id=object_id, v=ASSET_VERSION, generator=GENERATOR_VERSION
+        ASSET_SOURCE,
+        release,
+        id=object_id,
+        v=ASSET_VERSION,
+        generator=GENERATOR_VERSION,
+        measure=MEASURE_VERSION,
     )
 
 

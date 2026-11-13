@@ -1,30 +1,61 @@
-// R13.9 / R13.10 (Q-441, Q-442): the app shell's Sound control. A "Sound" button in the top bar
-// opens a small popover with sound on/off, volume, ambience on/off and volume, and Flashes. The
-// button's click unlocks audio (Q-73: a user gesture, never on load); no sound plays from it. The
-// settings are the `useSoundSettings` store (saved under the pre-D-39 key). Every sound follows
-// Sound and Volume (the engine, the Listen sweep and the build pane's Hear it, hearAudio.ts); the
-// ambience itself plays only in the fly view at "+ Artistic" (#116). In the build view the top bar
-// is click-through, so index.css moves this control to the bottom right and gives it clicks.
-// Popover pattern as ConfidencePopover: Escape (consumed, so the shell's own Escape handlers skip it,
-// A21.10) and an outside click close it, and focus goes back to the button. Native controls with
-// visible labels, targets at least 24 px (R9).
-import { useEffect, useId, useRef, useState } from 'react';
+// R13.9 / R13.10 (Q-441, Q-442; moved by Q-456): the sound settings. Since Q-456 (Moon, 12 Nov 2026)
+// they are not a "Sound" button in the sky's top bar any more: the sound belongs to the generated
+// bodies, so these controls sit in the build view's Ambience dropdown (`build/AmbiencePanel.tsx`),
+// whose header button unlocks audio (Q-73: a user gesture, never on load). Sound on/off and volume,
+// the fly view's ambience on/off and volume, and lightning Flashes. The settings are the
+// `useSoundSettings` store (saved under the pre-D-39 key). Every sound follows Sound and Volume (the
+// engine, the Listen sweep and Hear it, hearAudio.ts); the ambience plays only in the fly view at
+// "+ Artistic" (#116). Switches and sliders have visible labels; rows are 40 px (D-38), 44 px on touch.
+import { useEffect, useId } from 'react';
 import { useShallow } from 'zustand/react/shallow';
+import { SwitchRow } from '@/app/PanelControls';
 import { useSound, useSoundStatus } from '../SoundProvider';
 import { ensureLoaded, useSoundSettings } from '../settings';
 
 export const SOUND_STATUS_OFF = 'Sound is off.';
 export const SOUND_STATUS_NONE = 'This browser cannot play sound.';
-export const SOUND_STATUS_SUSPENDED = 'The browser paused the sound. Click Sound again to resume it.';
-export const SOUND_STATUS_READY =
-  'Every sound follows Sound and Volume, Hear it included. The imagined ambience plays in the fly view at + Artistic.';
-export const FLASHES_HINT = 'Lightning flashes in the fly view. Reduced motion always turns them off.';
+export const SOUND_STATUS_SUSPENDED = 'The browser paused the sound. Click Ambience again to resume it.';
+export const SOUND_STATUS_READY = 'Ambience plays in the fly view when Show is set to + Artistic.';
+export const SOUND_STATUS_AMBIENCE_OFF = 'Ambience is off.';
+export const FLASHES_HINT = 'Lightning in the fly view. Off with reduced motion.';
+/** R8.9 (R12 #10): `outputLatency` above HIGH_OUTPUT_LATENCY_S, likely Bluetooth (#83). */
+export const LATENCY_HINT = 'High audio delay: Bluetooth? Use the laptop speaker or wired output.';
 
-const rowClass = 'flex min-h-11 items-center gap-3';
-const checkClass = 'size-6 shrink-0 accent-sky-400';
-const rangeClass = 'h-6 w-full accent-sky-400 disabled:opacity-40';
+function Volume({
+  label,
+  value,
+  disabled,
+  onChange,
+  testId,
+}: {
+  label: string;
+  value: number;
+  disabled: boolean;
+  onChange(v: number): void;
+  testId: string;
+}) {
+  const id = useId();
+  return (
+    <div className="sx-snd-vol">
+      <label htmlFor={id}>{label}</label>
+      <input
+        id={id}
+        type="range"
+        min={0}
+        max={100}
+        step={1}
+        value={Math.round(value * 100)}
+        disabled={disabled}
+        aria-valuetext={`${Math.round(value * 100)}%`}
+        onChange={(e) => onChange(Number(e.target.value) / 100)}
+        data-testid={testId}
+      />
+    </div>
+  );
+}
 
-export function SoundSettings({ className }: { className?: string }) {
+/** The sound settings as a panel body (no button of its own): the Ambience dropdown holds it. */
+export function SoundControls() {
   const sound = useSound();
   const status = useSoundStatus();
   const s = useSoundSettings(
@@ -37,146 +68,62 @@ export function SoundSettings({ className }: { className?: string }) {
       update: st.update,
     })),
   );
-  const [open, setOpen] = useState(false);
-  const button = useRef<HTMLButtonElement>(null);
-  const panel = useRef<HTMLDivElement>(null);
-  const panelId = useId();
-  const titleId = useId();
-  const statusId = useId();
-  const flashesHintId = useId();
-  const ids = { sound: useId(), volume: useId(), amb: useId(), ambVol: useId(), flashes: useId() };
+  const hintId = useId();
+  // R8.9: read only after a click unlocked audio (the driver's check reads the shared context, which
+  // must not be made outside a gesture, Q-73). Re-read whenever the status changes.
+  const highLatency =
+    status.unlocked && status.audio !== 'none' && sound.outputs.audio.isHighLatency();
 
   useEffect(() => ensureLoaded(), []);
 
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape' || e.defaultPrevented) return;
-      e.preventDefault();
-      setOpen(false);
-      button.current?.focus();
-    };
-    const onDown = (e: PointerEvent) => {
-      const t = e.target as Node | null;
-      if (t && (panel.current?.contains(t) || button.current?.contains(t))) return;
-      setOpen(false);
-    };
-    document.addEventListener('keydown', onKey);
-    document.addEventListener('pointerdown', onDown);
-    return () => {
-      document.removeEventListener('keydown', onKey);
-      document.removeEventListener('pointerdown', onDown);
-    };
-  }, [open]);
-
-  const onButton = () => {
-    // Synchronously inside the click (Q-73): browsers only start audio from a user activation.
-    void sound.unlock();
-    setOpen((o) => !o);
-  };
-
   const line = !s.soundOn
     ? SOUND_STATUS_OFF
-    : status.audio === 'none'
-      ? SOUND_STATUS_NONE
-      : status.unlocked && status.audio === 'suspended'
-        ? SOUND_STATUS_SUSPENDED
-        : SOUND_STATUS_READY;
+    : !s.ambienceOn
+      ? SOUND_STATUS_AMBIENCE_OFF
+      : status.audio === 'none'
+        ? SOUND_STATUS_NONE
+        : status.unlocked && status.audio === 'suspended'
+          ? SOUND_STATUS_SUSPENDED
+          : SOUND_STATUS_READY;
 
   return (
-    <div className={`sx-sound relative shrink-0 ${className ?? ''}`} data-testid="sound-settings">
-      <button
-        ref={button}
-        type="button"
-        className="sx-coords inline-flex min-h-11 items-center gap-2 text-fg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400"
-        aria-expanded={open}
-        aria-controls={panelId}
-        onClick={onButton}
-        data-testid="sound-button"
-      >
-        Sound
-        <span className="text-muted">{s.soundOn ? 'on' : 'off'}</span>
-      </button>
-      <div
-        ref={panel}
-        id={panelId}
-        role="group"
-        aria-labelledby={titleId}
-        aria-describedby={statusId}
-        hidden={!open}
-        className="sx-sound-pop absolute top-full right-0 z-50 mt-2 w-72 rounded-lg border border-line bg-s1 p-3 text-sm text-fg shadow-lg"
-        data-testid="sound-popover"
-      >
-        <h2 id={titleId} className="mb-1 text-sm font-semibold">
-          Sound settings
-        </h2>
-        <p id={statusId} className="mb-2 text-muted" data-testid="sound-status">
-          {line}
+    <div className="sx-snd" data-testid="sound-settings">
+      <p className="sx-snd-status" role="status" data-testid="sound-status">
+        {line}
+      </p>
+      {highLatency && (
+        <p className="sx-snd-hint" data-testid="sound-latency-hint">
+          {LATENCY_HINT}
         </p>
-        <div className={rowClass}>
-          <input
-            id={ids.sound}
-            type="checkbox"
-            className={checkClass}
-            checked={s.soundOn}
-            onChange={(e) => s.update({ soundOn: e.target.checked })}
-          />
-          <label htmlFor={ids.sound}>Sound</label>
-        </div>
-        <div className={rowClass}>
-          <label htmlFor={ids.volume} className="w-28 shrink-0">
-            Volume
-          </label>
-          <input
-            id={ids.volume}
-            type="range"
-            min={0}
-            max={100}
-            step={1}
-            className={rangeClass}
-            value={Math.round(s.volume * 100)}
-            disabled={!s.soundOn}
-            onChange={(e) => s.update({ volume: Number(e.target.value) / 100 })}
-          />
-        </div>
-        <div className={rowClass}>
-          <input
-            id={ids.amb}
-            type="checkbox"
-            className={checkClass}
-            checked={s.ambienceOn}
-            onChange={(e) => s.update({ ambienceOn: e.target.checked })}
-          />
-          <label htmlFor={ids.amb}>Ambience (fly view)</label>
-        </div>
-        <div className={rowClass}>
-          <label htmlFor={ids.ambVol} className="w-28 shrink-0">
-            Ambience volume
-          </label>
-          <input
-            id={ids.ambVol}
-            type="range"
-            min={0}
-            max={100}
-            step={1}
-            className={rangeClass}
-            value={Math.round(s.ambienceVolume * 100)}
-            disabled={!s.soundOn || !s.ambienceOn}
-            onChange={(e) => s.update({ ambienceVolume: Number(e.target.value) / 100 })}
-          />
-        </div>
-        <div className={rowClass}>
-          <input
-            id={ids.flashes}
-            type="checkbox"
-            className={checkClass}
-            checked={s.flashesOn}
-            aria-describedby={flashesHintId}
-            onChange={(e) => s.update({ flashesOn: e.target.checked })}
-          />
-          <label htmlFor={ids.flashes}>Flashes</label>
-        </div>
-        <p id={flashesHintId} className="text-muted">
+      )}
+      <div className="sx-snd-group">
+        <SwitchRow label="Sound" checked={s.soundOn} onChange={(v) => s.update({ soundOn: v })} testId="sound-on" />
+        <Volume
+          label="Sound volume"
+          value={s.volume}
+          disabled={!s.soundOn}
+          onChange={(v) => s.update({ volume: v })}
+          testId="sound-volume"
+        />
+      </div>
+      <div className="sx-snd-group">
+        <SwitchRow
+          label="Ambience in the fly view"
+          checked={s.ambienceOn}
+          onChange={(v) => s.update({ ambienceOn: v })}
+          testId="sound-ambience"
+        />
+        <Volume
+          label="Ambience volume"
+          value={s.ambienceVolume}
+          disabled={!s.soundOn || !s.ambienceOn}
+          onChange={(v) => s.update({ ambienceVolume: v })}
+          testId="sound-ambience-volume"
+        />
+      </div>
+      <div className="sx-snd-group" aria-describedby={hintId}>
+        <SwitchRow label="Flashes" checked={s.flashesOn} onChange={(v) => s.update({ flashesOn: v })} testId="sound-flashes" />
+        <p id={hintId} className="sx-snd-hint">
           {FLASHES_HINT}
         </p>
       </div>

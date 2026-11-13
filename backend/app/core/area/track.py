@@ -8,8 +8,9 @@ for its ``object_id``. The keys are the ones the endpoints read: ``frames.object
 
 - **frames:** the stored list is complete (``frames.is_complete``) and holds at least one frame;
 - **path:** every Horizons range answer of the path search is cached, with an ephemeris block;
-- **spectrum:** the entry for that frame list (and the API's measure settings) is cached. The
-  spectrum is stored only for a complete list whose every cutout is cached, so a hit is final.
+- **spectrum:** the entry for that frame list is cached, under the API's measure settings with
+  the mover rule of ``config_for`` (Q-139). The spectrum is stored only for a complete list
+  whose every cutout is cached, so a hit is final.
 
 Every read goes through an offline view of the cache (``offline=True`` on both the cache and the
 settings), so a miss, including the SBDB lookup behind ``is_comet``, is a miss and never a live
@@ -27,7 +28,7 @@ from app.context import Context
 from app.core.find import moving
 from app.core.find.frames import is_complete, object_frames_key, stored_result
 from app.core.find.resolver import is_comet, load_object
-from app.core.measure.config import DEFAULT_CONFIG, MeasureConfig
+from app.core.measure.config import DEFAULT_CONFIG, MeasureConfig, config_for
 from app.core.measure.spectrum import cached_spectrum_key
 
 # Why Track is not available (for the precompute log and the tests; not a served code).
@@ -100,7 +101,7 @@ def check(ctx: Context, object_id: str, cfg: MeasureConfig = DEFAULT_CONFIG) -> 
                 return TrackCheck(False, PATH_EPHEMERIS)
             digests.append(_sha(e))
 
-    skey = cached_spectrum_key(view, obj.id, fr, cfg)
+    skey = cached_spectrum_key(view, obj.id, fr, config_for(obj.moving, cfg))
     spectrum = view.cache.get(skey) if skey is not None else None
     if spectrum is None:
         return TrackCheck(False, SPECTRUM_NOT_CACHED)

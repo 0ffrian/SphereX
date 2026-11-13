@@ -1,17 +1,35 @@
 // The area search service seam (Known objects and Discovery, the dock's two square tools).
 //
-// DUMMY DATA. The area search backend is not built, so every function here returns a fixed,
-// clearly marked demo answer (`demo: true`) and never queries anything. The demo answers only when
+// REAL DATA FIRST (issue #96, Q-205: precomputed results). The drawn square is snapped to a prepared
+// area of `GET /v1/areas`; when one holds it, its stored replies are read and shown as they are
+// (realArea.ts), tagged "Precomputed" and, for synthetic fixtures, "Test data".
+//
+// DEMO FALLBACK. When no prepared area holds the square (or there is no backend), the functions
+// return the fixed, clearly marked demo answer (`demo: true`). The demo answers only when
 // the drawn area overlaps the prepared Eros area (the sky image of public/demo/eros/eros.json);
 // anywhere else it refuses with `area:not_prepared` (Q-414). Eros's frames and path are real
 // SPHEREx demo data (extracted from mockup/chase-the-rock.html); where they sit in the drawn
 // square, the dots, the counts and the two other movers are made up. The UI shows a "Demo data"
 // tag wherever it uses them.
 //
-// TODO Atish: replace the bodies of areaSearch() / knownObjectsIn() / discoverIn() with calls to
-// /v1/areas (Q-205). Keep the return types: the cards and the sky layer read only these.
+// Issue #130 (Q-455): a known object's "Track it" reads its `/frames` and `/path`
+// (loadObjectTrack); the Eros card keeps the demo's cutouts, mask and brightness under the Demo tag.
+import { ApiError } from '@/app/api/errors';
+import type { Frame } from '@/app/api/types';
 import { deltaRa, wrapRa } from '@/viewer/sky/skyMath';
 import type { AreaBox } from '@/app/shell/areaStore';
+import type { AreaKnownObject, AreaKnownPosition, AreaTrack, TrackPath } from '@/contract';
+import { getSkyApi } from '@/state/store';
+import { isoToMjd } from './erosModel';
+import {
+  findArea,
+  loadDiscovery,
+  loadKnown,
+  matchName,
+  RealAreaFailed,
+  type RealDiscovery,
+  type RealKnown,
+} from './realArea';
 
 /** One exposure of 433 Eros (the demo frames). Fields as in the demo file's `hops`. */
 export interface ErosHop {
@@ -38,11 +56,15 @@ export interface ErosHop {
   flags_png: string;
   /** Position on the demo sky image, in its pixels. */
   wide_px: [number, number];
+  /** Set on a real frame that the demo file has no cutout for (issue #130): nothing is drawn for it. */
+  no_cutout?: boolean;
 }
 export interface ErosTrackPoint {
   /** ISO time (UTC). */
   t: string;
   px: [number, number];
+  /** First point of a new observing window of `/path` (A19): no line joins it to the point before. */
+  gap?: true;
 }
 /** D-02 provenance of a field of the demo file. */
 export interface ErosProvenance {
@@ -59,15 +81,28 @@ export interface ErosDemo {
 }
 
 export interface KnownObject {
+  /** The number ("433") or, for an unnumbered object, its designation. */
   id: string;
+  /** The name without its number ("Eros"). */
   name: string;
   kind: string;
   frames: number;
   visits: number;
+  /** Real rows only (issue #130, `/known`): the designation as SkyBoT gives it, e.g. "433 Eros". */
+  designation?: string;
+  /** The backend's object id (`sbdb-20000433`), null when it has none. */
+  objectId?: string | null;
+  /** True: the Track pane could open it offline (A17.5). The demo row is always true. */
+  trackAvailable?: boolean;
+  /** Horizons positions at each frame time, seen from SPHEREx: `model_dependent` (A16.5). */
+  positions?: AreaKnownPosition[];
 }
 export interface KnownObjectsResult {
-  demo: true;
+  /** True for the made-up demo answer; false for a prepared area's stored reply. */
+  demo: boolean;
   objects: KnownObject[];
+  /** The prepared area's reply (null for the demo). */
+  real: RealKnown | null;
 }
 
 export type MoverKind = 'known' | 'unexplained' | 'once';
@@ -76,8 +111,12 @@ export interface DiscoveryMover {
   /** Name when it matches a known object, else null. */
   known: string | null;
   kind: MoverKind;
-  /** Detections on the demo sky image, in its pixels; one per visit. */
+  /** Detections on the demo sky image, in its pixels; one per visit (empty for real tracks). */
   pts: [number, number][];
+  /** Number of visits the mover is seen in. */
+  visits: number;
+  /** The prepared area's track (null for the demo). */
+  track: AreaTrack | null;
 }
 export interface DiscoveryDot {
   p: [number, number];
@@ -89,7 +128,10 @@ export interface DiscoveryStep {
   result: string;
 }
 export interface DiscoveryResult {
-  demo: true;
+  /** True for the made-up demo answer; false for a prepared area's stored replies. */
+  demo: boolean;
+  /** The prepared area's replies (null for the demo). */
+  real: RealDiscovery | null;
   steps: DiscoveryStep[];
   dots: DiscoveryDot[];
   movers: DiscoveryMover[];
@@ -102,8 +144,8 @@ export type AreaSearchResult =
 
 export const NOT_PREPARED = 'No prepared data for this area yet.';
 
-/** The demo refuses an area it has no data for (Q-414). */
-export type AreaRefusalCode = 'area:not_prepared';
+/** The demo refuses an area it has no data for (Q-414); a prepared area that fails to load. */
+export type AreaRefusalCode = 'area:not_prepared' | 'area:failed';
 export class AreaRefused extends Error {
   readonly code: AreaRefusalCode;
   constructor(code: AreaRefusalCode = 'area:not_prepared', message = NOT_PREPARED) {
@@ -121,16 +163,28 @@ export function erosArea(d: ErosDemo): { ra: number; dec: number; halfW: number;
   return { ra: c[0], dec: c[1], halfW: (d.wide.w * k) / 2, halfH: (d.wide.h * k) / 2 };
 }
 
-/** True when the drawn box overlaps the prepared Eros area (small-angle: RA scaled by cos Dec). */
-export function boxOverlapsEros(box: AreaBox, d: ErosDemo): boolean {
-  const e = erosArea(d);
-  if (!e) return false;
+/** A prepared area on the sky: centre and half sides in degrees. */
+export interface AreaSpan {
+  ra: number;
+  dec: number;
+  halfW: number;
+  halfH: number;
+}
+
+/** True when the drawn box overlaps the area (small-angle: RA scaled by cos Dec). */
+export function boxOverlaps(box: AreaBox, e: AreaSpan): boolean {
   const cosD = Math.cos((e.dec * Math.PI) / 180);
   const bra = wrapRa(box.a.ra + deltaRa(box.b.ra, box.a.ra) / 2);
   const bdec = (box.a.dec + box.b.dec) / 2;
   const dx = Math.abs(deltaRa(bra, e.ra)) * cosD;
   const dy = Math.abs(bdec - e.dec);
   return dx < box.widthDeg / 2 + e.halfW && dy < box.heightDeg / 2 + e.halfH;
+}
+
+/** True when the drawn box overlaps the prepared Eros area of the demo file. */
+export function boxOverlapsEros(box: AreaBox, d: ErosDemo): boolean {
+  const e = erosArea(d);
+  return e ? boxOverlaps(box, e) : false;
 }
 
 /** The demo file when the box overlaps the prepared area; else refuses with `area:not_prepared`. */
@@ -162,20 +216,148 @@ export function erosDemo(): Promise<ErosDemo | null> {
 }
 
 /** Dummy: the one known object, only for a box that overlaps the prepared Eros area. */
-export async function knownObjectsIn(box: AreaBox): Promise<KnownObjectsResult> {
+async function demoKnownIn(box: AreaBox): Promise<KnownObjectsResult> {
   const d = await preparedFor(box);
   return {
     demo: true,
+    real: null,
     objects: [
-      {
-        id: '433',
-        name: 'Eros',
-        kind: 'asteroid',
-        frames: d?.hops.length ?? 16,
-        visits: 2,
-      },
+      { id: '433', name: 'Eros', kind: 'asteroid', frames: d?.hops.length ?? 16, visits: 2, trackAvailable: true },
     ],
   };
+}
+
+/** "433 Eros" with number 433 -> { id: "433", name: "Eros" }; unnumbered: the designation is the id. */
+export function splitDesignation(designation: string, number: number | null): { id: string; name: string } {
+  if (number !== null && designation.startsWith(`${number} `)) {
+    return { id: String(number), name: designation.slice(String(number).length + 1) };
+  }
+  return { id: number !== null ? String(number) : designation, name: number !== null ? designation : '' };
+}
+
+/** The latest SkyBoT answer date of the area's visits (ISO), null when none answered. */
+export function latestSkybot(known: Pick<RealKnown['known'], 'skybot'>): string | null {
+  let best: string | null = null;
+  for (const s of known.skybot) {
+    if (s.fetched_at && (!best || isoToMjd(s.fetched_at) > isoToMjd(best))) best = s.fetched_at;
+  }
+  return best;
+}
+
+/** One `/known` row as the card's row (A18.5): the reply's fields, nothing computed. Pure. */
+export function knownRow(k: AreaKnownObject): KnownObject {
+  return {
+    ...splitDesignation(k.designation, k.number),
+    kind: k.kind,
+    frames: k.n_frames,
+    visits: k.n_visits,
+    designation: k.designation,
+    objectId: k.object_id,
+    trackAvailable: k.track_available,
+    positions: k.positions,
+  };
+}
+
+/**
+ * The Eros card's data for an object (issue #130): `/frames` and `/path` of `objectId` replace the
+ * demo's frame list, counts and sky path. Where a real frame has a demo cutout (same frame id, the
+ * same exposure) the demo's cutout, mask and brightness are kept (still demo); a real frame the demo
+ * has no cutout for is listed with `no_cutout`. The path is projected onto the demo sky image.
+ */
+export function mergeReal(demo: ErosDemo | null, frames: readonly Frame[], path: TrackPath | null): ErosDemo {
+  const byId = new Map((demo?.hops ?? []).map((h) => [h.frame_id, h]));
+  const hops: ErosHop[] = frames.map((f) => {
+    const d = byId.get(f.frame_id);
+    const det = /_(D\d)$/.exec(f.frame_id)?.[1] ?? 'D?';
+    const exp = Number(/_(\d+)_D\d$/.exec(f.frame_id)?.[1] ?? 0);
+    if (d) return { ...d, mjd_avg: isoToMjd(f.time), wl_um: f.wavelength_um };
+    return {
+      frame_id: f.frame_id,
+      exposure: exp,
+      detector: det,
+      mjd_avg: isoToMjd(f.time),
+      hw_flags: f.flags,
+      nx: 0,
+      ny: 0,
+      x: 0,
+      y: 0,
+      wl_um: f.wavelength_um,
+      flux: Number.NaN,
+      stars: [],
+      seg: [],
+      north: [0, 1],
+      east: [1, 0],
+      png: '',
+      flags_png: '',
+      wide_px: [0, 0],
+      no_cutout: true,
+    };
+  });
+  hops.sort((a, b) => a.mjd_avg - b.mjd_avg || a.detector.localeCompare(b.detector));
+  const base: ErosDemo = demo ?? {
+    object: { name: '' },
+    wide: { png: '', w: 0, h: 0 },
+    provenance: undefined,
+    track: [],
+    hops: [],
+  };
+  const track: ErosTrackPoint[] = [];
+  if (path && demo) {
+    // A19: the path is never joined across a gap between windows (or a point the plane cannot show).
+    const windowOf = (iso: string): number => {
+      const t = Date.parse(iso);
+      return path.windows.findIndex((w) => Date.parse(w.start) <= t && t <= Date.parse(w.end));
+    };
+    let prevWindow: number | null = null;
+    let broken = false;
+    for (const p of path.points) {
+      const px = skyToPx(demo, p.ra, p.dec);
+      if (!px) {
+        broken = true;
+        continue;
+      }
+      const w = windowOf(p.time);
+      const gap = track.length > 0 && (broken || (prevWindow !== null && w !== prevWindow));
+      track.push(gap ? { t: p.time, px, gap: true } : { t: p.time, px });
+      prevWindow = w;
+      broken = false;
+    }
+  }
+  return { ...base, hops, track };
+}
+
+/** Sky position to a pixel of the demo sky image (tangent plane; reproduces the demo track to 0.5 px). */
+export function skyToPx(d: ErosDemo, ra: number, dec: number): [number, number] | null {
+  const c = d.wide.center;
+  const k = d.wide.deg_per_px;
+  if (!c || !k || !(d.wide.w > 0)) return null;
+  const r = Math.PI / 180;
+  const a0 = c[0] * r;
+  const d0 = c[1] * r;
+  const a = ra * r;
+  const dd = dec * r;
+  const cs = Math.sin(d0) * Math.sin(dd) + Math.cos(d0) * Math.cos(dd) * Math.cos(a - a0);
+  if (!(cs > 0)) return null;
+  const xi = (Math.cos(dd) * Math.sin(a - a0)) / cs;
+  const eta = (Math.cos(d0) * Math.sin(dd) - Math.sin(d0) * Math.cos(dd) * Math.cos(a - a0)) / cs;
+  const kr = k * r;
+  return [d.wide.w / 2 - xi / kr, d.wide.h / 2 - eta / kr];
+}
+
+/** What the Eros card reads for an object: its frames and path from the API. Throws on failure. */
+export async function loadObjectTrack(objectId: string, signal?: AbortSignal): Promise<{ frames: Frame[]; path: TrackPath | null }> {
+  const api = getSkyApi();
+  const [frames, path] = await Promise.all([
+    api.frames(objectId, signal),
+    api.path(objectId, signal).then(
+      (p) => p.data,
+      (e: unknown) => {
+        if (e instanceof ApiError && e.kind === 'aborted') throw e;
+        return null; // no path: the sky path is simply not drawn
+      },
+    ),
+  ]);
+  return { frames: frames.data.frames, path };
 }
 
 /** Mulberry32, the mock-up's `rng`, so the dummy dots land where the mock-up puts them. */
@@ -193,7 +375,7 @@ function rng(seed: number): () => number {
  * Dummy: the mock-up's 212 dots and three movers (T1 is Eros, T2 and T3 are made up), only for a
  * box that overlaps the prepared Eros area. The counts are demo counts, not catalogue results.
  */
-export async function discoverIn(box: AreaBox): Promise<DiscoveryResult> {
+async function demoDiscoverIn(box: AreaBox): Promise<DiscoveryResult> {
   const d = await preparedFor(box);
   const hs = d?.hops ?? [];
   const a: [number, number] = hs[0]?.wide_px ?? [867, 291];
@@ -202,9 +384,9 @@ export async function discoverIn(box: AreaBox): Promise<DiscoveryResult> {
   const X = () => 30 + r() * 1220;
   const Y = () => 30 + r() * 660;
   const movers: DiscoveryMover[] = [
-    { id: 'T1', known: '433 Eros', kind: 'known', pts: [a, z] },
-    { id: 'T2', known: null, kind: 'unexplained', pts: [[430, 540], [700, 330]] },
-    { id: 'T3', known: null, kind: 'once', pts: [[1010, 560]] },
+    { id: 'T1', known: '433 Eros', kind: 'known', pts: [a, z], visits: 2, track: null },
+    { id: 'T2', known: null, kind: 'unexplained', pts: [[430, 540], [700, 330]], visits: 2, track: null },
+    { id: 'T3', known: null, kind: 'once', pts: [[1010, 560]], visits: 1, track: null },
   ];
   const dots: DiscoveryDot[] = [];
   for (let i = 0; i < 58; i++) dots.push({ p: [X(), Y()], k: 'glitch' });
@@ -213,6 +395,7 @@ export async function discoverIn(box: AreaBox): Promise<DiscoveryResult> {
   for (const m of movers) for (const p of m.pts) dots.push({ p, k: 'mover' });
   return {
     demo: true,
+    real: null,
     steps: [
       { label: 'Find dots', result: '212 in 16 frames (demo)' },
       { label: 'Drop one-exposure glitches', result: '−58 (demo)' },
@@ -223,6 +406,63 @@ export async function discoverIn(box: AreaBox): Promise<DiscoveryResult> {
     dots,
     movers,
   };
+}
+
+/** A refusal of the real path, in the demo's refusal type (the cards read only that). */
+function refuse(e: unknown): never {
+  if (e instanceof RealAreaFailed) throw new AreaRefused('area:failed', e.message);
+  throw e;
+}
+
+/** The steps of a prepared area, from its stored counts (A18.3); nothing is computed here. */
+export function realSteps(r: RealDiscovery): DiscoveryStep[] {
+  const n = r.summary.steps;
+  const checked = `${n.n_found_blind} found blind, ${n.n_unexplained} unexplained` +
+    (n.n_unchecked > 0 ? `, ${n.n_unchecked} not checked` : '');
+  return [
+    { label: 'Find dots', result: `${n.n_dots} in ${r.summary.n_frames} frames` },
+    { label: 'Drop one-exposure glitches', result: `−${n.n_glitches}` },
+    { label: 'Drop stars (Gaia DR3, CatWISE)', result: `−${n.n_stars} stars, −${n.n_fixed} fixed` },
+    {
+      label: 'Join what moves across visits',
+      result: `${n.n_tracks} tracks` + (n.n_possible > 0 ? `, ${n.n_possible} possible` : ''),
+    },
+    { label: 'Check known objects (SkyBoT)', result: checked },
+  ];
+}
+
+/** A prepared area's tracks as the card's movers (verdicts as stored, A16.5). */
+export function realMovers(r: RealDiscovery): DiscoveryMover[] {
+  return (r.tracks?.tracks ?? []).map((t) => ({
+    id: t.track_id,
+    known: t.verdict === 'found_blind' && t.match ? matchName(t.match) : null,
+    kind: t.verdict === 'found_blind' ? 'known' : t.visits.length < 2 ? 'once' : 'unexplained',
+    pts: [],
+    visits: t.visits.length,
+    track: t,
+  }));
+}
+
+/**
+ * Known objects (A18.5): a prepared area's stored `/known` reply, else the demo (which refuses
+ * outside Eros's area). The demo also stands in when the index cannot be read (no backend); a
+ * prepared area whose `/known` fails, or breaks the contract, refuses with `area:failed`.
+ */
+export async function knownObjectsIn(box: AreaBox, signal?: AbortSignal): Promise<KnownObjectsResult> {
+  const api = getSkyApi();
+  const hit = await findArea(api, box, signal);
+  if (!hit) return demoKnownIn(box);
+  const real = await loadKnown(api, hit.entry, hit.fixture, signal).catch(refuse);
+  return { demo: false, real, objects: real.known.known.map(knownRow) };
+}
+
+/** Discovery: a prepared area's stored replies, else the demo (which refuses outside Eros's area). */
+export async function discoverIn(box: AreaBox, signal?: AbortSignal): Promise<DiscoveryResult> {
+  const api = getSkyApi();
+  const hit = await findArea(api, box, signal);
+  if (!hit) return demoDiscoverIn(box);
+  const real = await loadDiscovery(api, hit.entry, hit.fixture, signal).catch(refuse);
+  return { demo: false, real, steps: realSteps(real), dots: [], movers: realMovers(real) };
 }
 
 /** One entry point: the flow chosen in the dock decides what is asked. */

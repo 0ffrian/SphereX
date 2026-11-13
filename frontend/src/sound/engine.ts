@@ -4,12 +4,21 @@
 // `startTrain` / `updateTrain` / `stopTrain` for pulse trains; the engine applies the honesty gate,
 // the R8.3 rate cap and the strength multiplier, then fans every event out to all active drivers.
 // Drivers never know about objects. Nothing here runs at import time.
-import type { HapticChannel, HapticDriver, HapticEvent, HapticVoice, Tag } from '@/contract';
+import type {
+  HapticChannel,
+  HapticDriver,
+  HapticEvent,
+  HapticVoice,
+  Tag,
+  ToneId,
+  ToneParams,
+} from '@/contract';
 import { DEFAULT_HONESTY, isTagShown, type HonestyState } from '@/viewer/honesty';
 import { getUnlockState, unlockAudio } from './audioContext';
 import { AudioDriver } from './voices';
 import {
   MAX_EVENTS_PER_SECOND,
+  MAX_GROUP_NOTES,
   MIN_TICK_INTERVAL_MS,
   STRENGTH_MULTIPLIER_MAX,
   STRENGTH_MULTIPLIER_MIN,
@@ -18,6 +27,7 @@ import {
   TRAIN_MAX_RATE_HZ,
   TRAIN_MIN_RATE_HZ,
   TRAIN_WINDOW_MS,
+  TONE_UPDATE_MIN_MS,
 } from './tuning';
 
 export type {
@@ -29,6 +39,8 @@ export type {
   HapticProfile,
   TextureHaptic,
   DataHaptic,
+  ToneId,
+  ToneParams,
 } from '@/contract';
 
 /** D-20: the debug hook. A `CustomEvent<HapticEvent>` on `window` for every event that played. */
@@ -98,6 +110,34 @@ export function playsTrains(d: HapticDriver): d is TrainCapableDriver {
   return typeof (d as Partial<TrainCapableDriver>).playTrain === 'function';
 }
 
+/**
+ * A tone as the engine sends it to a driver (R8.8 tone stream, Q-189): the full current state,
+ * strength already multiplied by the strength multiplier and clamped to 0–1. The object is reused
+ * per tone: a driver must not keep it after the call returns.
+ */
+export interface ToneOutput {
+  readonly pitch: number;
+  readonly strength: number;
+  readonly tag: Tag;
+  readonly pan?: number;
+}
+
+/**
+ * A driver that plays sustained tones (R8.8, Q-189; audio only). `updateTone` for an id the driver
+ * is not playing starts it (with the fade in): that is how a tone started before the unlock, or
+ * while the sound was off, begins once output runs. `stop()` must also end every tone.
+ */
+export interface ToneCapableDriver extends HapticDriver {
+  startTone(id: ToneId, t: ToneOutput): void;
+  updateTone(id: ToneId, t: ToneOutput): void;
+  /** Fade the tone out and release its nodes. A no-op for an id that is not playing. */
+  stopTone(id: ToneId): void;
+}
+
+export function playsTones(d: HapticDriver): d is ToneCapableDriver {
+  return typeof (d as Partial<ToneCapableDriver>).startTone === 'function';
+}
+
 export interface SoundEngineOptions {
   /** Milliseconds, monotonic. Default `performance.now`. */
   clock?: () => number;
@@ -124,6 +164,18 @@ interface Train {
   /** Engine-clock time the pending timer fires. */
   wakeAt: number;
   readonly seq: number;
+}
+
+interface Tone {
+  readonly id: ToneId;
+  /** The caller's current params (a private copy, changed in place). */
+  readonly p: ToneParams;
+  /** Reused per send. */
+  readonly out: { pitch: number; strength: number; tag: Tag; pan?: number };
+  /** Engine-clock time of the last send to the drivers. */
+  lastSent: number;
+  /** A flush timer for coalesced updates, or null. */
+  timer: unknown;
 }
 
 /** updateTrain moves a pending timer only when its fire time changes by more than this (ms). */
@@ -183,6 +235,7 @@ export class SoundEngine {
   private lastTickLike = -Infinity;
 
   private train: Train | null = null;
+  private readonly tones = new Map<ToneId, Tone>();
   /** A one-shot is playing on a driver that cancels trains until this time. */
   private oneShotUntil = -Infinity;
 
@@ -220,10 +273,13 @@ export class SoundEngine {
     return this.honestyState;
   }
 
-  /** D-21. A running train whose tag the new state hides stops at once. */
+  /** D-21. A running train or tone whose tag the new state hides stops at once. */
   setHonesty(state: HonestyState): void {
     this.honestyState = state;
     if (this.train && !isTagShown(state, this.train.p.tag)) this.stopTrain();
+    for (const t of [...this.tones.values()]) {
+      if (!isTagShown(state, t.p.tag)) this.stopTone(t.id);
+    }
   }
 
   get strengthMultiplier(): number {
@@ -317,10 +373,134 @@ export class SoundEngine {
     return true;
   }
 
-  /** Stop everything: the train, every driver's pattern and every scheduled sound. */
+  /**
+   * Play the notes of one moment as ONE event (Q-458): an exposure tick sounds one note per frame at
+   * the same time (R8.9.2, two on Eros). The group passes the 25 ms tick gap and the 40 events/s cap
+   * once, as a single tick would; each note keeps its own honesty gate (a hidden note is silent, the
+   * others play). Returns the number of notes that played (0 when the group was refused or dropped).
+   * Every note must be a `tick`, `double` or `heartbeat` with a finite strength; at most
+   * MAX_GROUP_NOTES notes. Dropped groups are never queued.
+   */
+  emitTogether(notes: readonly HapticEvent[]): number {
+    const n = notes.length;
+    if (n === 0 || n > MAX_GROUP_NOTES) return 0;
+    let shown = 0;
+    for (const e of notes) {
+      if (e.kind === 'stop' || e.kind === 'pulseTrain' || !Number.isFinite(e.strength)) return 0;
+      if (isTagShown(this.honestyState, e.tag)) shown++;
+    }
+    if (shown === 0) return 0;
+    const now = this.clock();
+    if (now - this.lastTickLike < MIN_TICK_INTERVAL_MS) return 0;
+    if (!this.admit(now)) return 0;
+    this.lastTickLike = now;
+    let blockMs = 0;
+    for (const e of notes) {
+      if (!isTagShown(this.honestyState, e.tag)) continue;
+      const ev = this.prepare(e);
+      for (const d of this.active) {
+        if (!d.supported) continue;
+        d.emit(ev);
+        if (playsTrains(d)) blockMs = Math.max(blockMs, d.oneShotBlockMs(ev));
+      }
+      this.dispatchDebug(ev);
+    }
+    if (blockMs > 0) this.interruptTrain(now, now + blockMs);
+    return shown;
+  }
+
+  /** Stop everything: the train, every tone, every driver's pattern and every scheduled sound. */
   stop(): void {
     this.cancelTrain();
+    this.cancelTones();
     for (const d of this.drivers) d.stop();
+  }
+
+  // ------------------------------------------------------------ tone stream (R8.8, Q-189)
+
+  /**
+   * Start, or replace, the sustained tone `id` (R8.8). It fades in over TONE_FADE_IN_S. Returns
+   * false (and plays nothing; a tone already playing under `id` stops) when the honesty state hides
+   * `tag` or `strength` is not a finite number. A locked or suspended AudioContext, or the sound
+   * switch off, is not an error: the tone is kept and begins at the first `updateTone` after
+   * output runs.
+   */
+  startTone(id: ToneId, params: ToneParams): boolean {
+    if (!Number.isFinite(params.strength) || !isTagShown(this.honestyState, params.tag)) {
+      this.stopTone(id);
+      return false;
+    }
+    const prev = this.tones.get(id);
+    if (prev && prev.timer !== null) this.timers.clearTimeout(prev.timer);
+    const tone: Tone = {
+      id,
+      p: { ...params },
+      out: { pitch: 0, strength: 0, tag: params.tag },
+      lastSent: this.clock(),
+      timer: null,
+    };
+    this.tones.set(id, tone);
+    this.fillOut(tone);
+    for (const d of this.active) {
+      if (d.supported && playsTones(d)) d.startTone(id, tone.out);
+    }
+    return true;
+  }
+
+  /**
+   * Change the playing tone `id`: pitch, gain and pan glide (TONE_GLIDE_S). Call it as often as the
+   * pointer or the replay moves; sends are coalesced to one per TONE_UPDATE_MIN_MS (about one per
+   * frame; the last change always lands) and never count against the 40 events/s cap. A tag the
+   * honesty state hides stops the tone; a strength that is not finite is refused and the tone plays
+   * on unchanged. Returns false in those cases and when `id` is not playing (after `stop()`, a
+   * hidden page or a honesty change: call `startTone` again).
+   */
+  updateTone(id: ToneId, changes: Partial<ToneParams>): boolean {
+    const t = this.tones.get(id);
+    if (!t) return false;
+    const strength = changes.strength ?? t.p.strength;
+    if (!Number.isFinite(strength)) return false;
+    const tag = changes.tag ?? t.p.tag;
+    if (!isTagShown(this.honestyState, tag)) {
+      this.stopTone(id);
+      return false;
+    }
+    const p = t.p;
+    p.strength = strength;
+    p.tag = tag;
+    if (changes.pitch !== undefined) p.pitch = changes.pitch;
+    if ('pan' in changes) p.pan = changes.pan;
+    if ('voice' in changes) p.voice = changes.voice;
+    if ('channel' in changes) p.channel = changes.channel;
+    const now = this.clock();
+    if (now - t.lastSent >= TONE_UPDATE_MIN_MS) {
+      if (t.timer !== null) {
+        this.timers.clearTimeout(t.timer);
+        t.timer = null;
+      }
+      this.sendTone(t, now);
+    } else if (t.timer === null) {
+      t.timer = this.timers.setTimeout(() => {
+        t.timer = null;
+        if (this.tones.get(id) === t) this.sendTone(t, this.clock());
+      }, t.lastSent + TONE_UPDATE_MIN_MS - now);
+    }
+    return true;
+  }
+
+  /** Fade the tone `id` out (TONE_FADE_OUT_S) and release it. A no-op when it is not playing. */
+  stopTone(id: ToneId): void {
+    const t = this.tones.get(id);
+    if (!t) return;
+    if (t.timer !== null) this.timers.clearTimeout(t.timer);
+    t.timer = null;
+    this.tones.delete(id);
+    for (const d of this.drivers) if (playsTones(d)) d.stopTone(id);
+  }
+
+  /** Whether the tone `id` is held by the engine (it may still wait for output to run). */
+  hasTone(id: ToneId): boolean {
+    return this.tones.has(id);
   }
 
   // ------------------------------------------------------------ trains (Q-71)
@@ -405,6 +585,30 @@ export class SoundEngine {
   }
 
   // ------------------------------------------------------------ internals
+
+  private fillOut(t: Tone): void {
+    const o = t.out;
+    o.pitch = t.p.pitch;
+    o.strength = this.scale(t.p.strength);
+    o.tag = t.p.tag;
+    o.pan = t.p.pan;
+  }
+
+  private sendTone(t: Tone, now: number): void {
+    this.fillOut(t);
+    t.lastSent = now;
+    for (const d of this.active) {
+      if (d.supported && playsTones(d)) d.updateTone(t.id, t.out);
+    }
+  }
+
+  private cancelTones(): void {
+    for (const t of this.tones.values()) {
+      if (t.timer !== null) this.timers.clearTimeout(t.timer);
+      t.timer = null;
+    }
+    this.tones.clear();
+  }
 
   private stopTrainOutput(): void {
     for (const d of this.active) {

@@ -38,3 +38,27 @@ export interface HapticDriver {
   emit(e: HapticEvent): void;
   stop(): void;
 }
+
+/**
+ * R8.8 tone stream (Q-189, built in #77): the ids of the sustained tones. At most one tone per id.
+ * `path` is the Track path voice (R8.9.2); `body` is the body tone (R8.9.1, deferred by D-39).
+ */
+export type ToneId = 'body' | 'path';
+
+/**
+ * R8.8 tone stream (Q-189): what a source asks for when it starts or updates a sustained tone.
+ * Pitch, gain and pan glide while it plays. The tag sets the sustained timbre (R8.9, Q-190).
+ */
+export interface ToneParams {
+  /** 0–1, mapped to Hz as R8.9 (`pitch.ts`; `wavelengthToPitch` for a λ, Q-430). */
+  pitch: number;
+  /** 0–1 → continuous gain (× the strength multiplier and the volume), with the audible floor. */
+  strength: number;
+  tag: Tag;
+  /** −1 (left) to 1 (right). */
+  pan?: number;
+  /** Kept for R8.8 parity; a sustained tone's timbre follows `tag` only. */
+  voice?: HapticVoice;
+  /** Display hint (Q-85); drivers ignore it. */
+  channel?: HapticChannel;
+}
