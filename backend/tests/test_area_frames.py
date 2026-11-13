@@ -10,6 +10,7 @@ import sys
 from dataclasses import fields
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 import httpx
 import jsonschema
@@ -350,8 +351,9 @@ def test_failed_cones_make_the_result_incomplete_before_any_cutout(tmp_path: Pat
 
 
 def test_a_failed_cone_keeps_the_dates_of_the_cones_that_answered(tmp_path: Path) -> None:
-    """Issue #140 review: the early return on a failed cone still carries ``sia_fetched``, so
-    ``AreaResult.times`` can date the run from the cones that were read (Q-420 (9))."""
+    """Issue #140 review: the early return on a failed cone still carries ``sia_fetched``, so the
+    field means "every SIA cone body read" on every return (a consistency fix: an incomplete
+    ``AreaFrames`` is never stored, so it never dates a run)."""
     ctx = make_context(make_settings(tmp_path, offline=True))
     _, body = next((m, b) for m, b in entries("irsa_sia") if m["key"]["query"]["ra"] == "90.40961")
     for ra, dec in cone_grid(AreaBox.of(EROS_AREA), 0.25)[1:]:  # cone 0 is never cached
@@ -493,19 +495,42 @@ def test_the_cached_grid_shares_read_only_centres_and_keeps_a_few_sizes() -> Non
     assert cell_grid(box, 30.0) is not grid  # evicted once more sizes were used since
 
 
-def test_two_threads_on_one_grid_share_one_build_of_its_centres() -> None:
+def test_two_threads_on_one_grid_share_one_build_of_its_centres(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """``cached_property`` has no lock in Python 3.12, so without the grid's own lock threads that
+    reach a cold grid together each build its centres. A slow, counting build and a barrier make
+    that race certain, so the test fails without the lock instead of passing by luck."""
+    import functools
     import threading
+    import time
 
-    from app.core.area.geometry import cell_grid
+    from app.core.area.geometry import CellGrid, cell_grid
 
+    real = CellGrid.__dict__["_centres"].func
+    builds: list[int] = []
+
+    def slow(self: CellGrid) -> Any:
+        builds.append(1)
+        time.sleep(0.05)
+        return real(self)
+
+    prop = functools.cached_property(slow)
+    prop.__set_name__(CellGrid, "_centres")
+    monkeypatch.setattr(CellGrid, "_centres", prop)
     box = AreaBox(10.0, 0.0, 0.3, 0.2)
+    n = 4
+    start = threading.Barrier(n)
     got: list[object] = []
-    threads = [
-        threading.Thread(target=lambda: got.append(cell_grid(box, 17.0).centres()[0]))
-        for _ in range(4)
-    ]
+
+    def run() -> None:
+        start.wait()
+        got.append(cell_grid(box, 17.0).centres()[0])
+
+    threads = [threading.Thread(target=run) for _ in range(n)]
     for t in threads:
         t.start()
     for t in threads:
         t.join()
-    assert len(got) == 4 and all(g is got[0] for g in got)
+    assert len(builds) == 1
+    assert len(got) == n and all(g is got[0] for g in got)

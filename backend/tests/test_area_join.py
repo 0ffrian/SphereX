@@ -263,9 +263,9 @@ def test_a_refused_chain_never_serves_a_pair_rate_outside_the_whole_span_window(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Each pair passes its own window, but the span's (diagonal / span) is tighter than every
-    pair's rate: the track is served without a rate rather than with one the chain broke."""
+    pair's rate: the real chain fit (0.5 deg/day) is refused by that window, and the track is
+    served without a rate rather than with one the chain broke."""
     labels, geo, frames = _three_visit_join_inputs()
-    monkeypatch.setattr(join, "chain_fit", lambda *_a, **_k: None)
     span_max = 0.3  # below the 1-2 (0.45) and 2-3 pair rates, above the pairs' own windows' floor
     real = AreaGeometry.rate_max_for
 

@@ -182,7 +182,8 @@ def chain_fit(
     cfg: AreaConfig = DEFAULT_AREA_CONFIG,
 ) -> tuple[Vec, float | None] | None:
     """``(v_AB, u)`` of a track over all its legs (issue #128 (4)), or ``None`` when that fit fails
-    the pair test's own limits (the caller then keeps the first pair's fit, which passed).
+    the pair test's own limits (the caller, ``join``, then serves the first consecutive pair's fit
+    whose rate lies inside the chain's window, or no rate at all when no pair's does).
 
     ``v_AB`` is the slope of the least-squares line through the legs' positions at their
     ``t_ref``, equal weights, and must lie in ``[rate_min, rate_max]`` (the caller passes the
