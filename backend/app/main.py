@@ -97,6 +97,7 @@ def create_app(
     # Issue #41: a capped web request (/frames, /spectrum, overlays) downloads no cutouts itself;
     # it starts or joins the object's job, which downloads them in the shared bounded pool.
     app.state.frames.on_request = app.state.pipeline.request_frames
+    app.state.frames.on_track_request = app.state.pipeline.request_track_frames
     app.state.aliases = load_aliases(s.targets_file)
     # Gemini layer (issue #14): no key -> client None, the layer is off and the code colour shows.
     app.state.gemini = GeminiPainter(s, ctx.cache, make_client(s, transport=transport))
@@ -107,7 +108,11 @@ def create_app(
         app.add_middleware(
             CORSMiddleware,
             allow_origins=s.cors_list,
-            allow_methods=["GET"],
+            # GET, and POST for Track on demand (issue #142). This also lets a browser on an
+            # allowed origin send the other POSTs (POST /v1/areas/live, #141, has its own 429
+            # queue cap); the admin POST stays curl-only because its X-SX-Admin-Token header is
+            # not an allowed header.
+            allow_methods=["GET", "POST"],
             # Let the browser read the D-16 cached_at, the asset status (Q-39) and the
             # combine metadata (Q-50).
             expose_headers=[

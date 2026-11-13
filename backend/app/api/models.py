@@ -75,6 +75,8 @@ class FramesResponse(BaseModel):
     missing: list[str]
     north_up: bool
     provenance: dict[str, Provenance] | None = Field(default=None)
+    # Track on demand (Q-468): the window asked for, ``[start, end]`` UTC; absent otherwise.
+    track_window: list[str] | None = None
 
 
 # Overlays (issue #12; Q-50). Contract shared with the frontend overlay UI: do not rename.
@@ -173,3 +175,8 @@ class JobStatus(BaseModel):
     finished_at: str | None = None
     error: str | None = None
     seq: int | None = None
+    # A Track on demand job only (Q-468): its window ``[start, end]`` UTC, and once it is done
+    # whether Track is ready for that window (A19.12) and, if not, why (a ``track.check`` code).
+    track_window: list[str] | None = None
+    track_available: bool | None = None
+    reason: str | None = None
