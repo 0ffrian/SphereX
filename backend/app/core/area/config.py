@@ -296,6 +296,91 @@ def area_key(release: str, area_id: str, stage: str, params: str) -> CacheKey:
     return CacheKey.make(AREA_SOURCE, release, id=area_id, v=AREA_VERSION, stage=stage, p=params)
 
 
+# --- spectrum check (A17.13, Q-474, Q-475) -------------------------------------------------
+#
+# Its own version and settings sha, never in ``method_settings``: a change here must not alter
+# the area's ``settings_sha`` (``AreaStore._head`` would refuse every stored area until it is
+# recomputed). The values live here, not in ``spectrum.py``, because the read side (``store``)
+# needs the key and ``app.main`` must not import the computation (A16.2, ``AREA_READ_SIDE``).
+
+# Bump when the spectrum check changes in a way that changes results.
+SPECTRUM_VERSION = "spectrum-1"
+SPECTRA_STAGE = "spectra"
+SUN_TABLE = Path(__file__).resolve().parents[3] / "assets" / "solar" / "sun.json"
+
+
+@dataclass(frozen=True)
+class SpectrumConfig:
+    """Starting values of the spectrum check (Q-475); every one is written into ``method``."""
+
+    snr_min: float = 3.0  # step 1: a dot at or above this is a point
+    dichroic_um: float = 2.42  # step 1: short arm below, long arm at or above (arXiv:2511.02985)
+    star_snr_min: float = 30.0  # step 2: calibration stars
+    star_match_arcsec: float = 4.0  # step 2
+    star_pairs_min: int = 10  # step 2: fewer and sigma_sys is the default
+    sigma_sys_default: float = 0.06  # step 2
+    limit_snr_min: float = 5.0  # step 3: the measured dot of a limit
+    limit_sigma: float = 2.0  # step 3: limit = max(F, 0) + 2 sigma
+    pair_sigma: float = 2.0  # step 7: a pair is outside a bound by more than 2 sigma_rho
+    informative_snr: float = 3.0  # step 7: rho / sigma_rho for an informative pair
+    r_min: float = 0.6  # step 5 [verify V-S2]
+    r_max: float = 3.0  # step 5 [verify V-S2]
+    pv_min: float = 0.03  # step 5
+    pv_max: float = 0.5  # step 5
+    eta_min: float = 0.7  # step 5
+    eta_max: float = 2.0  # step 5
+    emissivity: float = 0.9  # step 5 (NEATM, Harris 1998)
+    phase_integral: float = 0.39  # step 5: q in A = q p_V
+    hg_g: float = 0.15  # step 5: HG slope of the reflected term
+    a_max_mag: float = 1.0  # step 6 [verify V-S5]
+    p_min_h: float = 2.2  # step 6: spin barrier (Pravec and Harris 2000) [verify V-S5]
+    slope_short: float = 4.0  # step 6
+    slope_long: float = 15.0  # step 6
+    step_sigma: float = 3.0  # step 6: fails when |c| > a + 3 sigma_c
+
+
+DEFAULT_SPECTRUM_CONFIG = SpectrumConfig()
+
+
+@lru_cache(maxsize=4)
+def _file_sha(path: str, mtime_ns: int) -> str:
+    del mtime_ns  # memo key only
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
+def sun_table_sha(path: Path = SUN_TABLE) -> str:
+    """SHA-256 of the committed solar table; part of the spectrum settings, so a new table
+    makes every stored ``spectra`` stage outdated (the backfill rewrites them)."""
+    return _file_sha(str(path), path.stat().st_mtime_ns)
+
+
+def spectrum_settings(cfg: SpectrumConfig = DEFAULT_SPECTRUM_CONFIG) -> dict[str, Setting]:
+    """``method.settings`` of the spectrum check; their sha is the ``s`` of the key."""
+    out: dict[str, Setting] = {f.name: getattr(cfg, f.name) for f in fields(SpectrumConfig)}
+    out["spectrum_version"] = SPECTRUM_VERSION
+    out["sun_sha256"] = sun_table_sha()
+    return out
+
+
+def spectra_settings_sha(cfg: SpectrumConfig = DEFAULT_SPECTRUM_CONFIG) -> str:
+    text = json.dumps(spectrum_settings(cfg), sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(text.encode("ascii")).hexdigest()
+
+
+def spectra_key(release: str, area_id: str, params: str, settings: str) -> CacheKey:
+    """Key of an area's ``spectra`` stage (Q-474): the area's ``params_hash`` and the sha of
+    the spectrum settings, so a threshold change needs only the backfill."""
+    return CacheKey.make(
+        AREA_SOURCE,
+        release,
+        id=area_id,
+        v=SPECTRUM_VERSION,
+        stage=SPECTRA_STAGE,
+        p=params,
+        s=settings,
+    )
+
+
 # --- [[area]] loader -----------------------------------------------------------------------
 
 

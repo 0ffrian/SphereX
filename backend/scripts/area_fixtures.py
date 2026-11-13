@@ -44,7 +44,15 @@ OUT_DIR = BACKEND_DIR.parent / "shared" / "fixtures" / "area"
 PIXEL_DEG = 6.15 / 3600.0  # SPHEREx pixel (A17 "Units and symbols")
 SYNTHETIC = "synthetic fixture"
 DATA_RELEASE = "synthetic_fixture"
-FILES = ("summary.json", "known.json", "dots.json", "tracks.json", "checks.json", "export.ecsv")
+FILES = (
+    "summary.json",
+    "known.json",
+    "dots.json",
+    "tracks.json",
+    "checks.json",
+    "spectra.json",
+    "export.ecsv",
+)
 
 # Synthetic detector bands (um) and resolving power, only to give each dot a wavelength.
 BANDS: dict[int, tuple[float, float]] = {
@@ -77,13 +85,7 @@ SETTINGS: dict[str, int | float | str] = {
     "rate_max_deg_day": 1.2,
     "r_known_min_px": 3.0,
     "v_lim": 22.0,
-    "sed_snr_min": 3.0,
-    "sed_min_dots": 6,
-    "sed_sigma_floor": 0.15,
-    "sed_chi2_max": 3.0,
 }
-SED_CHI2_MAX = 3.0
-SED_SIGMA_FLOOR = 0.15
 
 ORBIT_ASSUMPTION = (
     "orbit solutions from SkyBoT (candidates) and JPL Horizons (positions) as of fetched_at, "
@@ -156,12 +158,6 @@ PROV_TRACKS_BASE = {
         "source": _src("made-up known objects"),
         "assumption": ORBIT_ASSUMPTION,
     },
-}
-PROV_SED = {
-    "tag": "derived",
-    "source": _src("made-up scores"),
-    "formula": "weighted degree-2 fit of ln F against ln wavelength, chi2_red against "
-    "sed_chi2_max (A17.13)",
 }
 PROV_CHECKS = {
     "test_mover": {
@@ -458,20 +454,6 @@ def _wilson(k: int, n: int) -> list[float]:
     return [_r(max(0.0, centre - half), 4), _r(min(1.0, centre + half), 4)]
 
 
-def _sed(dots: list[Dot], chi2: float | None) -> dict[str, Any]:
-    used = [d for d in dots if d.flux / d.err >= float(SETTINGS["sed_snr_min"])]
-    detectors = {d.frame.detector for d in used}
-    if len(used) < int(SETTINGS["sed_min_dots"]) or len(detectors) < 2 or chi2 is None:
-        return {
-            "label": "too_few",
-            "chi2_red": None,
-            "n_dots": len(used),
-            "sigma_floor": SED_SIGMA_FLOOR,
-        }
-    label = "smooth" if chi2 <= SED_CHI2_MAX else "rough"
-    return {"label": label, "chi2_red": chi2, "n_dots": len(used), "sigma_floor": SED_SIGMA_FLOOR}
-
-
 def _tracklets(m: Mover, dots: list[Dot]) -> list[dict[str, Any]]:
     out = []
     for v in sorted({d.frame.visit for d in dots}):
@@ -498,7 +480,6 @@ def _track(
     match: dict[str, Any] | None,
     linker: str,
     unchecked_by: list[str],
-    chi2: float | None,
 ) -> dict[str, Any]:
     paired = status == "track"
     return {
@@ -514,7 +495,6 @@ def _track(
         "match": match,
         "linker": linker,
         "unchecked_by": sorted(unchecked_by),
-        "sed": _sed(dots, chi2),
     }
 
 
@@ -748,7 +728,6 @@ def main_area() -> tuple[dict[str, Any], dict[str, str]]:
                 match=match,
                 linker="pairs",
                 unchecked_by=[],
-                chi2=1.2,
             ),
             by_mover["A1"],
         ),
@@ -762,7 +741,6 @@ def main_area() -> tuple[dict[str, Any], dict[str, str]]:
                 match=None,
                 linker="pairs",
                 unchecked_by=[],
-                chi2=7.8,
             ),
             by_mover["U1"],
         ),
@@ -776,7 +754,6 @@ def main_area() -> tuple[dict[str, Any], dict[str, str]]:
                 match=None,
                 linker="pairs",
                 unchecked_by=[horizons],
-                chi2=1.9,
             ),
             by_mover["A2"],
         ),
@@ -790,7 +767,6 @@ def main_area() -> tuple[dict[str, Any], dict[str, str]]:
                 match=None,
                 linker="pairs",
                 unchecked_by=[],
-                chi2=None,
             ),
             by_mover["R1"],
         ),
@@ -815,13 +791,27 @@ def main_area() -> tuple[dict[str, Any], dict[str, str]]:
             "tracks": tracks,
             "skybot": skybot,
             **_head(spec, tracks_missing),
-            "provenance": {**PROV_TRACKS_BASE, "sed": PROV_SED},
+            "provenance": PROV_TRACKS_BASE,
         },
         "checks.json": checks,
     }
     union = [m for r in replies.values() for m in r["missing"]]
     replies["summary.json"] = _summary(spec, steps, union)
+    replies["spectra.json"] = _spectra(replies)
     return _index_entry(spec), _serialise(spec, replies)
+
+
+def _spectra(replies: dict[str, Any]) -> dict[str, Any]:
+    """The real spectrum check (A17.13) run on the synthetic replies, so the fixture has the
+    shape and the rules of the code; its provenance sources say synthetic, as every other."""
+    from app.core.area.spectrum import compute_spectra
+    from app.core.card.validate import check
+
+    reply = compute_spectra(replies["summary.json"], replies["dots.json"], replies["tracks.json"])
+    for entry in reply["provenance"].values():
+        entry["source"] = _src(entry["source"])
+    check(reply, "area-spectra.schema.json")
+    return reply
 
 
 def _main_checks(spec: Spec, frames: list[Frame]) -> dict[str, Any]:
@@ -923,7 +913,6 @@ def multivisit_area() -> tuple[dict[str, Any], dict[str, str]]:
                 match=None,
                 linker="rate_grid",
                 unchecked_by=[],
-                chi2=1.4,
             ),
             by_mover["F1"],
         )
@@ -938,7 +927,7 @@ def multivisit_area() -> tuple[dict[str, Any], dict[str, str]]:
             "tracks": tracks,
             "skybot": skybot,
             **_head(spec, []),
-            "provenance": {**PROV_TRACKS_BASE, "sed": PROV_SED},
+            "provenance": PROV_TRACKS_BASE,
         },
         "checks.json": _not_run_checks(spec),
     }
@@ -952,7 +941,7 @@ def _dump(data: Any) -> str:
 
 
 def _serialise(spec: Spec, replies: dict[str, Any]) -> dict[str, str]:
-    out = {name: _dump(replies[name]) for name in FILES if name.endswith(".json")}
+    out = {name: _dump(replies[name]) for name in FILES if name in replies}
     out["export.ecsv"] = _ecsv(spec)
     return out
 
