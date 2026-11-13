@@ -22,7 +22,7 @@ from app.core.area.match import Candidate
 from app.core.find import moving
 from app.core.find.frames import FrameService, object_frames_key
 from app.core.find.resolver import is_comet, load_object
-from app.core.measure.config import DEFAULT_CONFIG
+from app.core.measure.config import DEFAULT_CONFIG, config_for
 from app.core.measure.spectrum import SpectrumService, cached_spectrum_key
 from app.main import create_app
 from scripts import area_discovery, prefetch
@@ -79,7 +79,7 @@ def _keys(ctx: Context) -> dict[str, list[Any]]:
         fr = fs.get_frames(obj)
     finally:
         fs.close()
-    spectrum = cached_spectrum_key(ctx, obj.id, fr, DEFAULT_CONFIG)
+    spectrum = cached_spectrum_key(ctx, obj.id, fr, config_for(obj.moving, DEFAULT_CONFIG))
     assert spectrum is not None
     return {"frames": [frames_key], "path": path[:1], "spectrum": [spectrum]}
 

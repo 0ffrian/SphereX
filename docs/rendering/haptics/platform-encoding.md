@@ -53,6 +53,6 @@ A change of state stops at once any sound the new state hides (a train, a tone, 
 - **Strength → level:** `strength` (0–1, times the user multiplier) maps to **3–4 discrete levels**: soft, medium, firm, plus the whisper if calibration found it distinct ([§8.7](calibration.md#r87-calibration-and-settings)). Split 0–1 into equal bins, one per level the device can render.
 - **Fine detail lives in time, not strength:** rhythm, pulse rate and spacing carry it, together with the paired audio ([§8.9](audio-pairing.md#r89-audio-pairing-d-10)), which has continuous gain.
 - **Pattern length:** Chrome caps the pattern array, believed at about 99 entries **[verify]** (R12 #9). Keep patterns short; the 250 ms train windows keep each call short.
-- **Rate limit:** at most 40 events per second, with ≥25 ms between ticks; drop extra events rather than queue them. This applies to the audio driver at the event too.
+- **Rate limit:** at most 40 events per second, with ≥25 ms between ticks; drop extra events rather than queue them (a grouped exposure tick counts once, [Q-458](../../decisions/sound-ambience.md)). This applies to the audio driver at the event too.
 - **Roughness:** irregular spacing, with ±30% jitter from a seeded RNG.
 - **Continuous tone:** vibration cannot carry the body tone. After the event the vibrate driver plays the R8.4 height ticks instead (**Proposed (Q-192)**).

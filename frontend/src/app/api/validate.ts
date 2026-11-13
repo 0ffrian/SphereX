@@ -30,7 +30,21 @@ import type {
   SpectrumPoint,
   SpectrumResponse,
 } from './types';
-import { OBJECT_TYPES, TAGS, type ObjectCard, type RenderParams, type Tag } from '@/contract';
+import {
+  AREA_DOT_LABELS,
+  AREA_VERDICTS,
+  OBJECT_TYPES,
+  TAGS,
+  type AreaDots,
+  type AreaIndex,
+  type AreaKnown,
+  type AreaSummary,
+  type AreaTracks,
+  type ObjectCard,
+  type RenderParams,
+  type Tag,
+  type TrackPath,
+} from '@/contract';
 
 type Obj = Readonly<Record<string, unknown>>;
 
@@ -685,4 +699,265 @@ export function parseRenderParams(raw: unknown): RenderParams {
   });
   strList(o, 'missing', p);
   return raw as RenderParams;
+}
+
+// ---- Area search (A17.8; issue #96, P8) ---------------------------------------------------------
+// Each reply is checked for every field the sky layers and the Area card read (red-team L18: P9
+// extends the checks for the fields it reads), then returned as is, like the card above. A reply
+// that fails is refused whole; nothing is defaulted.
+
+const AREA_TAGS = ['measured', 'derived', 'model_dependent'] as const;
+
+function areaProvenance(o: Obj, key: string, path: string): void {
+  const e = obj(o[key], `${path}.${key}`);
+  const tag = oneOf(e, 'tag', `${path}.${key}`, AREA_TAGS);
+  const text = (k: string) => (typeof e[k] === 'string' ? (e[k] as string).trim() : '');
+  if (tag === 'derived' && !text('formula')) {
+    fail(`${path}.${key}.formula`, 'a derived value needs a formula');
+  }
+  if (tag === 'model_dependent' && !text('assumption')) {
+    fail(`${path}.${key}.assumption`, 'a model_dependent value needs an assumption');
+  }
+}
+
+function raDec(o: Obj, path: string): void {
+  const ra = num(o, 'ra', path);
+  const dec = num(o, 'dec', path);
+  if (ra < 0 || ra >= 360) fail(`${path}.ra`, 'expected 0 ≤ RA < 360');
+  if (dec < -90 || dec > 90) fail(`${path}.dec`, 'expected −90 ≤ Dec ≤ 90');
+}
+
+function positive(o: Obj, key: string, path: string): number {
+  const v = num(o, key, path);
+  if (v <= 0) fail(`${path}.${key}`, 'expected a positive number');
+  return v;
+}
+
+/** The fields an area entry and a summary share (A17.8). */
+function areaBox(o: Obj, path: string): void {
+  str(o, 'area_id', path);
+  raDec(o, path);
+  positive(o, 'width_deg', path);
+  positive(o, 'height_deg', path);
+  str(o, 'data_release', path);
+  nonNeg(o, 'n_frames', path);
+  nonNeg(o, 'n_visits', path);
+  time(o, 'computed_at', path);
+  time(o, 'cached_at', path);
+}
+
+/** `GET /v1/areas` (A17.8). */
+export function parseAreaIndex(raw: unknown): AreaIndex {
+  const p = 'areas';
+  const o = obj(raw, p);
+  arr(o, 'areas', p).forEach((a, i) => areaBox(obj(a, `${p}.areas[${i}]`), `${p}.areas[${i}]`));
+  nullableTime(o, 'cached_at', p);
+  nullableTime(o, 'computed_at', p);
+  strList(o, 'missing', p);
+  areaProvenance(obj(o.provenance, `${p}.provenance`), 'areas', `${p}.provenance`);
+  return raw as AreaIndex;
+}
+
+/** `GET /v1/areas/{area_id}` (A17.8): the box, frames (visits and times) and step counts. */
+export function parseAreaSummary(raw: unknown): AreaSummary {
+  const p = 'area';
+  const o = obj(raw, p);
+  areaBox(o, p);
+  arr(o, 'frames', p).forEach((f, i) => {
+    const path = `${p}.frames[${i}]`;
+    const fo = obj(f, path);
+    str(fo, 'frame_id', path);
+    num(fo, 'visit', path);
+    num(fo, 'detector', path);
+    time(fo, 'time', path);
+    num(fo, 'wavelength_min_um', path);
+    num(fo, 'wavelength_max_um', path);
+  });
+  const steps = obj(o.steps, `${p}.steps`);
+  for (const k of [
+    'n_dots',
+    'n_glitches',
+    'n_stars',
+    'n_fixed',
+    'n_tracks',
+    'n_possible',
+    'n_found_blind',
+    'n_unexplained',
+    'n_unchecked',
+  ]) {
+    nonNeg(steps, k, `${p}.steps`);
+  }
+  strList(o, 'missing', p);
+  const prov = obj(o.provenance, `${p}.provenance`);
+  for (const k of ['frames', 'coverage', 'steps']) areaProvenance(prov, k, `${p}.provenance`);
+  return raw as AreaSummary;
+}
+
+/** `GET /v1/areas/{area_id}/dots` (A17.8). */
+export function parseAreaDots(raw: unknown): AreaDots {
+  const p = 'dots';
+  const o = obj(raw, p);
+  arr(o, 'visits', p).forEach((v, i) => {
+    const vp = `${p}.visits[${i}]`;
+    const vo = obj(v, vp);
+    num(vo, 'visit', vp);
+    arr(vo, 'dots', vp).forEach((d, j) => {
+      const dp = `${vp}.dots[${j}]`;
+      const dov = obj(d, dp);
+      str(dov, 'dot_id', dp);
+      str(dov, 'frame_id', dp);
+      time(dov, 'time', dp);
+      raDec(dov, dp);
+      positive(dov, 'wavelength_um', dp);
+      strList(dov, 'flags', dp);
+      oneOf(dov, 'label', dp, AREA_DOT_LABELS);
+    });
+  });
+  time(o, 'cached_at', p);
+  time(o, 'computed_at', p);
+  strList(o, 'missing', p);
+  const prov = obj(o.provenance, `${p}.provenance`);
+  for (const k of ['position', 'photometry', 'wavelength', 'label']) {
+    areaProvenance(prov, k, `${p}.provenance`);
+  }
+  return raw as AreaDots;
+}
+
+const TRACK_STATUSES = ['track', 'possible'] as const;
+const TRACK_REASONS = ['ambiguous', 'no_partner', 'one_visit'] as const;
+
+/** `GET /v1/areas/{area_id}/tracks` (A17.8): tracklets as dot ids (Q-208 (2)), verdict, match. */
+export function parseAreaTracks(raw: unknown): AreaTracks {
+  const p = 'tracks';
+  const o = obj(raw, p);
+  arr(o, 'tracks', p).forEach((t, i) => {
+    const tp = `${p}.tracks[${i}]`;
+    const to = obj(t, tp);
+    str(to, 'track_id', tp);
+    arr(to, 'visits', tp).forEach((v, j) => {
+      if (typeof v !== 'number' || !Number.isFinite(v))
+        fail(`${tp}.visits[${j}]`, 'expected a number');
+    });
+    const tracklets = arr(to, 'tracklets', tp);
+    if (tracklets.length === 0) fail(`${tp}.tracklets`, 'expected at least one tracklet');
+    tracklets.forEach((tl, j) => {
+      const lp = `${tp}.tracklets[${j}]`;
+      const lo = obj(tl, lp);
+      num(lo, 'visit', lp);
+      if (strList(lo, 'dot_ids', lp).length === 0) fail(`${lp}.dot_ids`, 'expected at least one');
+    });
+    oneOf(to, 'status', tp, TRACK_STATUSES);
+    if (to.reason !== null) oneOf(to, 'reason', tp, TRACK_REASONS);
+    oneOf(to, 'verdict', tp, AREA_VERDICTS);
+    if (!('match' in to)) fail(`${tp}.match`, 'expected an object or null');
+    if (to.match !== null) {
+      const mo = obj(to.match, `${tp}.match`);
+      str(mo, 'designation', `${tp}.match`);
+      nullableNum(mo, 'number', `${tp}.match`);
+    }
+  });
+  time(o, 'cached_at', p);
+  time(o, 'computed_at', p);
+  strList(o, 'missing', p);
+  const prov = obj(o.provenance, `${p}.provenance`);
+  for (const k of ['tracks', 'match']) areaProvenance(prov, k, `${p}.provenance`);
+  return raw as AreaTracks;
+}
+
+/** A whole number of `min` or more (counts, visit numbers, catalogue numbers). */
+function whole(o: Obj, key: string, path: string, min: number): number {
+  const v = num(o, key, path);
+  if (!Number.isInteger(v) || v < min) fail(`${path}.${key}`, `expected a whole number of ${min} or more`);
+  return v;
+}
+
+const KNOWN_KINDS = ['asteroid', 'comet'] as const;
+
+/** `GET /v1/areas/{area_id}/known` (A17.8, A17.5): the Known card's rows (issue #130). */
+export function parseAreaKnown(raw: unknown): AreaKnown {
+  const p = 'known';
+  const o = obj(raw, p);
+  arr(o, 'known', p).forEach((k, i) => {
+    const kp = `${p}.known[${i}]`;
+    const ko = obj(k, kp);
+    str(ko, 'designation', kp);
+    if (ko.number !== null) whole(ko, 'number', kp, 1);
+    nullableStr(ko, 'object_id', kp);
+    oneOf(ko, 'kind', kp, KNOWN_KINDS);
+    nullableNum(ko, 'v_mag', kp);
+    whole(ko, 'n_frames', kp, 1);
+    whole(ko, 'n_visits', kp, 1);
+    bool(ko, 'track_available', kp);
+    arr(ko, 'positions', kp).forEach((pos, j) => {
+      const pp = `${kp}.positions[${j}]`;
+      const po = obj(pos, pp);
+      str(po, 'frame_id', pp);
+      time(po, 'time', pp);
+      raDec(po, pp);
+    });
+  });
+  arr(o, 'skybot', p).forEach((sb, i) => {
+    const sp = `${p}.skybot[${i}]`;
+    const so = obj(sb, sp);
+    whole(so, 'visit', sp, 1);
+    nullableTime(so, 'fetched_at', sp);
+  });
+  time(o, 'cached_at', p);
+  time(o, 'computed_at', p);
+  strList(o, 'missing', p);
+  const prov = obj(o.provenance, `${p}.provenance`);
+  for (const k of ['positions', 'skybot']) areaProvenance(prov, k, `${p}.provenance`);
+  return raw as AreaKnown;
+}
+
+const PATH_CODES = [
+  'path:deferred',
+  'path:not_cached',
+  'path:observer',
+  'path:ephemeris',
+  'path:window',
+  'path:frames_incomplete',
+] as const;
+
+/** `GET /v1/objects/{id}/path` (A19.5, Q-141; issue #130): model_dependent by contract. */
+export function parseTrackPath(raw: unknown): TrackPath {
+  const p = 'path';
+  const o = obj(raw, p);
+  str(o, 'id', p);
+  if (o.observer !== '500@-163182') fail(`${p}.observer`, 'expected the SPHEREx observer 500@-163182');
+  whole(o, 'step_min', p, 1);
+  if (o.interp_error_arcsec !== null && num(o, 'interp_error_arcsec', p) < 0) {
+    fail(`${p}.interp_error_arcsec`, 'expected 0 or more');
+  }
+  nullableTime(o, 'fetched_at', p);
+  nullableTime(o, 'cached_at', p);
+  if (o.tag !== 'model_dependent') fail(`${p}.tag`, 'expected model_dependent');
+  str(o, 'assumption', p);
+  str(o, 'formula', p);
+  arr(o, 'points', p).forEach((r, i) => {
+    const q = `${p}.points[${i}]`;
+    const e = obj(r, q);
+    time(e, 'time', q);
+    raDec(e, q);
+  });
+  arr(o, 'frame_points', p).forEach((r, i) => {
+    const q = `${p}.frame_points[${i}]`;
+    const e = obj(r, q);
+    time(e, 'time', q);
+    raDec(e, q);
+    if (str(e, 'frame_id', q) === '') fail(`${q}.frame_id`, 'expected a frame id');
+    for (const k of ['ra_3sigma_arcsec', 'dec_3sigma_arcsec']) {
+      if (e[k] !== null && num(e, k, q) < 0) fail(`${q}.${k}`, 'expected 0 or more');
+    }
+  });
+  arr(o, 'windows', p).forEach((r, i) => {
+    const q = `${p}.windows[${i}]`;
+    const w = obj(r, q);
+    time(w, 'start', q);
+    time(w, 'end', q);
+  });
+  strList(o, 'missing', p).forEach((c, i) => {
+    if (!(PATH_CODES as readonly string[]).includes(c)) fail(`${p}.missing[${i}]`, 'expected a path refusal code');
+  });
+  return raw as TrackPath;
 }

@@ -55,6 +55,8 @@ export function trackAt(eros: ErosDemo, mjd: number): [number, number] {
     if (mjd <= mb) {
       const a = T[i - 1]!;
       const ma = isoToMjd(a.t);
+      // Across a gap between windows nothing is known: the marker holds at the nearer end.
+      if (b.gap) return mjd - ma <= mb - mjd ? a.px : b.px;
       const f = (mjd - ma) / (mb - ma);
       return [a.px[0] + f * (b.px[0] - a.px[0]), a.px[1] + f * (b.px[1] - a.px[1])];
     }

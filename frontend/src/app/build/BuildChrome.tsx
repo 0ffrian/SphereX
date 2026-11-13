@@ -1,20 +1,12 @@
 // Issue #71 stream U (Q-294): the two floating panels of the mock-up's build view that sit at the
-// bottom of the screen: the zoom bar (bottom left, `.zoom`: minus, the zoom, plus) and the tool
-// dock (bottom centre, `.dock`: target, audio, area, then search; the mock-up's haptics button is cut, D-39). Both are shell chrome in
-// the mock-up and are drawn here only while the build is open, on a desktop width (a phone keeps
-// the tab bar). Each button does a real thing or says it cannot:
+// bottom of the screen: the zoom bar (bottom left, `.zoom`: minus, the zoom, plus), and beside it
+// "Read paper" (Q-457). The mock-up's tool dock is not drawn in the build view (Moon, 13 Nov 2026,
+// Q-457). Drawn only while the build is open, on a desktop width (a phone keeps the tab bar).
 //   zoom bar   -> the 3D view (ViewerApp.zoom / resetView; the value is its own zoom, 100% = as opened)
-//   target     -> back to the sky (closes the build)
-//   audio      -> the spectrum tool (the fingerprint chart; its Listen sweep is also in "Hear it")
-//   area       -> Area search: not built, shown disabled
-//   search     -> the search field
+//   Read paper -> the paper on how the bodies are generated (PROCEDURAL_PAPER_URL), once published
 import { useEffect, useState } from 'react';
 import { Icon } from '@/app/shell/icons';
-import { RailIcon } from '@/app/shell/railIcons';
-import { openTool } from '@/app/shell/ToolRail';
 import { useViewControls } from '@/app/engineView';
-import { closeBuildPane } from './focus';
-import type { PopId } from '@/app/ViewerPanel';
 
 /** "150%": the view's zoom against the view the body opened with. */
 export function zoomPercent(ratio: number): string {
@@ -87,66 +79,57 @@ export function ZoomBar() {
   );
 }
 
-// The props stay in the signature for the pane's call; the dock no longer opens a panel (Feel was removed on purpose).
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export function BuildDock(_props: { pop: PopId | null; onPop(p: PopId | null): void }) {
-  return (
-    <nav className="sx-fl sx-dock" aria-label="Tools and search" data-testid="build-dock">
-      <ul className="m-0 flex list-none gap-1 p-0">
-        <li>
-          <button
-            type="button"
-            className="sx-dtool"
-            data-active="true"
-            aria-label="Sky view. Closes the build."
-            title="Sky view (closes the build)"
-            onClick={closeBuildPane}
-            data-testid="dock-sky"
-          >
-            <RailIcon id="sky" />
-          </button>
-        </li>
-        <li>
-          <button
-            type="button"
-            className="sx-dtool"
-            aria-label="Spectrum. Opens the fingerprint chart and closes the build."
-            title="Spectrum"
-            onClick={() => openTool('spectrum')}
-            data-testid="dock-spectrum"
-          >
-            <RailIcon id="spectrum" />
-          </button>
-        </li>
-        <li>
-          <button
-            type="button"
-            className="sx-dtool"
-            disabled
-            aria-label="Area search. Not available yet."
-            title="Area search: not available yet"
-            data-testid="dock-area"
-          >
-            <Icon name="area" className="size-5" />
-          </button>
-        </li>
-      </ul>
-      <i className="sx-vsep" aria-hidden="true" />
+/**
+ * The paper on how the generated bodies are made (Moon, 13 Nov 2026, Q-457). The team is still
+ * writing it: set the link here when it is published. Until then the button says so and goes nowhere.
+ */
+export const PROCEDURAL_PAPER_URL: string | null = null;
+export const PAPER_PENDING = 'The paper is still being written.';
+
+/** Beside the zoom card: a paper icon that opens out to "Read paper" on hover or focus. */
+export function ReadPaper({ url = PROCEDURAL_PAPER_URL }: { url?: string | null }) {
+  // Before the paper exists a press says why (a touch screen has no hover and shows no tooltip).
+  const [note, setNote] = useState(false);
+  useEffect(() => {
+    if (!note) return;
+    const id = window.setTimeout(() => setNote(false), 4000);
+    return () => window.clearTimeout(id);
+  }, [note]);
+  const inner = (
+    <>
+      <Icon name="paper" className="size-[18px] flex-none" />
+      <span className="sx-paper-label">Read paper</span>
+    </>
+  );
+  return url ? (
+    <a
+      className="sx-fl sx-paper"
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label="Read paper: how the bodies are generated (opens in a new tab)"
+      data-testid="build-paper"
+    >
+      {inner}
+    </a>
+  ) : (
+    <>
       <button
         type="button"
-        className="sx-dtool"
-        aria-label="Search the sky"
-        aria-keyshortcuts="/"
-        title="Search (/)"
-        onClick={() => {
-          const input = document.querySelector<HTMLInputElement>('[data-testid="search-input"]');
-          input?.focus();
-          input?.select();
-        }}
-        data-testid="dock-search"
+        className="sx-fl sx-paper"
+        aria-disabled="true"
+        aria-label={`Read paper. ${PAPER_PENDING}`}
+        title={PAPER_PENDING}
+        onClick={() => setNote(true)}
+        data-testid="build-paper"
       >
-        <Icon name="search" className="size-5" />
+        {inner}
       </button>
-    </nav>
+      {note && (
+        <p className="sx-paper-note" role="status" data-testid="build-paper-note">
+          {PAPER_PENDING}
+        </p>
+      )}
+    </>
   );
 }

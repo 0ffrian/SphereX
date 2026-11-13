@@ -56,7 +56,7 @@ frontend/src/sound/                  (Atish: D-13, D-17; haptics cut and the aud
   tuning.ts           # every sound tuning constant, marked CREATIVE placeholder (D-13) or [verify]
   listenSweep.ts      # A8 Listen sweep, into the spectrum bus
   appSound.ts SoundProvider.tsx   # the app's one engine and sweep, bound to settings, honesty and the page
-  ui/SoundSettings.tsx            # R13.9 Sound popover in the top bar
+  ui/SoundSettings.tsx            # R13.9 sound settings (SoundControls), in the build view's Ambience dropdown (Q-456)
   ambience/           # R13 flyover soundscape and weather (planned, #112 to #117; layout in R13.11)
 frontend/src/contract/               (generated, D-18)  # generated.ts from shared/schemas/; hand-written helpers next to it:
                                                         # assertTagged(), tags.ts (TV<T>), haptics.ts (the R8.8 runtime types, Q-19; names kept after D-39)

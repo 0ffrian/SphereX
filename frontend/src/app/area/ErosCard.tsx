@@ -2,7 +2,9 @@
 // tabs over it (name, minimise, close; a back chevron from Discovery), the date with a wavelength
 // dot and n / N, the Wavelength and Taken rows, the four layer checkboxes, the brightness against
 // wavelength chart and a collapsed Detectors row. The top-left player drives the exposure
-// (shell/Transport.tsx). DEMO DATA: see areaService.ts. MoverDemoCard is the same layout for the
+// (shell/Transport.tsx). Issue #130: for a known object the frame list, the counts and the sky path
+// are the backend's (`/frames`, `/path`); the cutouts, masks and brightness stay DEMO DATA (Demo tag),
+// see areaService.ts. MoverDemoCard is the same layout for the
 // made-up movers, with no frames.
 import { useEffect, useRef, type ReactNode } from 'react';
 import { Icon } from '@/app/shell/icons';
@@ -12,8 +14,12 @@ import { useShellStore } from '@/app/shell/shellStore';
 import { wavelengthColor } from '@/app/flipbook/wavelengthColor';
 import type { ErosDemo, ErosHop } from './areaService';
 import { ProvenanceBadge } from '@/app/Badge';
-import { DemoTag } from './DemoTag';
+import { DEMO_CUTOUT_NOTE, DemoTag } from './DemoTag';
+import { HearTheShift } from '@/app/sound/HearTheShift';
 import { drawCutout } from './erosDraw';
+import { useAppStore } from '@/state/store';
+import { effectiveHonesty } from '@/viewer/honesty';
+import { MEASURED_ONLY_NOTE } from './KnownPositionsLayer';
 import { DETECTORS, detectorIndex, detectorsWithFrames, mjdDay, mjdHM, mjdYear } from './erosModel';
 
 const OVERLAYS: { key: keyof ErosOverlays; label: string }[] = [
@@ -22,6 +28,14 @@ const OVERLAYS: { key: keyof ErosOverlays; label: string }[] = [
   { key: 'path', label: 'Path' },
   { key: 'flags', label: 'Flagged pixels' },
 ];
+
+/** The cutout's Horizons overlays (predicted position, path): Estimated, hidden in "Measured only". */
+const ESTIMATED_OVERLAYS: ReadonlySet<keyof ErosOverlays> = new Set(['pred', 'path']);
+
+/** True in "Measured only" (D-21): every Estimated path and overlay is hidden. */
+function useMeasuredOnly(): boolean {
+  return useAppStore((s) => effectiveHonesty(s.honesty) === 'measured');
+}
 
 function Tabs({ title, back }: { title: string; back?: () => void }) {
   const setMinimised = useAreaStore((s) => s.setMinimised);
@@ -74,20 +88,22 @@ function Tabs({ title, back }: { title: string; back?: () => void }) {
 function Cutout({ hop }: { hop: ErosHop }) {
   const ref = useRef<HTMLCanvasElement>(null);
   const ov = useAreaStore((s) => s.ov);
+  const measured = useMeasuredOnly();
   useEffect(() => {
     const c = ref.current;
     if (!c) return;
     const draw = () => {
-      const alt = drawCutout(c, hop, useAreaStore.getState().ov, draw);
+      const cur = useAreaStore.getState().ov;
+      const alt = drawCutout(c, hop, measured ? { ...cur, pred: false, path: false } : cur, draw);
       c.setAttribute('aria-label', alt);
     };
     draw();
-  }, [hop, ov]);
+  }, [hop, ov, measured]);
   return <canvas ref={ref} className="sx-kn-canvas" role="img" aria-label="SPHEREx cutout" data-testid="eros-cutout" />;
 }
 
 /** Brightness against wavelength, one dot per exposure taken so far. */
-function Chart({ eros, cur }: { eros: ErosDemo; cur: ErosHop }) {
+function Chart({ eros, cur, name }: { eros: ErosDemo; cur: ErosHop; name: string }) {
   const W = 360;
   const H = 118;
   const L = 30;
@@ -96,13 +112,14 @@ function Chart({ eros, cur }: { eros: ErosDemo; cur: ErosHop }) {
   const B = 22;
   const x0 = 0.75;
   const x1 = 5;
-  const all = eros.hops;
+  // A real frame the demo has no brightness for has no dot (flux NaN).
+  const all = eros.hops.filter((h) => Number.isFinite(h.flux));
   const fmax = Math.max(...all.map((h) => h.flux + (h.flux_err ?? 0))) * 1.08;
   const fmin = Math.min(0, ...all.map((h) => h.flux - (h.flux_err ?? 0)));
   const X = (l: number) => L + ((l - x0) / (x1 - x0)) * (W - L - R);
   const Y = (f: number) => T + (1 - (f - fmin) / (fmax - fmin)) * (H - T - B);
   const shown = all.filter((h) => h.mjd_avg <= cur.mjd_avg + 1e-9);
-  const label = `Brightness of Eros against wavelength, ${shown.length} of ${all.length} exposures: ${shown
+  const label = `Brightness of ${name} against wavelength, ${shown.length} of ${all.length} exposures: ${shown
     .map((h) => `${h.wl_um.toFixed(2)} µm ${h.flux.toFixed(0)}`)
     .join('; ')}`;
   return (
@@ -137,7 +154,7 @@ function Chart({ eros, cur }: { eros: ErosDemo; cur: ErosHop }) {
   );
 }
 
-function Detectors({ eros }: { eros: ErosDemo }) {
+function Detectors({ eros, name }: { eros: ErosDemo; name: string }) {
   const det = useAreaStore((s) => s.det);
   const setDet = useAreaStore((s) => s.setDet);
   const have = detectorsWithFrames(eros);
@@ -156,7 +173,7 @@ function Detectors({ eros }: { eros: ErosDemo }) {
             className="sx-kn-detb"
             aria-checked={det === i}
             disabled={!have.has(i)}
-            title={have.has(i) ? undefined : 'No Eros frame in this detector'}
+            title={have.has(i) ? undefined : `No ${name} frame in this detector`}
             onClick={() => setDet(det === i ? null : i)}
           >
             <span className="sx-kn-rd" aria-hidden="true" />
@@ -176,14 +193,20 @@ function Detectors({ eros }: { eros: ErosDemo }) {
 function CheckGroup({ disabled }: { disabled?: boolean }) {
   const ov = useAreaStore((s) => s.ov);
   const toggle = useAreaStore((s) => s.toggleOv);
+  const measured = useMeasuredOnly();
+  const off = (k: keyof ErosOverlays) => !!disabled || (measured && ESTIMATED_OVERLAYS.has(k));
   return (
     <div className="sx-kn-opts" role="group" aria-label="Show on the image" data-off={disabled ? '' : undefined}>
       {OVERLAYS.map((o) => (
-        <label key={o.key} className="sx-kn-opt">
+        <label
+          key={o.key}
+          className="sx-kn-opt"
+          title={!disabled && off(o.key) ? `${MEASURED_ONLY_NOTE}: hidden in Measured only` : undefined}
+        >
           <input
             type="checkbox"
-            checked={disabled ? false : ov[o.key]}
-            disabled={disabled}
+            checked={off(o.key) ? false : ov[o.key]}
+            disabled={off(o.key)}
             onChange={() => toggle(o.key)}
             data-testid={`eros-ov-${o.key}`}
           />
@@ -202,11 +225,12 @@ function CheckGroup({ disabled }: { disabled?: boolean }) {
 function Shell({ title, children }: { title: string; children: (close: () => void) => ReactNode }) {
   const closePanel = useShellStore((s) => s.closePanel);
   const flow = useAreaStore((s) => s.flow);
+  const kind = useAreaStore((s) => s.focus?.kind ?? 'asteroid');
   return (
     <PanelCard
       bare
       title={title}
-      subtitle="Known object · asteroid"
+      subtitle={`Known object · ${kind}`}
       icon="area"
       onClose={closePanel}
       returnFocusTo={flow === 'known' ? '[data-testid="tool-known"]' : '[data-testid="tool-area"]'}
@@ -217,23 +241,42 @@ function Shell({ title, children }: { title: string; children: (close: () => voi
   );
 }
 
-export function ErosCard({ title = '433 Eros', back }: { title?: string; back?: () => void }) {
+export function ErosCard({ title: given, back }: { title?: string; back?: () => void }) {
+  const focus = useAreaStore((s) => s.focus);
+  const real = useAreaStore((s) => s.trackSource === 'real');
+  const hasPath = useAreaStore((s) => s.trackPath);
+  const pathPending = useAreaStore((s) => s.pathPending);
+  const measured = useMeasuredOnly();
+  const title = given ?? (focus ? `${focus.id} ${focus.name}`.trim() : '433 Eros');
   const eros = useAreaStore((s) => s.eros);
   const failed = useAreaStore((s) => s.erosFailed);
   const hop = useAreaStore((s) => currentHop(s));
   const n = useAreaStore((s) => erosList(s.eros, s.det).length);
   const index = useAreaStore((s) => s.index);
   const known = useAreaStore((s) => s.flow === 'known');
+  // The demo cutouts and their photometry are labelled only when some frame actually shows one.
+  const anyCutout = eros?.hops.some((h) => !h.no_cutout) ?? false;
   return (
     <Shell title={title}>
       {() => (
         <div data-testid="eros-card">
           <div className="fb-view" data-testid="frame-viewer">
             <Tabs title={title} back={back} />
-            {hop && <Cutout hop={hop} />}
+            {hop && !hop.no_cutout && <Cutout hop={hop} />}
+            {hop?.no_cutout && (
+              <p className="sx-kn-demo" role="status" data-testid="eros-no-cutout">
+                No cutout for this frame in the demo
+              </p>
+            )}
             {!hop && (
-              <p className="sx-kn-demo" role="status">
-                {failed ? 'The demo frames could not be loaded.' : 'Loading the demo frames…'}
+              <p className="sx-kn-demo" role="status" data-testid="eros-card-status">
+                {failed
+                  ? focus
+                    ? 'The frames of this object could not be loaded.'
+                    : 'The demo frames could not be loaded.'
+                  : focus
+                    ? 'Loading the frames…'
+                    : 'Loading the demo frames…'}
               </p>
             )}
             {hop && (
@@ -263,6 +306,32 @@ export function ErosCard({ title = '433 Eros', back }: { title?: string; back?: 
                 {hop ? `${mjdDay(hop.mjd_avg)} ${mjdHM(hop.mjd_avg)} UTC · exposure ${hop.exposure} of 4` : '-'}
               </dd>
             </dl>
+            {real && (
+              <p className="fb-muted sx-kn-real" data-testid="eros-real">
+                {`${eros?.hops.length ?? 0} frames from the backend`}
+              </p>
+            )}
+            {(real || measured) && (
+              <p className="fb-muted sx-kn-real" role="status" data-testid="eros-path">
+                {measured ? (
+                  `${MEASURED_ONLY_NOTE}: the path is hidden in Measured only`
+                ) : hasPath ? (
+                  <>
+                    <ProvenanceBadge
+                      tag="model_dependent"
+                      tooltip="Estimated: the path is a JPL Horizons prediction seen from SPHEREx, not a measurement."
+                      srText
+                      variant="tag"
+                    />
+                    {' Path from Horizons'}
+                  </>
+                ) : pathPending ? (
+                  'The path is still being prepared. Open the card again shortly.'
+                ) : (
+                  'No path for this object'
+                )}
+              </p>
+            )}
             {known && (
               <div className="sx-kn-leg" aria-hidden="true">
                 <span><i />path so far</span>
@@ -271,27 +340,34 @@ export function ErosCard({ title = '433 Eros', back }: { title?: string; back?: 
               </div>
             )}
             <CheckGroup />
+            <HearTheShift />
             <div className="sx-kn-spec">
               <div className="sx-kn-spec-h">
                 <span className="sx-kn-spec-t">
                   Wavelength
-                  <ProvenanceBadge
-                    tag={eros?.provenance?.['hops[].flux']?.tag ?? 'model_dependent'}
-                    tooltip={
-                      eros?.provenance?.['hops[].flux']?.note ??
-                      'Approximate photometry from the demo extraction; not a calibrated SPHEREx flux.'
-                    }
-                    srText
-                    variant="tag"
-                  />
+                  {anyCutout && (
+                    <ProvenanceBadge
+                      tag={eros?.provenance?.['hops[].flux']?.tag ?? 'model_dependent'}
+                      tooltip={
+                        eros?.provenance?.['hops[].flux']?.note ??
+                        'Approximate photometry from the demo extraction; not a calibrated SPHEREx flux.'
+                      }
+                      srText
+                      variant="tag"
+                    />
+                  )}
                 </span>
-                <small>Eros’s brightness in each exposure so far</small>
+                <small>Brightness of {title} in each exposure so far</small>
               </div>
-              {eros && hop && <Chart eros={eros} cur={hop} />}
+              {eros && hop && <Chart eros={eros} cur={hop} name={title} />}
             </div>
-            {eros && <Detectors eros={eros} />}
+            {eros && <Detectors eros={eros} name={title} />}
             <div className="sx-kn-foot">
-              <DemoTag />
+              {!real ? (
+                <DemoTag />
+              ) : anyCutout ? (
+                <DemoTag label="Demo cutouts" note={DEMO_CUTOUT_NOTE} testId="demo-tag" />
+              ) : null}
             </div>
           </div>
         </div>

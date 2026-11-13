@@ -9,6 +9,7 @@ import pytest
 
 from app.core.measure import aperture, solid_angle
 from app.core.measure.config import DEFAULT_CONFIG as CFG
+from app.core.measure.config import mover_config
 from app.core.measure.photometry import Measurement, Refusal, measure_frame
 from tests.measure_synth import NX, NY, OUTER_PIXEL, SOURCE_TOTAL, VAR, X0, Y0, Synth
 
@@ -132,6 +133,36 @@ def test_nan_core_with_sur_error_nearby_is_saturated() -> None:
 def test_other_bad_core_pixels_refuse_as_aperture_flags(flag: str) -> None:
     r = refused(Synth().standard().set_flag(18, 13, flag))
     assert r.reason == "aperture_flags" and flag in r.detail
+
+
+def test_fixed_object_with_outlier_on_the_core_is_still_refused() -> None:
+    """Q-139 is for movers only: the default config refuses OUTLIER in the core (A4.2)."""
+    r = refused(Synth().standard().set_flag(18, 13, "OUTLIER"))
+    assert r.reason == "aperture_flags" and "OUTLIER" in r.detail
+
+
+def test_mover_outlier_on_the_core_is_kept_and_recorded() -> None:
+    clean = measured(Synth().standard())
+    s = Synth().standard().set_flag(18, 13, "OUTLIER")
+    m = measure_frame(s.hdul(), X0, Y0, mover_config())
+    assert isinstance(m, Measurement)
+    assert m.core_flagged == ("OUTLIER",) and m.dropped_flags == ()
+    assert m.flagged  # agrees with the API's `flagged`
+    assert m.flux == pytest.approx(clean.flux, rel=1e-9)  # the pixel stays in the sum
+
+
+@pytest.mark.parametrize("flag", ["HOT", "NONLINEAR", "PERSIST"])
+def test_mover_hardware_flag_beside_outlier_on_the_core_still_refuses(flag: str) -> None:
+    s = Synth().standard().set_flag(18, 13, "OUTLIER", flag)
+    r = measure_frame(s.hdul(), X0, Y0, mover_config())
+    assert isinstance(r, Refusal) and r.reason == "aperture_flags"
+
+
+def test_mover_outlier_off_the_core_is_still_dropped() -> None:
+    s = Synth().standard().set_flag(int(X0) + 2, int(Y0), "OUTLIER")  # 2 px out: aperture, not core
+    m = measure_frame(s.hdul(), X0, Y0, mover_config())
+    assert isinstance(m, Measurement)
+    assert m.core_flagged == () and m.dropped_flags == ("OUTLIER",)
 
 
 def test_nan_core_alone_is_aperture_flags() -> None:

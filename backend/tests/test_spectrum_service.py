@@ -317,3 +317,57 @@ def test_report_targets(ctx: Context, capsys: pytest.CaptureFixture[str]) -> Non
     uncached = [*good, frame("B", 2.0, "2026-01-02T00:00:00.000Z")]
     spectrum_mod.report_targets(service(ctx, uncached, {"A": GOOD}), [("uncached", OBJ)])
     assert "'cutout': 1" in capsys.readouterr().out
+
+
+# --- OUTLIER on a mover's core (Q-139, Q-460) ---------------------------------------------
+
+OUTLIER_CORE = Synth().standard().set_flag(18, 13, "OUTLIER").fits_bytes()
+MOVER = ResolvedObject(
+    id="sbdb-1", name=None, ra=150.0, dec=2.0, moving=True, resolver="sbdb", spkid="1"
+)
+
+
+def test_mover_outlier_core_is_a_flagged_point_and_fixed_is_refused(ctx: Context) -> None:
+    frames = [frame("A", 2.0, "2026-01-01T00:00:00.000Z")]
+    mover = service(ctx, frames, {"A": OUTLIER_CORE}).get_spectrum(MOVER).body
+    (pt,) = mover["spectrum"]
+    assert pt["flagged"] and pt["flag_reasons"] == ["outlier_core"] and pt["dropped_flags"] == []
+    assert mover["light_curve"][0]["flagged"] and mover["missing"] == []
+    assert mover["method"]["core_flag_only"] == ["OUTLIER"]
+    fixed = service(ctx, frames, {"A": OUTLIER_CORE}).get_spectrum(OBJ).body
+    assert fixed["spectrum"] == [] and fixed["missing"] == ["aperture_flags:A"]
+    assert "core_flag_only" not in fixed["method"]  # a fixed object's method block is unchanged
+
+
+def test_mover_and_fixed_results_do_not_share_a_cache_entry(ctx: Context) -> None:
+    frames = [frame("A", 2.0, "2026-01-01T00:00:00.000Z")]
+    svc = service(ctx, frames, {"A": GOOD})
+    svc.get_spectrum(MOVER)
+    assert not svc.get_spectrum(OBJ).from_cache  # different method sha, so a different key
+
+
+def test_premeasured_is_reused_only_under_the_same_method(ctx: Context, tmp_path: Path) -> None:
+    from concurrent.futures import Future
+
+    from app.core.measure.config import DEFAULT_CONFIG, method_sha, mover_config
+    from app.core.measure.photometry import Refusal
+    from app.core.measure.spectrum import Premeasured
+
+    frames = [frame("A", 2.0, "2026-01-01T00:00:00.000Z")]
+    svc = service(ctx, frames, {"A": OUTLIER_CORE})
+    sha = str(ctx.cache.get_meta(spectrum_mod.cutout_key(ctx, frames[0]))["body_sha256"])  # type: ignore[index]
+
+    def pre(method: str) -> dict[str, Premeasured]:
+        fut: Future[Any] = Future()
+        fut.set_result(Refusal("measure", "sentinel"))
+        return {"A": Premeasured(sha, X0, Y0, fut, method)}
+
+    # Made with the fixed-object config but read for a mover: ignored, measured afresh.
+    stale = svc.get_spectrum(MOVER, premeasured=pre(method_sha(DEFAULT_CONFIG))).body
+    assert len(stale["spectrum"]) == 1 and stale["missing"] == []
+    # Made with the mover config: reused (the sentinel refusal comes back). A fresh cache, so the
+    # first result is not served from the derived cache.
+    other = make_context(make_settings(tmp_path / "other"))
+    svc2 = service(other, frames, {"A": OUTLIER_CORE})
+    reused = svc2.get_spectrum(MOVER, premeasured=pre(method_sha(mover_config()))).body
+    assert reused["spectrum"] == [] and reused["missing"] == ["measure:A"]
