@@ -315,13 +315,18 @@ export function skippedText(
   code: string | undefined,
   failed: boolean,
 ): { title: string; line: string } {
-  const line =
-    code === 'area:no_visit_pair'
-      ? 'No two visits close in time there.'
-      : code
-        ? failureText(code).title + '.'
-        : 'It could not be computed.';
-  return { title: `Square ${index} ${failed ? 'failed' : 'skipped'}`, line };
+  return {
+    title: `Square ${index} ${failed ? 'failed' : 'skipped'}`,
+    line: squareReason(code) + '.',
+  };
+}
+
+/** Why a square has no result, in a few words (no full stop): "No two visits close in time there". */
+export function squareReason(code: string | undefined): string {
+  if (code === 'area:no_visit_pair') return 'No two visits close in time there';
+  if (code === 'area:frames_incomplete') return 'Some of its frames could not be downloaded';
+  if (code === 'cancelled') return 'It was stopped';
+  return code ? failureText(code, true).title : 'It could not be computed';
 }
 
 /** The island's pill for a minimised scan card: "Discovery · Square 7 of 15", or its end. */
