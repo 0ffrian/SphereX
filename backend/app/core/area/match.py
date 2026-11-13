@@ -154,6 +154,7 @@ def known_candidates(
     refresh: bool = False,
 ) -> tuple[dict[int, str | None], list[Candidate], list[Served]]:
     """Step 1: SkyBoT per visit, the magnitude cut and the coverage prefilter."""
+    geo.require(frames, cfg)
     answers: dict[int, str | None] = {}
     served: list[Served] = []
     found: dict[str, tuple[skybot.SkybotBody, list[tuple[int, float, float, float]]]] = {}
@@ -360,6 +361,7 @@ def known_list(
     geo: AreaGeometry,
     cfg: AreaConfig = DEFAULT_AREA_CONFIG,
 ) -> list[KnownObject]:
+    geo.require(frames, cfg)
     grid = cell_grid(geo.box, cfg.coverage_cell_arcsec)
     cov = {c.visit: c for c in frames.coverage}
     visit_of = {f.frame_id: f.visit for f in frames.frames}

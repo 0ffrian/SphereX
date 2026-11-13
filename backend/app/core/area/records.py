@@ -121,6 +121,10 @@ class AreaFrames:
     # ``AreaFrames`` from that JSON; a stored run keeps its dates in the reply head instead.
     sia_fetched: tuple[str, ...] = ()
 
+    def __post_init__(self) -> None:
+        # The one place ``sia_fetched`` is made sorted and unique, whichever constructor built it.
+        object.__setattr__(self, "sia_fetched", tuple(sorted(set(self.sia_fetched))))
+
 
 def _mask_rows(mask: NDArray[np.bool_]) -> list[str]:
     return ["".join("1" if v else "0" for v in row) for row in mask]
