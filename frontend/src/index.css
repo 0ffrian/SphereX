@@ -6423,3 +6423,14 @@ li[data-state='running'] > .sx-live-mk {
     top: 64px;
   }
 }
+/* Phone width: the readout row sits at the left, so the list spans the screen under it. */
+@media (max-width: 640px) {
+  .sx-runs-menu {
+    position: fixed;
+    top: 64px;
+    left: max(16px, env(safe-area-inset-left, 0px));
+    right: max(16px, env(safe-area-inset-right, 0px));
+    width: auto;
+    z-index: 60;
+  }
+}
