@@ -103,7 +103,7 @@ def measure_frame(
     shape: tuple[int, int] = (int(image.shape[0]), int(image.shape[1]))
     bits = flags.bits_by_name(flag_hdu.header)
     if not bits:
-        return Refusal("flags_header", "FLAGS header names no bits (no MP_* keywords)")
+        return Refusal("flags_header", "FLAGS header names no bits (no MP_* or MSKN*/MSKM* keywords)")
     # Saturation detection needs these bits; without them a saturated core would pass as flux.
     needed = sorted({*cfg.saturation_flags, *cfg.saturation_context_flags} - set(bits))
     if needed:
