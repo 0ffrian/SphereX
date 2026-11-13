@@ -111,9 +111,12 @@ export const useScanStore = create<ScanState>()((set, get) => {
       )
         results = await api.results(v.runId, ctl.signal).catch(() => results);
       if (mine !== token) return;
-      set({ view: { ...prev, record, square, results, stale: false } });
-      if (!isFinished(record.state) || !results)
-        pollTimer = setTimeout(() => void poll(mine), SCAN_POLL_MS);
+      // A finished run whose results cannot be read: try again, up to SCAN_MAX_MISSED times.
+      const noResults = isFinished(record.state) && !results;
+      const miss = noResults ? missed + 1 : 0;
+      set({ view: { ...prev, record, square, results, stale: miss >= SCAN_MAX_MISSED } });
+      if ((!isFinished(record.state) || !results) && miss < SCAN_MAX_MISSED)
+        pollTimer = setTimeout(() => void poll(mine, miss), SCAN_POLL_MS);
     } catch (e) {
       if (mine !== token || ctl.signal.aborted) return;
       if (e instanceof RunGone) {
@@ -181,7 +184,14 @@ export const useScanStore = create<ScanState>()((set, get) => {
         .start({ ...v.region, kind: v.flow })
         .catch(() => ({ kind: 'unavailable' as const }));
       set({ busy: false });
-      if (get().view !== v) return;
+      if (get().view !== v) {
+        // The user moved on (Select again, Escape) while it started: stop it, nothing follows it.
+        if (answer.kind === 'started')
+          void getScanApi()
+            .stop(answer.run.run_id)
+            .catch(() => {});
+        return;
+      }
       if (answer.kind === 'started') {
         save({ runId: answer.run.run_id, flow: v.flow, region: answer.run.region });
         get().follow(answer.run.run_id, v.flow, answer.run.region, answer.run);
@@ -318,4 +328,9 @@ export function scanMiniTitle(v: ScanView | null): string | null {
   if (r.state === 'paused') return `${flow} · Paused`;
   const cur = r.squares.find((s) => s.state === 'running');
   return cur ? `${flow} · Square ${cur.index} of ${n}` : `${flow} · Scanning`;
+}
+
+/** A scan that is still going (queued, running or paused): a new selection must not drop it. */
+export function runningScan(v: ScanView | null): Extract<ScanView, { kind: 'run' }> | null {
+  return v?.kind === 'run' && !(v.record && isFinished(v.record.state)) ? v : null;
 }

@@ -97,7 +97,9 @@ export function ScanCard() {
         {view.kind === 'offer' && <Offer view={view} />}
         {view.kind === 'failed' && <Failed view={view} />}
         {view.kind === 'run' && !done && <Scanning view={view} record={record} />}
-        {view.kind === 'run' && done && record && <Done record={record} results={view.results} />}
+        {view.kind === 'run' && done && record && (
+          <Done record={record} results={view.results} stale={view.stale} />
+        )}
       </div>
     </PanelCard>
   );
@@ -527,7 +529,15 @@ function skippedShort(code: string | undefined): string {
   return code ? failureText(code).title.toLowerCase() : 'not computed';
 }
 
-function Done({ record, results }: { record: RunRecord; results: RunResults | null }) {
+function Done({
+  record,
+  results,
+  stale,
+}: {
+  record: RunRecord;
+  results: RunResults | null;
+  stale: boolean;
+}) {
   const [filter, setFilter] = useState<Filter>('found');
   const n = record.squares.length;
   const doneN = record.totals.squares_done;
@@ -589,7 +599,11 @@ function Done({ record, results }: { record: RunRecord; results: RunResults | nu
           ))}
         </div>
       ) : (
-        <p className="sx-live-m">Reading the results…</p>
+        <p className="sx-live-m">
+          {stale
+            ? 'The results could not be read. Close and reopen the scan to try again.'
+            : 'Reading the results…'}
+        </p>
       )}
       {results && (
         <div className="sx-scan-rows" data-testid="scan-rows">

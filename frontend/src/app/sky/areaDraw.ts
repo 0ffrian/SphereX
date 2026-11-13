@@ -13,7 +13,7 @@ import {
 import { useAreaStore, type AreaBox, type AreaDrag } from '@/app/shell/areaStore';
 import { clampCentred, clampDrag } from '@/app/area/aim';
 import { regionBox, selectionAt, type Selection } from '@/app/area/scanGrid';
-import { useScanStore, viewRegion } from '@/app/area/scanStore';
+import { isFinished, runningScan, useScanStore, viewRegion } from '@/app/area/scanStore';
 import { getScanApi, RunGone } from '@/app/area/scanApi';
 import { useShellStore } from '@/app/shell/shellStore';
 
@@ -93,6 +93,12 @@ export function selectionNow(x: number, y: number): Selection | null {
  * is gridded and offered for a scan (scanStore).
  */
 export function pickRegionAt(x: number, y: number): void {
+  // One scan at a time (one worker, #156): while one is going, its card comes back instead.
+  const going = runningScan(useScanStore.getState().view);
+  if (going) {
+    reopenScan(going.flow);
+    return;
+  }
   const sel = selectionNow(x, y);
   if (!sel) return;
   const s = useAreaStore.getState();
@@ -113,15 +119,24 @@ export function pickRegionAt(x: number, y: number): void {
 export function reopenScan(flow: 'known' | 'discovery'): boolean {
   const v = useScanStore.getState().view;
   const region = viewRegion(v);
-  if (!v || v.kind !== 'run' || v.flow !== flow || !region) return false;
-  useAreaStore.getState().openScan(flow, regionBox(region));
+  if (!v || v.kind !== 'run' || !region) return false;
+  // A finished scan comes back from its own tool only; one still going, from either tool.
+  if (v.flow !== flow && !runningScan(v)) return false;
+  useAreaStore.getState().openScan(v.flow, regionBox(region));
   flyToView({ ra: region.ra, dec: region.dec, fovDeg: clampFov(region.height_deg) }, reducedMotion());
   return true;
 }
 
+/** Back to the scan card from an object or square opened in it: the card, and the sky on its region. */
+export function backToScan(): void {
+  const v = useScanStore.getState().view;
+  if (!v || !reopenScan(v.flow)) useAreaStore.getState().backToScan();
+}
+
 /**
- * A scan saved in this browser that is not finished (a page reload mid-scan): follow it again,
- * open its tool and fly to its region. Its squares redraw from GET /v1/runs/{id}.
+ * A scan saved in this browser (a page reload mid-scan): follow it again, and when it is still
+ * going and the user is on the plain sky, open its tool and fly to its region. Its squares redraw
+ * from GET /v1/runs/{id}. A finished one is only followed: its dock button brings it back.
  */
 export function restoreSavedScan(): void {
   const s = useScanStore.getState();
@@ -134,6 +149,7 @@ export function restoreSavedScan(): void {
       (record) => {
         if (useScanStore.getState().view) return;
         useScanStore.getState().follow(saved.runId, saved.flow, record.region, record);
+        if (isFinished(record.state) || useShellStore.getState().tool !== 'sky') return;
         useShellStore.getState().setTool('area');
         reopenScan(saved.flow);
       },
