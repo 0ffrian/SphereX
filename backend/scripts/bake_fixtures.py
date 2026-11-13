@@ -21,7 +21,10 @@ with the same ``card_to_params`` the API uses, plus the one display value the fi
 they drift.
 
 The output is byte-stable: lossless WebP and timestamp-free PNG (``encode``), no ``bake.json``
-(its key would only repeat the parameters), so a rerun reproduces the committed bytes.
+(its key would only repeat the parameters), so a rerun on one machine reproduces its own bytes.
+Across machines Pillow's zlib-ng may write another deflate stream for the same pixels, so a PNG
+map counts as unchanged when ``same_png`` holds (Q-204 (2)): ``--check`` passes and no file is
+rewritten. WebP, ``height.bin`` and the params JSON stay byte-exact.
 """
 
 from __future__ import annotations
@@ -33,7 +36,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import unquote
 
-from app.core.render.bake import FILES, bake, encode, texture_dir
+from app.core.render.bake import FILES, bake, encode, same_png, texture_dir
 from app.core.render.card_to_params import card_to_params
 from app.core.render.params import params_from_card
 from app.settings import BACKEND_DIR
@@ -123,7 +126,7 @@ def main(
     ap.add_argument("--check", action="store_true", help="compare with the files on disk")
     args = ap.parse_args(argv)
     files = fixture_files()
-    stale = [rel for rel, data in files.items() if _read(out_dir / rel) != data]
+    stale = [rel for rel, data in files.items() if not _same(rel, _read(out_dir / rel), data)]
     params = {Path(n): t.encode("utf-8") for n, t in demo_planet_params().items()}
     stale_params = [n for n, data in params.items() if _read(params_dir / n) != data]
     if args.check:
@@ -150,6 +153,15 @@ def _read(path: Path) -> bytes | None:
         return path.read_bytes()
     except OSError:
         return None
+
+
+def _same(rel: Path, on_disk: bytes | None, fresh: bytes) -> bool:
+    """Byte-exact, except a PNG map: same chunks and inflated image data suffices (Q-204)."""
+    if on_disk is None:
+        return False
+    if rel.suffix == ".png":
+        return same_png(on_disk, fresh)
+    return on_disk == fresh
 
 
 if __name__ == "__main__":

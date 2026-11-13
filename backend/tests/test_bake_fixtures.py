@@ -9,6 +9,7 @@ import pytest
 from PIL import Image
 
 from scripts import bake_fixtures as bf
+from tests.helpers import png_redeflate
 
 PARAMS = sorted((bf.FIXTURES / "params").glob("*.json"))
 
@@ -28,6 +29,28 @@ def test_check_reports_a_changed_file(tmp_path: Path) -> None:
     victim = next(tmp_path.rglob("height.bin"))
     data = victim.read_bytes()
     victim.write_bytes(bytes([data[0] ^ 0xFF]) + data[1:])
+    assert bf.main(["--check"], out_dir=tmp_path, params_dir=tmp_path / "params") == 1
+
+
+def test_check_accepts_a_png_with_another_deflate_stream(tmp_path: Path) -> None:
+    """Q-204 (2): a PNG map from another machine's zlib passes and is not rewritten."""
+    assert bf.main([], out_dir=tmp_path, params_dir=tmp_path / "params") == 0
+    victim = next(tmp_path.rglob("normal.png"))
+    other = png_redeflate(victim.read_bytes(), level=1, parts=3)
+    assert other != victim.read_bytes()
+    victim.write_bytes(other)
+    assert bf.main(["--check"], out_dir=tmp_path, params_dir=tmp_path / "params") == 0
+    assert bf.main([], out_dir=tmp_path, params_dir=tmp_path / "params") == 0
+    assert victim.read_bytes() == other
+
+
+def test_check_reports_a_changed_png_pixel(tmp_path: Path) -> None:
+    assert bf.main([], out_dir=tmp_path, params_dir=tmp_path / "params") == 0
+    victim = next(tmp_path.rglob("height.png"))
+    with Image.open(victim) as img:
+        px = img.copy()
+    px.putpixel((0, 0), (px.getpixel((0, 0)) + 1) % 256)
+    px.save(victim, "PNG")
     assert bf.main(["--check"], out_dir=tmp_path, params_dir=tmp_path / "params") == 1
 
 
