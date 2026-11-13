@@ -239,6 +239,7 @@ describe('the spectrum check', () => {
     expect(host.querySelector('[data-testid="spectrum-glow"]')).toBeNull();
     expect(host.querySelector('[data-testid="spectrum-sun"]')).toBeNull();
     expect(host.querySelector('[data-testid="spectrum-distance"]')).toBeNull();
+    expect(host.querySelector('[data-testid="spectrum-compared"]')).toBeNull();
     const chart = host.querySelector('[data-testid="spectrum-chart"]')!;
     expect(chart.getAttribute('data-measured-only')).toBe('true');
     expect(chart.querySelectorAll('[data-testid="spectrum-point"]')).toHaveLength(14);
@@ -254,5 +255,20 @@ describe('the spectrum check', () => {
     expect(host.querySelector('[data-testid="spectrum-chart"]')).toBeNull();
     expect(host.querySelector('[data-testid="spectrum-steady"]')).not.toBeNull();
     expect(host.querySelector('[data-testid="spectrum-colour"]')).toBeNull();
+  });
+});
+
+describe('the spectrum chart', () => {
+  it('clamps an error bar at the x axis', async () => {
+    const { SpectrumChart } = await import('./SpectrumCard');
+    const { chartModel } = await import('./spectrumWords');
+    const t = erosPackStage<AreaSpectra>('spectra').tracks.find((x) => x.track_id === 'T3')!;
+    t.points[1] = { ...t.points[1]!, flux_err: t.points[1]!.flux_uJy * 3 };
+    const m = chartModel(t, [0.6, 3], false);
+    await act(async () => root.render(<SpectrumChart trackId="T3" model={m} verdict="rock" />));
+    const axisY = Number(host.querySelector('line.ax')!.getAttribute('y1'));
+    for (const bar of host.querySelectorAll('[data-testid="spectrum-errbar"]'))
+      expect(Number(bar.getAttribute('y1'))).toBeLessThanOrEqual(axisY + 1e-6);
+    expect(host.querySelectorAll('[data-testid="spectrum-errbar"]').length).toBeGreaterThan(0);
   });
 });

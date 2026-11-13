@@ -56,10 +56,10 @@ export function SpectrumRowWord({ spectrum }: { spectrum: TrackSpectrum }) {
 // ---- Chart -------------------------------------------------------------------------------------
 
 const W = 328;
-const H = 176;
+const H = 186;
 const L = 34;
 const R = 8;
-const T = 8;
+const T = 18;
 const B = 24;
 
 function ticksLabel(m: ChartModel, y: number): string {
@@ -95,11 +95,9 @@ export function SpectrumChart({ trackId, model, verdict }: { trackId: string; mo
         </text>
       ))}
       <line className="ax" x1={L} x2={W - R} y1={sy(0)} y2={sy(0)} />
-      {m.measuredOnly && (
-        <text x={L - 6} y={T - 1} textAnchor="end">
-          µJy
-        </text>
-      )}
+      <text x={0} y={9} data-testid="spectrum-ylabel">
+        {m.yLabel}
+      </text>
       {m.glow && <path className="glow" d={poly(m.glow)} data-testid="spectrum-glow" />}
       {m.band && (
         <>
@@ -120,7 +118,7 @@ export function SpectrumChart({ trackId, model, verdict }: { trackId: string; mo
       {m.points.map((p) => (
         <g key={p.dotId}>
           {Math.abs(sy(p.y - p.err) - sy(p.y + p.err)) > 6 && (
-            <line className="eb" x1={sx(p.x)} x2={sx(p.x)} y1={sy(p.y - p.err)} y2={sy(Math.min(p.y + p.err, m.y1))} />
+            <line className="eb" x1={sx(p.x)} x2={sx(p.x)} y1={sy(Math.max(p.y - p.err, m.y0))} y2={sy(Math.min(p.y + p.err, m.y1))} data-testid="spectrum-errbar" />
           )}
           <circle className={p.visitIdx > 0 ? 'pt v2' : 'pt'} cx={sx(p.x)} cy={sy(Math.min(p.y, m.y1))} r={3.2} data-testid="spectrum-point" />
         </g>
@@ -239,7 +237,7 @@ export function SpectrumFacts({ spectrum: t, spectra, measuredOnly }: Pick<Spect
           <dd data-testid="spectrum-distance">{distance}</dd>
         </>
       )}
-      {showColour && (
+      {showColour && !measuredOnly && (
         <>
           <dt>Compared with</dt>
           <dd data-testid="spectrum-compared">{comparedText(spectra.calibration)}</dd>

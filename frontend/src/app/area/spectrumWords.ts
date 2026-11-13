@@ -132,7 +132,8 @@ export function comparedText(calibration: AreaSpectra['calibration']): string {
 
 /** The star scatter for the accordion: the median measured floor, or null when none was measured. */
 export function starScatter(calibration: AreaSpectra['calibration']): number | null {
-  const v = calibration.filter((c) => c.source === 'stars').map((c) => c.sigma_sys).sort((a, b) => a - b);
+  // A zero floor is not a measurement (a synthetic fixture): treated as not measured.
+  const v = calibration.filter((c) => c.source === 'stars' && c.sigma_sys > 0).map((c) => c.sigma_sys).sort((a, b) => a - b);
   if (v.length === 0) return null;
   const m = v.length >> 1;
   return v.length % 2 ? v[m]! : (v[m - 1]! + v[m]!) / 2;
@@ -173,6 +174,10 @@ export interface ChartModel {
   band: [number, number][] | null;
   /** The heat-glow allowance above R_max, when `heat_glow`; null otherwise. */
   glow: [number, number][] | null;
+  /** The top of the reflected range (R_max); null under Measured only. */
+  rangeHi: number | null;
+  /** The distance the heat-glow band is drawn for, when it is drawn. */
+  glowAu: number | null;
   /** The visits in order, for the key (visit number, first time). */
   visits: { visit: number; time: string | null }[];
   yLabel: string;
@@ -222,10 +227,15 @@ export function chartModel(t: TrackSpectrum, range: [number, number], measuredOn
     const top = Math.max(range[1], ...points.map((p) => p.y + p.err), ...limits.map((l) => l.y + 0.5));
     const n = Math.max(4, Math.ceil(top));
     y1 = n + 0.6;
-    yTicks = Array.from({ length: n }, (_, k) => k + 1);
+    // 1× to 4×, more when needed; past 8 the ticks step so their labels never crowd.
+    const stepBy = n <= 8 ? 1 : n <= 20 ? 2 : n <= 50 ? 5 : 10;
+    yTicks = Array.from({ length: Math.floor(n / stepBy) }, (_, k) => (k + 1) * stepBy);
+    if (stepBy > 1) yTicks.unshift(1);
   }
   const xTicks = [1, 2, 3, 4, 5].filter((x) => x > x0 && x < x1);
   const [lo, hi] = range;
+  // The long-arm edge is the reply's reflected range; the widening from about 1 on the short arm
+  // (each visit's short arm is set to 1, A17.13 step 8) is drawn to show that, not computed.
   const band: [number, number][] | null = measuredOnly
     ? null
     : [
@@ -260,6 +270,8 @@ export function chartModel(t: TrackSpectrum, range: [number, number], measuredOn
     limits,
     band,
     glow,
+    rangeHi: measuredOnly ? null : hi,
+    glowAu: glow ? t.r_au : null,
     visits: visitOrder.map((v) => ({ visit: v, time: firstTime.get(v) ?? null })),
     yLabel: measuredOnly ? 'µJy' : "times the Sun's colour",
   };
@@ -282,7 +294,17 @@ export function chartLabel(trackId: string, m: ChartModel, verdict: SpectrumVerd
           ? `${fmt(Math.min(...ys))} to ${fmt(Math.max(...ys))} microjanskys.`
           : `${fmt(Math.min(...ys))} to ${fmt(Math.max(...ys))} times the Sun's colour.`);
   const lim = m.limits.length > 0 ? ` ${m.limits.length} lower limit${m.limits.length === 1 ? '' : 's'}.` : '';
-  return m.measuredOnly ? `${what} ${pts}` : `${what} ${pts}${lim} ${VERDICT_WORDS[verdict].title}.`;
+  const list = ' Every point is listed under Points used.';
+  if (m.measuredOnly) return `${what} ${pts}${list}`;
+  const hi = m.rangeHi;
+  const above = hi === null ? 0 : m.points.filter((p) => p.y > hi).length;
+  const where =
+    above > 0
+      ? ` ${above} above the rock range${m.glow && m.glowAu !== null ? `, inside the heat glow allowance for ${m.glowAu.toFixed(2)} AU` : ''}.`
+      : n > 0
+        ? ' All inside the rock range.'
+        : '';
+  return `${what} ${pts}${where}${lim} ${VERDICT_WORDS[verdict].title}.${list}`;
 }
 
 /** A dot's flags from the area's `/dots` (Points used); none when the dots did not load. */

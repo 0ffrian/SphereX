@@ -5899,7 +5899,9 @@ li[data-state='running'] > .sx-live-mk {
   overflow: visible;
 }
 .sx-sp-chart text {
-  font: 500 10px var(--font-sans, Inter, system-ui, sans-serif);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 500;
   fill: var(--muted);
   font-variant-numeric: tabular-nums;
 }

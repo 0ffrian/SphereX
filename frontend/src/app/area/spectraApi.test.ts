@@ -70,10 +70,14 @@ describe('the HTTP client', () => {
     expect(await httpSpectraApi('/v1', offline).areaSpectra('a')).toEqual({ kind: 'unavailable' });
   });
 
+  it('refuses another area\'s reply', async () => {
+    expect(await httpSpectraApi('/v1', fetchOf(() => reply(EROS))).areaSpectra('live-0123456789ab')).toEqual({ kind: 'unavailable' });
+  });
+
   it('asks the area route, escaped', async () => {
     let url = '';
-    const f = (async (u: string) => ((url = u), reply(EROS))) as unknown as typeof fetch;
-    await httpSpectraApi('/v1', f).areaSpectra('a b');
+    const f = (async (u: string) => ((url = u), reply({ ...EROS, area_id: 'a b' }))) as unknown as typeof fetch;
+    expect((await httpSpectraApi('/v1', f).areaSpectra('a b')).kind).toBe('ok');
     expect(url).toBe('/v1/areas/a%20b/spectra');
   });
 

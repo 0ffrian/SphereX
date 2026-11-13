@@ -182,6 +182,11 @@ export function DiscoveryCard() {
           testId="disc-filter"
         />
       )}
+      {step >= 3 && active !== 'all' && shown.length === 0 && (
+        <p className="fb-muted" data-testid="disc-filter-none">
+          {active === 'rock' ? 'No rock-like tracks here.' : 'No known objects here.'}
+        </p>
+      )}
       {step >= 3 && (
         <div className="sx-lk-list" data-testid="disc-list">
           {shown.map(({ m, i }) => (

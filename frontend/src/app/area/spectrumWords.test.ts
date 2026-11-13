@@ -12,6 +12,7 @@ import {
   heatGlowLine,
   largestStep,
   rangeLine,
+  starScatter,
   steadyText,
   VERDICT_WORDS,
   verdictCounts,
@@ -111,6 +112,8 @@ describe('rows', () => {
     expect(distanceText(track('T1'))).toBeNull();
     expect(comparedText(spectra.calibration)).toBe('the Sun, and stars in the same frames');
     expect(comparedText(spectra.calibration.map((c) => ({ ...c, source: 'default' as const })))).toBe('the Sun');
+    expect(starScatter(spectra.calibration)).toBeCloseTo(0.0488, 3);
+    expect(starScatter(spectra.calibration.map((c) => ({ ...c, sigma_sys: 0 })))).toBeNull();
   });
 
   it('the step-list counts, in the table\'s order', () => {
@@ -131,7 +134,9 @@ describe('chart model', () => {
     expect(m.glow).not.toBeNull();
     expect(m.limits).toEqual([]);
     expect(m.yLabel).toBe("times the Sun's colour");
-    expect(chartLabel('T3', m, 'rock')).toMatch(/^Brightness divided by sunlight .* 14 points .* Looks like sunlight off a rock\.$/);
+    const label = chartLabel('T3', m, 'rock');
+    expect(label).toMatch(/^Brightness divided by sunlight .* 14 points .* Looks like sunlight off a rock\. Every point is listed under Points used\.$/);
+    expect(label).toContain('2 above the rock range, inside the heat glow allowance for 1.16 AU.');
   });
 
   it('T8: lower limits as arrows and no heat glow; no short-arm point, so no rel to draw', () => {
@@ -151,6 +156,15 @@ describe('chart model', () => {
     expect(chartModel(t, range, true).points).toHaveLength(13);
   });
 
+  it('a large colour steps the ticks so their labels never crowd', () => {
+    const t = track('T1');
+    t.points[1] = { ...t.points[1]!, rel: 37 };
+    const m = chartModel(t, range, false);
+    expect(m.yTicks.length).toBeLessThanOrEqual(10);
+    expect(m.yTicks[0]).toBe(1);
+    expect(m.yTicks.at(-1)).toBeGreaterThanOrEqual(35);
+  });
+
   it('x extends to 5.1 µm when a point is beyond 3.8; y gains ticks when needed', () => {
     const t = track('T1');
     t.points[1] = { ...t.points[1]!, lambda_um: 4.6, rel: 5.2 };
@@ -168,5 +182,6 @@ describe('chart model', () => {
     expect(m.yLabel).toBe('µJy');
     expect(m.points[0]!.y).toBe(track('T3').points[0]!.flux_uJy);
     expect(chartLabel('T3', m, 'rock')).not.toMatch(/rock/);
+    expect(chartLabel('T3', m, 'rock')).toMatch(/Every point is listed under Points used\.$/);
   });
 });
