@@ -2,7 +2,8 @@
 // that runs on its own (a loader on the current step, a tick on the done ones), then the movers it
 // found. The dots and movers draw on the sky (AreaTrackLayer). The steps, counts and movers come
 // from areaService.discoverIn: a prepared area's precomputed replies (Q-205), else DEMO DATA that
-// is not a search of the square.
+// is not a search of the square. Issue #145: the provenance lines, "Detection rates not measured
+// yet" until the checks D4 to D7 exist, Export ECSV, and a track's card with Track it and Build it.
 import GridLoader from '@/app/island/GridLoader';
 import { FETCHING_LOOK, SEARCHING_LOOK } from '@/app/island/loaderLooks';
 import { PanelCard } from '@/app/shell/PanelCard';
@@ -12,6 +13,8 @@ import { DemoTag } from './DemoTag';
 import { ErosCard, MoverDemoCard } from './ErosCard';
 import { RealAreaNotes } from './RealAreaNotes';
 import { RealTrackCard } from './RealTrackCard';
+import { Alert, AreaAlert } from './areaBits';
+import { API_BASE } from '@/app/api/config';
 import { visitNumbers } from '@/app/sky/area/blink';
 import type { DiscoveryMover } from './areaService';
 
@@ -51,6 +54,7 @@ export function DiscoveryCard() {
   const steps = disc?.steps ?? [];
   const total = steps.length;
   const nowStep = running ? step + 1 : -1;
+  const done = total > 0 && !running && step >= total - 1;
   const announce =
     total === 0
       ? ''
@@ -65,30 +69,23 @@ export function DiscoveryCard() {
     <PanelCard
       title="Discovery"
       subtitle={box ? `Area · ${formatAreaDims(box)}` : 'Area'}
-      icon="area"
       onClose={closePanel}
       onMinimise={() => useAreaStore.getState().setMinimised(true)}
       returnFocusTo='[data-testid="tool-area"]'
       testId="area-card"
     >
+      <div className="sx-live sx-results" data-testid="disc-card">
       {refusal ? (
-        <>
-          <p className="fb-muted" role="status" data-testid="area-refused" data-code={refusal.code}>
-            {refusal.message}
-          </p>
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              className="sx-btn sx-btn-ghost"
-              data-testid="area-redraw"
-              onClick={() => useAreaStore.getState().redraw()}
-            >
-              Draw again
-            </button>
-          </div>
-        </>
+        <AreaAlert refusal={refusal} />
       ) : real ? (
-        <RealAreaNotes computedAt={real.summary.computed_at} synthetic={real.synthetic} missing={real.missing} />
+        <RealAreaNotes
+          areaId={real.entry.area_id}
+          release={real.summary.data_release}
+          computedAt={real.summary.computed_at}
+          summary={real.summary}
+          synthetic={real.synthetic}
+          missing={real.missing}
+        />
       ) : disc?.demo ? (
         <div className="sx-kn-foot">
           <DemoTag />
@@ -168,6 +165,33 @@ export function DiscoveryCard() {
           ))}
         </div>
       )}
+      {done && real && (
+        // Until the completeness and false-alarm checks (D4 to D7) exist (plan answer 4).
+        <Alert tone="warn" title="Detection rates not measured yet" line="Treat possible tracks as leads." testId="disc-rates" />
+      )}
+      {(done || refusal) && (
+        <div className="sx-live-btns">
+          {done && real && (
+            <a
+              className="sx-btn-outline"
+              href={`${API_BASE}/areas/${encodeURIComponent(real.entry.area_id)}/export.ecsv`}
+              download
+              data-testid="disc-export"
+            >
+              Export ECSV
+            </a>
+          )}
+          <button
+            type="button"
+            className="sx-btn-outline"
+            data-testid="area-redraw"
+            onClick={() => useAreaStore.getState().redraw()}
+          >
+            Draw again
+          </button>
+        </div>
+      )}
+      </div>
     </PanelCard>
   );
 }
@@ -185,6 +209,9 @@ export function MoverCard() {
         track={m.track}
         provenance={disc.real.tracks.provenance}
         synthetic={disc.real.synthetic}
+        summary={disc.real.summary}
+        areaId={disc.real.entry.area_id}
+        release={disc.real.summary.data_release}
         back={openDisc}
       />
     );

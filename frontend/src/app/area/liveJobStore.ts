@@ -15,6 +15,7 @@ import {
   type LiveJobStatus,
   type LivePlan,
   type PlanAnswer,
+  type VisitPick,
 } from './liveAreaApi';
 
 export const POLL_MS = 1000;
@@ -44,6 +45,8 @@ export interface LiveJobStoreState {
   showPlan(box: AreaBox, flow: AreaFlow, answer: Exclude<PlanAnswer, { kind: 'unavailable' }>): void;
   /** Compute this area: start the job and follow it. */
   compute(): Promise<void>;
+  /** The visit pair picker (issue #145): the coverage check again with that pair, then its offer. */
+  choosePair(starts: VisitPick): Promise<void>;
   /** Stop (computing) or Cancel (waiting): the job ends, nothing is saved, the offer shows again. */
   stop(): Promise<void>;
   /** Try again after a failure: the coverage check again. */
@@ -180,8 +183,10 @@ export const useLiveJobStore = create<LiveJobStoreState>()((set, get) => {
       const view = get().view;
       if (view?.kind !== 'offer' || get().busy) return;
       set({ busy: true });
+      // The pair of the offer, so a pair picked in the picker is the one computed.
+      const pair: VisitPick = [view.plan.visits[0].start, view.plan.visits[1].start];
       const answer = await getLiveAreaApi()
-        .start(liveBoxOf(view.box))
+        .start(liveBoxOf(view.box), undefined, pair)
         .catch(() => ({ kind: 'unavailable' as const }));
       set({ busy: false });
       if (get().view !== view) return; // the card moved on meanwhile
@@ -196,6 +201,18 @@ export const useLiveJobStore = create<LiveJobStoreState>()((set, get) => {
       } else {
         set({ view: failView(view.box, view.flow, 'upstream_unavailable', '') });
       }
+    },
+    choosePair: async (starts) => {
+      const view = get().view;
+      if (view?.kind !== 'offer' || get().busy) return;
+      set({ busy: true });
+      const answer = await getLiveAreaApi()
+        .plan(liveBoxOf(view.box), undefined, starts)
+        .catch(() => ({ kind: 'unavailable' as const }));
+      set({ busy: false });
+      if (get().view !== view) return;
+      if (answer.kind === 'unavailable') set({ view: failView(view.box, view.flow, 'upstream_unavailable', '') });
+      else get().showPlan(view.box, view.flow, answer);
     },
     stop: async () => {
       const job = get().job;

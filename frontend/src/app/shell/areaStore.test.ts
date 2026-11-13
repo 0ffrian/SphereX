@@ -99,7 +99,8 @@ describe('Known flow on the API (issue #130)', () => {
     const s = useAreaStore.getState();
     expect(s.screen).toBe('list');
     expect(s.known?.demo).toBe(false);
-    expect(s.known?.real?.missing).toEqual(['skybot:2']);
+    // The stub serves no summary or tracks: those are named as missing too (issue #145).
+    expect(s.known?.real?.missing).toEqual(['skybot:2', 'area:summary_unavailable', 'area:detections_unavailable']);
     expect(s.refusal).toBeNull();
   });
   it('a newer square aborts the request of the older one', async () => {
