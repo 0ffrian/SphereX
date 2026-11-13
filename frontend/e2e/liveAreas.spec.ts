@@ -114,6 +114,8 @@ test('waiting: another area is computing; Cancel goes back to the offer', async 
 });
 
 test('failures: no visit pair, archive not reachable (Try again), offline', async ({ page }) => {
+  // Three page loads: under parallel load they can pass the 30 s default.
+  test.setTimeout(60_000);
   for (const [q, code, title] of [
     ['mock-no-pair', 'area:no_visit_pair', 'No two visits close in time'],
     ['mock-unreachable', 'upstream_unavailable', 'Frame archive not reachable'],

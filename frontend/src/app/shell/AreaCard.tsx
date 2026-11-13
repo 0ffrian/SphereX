@@ -12,7 +12,7 @@ import { KnownList } from '@/app/area/KnownList';
 import { LiveAreaCard } from '@/app/area/LiveAreaCard';
 import { TrackJobCard } from '@/app/area/TrackJobCard';
 import { ScanCard } from '@/app/area/ScanCard';
-import { fitCamera, flyToView, enterInArea, safeRect } from '@/app/sky/areaDraw';
+import { backToScan, fitCamera, flyToView, enterInArea, safeRect } from '@/app/sky/areaDraw';
 import { MAX_SIDE_DEG } from '@/app/area/aim';
 import { formatAreaDims, useAreaStore } from './areaStore';
 import { useShellStore } from './shellStore';
@@ -128,7 +128,7 @@ export function AreaCard() {
             trackBack === 'mover'
               ? () => useAreaStore.getState().openMover(useAreaStore.getState().sel)
               : trackBack === 'scan'
-                ? () => useAreaStore.getState().backToScan()
+                ? backToScan
                 : undefined
           }
         />

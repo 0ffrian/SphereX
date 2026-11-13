@@ -530,6 +530,7 @@ export const useAreaStore = create<AreaState>()((set, get) => {
     },
     backToScan: () => set({ screen: 'scan', minimised: false, playing: false, focus: null }),
     openSquare: (box, flow, focus = null) => {
+      // clearTimers first: it bumps the token, so an older read never applies this new focus.
       clearTimers();
       useLiveJobStore.getState().clearView();
       pendingFocus = focus;

@@ -131,6 +131,21 @@ describe('scan store', () => {
   });
 });
 
+describe('start while the user moves on', () => {
+  it('a run started after Select again is stopped, not followed (PR #159 review)', async () => {
+    const api = mockScanApi({ squareMs: 1000, now, persist: false });
+    const stop = vi.spyOn(api, 'stop');
+    setScanApi(api);
+    await useScanStore.getState().plan('discovery', REGION);
+    const p = useScanStore.getState().start();
+    useScanStore.getState().clear();
+    await p;
+    expect(useScanStore.getState().view).toBeNull();
+    expect(stop).toHaveBeenCalledTimes(1);
+    expect(useScanStore.getState().saved()).toBeNull();
+  });
+});
+
 describe('scan plan reply check', () => {
   it('accepts a plan, an error, and calls anything else unavailable', () => {
     expect(parseScanPlan({ error: 'scan:too_large', detail: 'x' })).toEqual({

@@ -486,5 +486,5 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | Q-466 | Known list: Detected (matched by a found-blind track) and Predicted rows, detected first, filter, paths on the sky | Decided (as built, #145) | [moving-objects](moving-objects.md) |
 | Q-467 | Provenance of a live area | Proposed | [moving-objects](moving-objects.md) |
 | Q-469 | Track it (on demand) and Build it from area results; placeholder build for an unexplained track (amends R7.6 for area tracks) | Decided (as built, #145) | [moving-objects](moving-objects.md) |
-| Q-472 | Scan UI: select a region, gridded screen, square-by-square scan, objects circled with trajectories, combined results | Decided (as built, #157) | [moving-objects](moving-objects.md) |
+| Q-472 | Scan UI: select a region, gridded screen, square-by-square scan, objects circled with trajectories, combined results | Decided (as built, #157); the UI not in the mock-up is Proposed | [moving-objects](moving-objects.md) |
 | B-01 to B-04 | Post-event backlog | Backlog | [scope-process](scope-process.md#post-event-backlog) |
