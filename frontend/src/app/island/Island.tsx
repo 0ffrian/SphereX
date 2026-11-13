@@ -13,6 +13,7 @@ import { useElapsedSeconds } from '@/app/StatusBoxes';
 import GridLoader from './GridLoader';
 import { FOUND_LOOK, IDLE_LOOK, LOADER_BASE, SEARCHING_LOOK, UPDATING_LOOK } from './loaderLooks';
 import { areaMiniTitle, useAreaStore } from '@/app/shell/areaStore';
+import { liveMiniTitle, useLiveJobStore } from '@/app/area/liveJobStore';
 import { subscribeMotion } from '@/app/sky/skyMotion';
 import { isThinking } from './islandText';
 import { useIslandStore } from './islandStore';
@@ -80,7 +81,13 @@ export function Island() {
   // The square tools (Known objects, Discovery): the island says what the dummy search is doing, and
   // it holds the place of a minimised card (a click brings it back).
   const areaSay = useAreaStore((s) => s.say);
-  const areaCardMini = useAreaStore((s) => (s.minimised ? areaMiniTitle(s) : null));
+  // The live area card (issue #144) says its step: "Discovery · Step 2 of 6 · Download frames".
+  const liveTitle = useLiveJobStore((s) =>
+    s.view ? liveMiniTitle(s, s.view.flow === 'known' ? 'Known objects' : 'Discovery') : null,
+  );
+  const areaCardMini = useAreaStore((s) =>
+    s.minimised ? (s.screen === 'live' && liveTitle !== null ? liveTitle : areaMiniTitle(s)) : null,
+  );
   const areaMini = buildMini ?? areaCardMini ?? objMini;
   const areaRunning = useAreaStore((s) => s.running);
   const restore = () => {
