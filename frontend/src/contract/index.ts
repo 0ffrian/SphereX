@@ -82,5 +82,7 @@ export type {
   HapticProfile,
   TextureHaptic,
   DataHaptic,
+  ToneId,
+  ToneParams,
 } from './haptics';
 export { assertTagged, isValidlyTagged, ProvenanceError, type Tagged } from './assertTagged';

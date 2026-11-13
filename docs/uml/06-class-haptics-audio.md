@@ -25,6 +25,10 @@ classDiagram
     startTrain(id, params) bool
     updateTrain(id, changes) bool
     stopTrain(id?)
+    emitTogether(notes) number
+    startTone(id, params) bool
+    updateTone(id, changes) bool
+    stopTone(id)
     setHonesty(state)
     setDriverEnabled(driver, on)
     unlock() Promise~bool~
@@ -34,6 +38,9 @@ classDiagram
     <<sound/voices.ts>>
     emit(e)
     playTrain(window)
+    startTone(id, tone)
+    updateTone(id, tone)
+    stopTone(id)
     setVolume(v)
     stop()
     stopTrain()
@@ -58,6 +65,11 @@ classDiagram
     chord(reply, {owner, mode}) ChordOutcome
     setChordMode(mode) bool
     stopChord(owner)
+    startTone(id, params) bool
+    updateTone(id, changes) bool
+    stopTone(id)
+    hasTone(id) bool
+    emitTogether(notes) number
     bind(honesty) unbind
   }
   class SpectrumChord {
@@ -98,7 +110,7 @@ classDiagram
     wavelengthToPitch(λ) "long λ = low (Q-430)"
     pitchToHz(p)
   }
-  SoundEngine --> AudioDriver : fans out events and trains
+  SoundEngine --> AudioDriver : fans out events, trains and tones
   AudioDriver ..> HapticEvent
   AudioDriver ..> pitch
   ListenSweep ..> pitch
