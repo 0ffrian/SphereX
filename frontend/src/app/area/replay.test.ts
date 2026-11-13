@@ -151,12 +151,17 @@ describe('recordAt', () => {
       squares_done: 1,
       squares_skipped: 0,
     });
+    // Abramenko, found in squares 1 and 3, counts once (as its circle does).
     expect(recordAt(RUN, 1900).totals).toMatchObject({
-      found: 2,
+      known: 2,
+      found: 1,
       unexplained: 1,
       squares_done: 2,
       squares_skipped: 1,
     });
+  });
+  it('ends on the run itself: the end frame has the server totals', () => {
+    expect(recordAt(RUN, durationOf(RUN)).totals).toEqual(RUN.totals);
   });
   it('is deterministic: the same t gives the same frame', () => {
     expect(recordAt(RUN, 1234.5)).toEqual(recordAt(RUN, 1234.5));

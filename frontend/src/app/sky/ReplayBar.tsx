@@ -5,18 +5,14 @@
 // red; click a tick or the rail to jump, drag the knob), the time and the square count, and the
 // speeds 1×, 10×, 60×, 600×. Escape, the runs button or another tool ends the replay.
 // Keyboard on the timeline: arrows step 1 % of the run, Page Up and Page Down jump to the previous
-// or next tick, Home and End to the start and the end.
+// or next tick, Home and End to the start and the end. Screen readers hear the position from the
+// slider's value text when they move it; nothing is announced while it plays (it would never stop).
 import { useEffect, useMemo, useRef, type KeyboardEvent, type PointerEvent } from 'react';
 import { useShellStore } from '@/app/shell/shellStore';
 import { clock, REPLAY_SPEEDS, squareAt, ticksOf, whenText } from '@/app/area/replay';
 import { useRunsStore } from '@/app/area/runsStore';
 
 const TOOL = { discovery: 'Discovery', known: 'Known objects' } as const;
-const TICK_TEXT = {
-  known: 'known object found',
-  unexplained: 'unexplained mover',
-  skipped: 'square skipped',
-} as const;
 
 export function ReplayBar() {
   const replay = useRunsStore((s) => s.replay);
@@ -171,17 +167,6 @@ export function ReplayBar() {
           ))}
         </span>
       </div>
-      <p className="sr-only" aria-live="polite">
-        {ticks.length > 0
-          ? `${ticks.filter((k) => k.t <= t).length} of ${ticks.length} events so far: ${summary(ticks, t)}`
-          : ''}
-      </p>
     </>
   );
-}
-
-/** The latest event before t, for screen readers (announced as the replay passes it). */
-function summary(ticks: ReturnType<typeof ticksOf>, t: number): string {
-  const last = [...ticks].reverse().find((k) => k.t <= t);
-  return last ? `${last.label} (${TICK_TEXT[last.kind]}) at ${clock(last.t)}` : 'none yet';
 }
