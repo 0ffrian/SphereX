@@ -22,10 +22,9 @@ from app.api.models import JobStatus
 from app.cache.keys import CacheKey
 from app.cache.store import CacheEntry, Served
 from app.context import Context, make_context
-from app.core.area import track
 from app.core.card import service as card_service
 from app.core.card.service import ObjectPipeline, track_job_key
-from app.core.find import moving
+from app.core.find import moving, track
 from app.core.find.frames import FrameService
 from app.core.find.resolver import load_object
 from app.core.measure.config import DEFAULT_CONFIG, config_for
