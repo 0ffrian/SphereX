@@ -1,6 +1,6 @@
 # 22 Area search: components and sequences
 
-Area search of [A16](../architecture/moving-objects/area-search.md) (agreed plan, Q-146): a square drawn on the sky, then **Known objects** (hand-off to Track, [A19](../architecture/moving-objects/track.md) and [A20](../architecture/moving-objects/track-ui.md)) or **Discovery** (dots, glitches, stars and fixed dots removed, joined across visits with a parallax-aware test, checked against known objects). Three diagrams: components, the offline precompute, and the sky interaction. Drawn 9 Nov 2026 from A16 to A18 (backend [A17](../architecture/moving-objects/area-backend.md), sky UI [A18](../architecture/moving-objects/area-ui.md), shell [A21](../architecture/sky-shell.md)). **Built:** the backend from frames to the API (issues #97 and #108: `frames.py`, `dots.py`, `clean.py`, `join.py`, `match.py`, `service.py`, `api/areas.py`, `core/export/ecsv.py`) and the committed Eros pack. The frontend reads `/v1/areas` from the sky dock (issue #96, Q-406): a prepared area that holds the drawn box answers first, and the Q-414 demo only where none does. Known objects' rows carry their Horizons positions and **Track it** reads the object's `/frames` and `/path` for the Eros card (issue #130, Q-455). **Live areas (issue #141, Q-462, Q-463):** a box drawn anywhere is planned by `core/area/live.py` and computed by a background job in `core/area/live_jobs.py` (the same pipeline, stored as `derived.area`), on SPHEREx DR1; see the live area job sequence. **Scans and runs (issue #156, Q-470, Q-471):** a region scanned square by square on the same worker, every run recorded with a replay timeline; see the scan and run sequence. The frontend's aim, draw and live card (issue #144) and the results with Track it and Build it (issue #145) are the last two diagrams. Not built: the gated extras D4 to D7 (cut). Items marked "proposed" wait on a decision (Q-178 to Q-187 in the spec).
+Area search of [A16](../architecture/moving-objects/area-search.md) (agreed plan, Q-146): a square drawn on the sky, then **Known objects** (hand-off to Track, [A19](../architecture/moving-objects/track.md) and [A20](../architecture/moving-objects/track-ui.md)) or **Discovery** (dots, glitches, stars and fixed dots removed, joined across visits with a parallax-aware test, checked against known objects). Three diagrams: components, the offline precompute, and the sky interaction. Drawn 9 Nov 2026 from A16 to A18 (backend [A17](../architecture/moving-objects/area-backend.md), sky UI [A18](../architecture/moving-objects/area-ui.md), shell [A21](../architecture/sky-shell.md)). **Built:** the backend from frames to the API (issues #97 and #108: `frames.py`, `dots.py`, `clean.py`, `join.py`, `match.py`, `service.py`, `api/areas.py`, `core/export/ecsv.py`) and the committed Eros pack. The frontend reads `/v1/areas` from the sky dock (issue #96, Q-406): a prepared area that holds the drawn box answers first, and the Q-414 demo only where none does. Known objects' rows carry their Horizons positions and **Track it** reads the object's `/frames` and `/path` for the Eros card (issue #130, Q-455). **Live areas (issue #141, Q-462, Q-463):** a box drawn anywhere is planned by `core/area/live.py` and computed by a background job in `core/area/live_jobs.py` (the same pipeline, stored as `derived.area`), on SPHEREx DR1; see the live area job sequence. **Scans and runs (issue #156, Q-470, Q-471):** a region scanned square by square on the same worker, every run recorded with a replay timeline; see the scan and run sequence. The frontend's aim, draw and live card (issue #144) and the results with Track it and Build it (issue #145) are the last two diagrams. Not built: the gated extras D4, D5 and D7 (cut); D6 is replaced by the spectrum check (`core/area/spectrum.py`, Q-474), computed when an area is stored and served from its own `spectra` stage (built: issue #161; its UI: issue #162, Q-476). Items marked "proposed" wait on a decision (Q-178 to Q-187 in the spec).
 
 ## Components
 
@@ -17,7 +17,6 @@ flowchart TB
     MAT["match.py<br/>SkyBoT candidates, Horizons positions from SPHEREx"]
     INJ["inject.py (gated D4)<br/>planted movers in memory, test mover, completeness grid"]
     CTL["control.py (gated D5)<br/>shuffled-time runs"]
-    SED["sed.py (gated D6)<br/>smoothness label per track"]
     RGL["rategrid.py (gated D7)<br/>3 or more visits"]
   end
   subgraph Reused["Reused or shared modules"]
@@ -31,10 +30,12 @@ flowchart TB
     ECSV["core/export/ecsv.py shared writer (A19.9)"]
   end
   CACHE[("Read-through cache D-25<br/>raw replies + derived.area entries")]
-  API["api/areas.py: /v1/areas, /area_id, /known, /dots, /tracks,<br/>/stamps/dot_id.png, /export.ecsv (no /checks: D4 to D7 cut),<br/>POST /live, GET and DELETE /live/area_id (Q-462)"]
+  API["api/areas.py: /v1/areas, /area_id, /known, /dots, /tracks,<br/>/stamps/dot_id.png, /export.ecsv, /spectra (proposed, Q-474)<br/>(no /checks: D4 to D7 cut),<br/>POST /live, GET and DELETE /live/area_id (Q-462)"]
   subgraph Live["backend/app/core/area/ live areas (issue #141)"]
     LIVE["live.py<br/>box rules, visit pair at the centre, plan, area id"]
     JOBS["live_jobs.py<br/>queue, one worker thread, run_live_area (pipeline imported lazily)"]
+    SPEC["spectrum.py (proposed, Q-474)<br/>colour per exposure vs the Sun, heat glow, steadiness, verdict per track"]
+    SUN[("assets/solar/sun.json<br/>CALSPEC + Kurucz, R = 41")]
   end
   PACK[("assets/areas pack<br/>derived.area entries, Eros (issue #108)")]
   subgraph FE["frontend/src"]
@@ -51,12 +52,13 @@ flowchart TB
   SVC --> ECSV
   SVC -.-> INJ
   SVC -.-> CTL
-  SVC -.-> SED
   SVC -.-> RGL
   INJ --> DOT
   CTL --> JON
   RGL --> CLN
-  SED --> MAT
+  JOBS --> SPEC
+  SPEC --> SUN
+  SPEC -->|stage spectra, own version| CACHE
   FRM --> SIA
   FRM --> CUT
   DOT --> WCS
