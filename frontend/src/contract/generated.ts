@@ -494,6 +494,12 @@ export type TrackPathMissingCode =
   | 'path:window'
   | 'path:frames_incomplete';
 export type TrackPathUtcTimeOrNull = TrackPathUtcTime | null;
+export type LiveAreaId = string;
+/**
+ * ISO-8601 UTC with a trailing Z.
+ */
+export type LiveUtcTime = string;
+export type LiveJobAreaId = string;
 
 /**
  * Bundle root: exists only so that every schema compiles into this one file.
@@ -509,6 +515,8 @@ export interface ContractSchemas {
   areaChecks: AreaChecks;
   areaError: AreaError;
   trackPath: TrackPath;
+  liveAreaPlan: LiveAreaPlan;
+  liveAreaJob: LiveAreaJob;
 }
 /**
  * What is known about one object (R3.2). Served by GET /v1/objects/{id}/card (D-16). Single source of the contract (D-18).
@@ -1169,6 +1177,144 @@ export interface TrackPathFramePoint {
    * Horizons 3-sigma Dec uncertainty (quantity 36); null until it is asked for.
    */
   dec_3sigma_arcsec: number | null;
+}
+/**
+ * POST /v1/areas/live with start=false (Q-462): what a live area would use, before anything runs. A stored area answers state=done instead (area-job.schema.json).
+ */
+export interface LiveAreaPlan {
+  area_id: LiveAreaId;
+  release: string;
+  box: LiveBox;
+  /**
+   * @minItems 2
+   * @maxItems 2
+   */
+  visits: [LiveVisit, LiveVisit];
+  /**
+   * Frames of the two visits over the box centre (the run may keep more over the whole box).
+   */
+  n_frames: number;
+  /**
+   * Rough run time, kept on the high side: 540 s + 600 s per square degree (13 Nov 2026 QR3 and DR1 runs).
+   */
+  estimate_s: number;
+  /**
+   * Other visit pairs at most max_gap_h apart, closest first (for a visit pair picker).
+   *
+   * @maxItems 10
+   */
+  alternatives:
+    | []
+    | [LiveVisitPair]
+    | [LiveVisitPair, LiveVisitPair]
+    | [LiveVisitPair, LiveVisitPair, LiveVisitPair]
+    | [LiveVisitPair, LiveVisitPair, LiveVisitPair, LiveVisitPair]
+    | [LiveVisitPair, LiveVisitPair, LiveVisitPair, LiveVisitPair, LiveVisitPair]
+    | [LiveVisitPair, LiveVisitPair, LiveVisitPair, LiveVisitPair, LiveVisitPair, LiveVisitPair]
+    | [
+        LiveVisitPair,
+        LiveVisitPair,
+        LiveVisitPair,
+        LiveVisitPair,
+        LiveVisitPair,
+        LiveVisitPair,
+        LiveVisitPair,
+      ]
+    | [
+        LiveVisitPair,
+        LiveVisitPair,
+        LiveVisitPair,
+        LiveVisitPair,
+        LiveVisitPair,
+        LiveVisitPair,
+        LiveVisitPair,
+        LiveVisitPair,
+      ]
+    | [
+        LiveVisitPair,
+        LiveVisitPair,
+        LiveVisitPair,
+        LiveVisitPair,
+        LiveVisitPair,
+        LiveVisitPair,
+        LiveVisitPair,
+        LiveVisitPair,
+        LiveVisitPair,
+      ]
+    | [
+        LiveVisitPair,
+        LiveVisitPair,
+        LiveVisitPair,
+        LiveVisitPair,
+        LiveVisitPair,
+        LiveVisitPair,
+        LiveVisitPair,
+        LiveVisitPair,
+        LiveVisitPair,
+        LiveVisitPair,
+      ];
+  provenance: {
+    visits: {
+      tag: 'measured';
+      source: string;
+      formula: string;
+    };
+  };
+}
+/**
+ * The drawn box snapped to a 0.05 degree grid (Q-462).
+ */
+export interface LiveBox {
+  ra: number;
+  dec: number;
+  width_deg: number;
+  height_deg: number;
+}
+export interface LiveVisit {
+  start: LiveUtcTime;
+  end: LiveUtcTime;
+  n_frames: number;
+}
+export interface LiveVisitPair {
+  /**
+   * @minItems 2
+   * @maxItems 2
+   */
+  visits: [LiveVisit, LiveVisit];
+  gap_h: number;
+}
+/**
+ * GET /v1/areas/live/{area_id}, and POST /v1/areas/live with start=true or for a stored area (Q-462): the state of a live area job. Results of a done job are served by /v1/areas/{area_id}/... as for a prepared area.
+ */
+export interface LiveAreaJob {
+  area_id: LiveJobAreaId;
+  state: 'queued' | 'running' | 'done' | 'failed';
+  /**
+   * Id of the running step; null when not running.
+   */
+  step?: string | null;
+  steps: LiveJobStep[];
+  elapsed_s: number;
+  /**
+   * Rough time left; null when done, failed or unknown.
+   */
+  eta_s: number | null;
+  /**
+   * 1 = next; only while queued.
+   */
+  queue_position?: number;
+  error?: LiveJobError;
+}
+export interface LiveJobStep {
+  id: 'visits' | 'frames' | 'dots' | 'labels' | 'join' | 'known';
+  label: string;
+  state: 'done' | 'running' | 'todo';
+  done?: number;
+  total?: number;
+}
+export interface LiveJobError {
+  code: string;
+  detail: string;
 }
 
 export const TAGS: readonly Tag[] = [

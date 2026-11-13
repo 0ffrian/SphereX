@@ -22,8 +22,9 @@
    that fails the pair test's limits (rate window, ``u <= 1/delta_min``, ``v_tol`` with the
    largest ``sigma_v`` of the chain's legs), or a chain of three or more legs with ``w`` for
    only some of them, is not served: the track keeps the ``v_AB`` of its first pair whose rate
-   also lies in the chain's window, with no ``u``, or no rate at all when no pair does. ``u`` is
-   only ever fitted over all of a track's legs. A 2-leg track is always fitted as a ``"chain"``.
+   also lies in the chain's window, never that pair's ``u`` (fitted on two of the legs only), or
+   no rate at all when no pair does. ``u`` is fitted only when every leg has ``w``. A 2-leg
+   track is always fitted as a ``"chain"``.
 
 Pure: ``w`` comes in as a mapping; ``spherex_w`` fetches it through the cache.
 """
@@ -82,6 +83,9 @@ def spherex_w(
 ) -> tuple[dict[int, SkyVelocity], list[Served]]:
     """One Horizons vector per visit at its mid-time (A17.4 step 3). A visit whose vector fails
     is absent; the join then falls back to the rate window for its pairs."""
+    # No ``cfg`` here: this step reads no setting, only the visits' mid-times, which the frames
+    # part of the key already covers.
+    geo.require(frames)
     out: dict[int, SkyVelocity] = {}
     served: list[Served] = []
     for visit, mid in sorted(geo.visit_mid_d.items()):
@@ -182,9 +186,9 @@ def chain_fit(
     cfg: AreaConfig = DEFAULT_AREA_CONFIG,
 ) -> tuple[Vec, float | None] | None:
     """``(v_AB, u)`` of a track over all its legs (issue #128 (4)), or ``None`` when that fit fails
-    the pair test's own limits (the caller, ``join``, then serves the ``v_AB`` of the first
-    consecutive pair whose rate lies inside the chain's window, without ``u``, or no rate at all
-    when no pair's does).
+    the pair test's own limits. ``join`` then serves the ``v_AB`` of the first consecutive pair
+    whose rate lies in the chain's window, with no ``u`` (a pair's ``u`` is fitted on two of the
+    legs), or no rate at all when no pair does (``TrackFit``).
 
     ``v_AB`` is the slope of the least-squares line through the legs' positions at their
     ``t_ref``, equal weights, and must lie in ``[rate_min, rate_max]`` (the caller passes the
@@ -237,9 +241,10 @@ def chain_fit(
     return v_ab, u
 
 
-# "chain": chain_fit over all legs. "pair": the chain fit was refused, so the v_AB of the first
-# consecutive pair whose fit lies in the chain's own rate window, and no u. "none": no pair does
-# either, so the track is served without a rate, PA or u (refused, not guessed).
+# "chain": chain_fit over all legs. "pair": the chain fit failed the limits, so the v_AB of the
+# first consecutive pair whose rate lies in the chain's own window, with u None (a pair's u is
+# fitted on two of the legs). "none": no pair does either, so the track is served without a
+# rate, PA or u (refused, not guessed): v_ab and u are None, and every reader must allow that.
 TrackFit = Literal["chain", "pair", "none"]
 
 
@@ -374,6 +379,7 @@ def join(
     w: Mapping[int, SkyVelocity],
     cfg: AreaConfig = DEFAULT_AREA_CONFIG,
 ) -> Join:
+    geo.require(frames, cfg)
     legs, static = _mover_legs(labels)
     visits = sorted(geo.visit_mid_d)
     coverage = {c.visit: c for c in frames.coverage}
@@ -412,9 +418,9 @@ def join(
             if got is not None:
                 out.append(JoinedTrack(members, "track", None, got[0], got[1], "chain"))
                 continue
-            # The whole-chain fit is refused: the first pair whose own fit also suits the chain's
-            # window (a pair can pass its window yet break the span's), without its u, which is
-            # fitted on two of the legs only (as chain_fit). No such pair: no rate is served.
+            # The whole-chain fit fails the limits: the v_AB of the first pair whose own fit also
+            # suits the chain's window (a pair can pass its window yet break the span's), never
+            # its u, which is fitted on two of the legs. No such pair: no rate is served.
             pair = next(
                 (f for f in (fits[k] for k in itertools.pairwise(chain)) if rmin <= f[1] <= rmax),
                 None,

@@ -180,18 +180,24 @@ def run_area(
     inputs: str = "area_cones",
     sources: Mapping[str, str] | None = None,
     refresh: bool = False,
+    on_step: Callable[[str], None] | None = None,
 ) -> AreaResult:
     """P4 to P6 on P3's records. ``star_cones`` replaces the area cone (the recorded area uses
     Track's recorded visit cones); ``inputs`` names where the frames came from and is written
-    into ``method.settings`` (and so ``params_hash``)."""
+    into ``method.settings`` (and so ``params_hash``). ``on_step`` is told ``labels``, ``join``
+    and ``known`` as each step starts (live area progress, Q-462); it never changes a result."""
+    step = on_step or (lambda _name: None)
+    step("labels")
     geo = clean.area_geometry(frames, cfg)
     cones = dict(star_cones) if star_cones is not None else clean.star_cones(frames)
     st = clean.star_lists(ctx, cones, refresh=refresh)
     labels = clean.label_dots(
         frames, bodies, per_frame, st.lists, cfg, star_missing=st.missing, geo=geo
     )
+    step("join")
     w, w_served = join.spherex_w(ctx, frames, geo, refresh=refresh)
     joined = join.join(labels, frames, geo, w, cfg)
+    step("known")
     known = match.known_step(ctx, frames, geo, cfg, refresh=refresh)
     verdicts = match.verdicts(joined.tracks, known, geo, cfg)
     objects = match.known_list(frames, known, geo, cfg)
@@ -262,6 +268,17 @@ def _skybot_reply(known: match.KnownStep) -> list[dict[str, Any]]:
     return [{"visit": v, "fetched_at": at} for v, at in sorted(known.skybot.items())]
 
 
+def track_rate_fields(t: join.JoinedTrack) -> dict[str, float | None]:
+    """``rate_deg_day``, ``pa_deg`` and ``u_inv_au`` of one ``/tracks`` entry: null for a
+    possible and for a track served without a rate (``fit == "none"``, or ``u`` when the track's
+    ``u`` was not fitted over all its legs)."""
+    return {
+        "rate_deg_day": _r(math.hypot(*t.v_ab), 4) if t.v_ab is not None else None,
+        "pa_deg": _pa(*t.v_ab) if t.v_ab is not None else None,
+        "u_inv_au": _r(t.u, 3) if t.u is not None else None,
+    }
+
+
 def _tracklet_reply(lg: join.Leg) -> dict[str, Any]:
     ve, vn = lg.v
     return {
@@ -315,9 +332,7 @@ def build_replies(result: AreaResult) -> dict[str, dict[str, Any]]:
                 "track_id": f"T{i}",
                 "visits": sorted({lg.visit for lg in t.legs}),
                 "tracklets": [_tracklet_reply(lg) for lg in t.legs],
-                "rate_deg_day": _r(math.hypot(*t.v_ab), 4) if t.v_ab else None,
-                "pa_deg": _pa(*t.v_ab) if t.v_ab else None,
-                "u_inv_au": _r(t.u, 3) if t.u is not None else None,
+                **track_rate_fields(t),
                 "status": t.status,
                 "reason": t.reason,
                 "verdict": v.verdict,

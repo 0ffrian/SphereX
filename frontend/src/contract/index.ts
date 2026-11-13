@@ -73,6 +73,12 @@ export type {
   TrackPathPoint,
   TrackPathFramePoint,
   TrackPathWindow,
+  LiveAreaPlan,
+  LiveAreaJob,
+  LiveJobStep,
+  LiveJobError,
+  LiveVisit,
+  LiveVisitPair,
 } from './generated';
 export { AREA_DOT_LABELS, AREA_VERDICTS, AREA_SED_LABELS, AREA_LINKERS } from './generated';
 /** D-23: IRMode uses the same shape as VisibleMode; `channels_um` is set on IRMode only. */

@@ -246,11 +246,11 @@ def test_join_reports_the_whole_chain_rate_for_three_visits() -> None:
     assert got.pair_test == "parallax"
 
 
-def test_join_keeps_the_first_pair_rate_when_the_chain_fit_is_refused(
+def test_join_keeps_the_first_pair_rate_but_no_u_when_the_chain_fit_is_refused(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The pair's rate and PA, but not its ``u`` (2.6016 here): that one is fitted on two of
-    the three legs, so it would mean something else than a chain's."""
+    """The 1-2 pair's ``v_AB`` is served, never its ``u``: that ``u`` is fitted on two of the
+    track's three legs (code review of the PR #140 follow-up)."""
     labels, geo, frames = _three_visit_join_inputs()
     monkeypatch.setattr(join, "chain_fit", lambda *_a, **_k: None)
     t = join.join(labels, frames, geo, W3, CFG).tracks[0]
@@ -264,9 +264,9 @@ def test_a_refused_chain_never_serves_a_pair_rate_outside_the_whole_span_window(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Each pair passes its own window, but the span's (diagonal / span) is tighter than every
-    pair's rate: the real chain fit (0.5 deg/day) is refused by that window, and the track is
-    served without a rate rather than with one the chain broke."""
+    pair's rate: the track is served without a rate rather than with one the chain broke."""
     labels, geo, frames = _three_visit_join_inputs()
+    monkeypatch.setattr(join, "chain_fit", lambda *_a, **_k: None)
     span_max = 0.3  # below the 1-2 (0.45) and 2-3 pair rates, above the pairs' own windows' floor
     real = AreaGeometry.rate_max_for
 
@@ -277,6 +277,13 @@ def test_a_refused_chain_never_serves_a_pair_rate_outside_the_whole_span_window(
     t = join.join(labels, frames, geo, W3, CFG).tracks[0]
     assert t.status == "track" and len(t.legs) == 3
     assert t.fit == "none" and t.v_ab is None and t.u is None
+    # Served with null rate, PA and u, and the known check takes it like any other track.
+    from app.core.area import match, service
+
+    assert service.track_rate_fields(t) == {"rate_deg_day": None, "pa_deg": None, "u_inv_au": None}
+    known = match.KnownStep({}, [], {}, [], [])
+    (v,) = match.verdicts([t], known, geo, CFG)
+    assert v.match is None
 
 
 def test_a_chain_with_w_for_only_some_visits_keeps_the_first_pair_rate_and_no_u() -> None:

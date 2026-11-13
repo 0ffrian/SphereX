@@ -60,6 +60,23 @@ class AreaGeometry:
     visit_mid_d: dict[int, float]  # visit -> mid-time in days after t0 (first and last exposure)
     visit_span_d: dict[int, float]  # visit -> last minus first exposure time, days
     rate_max_deg_day: float  # min(rate_max, size rule) with the shortest visit gap
+    # What ``area_geometry`` built this from (``_geometry_key``): checked by ``require`` in every
+    # step that takes both the frames and the geometry. None for a geometry built by hand (tests).
+    built_from: tuple[object, ...] | None = None
+
+    def require(self, frames: AreaFrames, cfg: AreaConfig | None = None) -> None:
+        """Raise ``ValueError`` unless this is ``area_geometry(frames, cfg)``: built for these
+        frames' area, frame times and visits (not the same area's frames before a filter, so
+        another ``t0``, visit times or rate limit) and, when ``cfg`` is given, its settings. It
+        rebuilds the key, one ``(visit, time)`` per frame, and compares it, so it is O(frames)
+        but parses no time and rebuilds no geometry; skipped for a hand-built geometry."""
+        if self.built_from is None:
+            return
+        f_key, c_key = _geometry_key(frames, cfg)
+        if self.box != AreaBox.of(frames.spec) or self.built_from[0] != f_key:
+            raise ValueError("geo was not built from these frames and settings")
+        if c_key is not None and self.built_from[1] != c_key:
+            raise ValueError("geo was not built from these frames and settings")
 
     def days(self, iso: str) -> float:
         return (parse_utc(iso) - self.t0).total_seconds() / 86400.0
@@ -70,6 +87,15 @@ class AreaGeometry:
         if dt_d <= 0.0:
             return cfg.rate_max_deg_day
         return min(cfg.rate_max_deg_day, max(diag, 0.0) / dt_d)
+
+
+def _geometry_key(
+    frames: AreaFrames, cfg: AreaConfig | None
+) -> tuple[object, tuple[float, float] | None]:
+    """The inputs ``area_geometry`` reads: the area, each frame's visit and time, and the two
+    settings its rate limit uses."""
+    f_key = (frames.spec, tuple((f.visit, f.time) for f in frames.frames))
+    return f_key, None if cfg is None else (cfg.rate_max_deg_day, cfg.margin_deg)
 
 
 def area_geometry(frames: AreaFrames, cfg: AreaConfig = DEFAULT_AREA_CONFIG) -> AreaGeometry:
@@ -89,7 +115,7 @@ def area_geometry(frames: AreaFrames, cfg: AreaConfig = DEFAULT_AREA_CONFIG) -> 
     mids = list(mid.values())
     gaps = [b - a for a, b in itertools.pairwise(mids)]
     rate = geo.rate_max_for(min(gaps), cfg) if gaps else cfg.rate_max_deg_day
-    return AreaGeometry(box, t0, mid, span, rate)
+    return AreaGeometry(box, t0, mid, span, rate, _geometry_key(frames, cfg))
 
 
 @dataclass(frozen=True)
@@ -523,11 +549,9 @@ def label_dots(
     geo: AreaGeometry,
 ) -> Labels:
     """A17.3 on one area. ``geo`` is the run's ``area_geometry(frames, cfg)``, built once by the
-    caller (issue #128 (2)); a ``geo`` built from other frames or settings (another area, or the
-    same area's frames before a filter, so another ``t0``, visit times or rate limit) raises
-    ``ValueError``. Rebuilding it to compare is a pass over the frame times, not the grids."""
-    if geo != area_geometry(frames, cfg):
-        raise ValueError("geo was not built from these frames and settings")
+    caller (issue #128 (2)); a ``geo`` built from other frames or settings raises ``ValueError``
+    (``AreaGeometry.require``)."""
+    geo.require(frames, cfg)
     pts = dot_points(per_frame, frames, geo, cfg)
     label: dict[int, str] = {}
     cover = covering_frames(frames, bodies, pts, cfg)

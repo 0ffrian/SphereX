@@ -323,14 +323,81 @@ function drawLabels(ctx: AreaCtx, i: AreaDrawInput, stats: AreaDrawStats): void 
   ctx.font = LABEL_FONT;
   ctx.textBaseline = 'bottom';
   ctx.setLineDash(NO_DASH);
+  const wanted: LabelWanted[] = [];
   for (const t of i.scene.tracks) {
     const last = lastPoint(t);
     if (last < 0) continue;
-    const tw = ctx.measureText(t.label).width;
-    const pos = clampLabel(t.sx[last]! + 8, t.sy[last]! - 8, tw, 14, i.safe);
-    haloText(ctx, t.label, pos.x, pos.y, labelColor(t.verdict));
+    wanted.push({
+      id: t.id,
+      x: t.sx[last]!,
+      y: t.sy[last]!,
+      w: ctx.measureText(t.label).width,
+      h: 14,
+      rank: t.id === i.selected ? 0 : LABEL_RANK[t.verdict],
+    });
+  }
+  const byId = new Map(i.scene.tracks.map((t) => [t.id, t]));
+  for (const p of placeLabels(wanted, i.safe)) {
+    const t = byId.get(p.id)!;
+    haloText(ctx, t.label, p.x, p.y, labelColor(t.verdict));
     stats.labels++;
   }
+}
+
+/** Which labels win a crowded spot: the selected track, then found blind, unexplained, the rest. */
+const LABEL_RANK: Record<SceneTrack['verdict'], number> = {
+  found_blind: 1,
+  unexplained: 2,
+  unchecked: 3,
+  possible: 4,
+};
+
+/** A label to place next to its anchor (the track's last dot), in CSS px. */
+export interface LabelWanted {
+  id: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  /** Lower wins a crowded spot; 0 (the selected track) is always drawn. */
+  rank: number;
+}
+
+/**
+ * Labels that never overlap (held UI issue 2: in a busy area they piled up until unreadable). In
+ * rank order each label tries four spots around its anchor (up right, down right, up left, down
+ * left), kept in the safe rectangle; one that fits nowhere is not drawn (its track still is, and it
+ * keeps its name in the card's list). The selected track's label is always drawn. Pure.
+ */
+export function placeLabels(wanted: readonly LabelWanted[], safe: Rect): { id: string; x: number; y: number }[] {
+  const order = wanted.map((w, k) => ({ w, k })).sort((a, b) => a.w.rank - b.w.rank || a.k - b.k);
+  const boxes: { x0: number; y0: number; x1: number; y1: number }[] = [];
+  const out: { id: string; x: number; y: number }[] = [];
+  const PAD = 2;
+  for (const { w } of order) {
+    const spots: [number, number][] = [
+      [w.x + 8, w.y - 8],
+      [w.x + 8, w.y + 8 + w.h],
+      [w.x - 8 - w.w, w.y - 8],
+      [w.x - 8 - w.w, w.y + 8 + w.h],
+    ];
+    let chosen: { x: number; y: number } | null = null;
+    for (const [sx, sy] of spots) {
+      const p = clampLabel(sx, sy, w.w, w.h, safe);
+      const b = { x0: p.x - PAD, y0: p.y - w.h - PAD, x1: p.x + w.w + PAD, y1: p.y + PAD };
+      if (!boxes.some((o) => b.x0 < o.x1 && o.x0 < b.x1 && b.y0 < o.y1 && o.y0 < b.y1)) {
+        chosen = p;
+        boxes.push(b);
+        break;
+      }
+    }
+    if (!chosen && w.rank === 0) {
+      chosen = clampLabel(spots[0]![0], spots[0]![1], w.w, w.h, safe);
+      boxes.push({ x0: chosen.x - PAD, y0: chosen.y - w.h - PAD, x1: chosen.x + w.w + PAD, y1: chosen.y + PAD });
+    }
+    if (chosen) out.push({ id: w.id, ...chosen });
+  }
+  return out;
 }
 
 function lastPoint(t: SceneTrack): number {
