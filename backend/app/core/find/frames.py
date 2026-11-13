@@ -200,10 +200,17 @@ def frames_key(
     )
 
 
-def object_frames_key(ctx: Context, obj: ResolvedObject) -> CacheKey:
-    """``frames_key`` for one object, with a moving object's path-search settings."""
-    cfg = moving.MovingConfig.from_context(ctx, obj.spkid) if obj.moving else None
+def object_frames_key(
+    ctx: Context, obj: ResolvedObject, window: moving.Window | None = None
+) -> CacheKey:
+    """``frames_key`` for one object, with a moving object's path-search settings (``window``:
+    Track on demand's window, Q-468)."""
+    cfg = moving.MovingConfig.from_context(ctx, obj.spkid, window) if obj.moving else None
     return frames_key(ctx, obj.id, moving_cfg=cfg)
+
+
+def memo_key(obj: ResolvedObject, window: moving.Window | None) -> str:
+    return obj.id if window is None else f"{obj.id}@{moving.window_label(window)}"
 
 
 def stored_result(obj: ResolvedObject, body: bytes) -> FramesResult:
@@ -238,6 +245,8 @@ class FrameService:
         # to download. It starts or joins the object's background job; the request itself then
         # downloads nothing and lists them as deferred.
         self.on_request: Callable[[ResolvedObject], object] | None = None
+        # The same for a Track on demand list (Q-468): starts or joins that window's Track job.
+        self.on_track_request: Callable[[ResolvedObject, moving.Window], object] | None = None
 
     def _download_pool(self) -> ThreadPoolExecutor | None:
         n = self.ctx.settings.cutout_concurrency
@@ -269,6 +278,7 @@ class FrameService:
         unlimited_live: bool = False,
         live_cap: int | None = None,
         on_frame: OnFrame | None = None,
+        window: moving.Window | None = None,
     ) -> FramesResult:
         """Frame list for one object.
 
@@ -282,15 +292,19 @@ class FrameService:
           a job (the object job's first batch, issue #41).
         - ``on_frame``: called in this thread as each frame of a list being built is finished
           (not for a stored or memoised list). Its errors are logged, never raised.
+        - ``window``: a moving object's Track on demand window (Q-468); its own list and key.
         """
         if obj.resolver == "reference":
             # Issue #71 (Q-258): a solar-system reference body is not a SPHEREx target.
             return FramesResult(obj.id, [], ["reference:not_a_spherex_target"], None, False)
+        if not obj.moving:
+            window = None  # a fixed object has no path search to narrow
+        mkey = memo_key(obj, window)
         if use_memo and not (refresh or rebuild):
             with self._memo_lock:
-                memo = self._memo.get(obj.id)
+                memo = self._memo.get(mkey)
                 if memo is not None:
-                    self._memo.move_to_end(obj.id)
+                    self._memo.move_to_end(mkey)
             if memo is not None:
                 return memo
         result = self._get_frames(
@@ -300,10 +314,11 @@ class FrameService:
             unlimited_live=unlimited_live,
             live_cap=live_cap,
             on_frame=on_frame,
+            window=window,
         )
         with self._memo_lock:
-            self._memo[obj.id] = result
-            self._memo.move_to_end(obj.id)
+            self._memo[mkey] = result
+            self._memo.move_to_end(mkey)
             while len(self._memo) > MEMO_SIZE:
                 self._memo.popitem(last=False)
         return result
@@ -317,16 +332,18 @@ class FrameService:
         unlimited_live: bool,
         live_cap: int | None = None,
         on_frame: OnFrame | None = None,
+        window: moving.Window | None = None,
     ) -> FramesResult:
         s = self.ctx.settings
         has_pm = obj.pm_ra_mas_yr is not None and obj.pm_dec_mas_yr is not None
-        cfg = moving.MovingConfig.from_context(self.ctx, obj.spkid) if obj.moving else None
+        cfg = moving.MovingConfig.from_context(self.ctx, obj.spkid, window) if obj.moving else None
         key = frames_key(self.ctx, obj.id, moving_cfg=cfg)
         if not (refresh or rebuild):
             entry = self.ctx.cache.get(key)
             if entry is not None:
                 return stored_result(obj, entry.body)
-        handoff = not unlimited_live and live_cap is None and self.on_request is not None
+        hook = self.job_hook(obj, window)
+        handoff = not unlimited_live and live_cap is None and hook is not None
         served: list[Served]
         missing: list[str]
         rows: list[SiaRow]
@@ -414,8 +431,8 @@ class FrameService:
                 frames.append(rec)
         if deferred:
             missing.append(f"{DEFERRED}:{deferred}")
-        if (deferred or search_deferred) and handoff and self.on_request is not None:
-            self.on_request(obj)
+        if (deferred or search_deferred) and handoff and hook is not None:
+            hook()
         frames.sort(key=lambda f: (f.time, f.wavelength_um, f.frame_id))
         result = FramesResult(obj.id, frames, missing, earliest_cached_at(served), has_pm)
         if is_complete(missing):
@@ -595,8 +612,20 @@ class FrameService:
             key, LiveResponse(data, "derived:frames", 200, "application/json"), if_changed=True
         )
 
-    def find(self, obj: ResolvedObject, frame_id: str) -> FrameRecord | None:
-        for f in self.get_frames(obj, use_memo=True).frames:
+    def job_hook(
+        self, obj: ResolvedObject, window: moving.Window | None
+    ) -> Callable[[], object] | None:
+        """The job hand-off for this list: the object job, or the window's Track job."""
+        if window is None:
+            on_request = self.on_request
+            return None if on_request is None else lambda: on_request(obj)
+        on_track = self.on_track_request
+        return None if on_track is None else lambda: on_track(obj, window)
+
+    def find(
+        self, obj: ResolvedObject, frame_id: str, window: moving.Window | None = None
+    ) -> FrameRecord | None:
+        for f in self.get_frames(obj, use_memo=True, window=window).frames:
             if f.frame_id == frame_id:
                 return f
         return None

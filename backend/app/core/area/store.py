@@ -23,6 +23,8 @@ from app.core.area.config import (
     Setting,
     area_key,
     method_settings,
+    spectra_key,
+    spectra_settings_sha,
 )
 from app.core.card.validate import check
 
@@ -92,6 +94,7 @@ class AreaStore:
         if pack_dir is not None and pack_dir.is_dir():
             self.roots.append(ReadThroughCache(pack_dir, offline=True))
         self.sha = settings_sha(method_settings(DEFAULT_AREA_CONFIG))
+        self.spectra_sha = spectra_settings_sha()
 
     def _releases(self, root: ReadThroughCache) -> list[str]:
         """The running release first, then every other release with area entries in ``root``
@@ -122,6 +125,26 @@ class AreaStore:
                 got = root.get(area_key(release, area_id, stage, str(head["params_hash"])))
                 if got is not None:
                     return got
+        return None
+
+    def heads(self, area_id: str) -> list[tuple[ReadThroughCache, str, dict[str, Any]]]:
+        """Every served head of ``area_id`` as (root, release, head), in reading order."""
+        out = []
+        for root in self.roots:
+            for release in self._releases(root):
+                head = self._head(root, release, area_id)
+                if head is not None:
+                    out.append((root, release, head))
+        return out
+
+    def spectra_entry(self, area_id: str) -> CacheEntry | None:
+        """The ``spectra`` stage (Q-474) of the area ``entry`` serves: same root, release and
+        ``params_hash``, and the running spectrum settings. None when it is not prepared."""
+        for root, release, head in self.heads(area_id):
+            p = str(head["params_hash"])
+            if root.get(area_key(release, area_id, "summary", p)) is None:
+                continue
+            return root.get(spectra_key(release, area_id, p, self.spectra_sha))
         return None
 
     def area_ids(self) -> list[str]:

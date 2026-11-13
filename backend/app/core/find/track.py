@@ -66,8 +66,15 @@ def _sha(entry: CacheEntry) -> str:
     return hashlib.sha256(entry.body).hexdigest()
 
 
-def check(ctx: Context, object_id: str, cfg: MeasureConfig = DEFAULT_CONFIG) -> TrackCheck:
-    """A19.12: frames, path and spectrum of ``object_id`` final in the cache. Never fetches."""
+def check(
+    ctx: Context,
+    object_id: str,
+    cfg: MeasureConfig = DEFAULT_CONFIG,
+    window: moving.Window | None = None,
+) -> TrackCheck:
+    """A19.12: frames, path and spectrum of ``object_id`` final in the cache. Never fetches.
+    ``window``: Track on demand's window (Q-468); ``None`` (areas, Q-461) checks the base
+    windows, so an area's answer never depends on which windows were asked for."""
     view = cache_only(ctx)
     obj = load_object(view, object_id)
     if obj is None:
@@ -77,7 +84,7 @@ def check(ctx: Context, object_id: str, cfg: MeasureConfig = DEFAULT_CONFIG) -> 
     if not obj.spkid:
         return TrackCheck(False, NO_SPKID)  # no Horizons path (as path:ephemeris in /path)
 
-    frames_entry = view.cache.get(object_frames_key(view, obj))
+    frames_entry = view.cache.get(object_frames_key(view, obj, window))
     if frames_entry is None:
         return TrackCheck(False, FRAMES_NOT_CACHED)
     fr = stored_result(obj, frames_entry.body)
@@ -87,7 +94,7 @@ def check(ctx: Context, object_id: str, cfg: MeasureConfig = DEFAULT_CONFIG) -> 
         return TrackCheck(False, FRAMES_EMPTY)
     digests = [_sha(frames_entry)]
 
-    mcfg = moving.MovingConfig.from_context(view, obj.spkid)
+    mcfg = moving.MovingConfig.from_context(view, obj.spkid, window)
     comet = is_comet(view, obj)
     for chunks in moving.range_chunks(mcfg):
         for a, b in chunks:

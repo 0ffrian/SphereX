@@ -136,12 +136,14 @@ def _overlaps(chunk: Span, span: Span) -> bool:
     return chunk[0] <= span[1] and chunk[1] >= span[0]
 
 
-def _frames(frames: FrameService, obj: ResolvedObject) -> FramesResult:
+def _frames(
+    frames: FrameService, obj: ResolvedObject, window: moving.Window | None = None
+) -> FramesResult:
     """The frame list: this process's last one when final, else a fresh read (the stored list,
     or a cache-only rebuild that hands the rest to the job), since a memoised partial list may
     be stale."""
-    fr = frames.get_frames(obj, use_memo=True)
-    return fr if is_complete(fr.missing) else frames.get_frames(obj)
+    fr = frames.get_frames(obj, use_memo=True, window=window)
+    return fr if is_complete(fr.missing) else frames.get_frames(obj, window=window)
 
 
 def build_path(
@@ -150,10 +152,12 @@ def build_path(
     obj: ResolvedObject,
     start: datetime | None = None,
     end: datetime | None = None,
+    window: moving.Window | None = None,
 ) -> dict[str, Any]:
     """The ``/path`` reply for a moving object (``obj.moving`` is the caller's check). Raises
-    ``PathRangeError`` for a range it cannot serve."""
-    cfg = moving.MovingConfig.from_context(ctx, obj.spkid)
+    ``PathRangeError`` for a range it cannot serve. ``window``: Track on demand's window
+    (Q-468); the path then covers that window only."""
+    cfg = moving.MovingConfig.from_context(ctx, obj.spkid, window)
     chosen = select_spans(cfg.windows, start, end, ctx.settings.path_max_span_days)
     missing: set[str] = set()
     spans: list[tuple[int, Span]] = []
@@ -211,8 +215,9 @@ def build_path(
         missing.add(EPHEMERIS)  # no SPK id: Horizons cannot be asked (as frames:ephemeris)
 
     if deferred:
-        if frames.on_request is not None:
-            frames.on_request(obj)
+        hook = frames.job_hook(obj, window)
+        if hook is not None:
+            hook()
         # Nothing is served until every span is in; the codes found so far are kept.
         return _reply(obj, cfg, [], [], [], None, missing | {DEFERRED}, [])
 
@@ -226,7 +231,7 @@ def build_path(
     frame_points: list[dict[str, Any]] = []
     worst: float | None = None
     if tracks:
-        fr = _frames(frames, obj)
+        fr = _frames(frames, obj, window)
         if not is_complete(fr.missing):
             missing.add(FRAMES_INCOMPLETE)
         for f in fr.frames:
