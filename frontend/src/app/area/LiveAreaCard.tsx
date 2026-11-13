@@ -183,7 +183,7 @@ function Waiting({ status, job }: { status: LiveJobStatus | null; job: LiveJob |
 }
 
 function Failed({ view, busy }: { view: Extract<LiveView, { kind: 'failed' }>; busy: boolean }) {
-  const t = failureText(view.code);
+  const t = failureText(view.code, view.fromJob === true);
   return (
     <>
       <div className="sx-live-alert" role="status" data-testid="live-failed" data-code={view.code}>

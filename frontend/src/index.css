@@ -5445,7 +5445,7 @@ body {
     position: absolute;
     top: 16px;
     bottom: auto;
-    border-radius: 8px;
+    border-radius: 10px;
     padding: 7px 12px;
     max-width: calc(100% - 24px);
     overflow: hidden;

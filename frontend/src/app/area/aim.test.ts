@@ -75,6 +75,20 @@ describe('2° clamp', () => {
   });
 });
 
+describe('2° clamp on a curved sky (review of PR #148)', () => {
+  it('both sides held: the width, measured across the final box, is not over 2°', () => {
+    // The width grows with the box's height too (as the gnomonic middle line moves).
+    const skew = (d: AreaDrag) => {
+      const h = Math.abs(d.y1 - d.y0) / 100;
+      return { w: (Math.abs(d.x1 - d.x0) / 100) * (1 + 0.02 * (3 - h)), h };
+    };
+    const d = clampDrag({ x0: 0, y0: 0, x1: 900, y1: 700 }, skew);
+    expect(skew(d).w).toBeLessThanOrEqual(2);
+    expect(skew(d).h).toBeLessThanOrEqual(2);
+    expect(skew(d).w).toBeCloseTo(2, 4);
+  });
+});
+
 describe('readouts', () => {
   it('reads the box in degrees with two decimals, and says "2° max" when held', () => {
     expect(formatBoxDeg(0.98, 0.61)).toBe('0.98° × 0.61°');

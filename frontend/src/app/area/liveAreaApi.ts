@@ -19,14 +19,15 @@
 //   - the HTTP client by default. A backend that does not serve the route (404, or not JSON: the
 //     fixture server, a backend before #141) or cannot be reached answers `unavailable`, and the UI
 //     keeps today's "No prepared data for this area yet" (Q-414). Nothing is made up.
-//   - the MOCK only when asked: `?live=mock` in the page URL on the dev server (or a build made
-//     with VITE_SX_LIVE_AREAS=mock). Its
+//   - the MOCK only when asked, on the dev server only: `?live=mock` in the page URL, or
+//     VITE_SX_LIVE_AREAS=mock. A public build never uses it. Its
 //     visit pair and counts are invented test values, so it never answers on its own (data first).
 //     Scenarios: `mock`, `mock-queued`, `mock-no-pair`, `mock-unreachable`, `mock-offline`,
 //     `mock-stored`, `mock-fail`; `live_ms=<ms>` sets the job's length, `live_hold=<0..1>` freezes
 //     its progress (screenshots).
 import { API_BASE } from '@/app/api/config';
 import { deltaRa, wrapRa } from '@/viewer/sky/skyMath';
+import { MAX_SIDE_DEG } from './aim';
 
 export interface LiveVisit {
   /** ISO times (UTC). */
@@ -92,11 +93,19 @@ export type StartAnswer =
   | { kind: 'error'; code: LiveErrorCode; detail: string }
   | { kind: 'unavailable' };
 
+/** The server no longer knows the job (404 `job_not_found`, e.g. after a restart). */
+export class LiveJobGone extends Error {
+  constructor(areaId: string) {
+    super(`No live area job '${areaId}'.`);
+    this.name = 'LiveJobGone';
+  }
+}
+
 export interface LiveAreaApi {
   /** Coverage check: the plan, without starting anything. */
   plan(box: LiveBox, signal?: AbortSignal): Promise<PlanAnswer>;
   start(box: LiveBox, signal?: AbortSignal): Promise<StartAnswer>;
-  /** Throws when the job cannot be read (the caller asks again on its next poll). */
+  /** Throws LiveJobGone when the server has no such job, another error when it cannot be read. */
   status(areaId: string, signal?: AbortSignal): Promise<LiveJobStatus>;
   stop(areaId: string): Promise<void>;
 }
@@ -109,11 +118,13 @@ export function liveBoxOf(b: {
   heightDeg: number;
 }): LiveBox {
   const r6 = (x: number) => Math.round(x * 1e6) / 1e6;
+  // Never past the 2° the backend allows (`area:too_large`): the drawn box is held there, and a
+  // rounding or projection hair over it must not turn into a refusal.
   return {
     ra: r6(wrapRa(b.a.ra + deltaRa(b.b.ra, b.a.ra) / 2)),
     dec: r6((b.a.dec + b.b.dec) / 2),
-    width_deg: r6(b.widthDeg),
-    height_deg: r6(b.heightDeg),
+    width_deg: Math.min(MAX_SIDE_DEG, r6(b.widthDeg)),
+    height_deg: Math.min(MAX_SIDE_DEG, r6(b.heightDeg)),
   };
 }
 
@@ -224,7 +235,10 @@ export function httpLiveAreaApi(base = API_BASE, fetchImpl: typeof fetch = (i, i
     },
     async status(areaId, signal) {
       const res = await fetchImpl(`${base}/areas/live/${encodeURIComponent(areaId)}`, { signal });
-      return parseStatusReply(await json(res));
+      const body = await json(res);
+      if (res.status === 404 && typeof body === 'object' && body !== null && (body as { error?: unknown }).error === 'job_not_found')
+        throw new LiveJobGone(areaId);
+      return parseStatusReply(body);
     },
     async stop(areaId) {
       await fetchImpl(`${base}/areas/live/${encodeURIComponent(areaId)}`, { method: 'DELETE' });
@@ -317,7 +331,7 @@ export function mockLiveAreaApi(
     },
     async status(areaId) {
       const job = jobs.get(areaId);
-      if (!job) throw new Error('No such job.');
+      if (!job) throw new LiveJobGone(areaId);
       const plan = MOCK_PLAN(areaId);
       if (job.stopped) {
         return { ...mockStatusAt(areaId, 0, plan), state: 'failed', eta_s: null, error: { code: 'cancelled', detail: 'The job was stopped. Nothing was saved.' } };
@@ -375,7 +389,8 @@ export function getLiveAreaApi(): LiveAreaApi {
     // The URL switch works on the dev server only (e2e, screenshots): a public build never shows
     // invented visit pairs because of a link.
     const search = typeof location === 'undefined' || !import.meta.env.DEV ? '' : location.search;
-    api = mockFromEnv(search, import.meta.env.VITE_SX_LIVE_AREAS as string | undefined) ?? httpLiveAreaApi();
+    const env = import.meta.env.DEV ? (import.meta.env.VITE_SX_LIVE_AREAS as string | undefined) : undefined;
+    api = mockFromEnv(search, env) ?? httpLiveAreaApi();
   }
   return api;
 }

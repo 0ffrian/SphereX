@@ -9,12 +9,13 @@ import { useAreaStore, type AreaBox } from '@/app/shell/areaStore';
 import { useShellStore } from '@/app/shell/shellStore';
 import { setSkyApi } from '@/state/store';
 import { LiveAreaCard } from './LiveAreaCard';
-import { httpLiveAreaApi, mockLiveAreaApi, mockStatusAt, setLiveAreaApi, type LivePlan } from './liveAreaApi';
+import { httpLiveAreaApi, LiveJobGone, mockLiveAreaApi, mockStatusAt, setLiveAreaApi, type LivePlan } from './liveAreaApi';
 import {
   aboutMinutes,
   clock,
   failureText,
   liveMiniTitle,
+  MAX_MISSED_POLLS,
   POLL_MS,
   releaseName,
   resetLiveJobs,
@@ -208,6 +209,36 @@ describe('an area already being computed', () => {
   });
 });
 
+describe('a job that cannot be followed (review of PR #148)', () => {
+  it('the server no longer knows it (restart): it fails at once, not "Starting" forever', async () => {
+    const api = mockLiveAreaApi('ok');
+    setLiveAreaApi({ ...api, status: async (id) => Promise.reject(new LiveJobGone(id)) });
+    await draw('known');
+    await useLiveJobStore.getState().compute();
+    await vi.advanceTimersByTimeAsync(10);
+    expect(useLiveJobStore.getState().job).toBeNull();
+    expect(useLiveJobStore.getState().view).toMatchObject({ kind: 'failed', code: 'upstream_unavailable', fromJob: true });
+  });
+  it('no reply for MAX_MISSED_POLLS polls in a row: given up as unreachable', async () => {
+    const api = mockLiveAreaApi('ok');
+    setLiveAreaApi({ ...api, status: async () => Promise.reject(new TypeError('Failed to fetch')) });
+    await draw('known');
+    await useLiveJobStore.getState().compute();
+    await vi.advanceTimersByTimeAsync((MAX_MISSED_POLLS - 2) * POLL_MS);
+    expect(useLiveJobStore.getState().view?.kind).toBe('job');
+    await vi.advanceTimersByTimeAsync(3 * POLL_MS);
+    expect(useLiveJobStore.getState().view).toMatchObject({ kind: 'failed', code: 'upstream_unavailable' });
+  });
+  it('a job that ends as cancelled (Stop, then Compute at once) goes back to the offer, not a failure', async () => {
+    const api = mockLiveAreaApi('ok');
+    setLiveAreaApi({ ...api, status: async (id) => ({ ...(await api.status(id)), state: 'failed', error: { code: 'cancelled', detail: '' } }) });
+    await draw('discovery');
+    await useLiveJobStore.getState().compute();
+    await vi.advanceTimersByTimeAsync(10);
+    expect(useLiveJobStore.getState().view?.kind).toBe('offer');
+  });
+});
+
 describe('waiting (state 5)', () => {
   it('a queued job waits, Cancel stops it', async () => {
     setLiveAreaApi(mockLiveAreaApi('queued', { durationMs: 10_000 }));
@@ -234,8 +265,9 @@ describe('failures (state 6)', () => {
     expect(useLiveJobStore.getState().view).toMatchObject({ kind: 'failed', code });
     expect(failureText(code).retry).toBe(retry);
   });
-  it('another refusal of the box (area:too_large) has no Try again', () => {
-    expect(failureText('area:too_large')).toMatchObject({ title: 'Could not compute this area', retry: false });
+  it('a refusal of the box (area:too_large) says to draw another area; a job failure may be retried', () => {
+    expect(failureText('area:too_large')).toEqual({ title: 'Could not compute this area', line: 'Nothing was saved. Draw a different area.', retry: false });
+    expect(failureText('area:frames_incomplete', true)).toMatchObject({ line: 'Nothing was saved. Try again in a minute.', retry: true });
   });
   it('Try again runs the coverage check again', async () => {
     let fail = true;

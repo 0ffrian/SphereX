@@ -10,6 +10,7 @@ import type { AreaBox } from '@/app/shell/areaStore';
 import type { AreaFlow } from './areaService';
 import {
   getLiveAreaApi,
+  LiveJobGone,
   liveBoxOf,
   type LiveJobStatus,
   type LivePlan,
@@ -17,11 +18,13 @@ import {
 } from './liveAreaApi';
 
 export const POLL_MS = 1000;
+/** Polls in a row that may fail (no reply, a broken one) before the job is given up as unreachable. */
+export const MAX_MISSED_POLLS = 30;
 
 export type LiveView =
   | { kind: 'offer'; box: AreaBox; flow: AreaFlow; plan: LivePlan }
   | { kind: 'job'; box: AreaBox; flow: AreaFlow }
-  | { kind: 'failed'; box: AreaBox; flow: AreaFlow; code: string; detail: string };
+  | { kind: 'failed'; box: AreaBox; flow: AreaFlow; code: string; detail: string; fromJob?: boolean };
 
 export interface LiveJob {
   areaId: string;
@@ -66,7 +69,14 @@ function stopPolling(): void {
 }
 
 export const useLiveJobStore = create<LiveJobStoreState>()((set, get) => {
-  const failView = (box: AreaBox, flow: AreaFlow, code: string, detail: string): LiveView => ({ kind: 'failed', box, flow, code, detail });
+  const failView = (box: AreaBox, flow: AreaFlow, code: string, detail: string, fromJob = false): LiveView => ({
+    kind: 'failed',
+    box,
+    flow,
+    code,
+    detail,
+    ...(fromJob ? { fromJob } : {}),
+  });
 
   const finish = (job: LiveJob, status: LiveJobStatus) => {
     stopPolling();
@@ -79,9 +89,17 @@ export const useLiveJobStore = create<LiveJobStoreState>()((set, get) => {
       return;
     }
     const err = status.error ?? { code: 'area:failed', detail: '' };
-    set({ job: null, view: showing ? failView(job.box, job.flow, err.code, err.detail) : get().view });
+    // Stopped (here, or in another tab): back to the offer, not a failure.
+    if (err.code === 'cancelled' && showing && job.plan) {
+      set({ job: null, view: { kind: 'offer', box: job.box, flow: job.flow, plan: job.plan } });
+      return;
+    }
+    set({ job: null, view: showing ? failView(job.box, job.flow, err.code, err.detail, true) : get().view });
   };
 
+  let missed = 0;
+  const lost = (job: LiveJob) =>
+    finish(job, { area_id: job.areaId, state: 'failed', step: null, steps: [], elapsed_s: 0, eta_s: null, error: { code: 'upstream_unavailable', detail: '' } });
   const poll = (mine: number) => {
     const job = get().job;
     if (!job || mine !== jobToken) return;
@@ -92,6 +110,7 @@ export const useLiveJobStore = create<LiveJobStoreState>()((set, get) => {
           if (mine !== jobToken) return;
           const cur = get().job;
           if (!cur) return;
+          missed = 0;
           if (status.state === 'done' || status.state === 'failed') {
             finish(cur, status);
             return;
@@ -99,9 +118,17 @@ export const useLiveJobStore = create<LiveJobStoreState>()((set, get) => {
           set({ job: { ...cur, status } });
           pollTimer = setTimeout(() => poll(mine), POLL_MS);
         },
-        // A missed poll is asked again: the job runs on the server whatever this tab does.
-        () => {
+        // A missed poll is asked again (the job runs on the server whatever this tab does), up to
+        // MAX_MISSED_POLLS in a row; a job the server no longer knows fails at once.
+        (e: unknown) => {
           if (mine !== jobToken) return;
+          const cur = get().job;
+          if (!cur) return;
+          missed++;
+          if (e instanceof LiveJobGone || missed >= MAX_MISSED_POLLS) {
+            lost(cur);
+            return;
+          }
           pollTimer = setTimeout(() => poll(mine), POLL_MS);
         },
       );
@@ -109,6 +136,7 @@ export const useLiveJobStore = create<LiveJobStoreState>()((set, get) => {
 
   const follow = (job: LiveJob) => {
     stopPolling();
+    missed = 0;
     const mine = jobToken;
     set({ job });
     poll(mine);
@@ -193,7 +221,7 @@ export function resetLiveJobs(): void {
 }
 
 /** A failure's dot title and one muted line (mock-up state 6). */
-export function failureText(code: string): { title: string; line: string; retry: boolean } {
+export function failureText(code: string, fromJob = false): { title: string; line: string; retry: boolean } {
   switch (code) {
     case 'area:no_visit_pair':
       return { title: 'No two visits close in time', line: 'Nothing can be seen moving here. Try a nearby patch.', retry: false };
@@ -202,8 +230,11 @@ export function failureText(code: string): { title: string; line: string; retry:
     case 'offline':
       return { title: 'Not available offline', line: 'This server shows only areas computed before.', retry: false };
     default:
-      // Another refusal of the box itself (`area:…`) gives the same answer again: no Try again.
-      return { title: 'Could not compute this area', line: 'Nothing was saved. Try again in a minute.', retry: !code.startsWith('area:') };
+      // A refusal of the box itself (`area:…` from the coverage check) gives the same answer again:
+      // no Try again. A job that failed on the way (frames incomplete, an archive hiccup) may work.
+      if (code.startsWith('area:') && !fromJob)
+        return { title: 'Could not compute this area', line: 'Nothing was saved. Draw a different area.', retry: false };
+      return { title: 'Could not compute this area', line: 'Nothing was saved. Try again in a minute.', retry: true };
   }
 }
 
