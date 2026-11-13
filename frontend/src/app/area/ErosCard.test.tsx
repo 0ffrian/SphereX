@@ -9,7 +9,7 @@ import { useAreaStore } from '@/app/shell/areaStore';
 import { useAppStore } from '@/state/store';
 import type { ErosDemo, ErosHop } from './areaService';
 import { ErosCard } from './ErosCard';
-import { drawTrackWindow } from './erosDraw';
+import { drawTrackWindow, trackShown } from './erosDraw';
 import { MEASURED_ONLY_NOTE } from './KnownPositionsLayer';
 
 declare global {
@@ -147,5 +147,22 @@ describe('the track window path', () => {
     // 00h, 06h, 12h, 18h on 20 Mar and 00h, 06h, 12h on 21 Mar.
     expect(marks).toHaveLength(7);
     expect(new Set(marks).size).toBe(7);
+  });
+  it('Measured only draws no path and no marks on the track window (D-21)', () => {
+    const start = Date.parse('2026-03-20T00:00:00.000Z');
+    const track = Array.from({ length: 13 }, (_, i) => ({
+      t: new Date(start + i * 3_600_000).toISOString(),
+      px: [i, i] as [number, number],
+    }));
+    const eros: ErosDemo = { ...EROS, wide: { png: '', w: 400, h: 400 }, track };
+    const rect = { x0: 0, y0: 0, x1: 400, y1: 400 };
+    const st = { mode: 'eros' as const, now: 61119.2, step: 0, sel: -1, disc: null, name: 'Eros' };
+    const shown = recordingContext();
+    drawTrackWindow(shown.g, rect, trackShown(eros, false), st, () => {});
+    expect(shown.labels.filter((l) => /\d\dh$/.test(l))).toEqual(['20 Mar 00h', '20 Mar 06h', '20 Mar 12h']);
+    expect(shown.labels.some((l) => l.startsWith('Eros ·'))).toBe(true);
+    const hidden = recordingContext();
+    drawTrackWindow(hidden.g, rect, trackShown(eros, true), st, () => {});
+    expect(hidden.labels).toEqual([]);
   });
 });

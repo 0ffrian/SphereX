@@ -3,7 +3,7 @@
 // from the design tokens (erosModel.tok); the layers' meaning is in the card's checkboxes.
 import type { DiscoveryResult, ErosDemo, ErosHop } from './areaService';
 import type { ErosOverlays } from '@/app/shell/areaStore';
-import { isoToMjd, mjdDay, mjdHM, mjdHour, tok, trackAt } from './erosModel';
+import { isoToMjd, mjdDay, mjdHM, tok, trackAt } from './erosModel';
 
 // ---- images -----------------------------------------------------------------------------------
 
@@ -194,6 +194,14 @@ const label = (g: CanvasRenderingContext2D, text: string, x: number, y: number, 
  * The window inside the drawn square: the demo sky image fitted (same aspect, black bars) and clipped
  * to the square, then the path (Known) or the dots and movers of the steps reached (Discovery).
  */
+/**
+ * The object as the track window may draw it: in "Measured only" without its path. Every path here
+ * is Horizons (the real `/path` or the demo file's), Estimated (model_dependent; D-21, R5.3, A18.2).
+ */
+export function trackShown(eros: ErosDemo, measuredOnly: boolean): ErosDemo {
+  return measuredOnly ? { ...eros, track: [] } : eros;
+}
+
 export function drawTrackWindow(
   g: CanvasRenderingContext2D,
   r: TrackRect,
@@ -334,9 +342,9 @@ export function drawTrackWindow(
     // several samples and only its first is labelled.
     let lastHour = Number.NaN;
     for (const p of T) {
-      const m = isoToMjd(p.t);
-      const hr = mjdHour(m);
+      // Hour and hour index both from the ISO time (an MJD round trip can read one hour low).
       const hourIndex = Math.floor(Date.parse(p.t) / 3_600_000);
+      const hr = new Date(hourIndex * 3_600_000).getUTCHours();
       if (hr % 6 || hourIndex === lastHour) continue;
       lastHour = hourIndex;
       const [x, y] = P(p.px);
@@ -344,7 +352,8 @@ export function drawTrackWindow(
       g.beginPath();
       g.arc(x, y, 2.6, 0, 7);
       g.fill();
-      label(g, `${mjdDay(m)} ${String(hr).padStart(2, '0')}h`, x, y + 2, fg, small);
+      // The day from the middle of the labelled hour, so a midnight mark never reads the day before.
+      label(g, `${mjdDay((hourIndex + 0.5) / 24 + 40587)} ${String(hr).padStart(2, '0')}h`, x, y + 2, fg, small);
     }
     const [ex, ey] = P(cur);
     g.strokeStyle = fg;
