@@ -1,6 +1,6 @@
 # 22 Area search: components and sequences
 
-Area search of [A16](../architecture/moving-objects/area-search.md) (agreed plan, Q-146): a square drawn on the sky, then **Known objects** (hand-off to Track, [A19](../architecture/moving-objects/track.md) and [A20](../architecture/moving-objects/track-ui.md)) or **Discovery** (dots, glitches, stars and fixed dots removed, joined across visits with a parallax-aware test, checked against known objects). Three diagrams: components, the offline precompute, and the sky interaction. Drawn 9 Nov 2026 from A16 to A18 (backend [A17](../architecture/moving-objects/area-backend.md), sky UI [A18](../architecture/moving-objects/area-ui.md), shell [A21](../architecture/sky-shell.md)). **Built:** the backend from frames to the API (issues #97 and #108: `frames.py`, `dots.py`, `clean.py`, `join.py`, `match.py`, `service.py`, `api/areas.py`, `core/export/ecsv.py`) and the committed Eros pack. The frontend reads `/v1/areas` from the sky dock (issue #96, Q-406): a prepared area that holds the drawn box answers first, and the Q-414 demo only where none does. Known objects' rows carry their Horizons positions and **Track it** reads the object's `/frames` and `/path` for the Eros card (issue #130, Q-455). **Live areas (issue #141, Q-462, Q-463):** a box drawn anywhere is planned by `core/area/live.py` and computed by a background job in `core/area/live_jobs.py` (the same pipeline, stored as `derived.area`), on SPHEREx DR1; see the last diagram. Not built: the gated extras D4 to D7 (cut). Items marked "proposed" wait on a decision (Q-178 to Q-187 in the spec).
+Area search of [A16](../architecture/moving-objects/area-search.md) (agreed plan, Q-146): a square drawn on the sky, then **Known objects** (hand-off to Track, [A19](../architecture/moving-objects/track.md) and [A20](../architecture/moving-objects/track-ui.md)) or **Discovery** (dots, glitches, stars and fixed dots removed, joined across visits with a parallax-aware test, checked against known objects). Three diagrams: components, the offline precompute, and the sky interaction. Drawn 9 Nov 2026 from A16 to A18 (backend [A17](../architecture/moving-objects/area-backend.md), sky UI [A18](../architecture/moving-objects/area-ui.md), shell [A21](../architecture/sky-shell.md)). **Built:** the backend from frames to the API (issues #97 and #108: `frames.py`, `dots.py`, `clean.py`, `join.py`, `match.py`, `service.py`, `api/areas.py`, `core/export/ecsv.py`) and the committed Eros pack. The frontend reads `/v1/areas` from the sky dock (issue #96, Q-406): a prepared area that holds the drawn box answers first, and the Q-414 demo only where none does. Known objects' rows carry their Horizons positions and **Track it** reads the object's `/frames` and `/path` for the Eros card (issue #130, Q-455). **Live areas (issue #141, Q-462, Q-463):** a box drawn anywhere is planned by `core/area/live.py` and computed by a background job in `core/area/live_jobs.py` (the same pipeline, stored as `derived.area`), on SPHEREx DR1; see the live area job sequence. The frontend's aim, draw and live card (issue #144) is the last diagram. Not built: the gated extras D4 to D7 (cut). Items marked "proposed" wait on a decision (Q-178 to Q-187 in the spec).
 
 ## Components
 
@@ -250,4 +250,39 @@ sequenceDiagram
     F->>A: DELETE /v1/areas/live/area_id
     A->>J: cancel at the next check, nothing stored
   end
+```
+
+## Aim, draw and the live card (issue #144)
+
+The frontend side of a live area, as built ([A18.1](../architecture/moving-objects/area-ui.md#a181-tool-and-drawing), Q-462): `areaStore` stages `aiming`, `drawing` and `set`, then the live card of `liveJobStore` for a box no prepared area holds. The job API is `app/area/liveAreaApi.ts` on the schemas of the sequence above. Closing the card leaves the job running (it is followed until done, failed or stopped); a done job opens in the existing Known and Discovery views.
+
+```mermaid
+stateDiagram-v2
+  [*] --> Aiming: dock, Known objects or Discovery
+  Aiming --> Aiming: drag turns the sky
+  Aiming --> Drawing: click or tap, zoom north up to 2.2 deg (Enter at a wide view)
+  Aiming --> Set: Enter at a narrow view, centred box of at most 2 deg
+  Drawing --> Set: release, box held at 2 deg a side
+  Aiming --> [*]: Escape
+  Drawing --> [*]: Escape
+  Set --> Results: a prepared area holds the box (GET /v1/areas)
+  Set --> Checking: area not_prepared
+  Checking --> Results: plan answers state done (stored)
+  Checking --> Offer: plan (POST /v1/areas/live start=false)
+  Checking --> Job: plan answers the job already queued or running
+  Checking --> Failed: no_visit_pair, upstream_unavailable, offline, other area refusals
+  Checking --> Refused: no live route (today's not_prepared refusal)
+  Offer --> Job: Compute this area (start=true)
+  Offer --> Failed: queue_full or a refusal
+  Offer --> Aiming: Draw again
+  Job --> Offer: Stop or Cancel (DELETE), or the job ends cancelled
+  Job --> Failed: job failed, job_not_found, or 30 missed polls
+  Job --> Results: done (hand-off)
+  Failed --> Checking: Try again
+  Failed --> Aiming: Draw again
+  state Job {
+    [*] --> Waiting
+    Waiting --> Computing: queue position reached
+  }
+  Results --> [*]
 ```

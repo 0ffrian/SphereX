@@ -313,6 +313,9 @@ describe('failures (state 6)', () => {
     expect(failureText('area:too_large')).toEqual({ title: 'Could not compute this area', line: 'Nothing was saved. Draw a different area.', retry: false });
     expect(failureText('area:frames_incomplete', true)).toMatchObject({ line: 'Nothing was saved. Try again in a minute.', retry: true });
   });
+  it('429 queue_full: too many areas waiting, Try again', () => {
+    expect(failureText('queue_full')).toEqual({ title: 'Too many areas waiting', line: 'Nothing was saved. Try again in a few minutes.', retry: true });
+  });
   it('Try again runs the coverage check again', async () => {
     let fail = true;
     const ok = mockLiveAreaApi('ok');
@@ -333,11 +336,14 @@ describe('wording', () => {
     area_id: 'a',
     release: 'spherex_dr1',
     visits: [
-      { start: '2026-06-12T11:11:00Z', end: '2026-06-12T11:24:00Z' },
-      { start: '2026-06-12T12:49:00Z', end: '2026-06-12T13:02:00Z' },
+      { start: '2026-06-12T11:11:00Z', end: '2026-06-12T11:24:00Z', n_frames: 7 },
+      { start: '2026-06-12T12:49:00Z', end: '2026-06-12T13:02:00Z', n_frames: 7 },
     ],
     n_frames: 14,
     estimate_s: 540,
+    box: { ra: 30.5, dec: 10.1, width_deg: 1, height_deg: 0.6 },
+    alternatives: [],
+    provenance: { visits: { tag: 'measured', source: 'test', formula: 'test' } },
   };
   it('as the mock-up words it', () => {
     expect(releaseName('spherex_dr1')).toBe('SPHEREx DR1');
@@ -358,11 +364,14 @@ describe('LiveAreaCard', () => {
     area_id: 'a',
     release: 'spherex_dr1',
     visits: [
-      { start: '2026-06-12T11:11:00Z', end: '2026-06-12T11:24:00Z' },
-      { start: '2026-06-12T12:49:00Z', end: '2026-06-12T13:02:00Z' },
+      { start: '2026-06-12T11:11:00Z', end: '2026-06-12T11:24:00Z', n_frames: 7 },
+      { start: '2026-06-12T12:49:00Z', end: '2026-06-12T13:02:00Z', n_frames: 7 },
     ],
     n_frames: 14,
     estimate_s: 540,
+    box: { ra: 30.5, dec: 10.1, width_deg: 1, height_deg: 0.6 },
+    alternatives: [],
+    provenance: { visits: { tag: 'measured', source: 'test', formula: 'test' } },
   };
   beforeEach(() => {
     globalThis.IS_REACT_ACT_ENVIRONMENT = true;

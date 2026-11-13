@@ -1,14 +1,15 @@
 // Live areas (issue #144, plan ticket C1; backend #141, Q-462): the job API behind ONE interface, so
 // swapping the mock for the real backend touches this file only.
 //
-// Contract: #141's `shared/schemas/area-live-plan.schema.json` and `area-job.schema.json` (PR #147;
-// these hand-written types give way to the generated ones in `@/contract` once it is on main):
+// Contract: #141's `shared/schemas/area-live-plan.schema.json` and `area-job.schema.json` (PR #147),
+// typed by the generated `@/contract` types (D-18); the reply checks below cover what the UI reads:
 //   POST   /v1/areas/live  {ra, dec, width_deg, height_deg, start: false}
 //          -> plan {area_id, release, box, visits: [{start, end, n_frames}] x2, n_frames, estimate_s, …}
 //          |  job  {area_id, state: "done"}                    (already stored)
 //          |  job  {area_id, state: "queued" | "running", …}   (already being computed)
 //          |  422/503 {error: "area:no_visit_pair" | "area:…" | "upstream_unavailable" | "offline", detail}
 //   POST   same body with start: true -> 202 job {area_id, state: "queued" | "running", …}
+//          |  429 {error: "queue_full", detail}                (too many areas already waiting)
 //   GET    /v1/areas/live/{area_id}
 //          -> {area_id, state, step, steps: [{id, label, state, done?, total?}], elapsed_s,
 //              eta_s (null when unknown; for a queued job the wait plus the run), queue_position?,
@@ -26,49 +27,26 @@
 //     `mock-stored`, `mock-fail`; `live_ms=<ms>` sets the job's length, `live_hold=<0..1>` freezes
 //     its progress (screenshots).
 import { API_BASE } from '@/app/api/config';
+import type { LiveAreaJob, LiveAreaPlan, LiveJobStep, LiveVisit } from '@/contract';
 import { deltaRa, wrapRa } from '@/viewer/sky/skyMath';
 import { MAX_SIDE_DEG } from './aim';
 
-export interface LiveVisit {
-  /** ISO times (UTC). */
-  start: string;
-  end: string;
-}
-export interface LivePlan {
-  area_id: string;
-  /** Data release, e.g. "spherex_dr1". */
-  release: string;
-  visits: [LiveVisit, LiveVisit];
-  n_frames: number;
-  estimate_s: number;
-}
-/** `area:no_visit_pair`, `upstream_unavailable`, `offline`, or another `area:…` refusal. */
+export type { LiveVisit };
+/** The coverage check's plan (`area-live-plan.schema.json`). */
+export type LivePlan = LiveAreaPlan;
+/** A job's state (`area-job.schema.json`): `eta_s` null when unknown; for a queued job, the wait plus the run. */
+export type LiveJobStatus = LiveAreaJob;
+export type LiveStep = LiveJobStep;
+export type LiveStepState = LiveJobStep['state'];
+export type LiveJobState = LiveAreaJob['state'];
+/**
+ * `area:no_visit_pair`, `upstream_unavailable`, `offline`, `queue_full`, or another `area:…`
+ * refusal.
+ */
 export type LiveErrorCode = string;
 /** An error body of the live routes. Anything else (`not_found`: no such route) is "unavailable". */
 export function isLiveError(code: string): boolean {
-  return code === 'upstream_unavailable' || code === 'offline' || code.startsWith('area:');
-}
-
-export type LiveStepState = 'done' | 'running' | 'todo';
-export interface LiveStep {
-  id: string;
-  label: string;
-  state: LiveStepState;
-  done?: number;
-  total?: number;
-}
-export type LiveJobState = 'queued' | 'running' | 'done' | 'failed';
-export interface LiveJobStatus {
-  area_id: string;
-  state: LiveJobState;
-  /** Id of the current step (null before the first or after the last). */
-  step: string | null;
-  steps: LiveStep[];
-  elapsed_s: number;
-  /** Seconds until the area is done (for a queued job: the wait plus the run); null: unknown. */
-  eta_s: number | null;
-  queue_position?: number;
-  error?: { code: string; detail: string };
+  return code === 'upstream_unavailable' || code === 'offline' || code === 'queue_full' || code.startsWith('area:');
 }
 
 /** The box asked about: centre and sides in degrees. */
@@ -143,17 +121,9 @@ export function parsePlanReply(body: unknown): PlanAnswer {
   if (body.state === 'done') return { kind: 'stored', areaId: body.area_id };
   if (body.state === 'queued' || body.state === 'running') return { kind: 'running', areaId: body.area_id, state: body.state };
   const v = body.visits;
+  // The fields the UI reads are checked; the backend checks the whole reply against its schema.
   if (isStr(body.release) && Array.isArray(v) && v.length === 2 && v.every(isVisit) && isNum(body.n_frames) && isNum(body.estimate_s))
-    return {
-      kind: 'plan',
-      plan: {
-        area_id: body.area_id,
-        release: body.release,
-        visits: [v[0] as LiveVisit, v[1] as LiveVisit],
-        n_frames: body.n_frames,
-        estimate_s: body.estimate_s,
-      },
-    };
+    return { kind: 'plan', plan: body as unknown as LivePlan };
   return { kind: 'unavailable' };
 }
 
@@ -168,6 +138,7 @@ export function parseStartReply(body: unknown): StartAnswer {
 }
 
 const STEP_STATES: readonly string[] = ['done', 'running', 'todo'];
+const STEP_IDS: readonly string[] = ['visits', 'frames', 'dots', 'labels', 'join', 'known'];
 const JOB_STATES: readonly string[] = ['queued', 'running', 'done', 'failed'];
 
 export function parseStatusReply(body: unknown): LiveJobStatus {
@@ -175,9 +146,9 @@ export function parseStatusReply(body: unknown): LiveJobStatus {
   if (!isObj(body) || !isStr(body.area_id) || !isStr(body.state) || !JOB_STATES.includes(body.state)) throw bad();
   if (!Array.isArray(body.steps) || !isNum(body.elapsed_s) || !(isNum(body.eta_s) || body.eta_s === null)) throw bad();
   const steps: LiveStep[] = body.steps.map((s: unknown) => {
-    if (!isObj(s) || !isStr(s.id) || !isStr(s.label) || !isStr(s.state) || !STEP_STATES.includes(s.state)) throw bad();
+    if (!isObj(s) || !isStr(s.id) || !STEP_IDS.includes(s.id) || !isStr(s.label) || !isStr(s.state) || !STEP_STATES.includes(s.state)) throw bad();
     return {
-      id: s.id,
+      id: s.id as LiveStep['id'],
       label: s.label,
       state: s.state as LiveStepState,
       ...(isNum(s.done) ? { done: s.done } : {}),
@@ -260,7 +231,7 @@ export function httpLiveAreaApi(base = API_BASE, fetchImpl: typeof fetch = (i, i
 export type MockScenario = 'ok' | 'queued' | 'no_pair' | 'unreachable' | 'offline' | 'stored' | 'fail';
 
 /** The six steps of a live area job, with their share of the run time and what they count. */
-export const MOCK_STEPS: readonly { id: string; label: string; weight: number; total?: 'visits' | 'frames' }[] = [
+export const MOCK_STEPS: readonly { id: LiveStep['id']; label: string; weight: number; total?: 'visits' | 'frames' }[] = [
   { id: 'visits', label: 'Find a pair of visits', weight: 0.05 },
   { id: 'frames', label: 'Download frames', weight: 0.45, total: 'frames' },
   { id: 'dots', label: 'Find dots', weight: 0.2, total: 'frames' },
@@ -269,15 +240,19 @@ export const MOCK_STEPS: readonly { id: string; label: string; weight: number; t
   { id: 'known', label: 'Check known objects (SkyBoT)', weight: 0.1, total: 'visits' },
 ];
 
-const MOCK_PLAN = (areaId: string): LivePlan => ({
+const MOCK_VISITS: [LiveVisit, LiveVisit] = [
+  { start: '2026-06-12T11:11:00Z', end: '2026-06-12T11:24:00Z', n_frames: 7 },
+  { start: '2026-06-12T12:49:00Z', end: '2026-06-12T13:02:00Z', n_frames: 7 },
+];
+const MOCK_PLAN = (areaId: string, box: LiveBox = { ra: 0, dec: 0, width_deg: 1, height_deg: 1 }): LivePlan => ({
   area_id: areaId,
   release: 'spherex_dr1',
-  visits: [
-    { start: '2026-06-12T11:11:00Z', end: '2026-06-12T11:24:00Z' },
-    { start: '2026-06-12T12:49:00Z', end: '2026-06-12T13:02:00Z' },
-  ],
+  box,
+  visits: MOCK_VISITS,
   n_frames: 14,
   estimate_s: 540,
+  alternatives: [],
+  provenance: { visits: { tag: 'measured', source: 'mock (invented test values)', formula: 'mock' } },
 });
 
 /** The mock job's progress at fraction `f` (0..1) of its run. Pure, so tests can check it. */
@@ -329,7 +304,7 @@ export function mockLiveAreaApi(
       if (f) return f;
       const id = idOf(box);
       if (scenario === 'stored') return { kind: 'stored', areaId: id };
-      return { kind: 'plan', plan: MOCK_PLAN(id) };
+      return { kind: 'plan', plan: MOCK_PLAN(id, box) };
     },
     async start(box) {
       const f = failure();

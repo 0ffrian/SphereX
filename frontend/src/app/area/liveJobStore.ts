@@ -254,6 +254,8 @@ export function failureText(code: string, fromJob = false): { title: string; lin
       return { title: 'Frame archive not reachable', line: 'Nothing was saved. Try again in a minute.', retry: true };
     case 'offline':
       return { title: 'Not available offline', line: 'This server shows only areas computed before.', retry: false };
+    case 'queue_full':
+      return { title: 'Too many areas waiting', line: 'Nothing was saved. Try again in a few minutes.', retry: true };
     default:
       // A refusal of the box itself (`area:…` from the coverage check) gives the same answer again:
       // no Try again. A job that failed on the way (frames incomplete, an archive hiccup) may work.
