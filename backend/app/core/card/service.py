@@ -44,6 +44,7 @@ from datetime import datetime
 from typing import Any
 
 from app.cache.store import CacheMissOffline, UpstreamUnavailable
+from app.core.area import track
 from app.core.card.assets import Asset, AssetStatus, AssetStore
 from app.core.card.build import SPECTRUM_FIELDS, build_card
 from app.core.card.catalogue import (
@@ -60,7 +61,7 @@ from app.core.classify import Classification, classify
 from app.core.find import moving
 from app.core.find.frames import DEFERRED, FrameEvent, FrameService, FramesResult, is_complete
 from app.core.find.resolver import ResolvedObject
-from app.core.jobs import Job, JobRegistry
+from app.core.jobs import Job, JobRegistry, QueueFull
 from app.core.measure.config import config_for, method_sha
 from app.core.measure.pool import MeasurePool
 from app.core.measure.spectrum import Premeasured, SpectrumService
@@ -132,6 +133,16 @@ class _Built:
     asset: Asset | None
 
 
+# ASSUMPTION (Q-468, PR #150 review): at most this many Track on demand jobs run at once; one
+# more answers 429 ``queue_full`` (as live areas do, Q-462). Their downloads also share the
+# SX_MAX_JOBS slots with the object jobs.
+MAX_TRACK_JOBS = 8
+
+
+def track_job_key(object_id: str, window: moving.Window) -> str:
+    return f"{object_id}@{moving.window_label(window)}"
+
+
 class _Lookup:
     """Sentinel: ``ensure_job`` was not given the saved asset, so the job looks it up."""
 
@@ -155,6 +166,9 @@ class ObjectPipeline:
         self.baker = baker
         s = self.ctx.settings
         self.jobs: JobRegistry[ObjectResult] = JobRegistry(s.job_ttl_s)
+        # Track on demand (issue #142, Q-468): one job per (object, window), apart from the
+        # object job, so a window's frames never reach a card and two windows never mix.
+        self.track_jobs: JobRegistry[track.TrackCheck] = JobRegistry(s.job_ttl_s)
         # SX_MAX_JOBS slots for the long part only: downloading every frame after the first
         # batch. Catalogue, first stage and partial answer never wait for a slot, so every
         # visitor gets an answer quickly; a job waiting for a slot reports stage "queued".
@@ -204,6 +218,51 @@ class ObjectPipeline:
     def request_frames(self, obj: ResolvedObject) -> None:
         """``FrameService.on_request``: a web request found cutouts still to download."""
         self.ensure_job(obj, restart_finished=True)
+
+    def ensure_track_job(self, obj: ResolvedObject, window: moving.Window) -> Job[track.TrackCheck]:
+        """Start or join the Track job of ``obj`` for ``window`` (Q-468): the window's path
+        search, cutouts and spectrum, then ``track.check`` for that window. No card is built or
+        saved from it. A finished job is not reused (a rerun reads the cache; a failure whose
+        retry delay passed is tried again). Raises ``QueueFull`` past ``MAX_TRACK_JOBS``."""
+
+        def run(job: Job[track.TrackCheck]) -> track.TrackCheck:
+            return self._track_job(obj, window, job)
+
+        return self.track_jobs.ensure(
+            track_job_key(obj.id, window), run, reuse_finished=False, max_running=MAX_TRACK_JOBS
+        )
+
+    def request_track_frames(self, obj: ResolvedObject, window: moving.Window) -> None:
+        """``FrameService.on_track_request``: a Track reader found downloads still to do."""
+        with contextlib.suppress(QueueFull):  # the reader still answers with what is cached
+            self.ensure_track_job(obj, window)
+
+    def _track_job(
+        self, obj: ResolvedObject, window: moving.Window, job: Job[track.TrackCheck]
+    ) -> track.TrackCheck:
+        slots = self._full_runs
+        if slots is not None and not slots.acquire(blocking=False):
+            job.update(stage="queued")
+            while not slots.acquire(timeout=1.0):
+                if self._closed.is_set():
+                    return track.check(self.ctx, obj.id, window=window)
+        try:
+            job.update(stage="frames")
+
+            def landed(ev: FrameEvent) -> None:
+                job.update(frames_done=ev.done, frames_total=ev.total)
+
+            with contextlib.suppress(CacheMissOffline, UpstreamUnavailable):
+                fr = self.frames.get_frames(
+                    obj, unlimited_live=True, on_frame=landed, window=window
+                )
+                if is_complete(fr.missing):
+                    job.update(stage="spectrum")
+                    SpectrumService(self.frames, pool=self.measure_pool).get_spectrum(obj, fr)
+        finally:
+            if slots is not None:
+                slots.release()
+        return track.check(self.ctx, obj.id, window=window)
 
     def close(self) -> None:
         self._closed.set()

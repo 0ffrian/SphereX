@@ -22,6 +22,9 @@ import {
   type ErosHop,
   type KnownObjectsResult,
 } from '@/app/area/areaService';
+import { getLiveAreaApi, liveBoxOf, type PlanAnswer } from '@/app/area/liveAreaApi';
+import { registerLiveHandoff, registerLiveRedraw, useLiveJobStore } from '@/app/area/liveJobStore';
+import { useShellStore } from './shellStore';
 
 export interface SkyCorner {
   ra: number;
@@ -41,9 +44,14 @@ export interface AreaDrag {
   y0: number;
   x1: number;
   y1: number;
+  /** A side is held at the 2° limit (issue #144): the readout says "2° max". */
+  held?: boolean;
 }
-/** Where the flow is: the drawing card, the island searching, the list, an Eros card, the steps. */
-export type AreaScreen = 'draw' | 'search' | 'list' | 'eros' | 'disc' | 'mover';
+/**
+ * Where the flow is: the drawing card, the island searching, the list, an Eros card, the steps, or
+ * the live card (offer, computing, waiting, failure; issue #144).
+ */
+export type AreaScreen = 'draw' | 'search' | 'list' | 'eros' | 'disc' | 'mover' | 'live';
 
 /** The checkboxes of the Eros card: which layers show on the cutout. */
 export interface ErosOverlays {
@@ -70,6 +78,22 @@ export function refusalOf(e: unknown): AreaRefusal {
   return { code: 'area:failed', message: `${detail} Draw the area again.` };
 }
 
+/**
+ * The coverage check for a box with no prepared area (issue #144): the live plan, or null when the
+ * refusal is not "not prepared" or the backend has no live areas (then today's refusal stands).
+ */
+async function liveCheck(
+  box: AreaBox,
+  refusal: AreaRefusal,
+  signal: AbortSignal,
+): Promise<Exclude<PlanAnswer, { kind: 'unavailable' }> | null> {
+  if (refusal.code !== 'area:not_prepared') return null;
+  const answer = await getLiveAreaApi()
+    .plan(liveBoxOf(box), signal)
+    .catch(() => ({ kind: 'unavailable' as const }));
+  return answer.kind === 'unavailable' ? null : answer;
+}
+
 /** The backend's id of 433 Eros, whose frames the demo file holds (issue #130). */
 export const DEMO_OBJECT_ID = 'sbdb-20000433';
 /** `/path` codes that mean "not ready yet, ask again" rather than "no path" (A19.5). */
@@ -78,8 +102,11 @@ const PATH_PENDING: readonly string[] = ['path:deferred', 'path:frames_incomplet
 export interface AreaState {
   /** Which dock tool started this (the dock highlight follows it). */
   flow: AreaFlow;
-  /** drawing: waiting for a drag; set: an area exists. */
-  stage: 'drawing' | 'set';
+  /**
+   * aiming: the pointer is the next view's rectangle, a click zooms there (issue #144);
+   * drawing: in that view, waiting for a drag; set: an area exists.
+   */
+  stage: 'aiming' | 'drawing' | 'set';
   box: AreaBox | null;
   /** The last area, kept for "Keep the last area" after redrawing or reopening. */
   last: AreaBox | null;
@@ -121,6 +148,8 @@ export interface AreaState {
   /** Dock: start a flow (also from another flow): drawing mode, nothing searched yet. */
   startFlow(flow: AreaFlow): void;
   setDrag(drag: AreaDrag | null): void;
+  /** Aim: the patch is picked (the sky zooms to it); the drag now draws. */
+  pickPatch(): void;
   /** The area is set: Known starts the island's search, Discovery opens its steps. */
   setBox(box: AreaBox): void;
   redraw(): void;
@@ -163,7 +192,7 @@ function clearTimers(): void {
 }
 
 const FRESH = {
-  stage: 'drawing' as const,
+  stage: 'aiming' as const,
   box: null,
   drag: null,
   screen: 'draw' as const,
@@ -241,21 +270,34 @@ export const useAreaStore = create<AreaState>()((set, get) => {
       set({ step, running: step < n - 1 });
     }, STEP_MS);
   };
-  const runKnown = (box: AreaBox) => {
+  const runKnown = (box: AreaBox, handoff = false) => {
     clearTimers();
     const mine = token;
     const ctl = new AbortController();
     knownAbort = ctl;
     set({ ...FRESH, stage: 'set', box, last: box, screen: 'search', say: { kind: 'searching', text: 'Known objects in this area' } });
-    // Settled at once (a refusal must not sit unhandled while the island "searches").
-    const answer = knownObjectsIn(box, ctl.signal).then(
-      (res) => ({ res }),
-      (e: unknown) => ({ refusal: refusalOf(e) }),
+    // Settled at once (a refusal must not sit unhandled while the island "searches"). No prepared
+    // area: the coverage check runs inside the same search (issue #144).
+    type Answer =
+      | { res: KnownObjectsResult }
+      | { refusal: AreaRefusal }
+      | { live: Exclude<PlanAnswer, { kind: 'unavailable' }> };
+    const answer: Promise<Answer> = knownObjectsIn(box, ctl.signal).then(
+      (res): Answer => ({ res }),
+      async (e: unknown): Promise<Answer> => {
+        const refusal = refusalOf(e);
+        const live = handoff ? null : await liveCheck(box, refusal, ctl.signal);
+        return live ? { live } : { refusal };
+      },
     );
     timers.push(
       setTimeout(() => {
         void answer.then((a) => {
           if (mine !== token) return;
+          if ('live' in a) {
+            openLive(box, 'known', a.live);
+            return;
+          }
           if ('refusal' in a) {
             const refusal = a.refusal;
             set({ say: { kind: 'found', text: refusal.message } });
@@ -289,6 +331,64 @@ export const useAreaStore = create<AreaState>()((set, get) => {
     );
   };
 
+  /** The live card for a box with no prepared area (issue #144). */
+  const openLive = (box: AreaBox, flow: AreaFlow, live: Exclude<PlanAnswer, { kind: 'unavailable' }>) => {
+    set({ say: null, screen: 'live', minimised: false });
+    useLiveJobStore.getState().showPlan(box, flow, live);
+  };
+  // A done live area (or a stored one) opens in the existing results views, unchanged.
+  // The live card has nothing left to show (a followed job stopped, with no offer to go back to).
+  registerLiveRedraw(() => {
+    if (get().screen === 'live') get().redraw();
+  });
+  registerLiveHandoff((box, flow, { ifIdle }) => {
+    const shell = useShellStore.getState();
+    const s = get();
+    // Never over another area the user is busy with (any card of a set box, the live card of
+    // another box included, or a box being dragged): only on the plain sky or while aiming.
+    if (ifIdle && shell.tool === 'area' && (s.stage === 'set' || s.drag !== null)) return;
+    if (ifIdle && shell.tool !== 'area' && shell.tool !== 'sky') return;
+    clearTimers();
+    set({ ...FRESH, flow });
+    if (shell.tool !== 'area') shell.setTool('area');
+    if (flow === 'known') runKnown(box, true);
+    else {
+      set({ ...FRESH, flow, stage: 'set', box, last: box });
+      openDiscFor(true);
+    }
+  });
+  const openDiscFor = (handoff: boolean) => {
+    const s0 = get();
+    // Back from a mover card: the steps stay as they were.
+    if (s0.disc) {
+      set({ screen: 'disc', minimised: false, playing: false });
+      return;
+    }
+    clearTimers();
+    const mine = token;
+    const ctl = new AbortController();
+    knownAbort = ctl;
+    set((s) => ({ screen: 'disc', minimised: false, step: -1, running: false, sel: -1, fitSeq: s.fitSeq + 1 }));
+    const box = get().box;
+    if (!box) return;
+    void Promise.all([discoverIn(box, ctl.signal), loadEros()]).then(
+      ([disc]) => {
+        if (mine !== token) return;
+        set({ disc });
+        startRun();
+      },
+      async (e: unknown) => {
+        if (mine !== token) return;
+        const refusal = refusalOf(e);
+        // No prepared area: the coverage check, then the live card (issue #144).
+        const live = handoff ? null : await liveCheck(box, refusal, ctl.signal);
+        if (mine !== token) return;
+        if (live) openLive(box, 'discovery', live);
+        else set({ refusal, running: false });
+      },
+    );
+  };
+
   return {
     flow: 'discovery',
     ...FRESH,
@@ -303,9 +403,13 @@ export const useAreaStore = create<AreaState>()((set, get) => {
     fitSeq: 0,
     startFlow: (flow) => {
       clearTimers();
+      useLiveJobStore.getState().clearView();
       set({ ...FRESH, flow });
     },
     setDrag: (drag) => set({ drag }),
+    pickPatch: () => {
+      if (get().stage === 'aiming') set({ stage: 'drawing', drag: null });
+    },
     setBox: (box) => {
       if (get().flow === 'known') runKnown(box);
       else {
@@ -337,30 +441,7 @@ export const useAreaStore = create<AreaState>()((set, get) => {
       }));
       void loadEros(obj);
     },
-    openDisc: () => {
-      const s0 = get();
-      // Back from a mover card: the steps stay as they were.
-      if (s0.disc) {
-        set({ screen: 'disc', minimised: false, playing: false });
-        return;
-      }
-      clearTimers();
-      const mine = token;
-      set((s) => ({ screen: 'disc', minimised: false, step: -1, running: false, sel: -1, fitSeq: s.fitSeq + 1 }));
-      const box = get().box;
-      if (!box) return;
-      void Promise.all([discoverIn(box), loadEros()]).then(
-        ([disc]) => {
-          if (mine !== token) return;
-          set({ disc });
-          startRun();
-        },
-        (e: unknown) => {
-          if (mine !== token) return;
-          set({ refusal: refusalOf(e), running: false });
-        },
-      );
-    },
+    openDisc: () => openDiscFor(false),
     openMover: (i) =>
       set({ screen: 'mover', sel: i, minimised: false, index: 0, det: null, playing: false }),
     setMinimised: (minimised) => set({ minimised }),
@@ -380,6 +461,7 @@ export const useAreaStore = create<AreaState>()((set, get) => {
     toggleOv: (k) => set((s) => ({ ov: { ...s.ov, [k]: !s.ov[k] } })),
     reset: () => {
       clearTimers();
+      useLiveJobStore.getState().clearView();
       set({ ...FRESH });
     },
   };
@@ -401,6 +483,8 @@ export function areaMiniTitle(
     const m = s.disc?.movers[s.sel];
     return m ? `${m.known ? `${m.id} · ${m.known}` : m.id}${tag}` : 'Discovery';
   }
+  // The live card's pill is liveMiniTitle (Island.tsx); this is only its fallback.
+  if (s.screen === 'live') return 'Live area';
   return s.screen === 'list' ? `Known objects${tag}` : `Discovery${tag}`;
 }
 

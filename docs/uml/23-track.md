@@ -1,6 +1,6 @@
 # 23 Track: components and sequences
 
-Track of [A19](../architecture/moving-objects/track.md) (data and backend, with [A19.9 to A19.15](../architecture/moving-objects/track-contract.md)) and [A20](../architecture/moving-objects/track-ui.md) (the screen): one known solar-system object, its path seen from SPHEREx, the SPHEREx frames that caught it, a north-up zoom with stars masked and a spectrum built exposure by exposure (Q-131, Q-134 to Q-145). Four diagrams: components, opening Track (with the object job filling the path), Track on demand (issue #142) and moving the time slider. Drawn 9 Nov 2026 from the spec; PR #53 (merged 10 Nov) built the frame search, everything else is to build. Items marked "proposed" wait on a decision (Q-178 to Q-187 in the spec).
+Track of [A19](../architecture/moving-objects/track.md) (data and backend, with [A19.9 to A19.15](../architecture/moving-objects/track-contract.md)) and [A20](../architecture/moving-objects/track-ui.md) (the screen): one known solar-system object, its path seen from SPHEREx, the SPHEREx frames that caught it, a north-up zoom with stars masked and a spectrum built exposure by exposure (Q-131, Q-134 to Q-145). Four diagrams: components, opening Track (with the object job filling the path), Track on demand (issue #142) and moving the time slider. Drawn 9 Nov 2026 from the spec; PR #53 (merged 10 Nov) built the frame search, #95 the star list, #74 the footprints and `/path`, and #142 Track on demand; the screen and the export are still to build. Items marked "proposed" wait on a decision (Q-178 to Q-187 in the spec).
 
 ## Components
 
@@ -12,6 +12,7 @@ flowchart TB
     OVL["core/find/overlays.py + stars.py<br/>star list per visit (built, #95)<br/>footprint for movers (built, #74)"]
     MEAS["core/measure (Stage 2)<br/>OUTLIER-core rule Q-139"]
   end
+  TJ["Track job per object and window<br/>(built, #142, Q-468): no card"]
   HOR["adapters/horizons.py<br/>observer 500@-163182, one-request gate"]
   SIA["adapters/irsa_sia.py + irsa_cutout.py"]
   CAT["adapters/gaia.py + wise.py"]
@@ -22,6 +23,7 @@ flowchart TB
     OV["/v1/objects/id/overlays"]
     SP["/v1/objects/id/spectrum"]
     EX["/v1/objects/id/track.ecsv (A19.9)"]
+    TR["POST /v1/objects/id/track<br/>around, days (built, #142)"]
   end
   subgraph FE["frontend/src/app/track (Atish, proposed D-17 amendment)"]
     PANE["TrackPane in the split pane, kind track (A21.8)"]
@@ -34,6 +36,9 @@ flowchart TB
     SOUND["Track path sound (R8.9.2)"]
   end
   STORE["state/store.ts track slice"]
+  TR --> TJ
+  TJ --> PS
+  TJ --> MEAS
   PS --> HOR
   PS --> SIA
   PATH --> HOR
@@ -100,28 +105,33 @@ sequenceDiagram
 
 ## Track on demand (issue #142, Q-468)
 
+The window travels with each call (`around`, `days`) and is never stored, so the card, the pre-fetch and the areas keep the base windows.
+
 ```mermaid
 sequenceDiagram
   autonumber
   participant FE as Frontend (Known card, Track it)
   participant API as Backend API
-  participant C as Cache (derived.track_window)
-  participant J as Object job (Q-111)
+  participant J as Track job (object and window)
   participant H as Horizons and IRSA
+  participant C as Cache (D-25)
   FE->>API: POST /v1/objects/id/track {around: visit time, days: 3}
   alt unknown, not moving, no SPK id, bad body or window outside
-    API-->>FE: 400 or 404 error, nothing stored, no job
+    API-->>FE: 400 or 404 error, no job
+  else 8 Track jobs already running
+    API-->>FE: 429 queue_full
   else
-    API->>C: add the window (union, clipped to moving_windows or the release)
-    API->>J: start the job (a running one is joined)
-    API-->>FE: 202, the /job JSON
+    API->>J: start the job for the clipped window (a running one is joined)
+    API-->>FE: 202, the /job JSON with track_window
     J->>H: path, cones and TLIST inside the window only, cutouts
-    J->>J: Stage 2 spectrum stored (also for a saved card)
+    H->>C: entries under the window's keys
+    J->>C: Stage 2 spectrum of the window's frames (no card)
     loop until state done
-      FE->>API: GET /job/events
-      API-->>FE: stage, frames n of N
+      FE->>API: GET /job/events?around&days
+      API-->>FE: stage, frames n of N, then track_available and reason
     end
-    FE->>API: GET frames, path, spectrum (as in Opening Track)
+    FE->>API: GET frames, path, spectrum, overlays ?around&days
+    API->>C: read the window's entries
   end
 ```
 

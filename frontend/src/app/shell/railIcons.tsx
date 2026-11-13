@@ -4,6 +4,7 @@
 // mock-up's Comet Breath, Haptics and Band-Hop Linker tools are not built, so they have no icon.
 import type { ReactNode } from 'react';
 import type { ToolId } from './shellStore';
+import { iconStrokes } from './icons';
 
 const SHAPES: Record<ToolId | 'known', ReactNode> = {
   // mock-up `reticle`
@@ -23,13 +24,12 @@ const SHAPES: Record<ToolId | 'known', ReactNode> = {
   ),
   // mock-up `bars`
   spectrum: <path pathLength="1" d="M3 10v4M7 7v10M11 3v18M15 8v8M19 5v14" />,
-  // mock-up `dots` (Discovery)
+  // Discovery: lucide `radar`, as the live-areas mock-up's dock (issue #144).
   area: (
     <>
-      <circle pathLength="1" cx="6" cy="7" r="2.2" />
-      <circle pathLength="1" cx="16" cy="6" r="2.2" />
-      <circle pathLength="1" cx="10" cy="15" r="2.2" />
-      <circle pathLength="1" cx="19" cy="17" r="2.2" />
+      {iconStrokes('radar').map((d) => (
+        <path key={d} pathLength="1" d={d} />
+      ))}
     </>
   ),
   // mock-up `orbit` (Known objects)

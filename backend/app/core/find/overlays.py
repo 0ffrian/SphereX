@@ -48,6 +48,7 @@ from app.core.find.frames import (
     FramesResult,
     frame_time,
     is_complete,
+    memo_key,
     position_at,
 )
 from app.core.find.propagate import CATALOGUE_FORMULA, propagate_many
@@ -287,33 +288,37 @@ class OverlayService:
         self._pool.shutdown(wait=False, cancel_futures=True)
         self._star_pool.shutdown(wait=False, cancel_futures=True)
 
-    def get_overlays(self, obj: ResolvedObject) -> OverlaysResult:
+    def get_overlays(
+        self, obj: ResolvedObject, window: moving_mod.Window | None = None
+    ) -> OverlaysResult:
+        """``window``: Track on demand's window (Q-468): the overlays of that frame list."""
+        key = memo_key(obj, window if obj.moving else None)
         with self._lock:
-            hit = self._memo.get(obj.id)
+            hit = self._memo.get(key)
             if hit is not None:
-                self._memo.move_to_end(obj.id)
+                self._memo.move_to_end(key)
                 return hit
-            shared = self._inflight.get(obj.id)
+            shared = self._inflight.get(key)
             if shared is None:
                 mine: Future[OverlaysResult] = Future()
-                self._inflight[obj.id] = mine
+                self._inflight[key] = mine
         if shared is not None:
             return shared.result()
         try:
-            result = self._compute(obj)
+            result = self._compute(obj, window)
         except BaseException as exc:
             with self._lock:
-                self._inflight.pop(obj.id, None)
+                self._inflight.pop(key, None)
             mine.set_exception(exc)
             raise
         with self._lock:
             if result.complete:
                 # In-process memo only (no derived cache entry): the reply is cheap to rebuild
                 # from cached inputs, and only a reply that more data could not change is kept.
-                self._memo[obj.id] = result
+                self._memo[key] = result
                 while len(self._memo) > MEMO_SIZE:
                     self._memo.popitem(last=False)
-            self._inflight.pop(obj.id, None)
+            self._inflight.pop(key, None)
         mine.set_result(result)
         return result
 
@@ -478,9 +483,11 @@ class OverlayService:
                 per_frame[f.frame_id] = _MoverFrame(star_list, track)
         return catalogs, per_frame_tables, per_frame
 
-    def _compute(self, obj: ResolvedObject) -> OverlaysResult:
+    def _compute(
+        self, obj: ResolvedObject, window: moving_mod.Window | None = None
+    ) -> OverlaysResult:
         ctx, cfg = self.ctx, self.cfg
-        fr = self.frames.get_frames(obj, use_memo=True)
+        fr = self.frames.get_frames(obj, use_memo=True, window=window)
         # Overlay codes only: the frames reply already reports its own refusals (saturated,
         # frames:truncated, ...) and the UI shows them with the flipbook.
         missing: set[str] = set()
