@@ -168,7 +168,9 @@ export function httpSpectraApi(
         const body: unknown = type.includes('json') ? await res.json().catch(() => null) : null;
         if (res.status === 404 && isObj(body) && body.error === 'spectra_not_prepared') return { kind: 'not_run' };
         if (!res.ok) return { kind: 'unavailable' };
-        return { kind: 'ok', data: parseAreaSpectra(body) };
+        const data = parseAreaSpectra(body);
+        // Never show another area's verdicts on this one.
+        return data.area_id === areaId ? { kind: 'ok', data } : { kind: 'unavailable' };
       } catch (e) {
         if (aborted(e) || signal?.aborted) throw e;
         if (import.meta.env?.DEV && e instanceof BadSpectra) console.warn('[spectra]', e.message);
