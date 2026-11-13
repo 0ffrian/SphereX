@@ -74,6 +74,14 @@ export function boxToPixels(box: AreaBox): AreaDrag | null {
   return { x0: a.x, y0: a.y, x1: b.x, y1: b.y };
 }
 
+/** A sky position in the pane's pixels now, or null when it is behind the camera or no view is registered. */
+export function skyToPixels(ra: number, dec: number): { x: number; y: number } | null {
+  if (!access) return null;
+  const { width, height } = access.getSize();
+  const p = raDecToScreen(access.getView(), ra, dec, width, height);
+  return Number.isFinite(p.x) && Number.isFinite(p.y) ? { x: p.x, y: p.y } : null;
+}
+
 /** The free rectangle of the sky pane in its own pixels, where the whole area should sit. */
 export interface SafeRect {
   l: number;

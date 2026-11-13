@@ -27,7 +27,7 @@ The log is split by topic so a task loads only what it needs. **Load this index 
 | [rendering-layers.md](rendering-layers.md) | the per-layer body fixes of issue #62 (PR #63): gas giant five tiered layers, brown dwarf limb and infrared bands, asteroid sphere and displacement, the flared T Tauri disc | 0 D, 4 Q, 11 KB |
 | [gemini.md](gemini.md) | the Gemini layer: scope, offline behaviour and its contract | 1 D, 2 Q, 7 KB |
 | [sky-shell.md](sky-shell.md) | the sky view, sky endpoints and sky tiles, the flipbook UI | 1 D, 10 Q, 12 KB |
-| [shell-surfaces.md](shell-surfaces.md) | the tool rail and the island, the object panel and card, the Build split view, the full-bleed layout | 1 D, 27 Q, 43 KB |
+| [shell-surfaces.md](shell-surfaces.md) | the tool rail and the island, the object panel and card, the Build split view, the full-bleed layout | 1 D, 28 Q, 43 KB |
 | [shell-proposals.md](shell-proposals.md) | open shell proposals that Track and Area search need: pane kinds, feature cards, hash keys, Escape order | 0 D, 9 Q, 15 KB |
 | [haptics-design.md](haptics-design.md) | haptics design rules, creative ownership, the haptics API, the shared field on shader kinds, texture and data sources per type | 5 D, 12 Q, 20 KB |
 | [haptics-sound.md](haptics-sound.md) | audio pairing (D-10), spectrum pitch and voice hints, the body tone and the Track path sound | 1 D, 10 Q, 13 KB |
@@ -442,7 +442,7 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | Q-411 | Pause removed from the Details pane (P key instead) | Open | [shell-surfaces](shell-surfaces.md) |
 | Q-412 | Show (honesty level) moves into Details in the build pane | Proposed (Moon to confirm) | [shell-surfaces](shell-surfaces.md) |
 | Q-413 | The island's loader pulses at rest | Open | [shell-surfaces](shell-surfaces.md) |
-| Q-414 | Known objects and Discovery demo answers only inside the Eros area (real areas first: Q-406) | Answered by Q-406 | [shell-surfaces](shell-surfaces.md) |
+| Q-414 | Known objects and Discovery demo answers only inside the Eros area (real areas first: Q-406; Known rows and Track it: Q-455) | Answered by Q-406 | [shell-surfaces](shell-surfaces.md) |
 | Q-415 | Moulding animation is the mock-up's generic body (amends Q-113 item 3) | Open | [shell-surfaces](shell-surfaces.md) |
 | Q-416 | Hear it: Atmosphere and the spectrum sweep (amends Q-295); amended by Q-446 (sweep on `pitch.ts`) and Q-450 (opens from Details) | Open (Atish to wire after merge) | [shell-surfaces](shell-surfaces.md) |
 | Q-417 | The browser tab reads "Odysseus" | Decided (Moon, tab title only) | [shell-surfaces](shell-surfaces.md) |
@@ -474,6 +474,7 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | Q-452 | Frame-rate menu after the player; simpler sky info popover | Decided (Moon) | [shell-surfaces](shell-surfaces.md) |
 | Q-453 | One clock for the build strip; chips leave with a staggered spring | Decided (Moon) | [shell-surfaces](shell-surfaces.md) |
 | Q-454 | Warm-start progress on `/v1/health` and the demo preflight (amends Q-195) | Proposed (Kevin to confirm with Q-195) | [contract](contract.md) |
+| Q-455 | Known objects on the real `/v1/areas`; the Eros card is the event's Track-lite (issue #130; builds on Q-406) | Decided (Moon) | [shell-surfaces](shell-surfaces.md) |
 | Q-456 | Sound settings move from the sky's top bar into the build view's Ambience dropdown | Decided (Moon) | [shell-surfaces](shell-surfaces.md) |
 | Q-457 | Build view: no dock, Minimise into the island, "Read paper" beside the zoom | Decided (Moon) | [shell-surfaces](shell-surfaces.md) |
 | Q-458 | Tone stream as built (Q-189) and the two-note exposure tick as one event through the 25 ms gap (`emitTogether`, #77) | Decided (as built) | [sound-ambience](sound-ambience.md) |

@@ -64,6 +64,7 @@ import { useShellStore } from '@/app/shell/shellStore';
 import { useAreaStore } from '@/app/shell/areaStore';
 import { AreaOverlay } from './AreaOverlay';
 import { AreaTrackLayer } from '@/app/area/AreaTrackLayer';
+import { KnownPositionsLayer } from '@/app/area/KnownPositionsLayer';
 import { boxFromPixels, centreRect, registerAreaView, rectOf } from './areaDraw';
 import { useCachedMarkers } from './useCachedMarkers';
 import { useTargetMarkers, type TargetMarker } from './useTargetMarkers';
@@ -785,6 +786,7 @@ export function SkyPane({ children }: { children?: ReactNode }) {
 
       <AreaOverlay view={view} />
       <AreaTrackLayer view={view} />
+      <KnownPositionsLayer view={view} />
       {/* Panels sit right after the canvas in the tab order. */}
       {children}
 

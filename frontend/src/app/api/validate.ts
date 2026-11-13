@@ -43,6 +43,7 @@ import {
   type ObjectCard,
   type RenderParams,
   type Tag,
+  type TrackPath,
 } from '@/contract';
 
 type Obj = Readonly<Record<string, unknown>>;
@@ -863,7 +864,16 @@ export function parseAreaTracks(raw: unknown): AreaTracks {
   return raw as AreaTracks;
 }
 
-/** `GET /v1/areas/{area_id}/known` (A17.8). P8 does not read it yet; P9's Known card does. */
+/** A whole number of `min` or more (counts, visit numbers, catalogue numbers). */
+function whole(o: Obj, key: string, path: string, min: number): number {
+  const v = num(o, key, path);
+  if (!Number.isInteger(v) || v < min) fail(`${path}.${key}`, `expected a whole number of ${min} or more`);
+  return v;
+}
+
+const KNOWN_KINDS = ['asteroid', 'comet'] as const;
+
+/** `GET /v1/areas/{area_id}/known` (A17.8, A17.5): the Known card's rows (issue #130). */
 export function parseAreaKnown(raw: unknown): AreaKnown {
   const p = 'known';
   const o = obj(raw, p);
@@ -871,8 +881,12 @@ export function parseAreaKnown(raw: unknown): AreaKnown {
     const kp = `${p}.known[${i}]`;
     const ko = obj(k, kp);
     str(ko, 'designation', kp);
-    nullableNum(ko, 'number', kp);
+    if (ko.number !== null) whole(ko, 'number', kp, 1);
     nullableStr(ko, 'object_id', kp);
+    oneOf(ko, 'kind', kp, KNOWN_KINDS);
+    nullableNum(ko, 'v_mag', kp);
+    whole(ko, 'n_frames', kp, 1);
+    whole(ko, 'n_visits', kp, 1);
     bool(ko, 'track_available', kp);
     arr(ko, 'positions', kp).forEach((pos, j) => {
       const pp = `${kp}.positions[${j}]`;
@@ -882,10 +896,68 @@ export function parseAreaKnown(raw: unknown): AreaKnown {
       raDec(po, pp);
     });
   });
+  arr(o, 'skybot', p).forEach((sb, i) => {
+    const sp = `${p}.skybot[${i}]`;
+    const so = obj(sb, sp);
+    whole(so, 'visit', sp, 1);
+    nullableTime(so, 'fetched_at', sp);
+  });
   time(o, 'cached_at', p);
   time(o, 'computed_at', p);
   strList(o, 'missing', p);
   const prov = obj(o.provenance, `${p}.provenance`);
   for (const k of ['positions', 'skybot']) areaProvenance(prov, k, `${p}.provenance`);
   return raw as AreaKnown;
+}
+
+const PATH_CODES = [
+  'path:deferred',
+  'path:not_cached',
+  'path:observer',
+  'path:ephemeris',
+  'path:window',
+  'path:frames_incomplete',
+] as const;
+
+/** `GET /v1/objects/{id}/path` (A19.5, Q-141; issue #130): model_dependent by contract. */
+export function parseTrackPath(raw: unknown): TrackPath {
+  const p = 'path';
+  const o = obj(raw, p);
+  str(o, 'id', p);
+  if (o.observer !== '500@-163182') fail(`${p}.observer`, 'expected the SPHEREx observer 500@-163182');
+  whole(o, 'step_min', p, 1);
+  if (o.interp_error_arcsec !== null && num(o, 'interp_error_arcsec', p) < 0) {
+    fail(`${p}.interp_error_arcsec`, 'expected 0 or more');
+  }
+  nullableTime(o, 'fetched_at', p);
+  nullableTime(o, 'cached_at', p);
+  if (o.tag !== 'model_dependent') fail(`${p}.tag`, 'expected model_dependent');
+  str(o, 'assumption', p);
+  str(o, 'formula', p);
+  arr(o, 'points', p).forEach((r, i) => {
+    const q = `${p}.points[${i}]`;
+    const e = obj(r, q);
+    time(e, 'time', q);
+    raDec(e, q);
+  });
+  arr(o, 'frame_points', p).forEach((r, i) => {
+    const q = `${p}.frame_points[${i}]`;
+    const e = obj(r, q);
+    time(e, 'time', q);
+    raDec(e, q);
+    if (str(e, 'frame_id', q) === '') fail(`${q}.frame_id`, 'expected a frame id');
+    for (const k of ['ra_3sigma_arcsec', 'dec_3sigma_arcsec']) {
+      if (e[k] !== null && num(e, k, q) < 0) fail(`${q}.${k}`, 'expected 0 or more');
+    }
+  });
+  arr(o, 'windows', p).forEach((r, i) => {
+    const q = `${p}.windows[${i}]`;
+    const w = obj(r, q);
+    time(w, 'start', q);
+    time(w, 'end', q);
+  });
+  strList(o, 'missing', p).forEach((c, i) => {
+    if (!(PATH_CODES as readonly string[]).includes(c)) fail(`${p}.missing[${i}]`, 'expected a path refusal code');
+  });
+  return raw as TrackPath;
 }
