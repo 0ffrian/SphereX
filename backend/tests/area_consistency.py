@@ -287,7 +287,11 @@ def _check_verdict(
         _check(reason is None, f"{tid}: a track has no reason")
         _check(verdict in {"found_blind", "unexplained", "unchecked"}, f"{tid}: verdict")
         _check(len(t["visits"]) >= 2, f"{tid}: a track spans 2 or more visits")
-        _check(t["rate_deg_day"] is not None and t["pa_deg"] is not None, f"{tid}: rate")
+        # A track's rate and PA come from one v_AB: both or neither. Neither when its chain fit
+        # and every pair fit fail the chain's window (A17.4 Output, Q-208 (21)), then no u either.
+        _check((t["rate_deg_day"] is None) == (t["pa_deg"] is None), f"{tid}: rate and PA")
+        if t["rate_deg_day"] is None:
+            _check(t["u_inv_au"] is None, f"{tid}: a track without a rate has no u")
     else:
         _check(reason is not None, f"{tid}: a possible names its reason")
         _check(verdict == "possible", f"{tid}: a possible's verdict is possible")

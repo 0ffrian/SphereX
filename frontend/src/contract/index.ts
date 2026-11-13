@@ -79,6 +79,26 @@ export type {
   LiveJobError,
   LiveVisit,
   LiveVisitPair,
+  // Scans and runs (#156, Q-470, Q-471).
+  ScanPlan,
+  ScanSquare,
+  Run,
+  RunKind,
+  RunRegion,
+  RunSquare,
+  RunSquareState,
+  RunState,
+  RunTotals,
+  RunEvent,
+  RunObject,
+  RunPosition,
+  RunProgress,
+  RunList,
+  RunSummary,
+  RunResults,
+  RunKnownRow,
+  RunTrackRow,
+  RunTrackRef,
 } from './generated';
 export { AREA_DOT_LABELS, AREA_VERDICTS, AREA_SED_LABELS, AREA_LINKERS } from './generated';
 /** D-23: IRMode uses the same shape as VisibleMode; `channels_um` is set on IRMode only. */

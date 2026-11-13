@@ -1,0 +1,106 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "scan-plan.schema.json",
+  "title": "ScanPlan",
+  "description": "POST /v1/scans with start=false (Q-470): the region cut into squares that cover it with overlap, in scan order. No SIA call: area_id is a stored area of the same box, else null; the job picks each square's visit pair.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "region",
+    "release",
+    "kind",
+    "cols",
+    "rows",
+    "squares",
+    "estimate_s",
+    "provenance"
+  ],
+  "properties": {
+    "region": {
+      "$ref": "run.schema.json#/definitions/RunRegion"
+    },
+    "release": {
+      "type": "string",
+      "minLength": 1
+    },
+    "kind": {
+      "$ref": "run.schema.json#/definitions/RunKind"
+    },
+    "cols": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 36
+    },
+    "rows": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 36
+    },
+    "squares": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 36,
+      "items": {
+        "$ref": "#/definitions/ScanSquare"
+      }
+    },
+    "estimate_s": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Rough total for the squares not stored yet."
+    },
+    "provenance": {
+      "$ref": "#/definitions/ScanPlanProvenance"
+    }
+  },
+  "definitions": {
+    "ScanSquare": {
+      "title": "ScanSquare",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "index",
+        "row",
+        "col",
+        "box",
+        "area_id"
+      ],
+      "properties": {
+        "index": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 36
+        },
+        "row": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "0 = top."
+        },
+        "col": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "0 = left on screen (east)."
+        },
+        "box": {
+          "$ref": "run.schema.json#/definitions/RunBox"
+        },
+        "area_id": {
+          "$ref": "run.schema.json#/definitions/RunAreaId"
+        }
+      }
+    },
+    "ScanPlanProvenance": {
+      "title": "ScanPlanProvenance",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "squares"
+      ],
+      "properties": {
+        "squares": {
+          "$ref": "area-index.schema.json#/definitions/AreaProvenanceEntry"
+        }
+      }
+    }
+  }
+}

@@ -1,18 +1,17 @@
 // Scans and runs (issue #157; backend #156, Q-470, Q-471): the API behind ONE module, so swapping
-// the mock for the real backend touches this file only. #156 has not published its schemas yet,
-// so the types below are copied from #156's spec (and posted on #156 for the backend to match);
-// once `shared/schemas/scan-plan.schema.json` and `run*.schema.json` exist, these become aliases of
-// the generated `@/contract` types.
+// the mock for the real backend touches this file only. The types are #156's contract
+// (`shared/schemas/scan-plan`, `run`, `run-results`; generated `@/contract` types, D-18).
 //
 //   POST   /v1/scans {ra, dec, width_deg, height_deg, kind, start: false} -> 200 ScanPlan
 //          (no network calls on the backend; visit pairs are resolved square by square by the job)
 //   POST   same body with start: true -> 202 RunRecord
 //          errors: 422 scan:too_large | area:bad_box, 429 queue_full, 503 offline
 //   GET    /v1/runs/{run_id} -> RunRecord (404 run_not_found)
-//   POST   /v1/runs/{run_id}/pause, /resume -> RunRecord (409 when not applicable)
+//   POST   /v1/runs/{run_id}/pause, /resume -> RunRecord (409 run_not_pausable | run_not_paused |
+//          run_finished; 429 queue_full on resume)
 //   DELETE /v1/runs/{run_id} -> 204 (stops it; finished squares stay stored)
 //   GET    /v1/runs/{run_id}/results -> RunResults (merged results of the finished squares)
-//   The running square's steps: #141's GET /v1/areas/live/{area_id} (liveAreaApi.status).
+//   The running square's steps come with the record (`progress`, only while running).
 //
 // Which implementation answers: the HTTP client by default (a backend that does not serve the
 // routes answers `unavailable`, and the tool keeps today's single-area flow). The MOCK only when
@@ -20,155 +19,51 @@
 // positions are INVENTED TEST VALUES, never shown in a public build. `scan_ms=<ms>` sets the time
 // per square, `scan_hold=<square>` freezes the run while that square is analysing (screenshots).
 import { API_BASE } from '@/app/api/config';
-import { getLiveAreaApi, mockStatusAt, type LiveJobStatus, type LivePlan } from './liveAreaApi';
-import { SQUARE_ESTIMATE_S, splitRegion, squareCentre } from './scanGrid';
+import type {
+  LiveJobError,
+  Run,
+  RunEvent,
+  RunKind,
+  RunKnownRow,
+  RunObject,
+  RunPosition,
+  RunRegion,
+  RunResults,
+  RunSquare,
+  RunSquareState,
+  RunState,
+  RunTotals,
+  RunTrackRow,
+  ScanPlan as ContractScanPlan,
+  ScanSquare,
+} from '@/contract';
+import { mockStatusAt, type LivePlan } from './liveAreaApi';
+import { gridShape, SQUARE_ESTIMATE_S, splitRegion, squareCentre } from './scanGrid';
 
-// ---- Types (#156) ------------------------------------------------------------------------------
+// ---- Types: #156's contract (`scan-plan`, `run`, `run-results` schemas; generated) ----------
 
-export type ScanKind = 'discovery' | 'known';
+export type ScanKind = RunKind;
 /** A box on the sky: centre and sides in degrees (north up, on the centre's tangent plane). */
-export interface ScanBox {
-  ra: number;
-  dec: number;
-  width_deg: number;
-  height_deg: number;
-}
-export interface ScanPlanSquare {
-  /** 1..N: top row first, left to right on screen, row by row. */
-  index: number;
-  /** The square's box, padded 0.05° and snapped (`live.snap_box`), as its live area's box. */
-  box: ScanBox;
-  /** The stored area of the same box, when it is already computed; else null. */
-  area_id: string | null;
-}
-export interface ScanPlan {
-  /** Data release, e.g. `spherex_dr1` (not in #156's list: asked for on #156, the card shows it). */
-  release: string;
-  /** The region as snapped by the backend (0.05°). */
-  region: ScanBox;
-  cols: number;
-  rows: number;
-  squares: ScanPlanSquare[];
-  /** Rough run time in seconds: the squares not stored yet. */
-  estimate_s: number;
-}
-
-export type SquareState = 'todo' | 'running' | 'done' | 'skipped' | 'failed';
-export type RunState = 'queued' | 'running' | 'paused' | 'done' | 'stopped' | 'failed';
-export interface RunError {
-  code: string;
-  detail: string;
-}
-export interface RunSquare extends ScanPlanSquare {
-  state: SquareState;
-  error?: RunError;
-}
-export interface RunPosition {
-  ra: number;
-  dec: number;
-  /** ISO UTC. */
-  time: string;
-}
-export type FoundKind = 'known' | 'unexplained' | 'predicted';
-export interface FoundObject {
-  kind: FoundKind;
-  /** Known and predicted objects: the designation as SkyBoT gives it ("7051 Sean"). */
-  designation?: string;
-  /** Tracks found by Discovery: the square's track id ("T7"). */
-  track_id?: string;
-  square: number;
-  /** The trajectory drawn: Horizons positions for known objects, measured dots for tracks. */
-  positions: RunPosition[];
-  /** SkyBoT's V magnitude, when given (optional; asked for on #156 for the label). */
-  v_mag?: number | null;
-}
-export type RunEventType =
-  | 'run_started'
-  | 'square_started'
-  | 'square_done'
-  | 'square_skipped'
-  | 'square_failed'
-  | 'found'
-  | 'run_paused'
-  | 'run_resumed'
-  | 'run_done'
-  | 'run_stopped';
-export interface RunEvent {
-  /** Seconds since `started_at`. */
-  t: number;
-  type: RunEventType;
-  square?: number;
-  area_id?: string;
-  object?: FoundObject;
-}
-export interface RunTotals {
-  known: number;
-  found: number;
-  unexplained: number;
-  squares_done: number;
-  squares_skipped: number;
-}
-export interface RunRecord {
-  run_id: string;
-  kind: ScanKind;
-  release: string;
-  region: ScanBox;
-  squares: RunSquare[];
-  state: RunState;
-  created_at: string;
-  started_at: string | null;
-  finished_at: string | null;
-  totals: RunTotals;
-  events: RunEvent[];
-  /** Queued behind another job: its place (1 = next). Optional (#141's `queue_position`). */
-  queue_position?: number;
-}
-
-/** One known object of the merged results, de-duplicated by designation. */
-export interface RunKnownRow {
-  designation: string;
-  /** Null for an unnumbered object. */
-  number: number | null;
-  name: string | null;
-  /** "asteroid", "comet". */
-  kind: string;
-  v_mag: number | null;
-  /** True when Discovery found it blind in a square (a track matched to it). */
-  detected: boolean;
-  /** The backend's object id (`sbdb-…`), null when it has none. */
-  object_id: string | null;
-  /** The Track pane can open it at once (Q-461). */
-  track_available: boolean;
-  squares: number[];
-  /** ISO dates of the visit pairs it was seen or predicted in (one per square). */
-  dates: string[];
-  positions: RunPosition[];
-}
-/** One Discovery track of the merged results; duplicates within 30″ across neighbouring squares merged. */
-export interface RunTrackRow {
-  track_id: string;
-  verdict: 'found_blind' | 'unexplained' | 'possible' | 'unchecked';
-  /** The known object it matched, when found_blind. */
-  designation: string | null;
-  rate_deg_day: number | null;
-  squares: number[];
-  dates: string[];
-  /** The stored area of its first square (the Track and Build it read it). */
-  area_id: string;
-  positions: RunPosition[];
-}
-export interface RunResults {
-  run_id: string;
-  release: string;
-  squares_total: number;
-  squares_done: number;
-  skipped: { index: number; error: RunError }[];
-  /** First visit start and last visit end over every finished square (ISO UTC). */
-  visits: { start: string; end: string } | null;
-  n_frames: number;
-  known: RunKnownRow[];
-  tracks: RunTrackRow[];
-}
+export type ScanBox = RunRegion;
+export type ScanPlanSquare = ScanSquare;
+export type ScanPlan = ContractScanPlan;
+export type SquareState = RunSquareState;
+export type RunError = LiveJobError;
+export type FoundObject = RunObject;
+export type FoundKind = RunObject['kind'];
+export type RunEventType = RunEvent['type'];
+/** The record of a run (`GET /v1/runs/{id}`). */
+export type RunRecord = Run;
+export type {
+  RunEvent,
+  RunKnownRow,
+  RunPosition,
+  RunResults,
+  RunSquare,
+  RunState,
+  RunTotals,
+  RunTrackRow,
+};
 
 export type ScanErrorCode = string;
 export type ScanPlanAnswer =
@@ -202,8 +97,6 @@ export interface ScanApi {
   resume(runId: string): Promise<RunRecord>;
   stop(runId: string): Promise<void>;
   results(runId: string, signal?: AbortSignal): Promise<RunResults>;
-  /** The running square's steps (#141's live area job). */
-  squareStatus(areaId: string, signal?: AbortSignal): Promise<LiveJobStatus>;
 }
 
 // ---- Reply checks (shape only; #156's schemas replace them) ------------------------------------
@@ -355,7 +248,9 @@ export function httpScanApi(
     },
     async stop(id) {
       const res = await fetchImpl(runUrl(id), { method: 'DELETE' });
-      if (!res.ok && res.status !== 404) throw new Error(`Stop failed (${res.status}).`);
+      // 404: no such run; 409 run_finished: it has finished or is already stopping.
+      if (!res.ok && res.status !== 404 && res.status !== 409)
+        throw new Error(`Stop failed (${res.status}).`);
     },
     async results(id, signal) {
       const res = await fetchImpl(runUrl(id, '/results'), { signal: timed(signal) });
@@ -363,7 +258,6 @@ export function httpScanApi(
       if (res.status === 404) throw new RunGone(id);
       return parseRunResults(body);
     },
-    squareStatus: (areaId, signal) => getLiveAreaApi().status(areaId, signal),
   };
 }
 
@@ -383,27 +277,35 @@ interface MockRun {
 const MOCK_KEY = 'sx-scan-mock-runs';
 const r6 = (x: number) => Math.round(x * 1e6) / 1e6;
 const snap = (x: number) => Math.round(x / 0.05) * 0.05;
+const MOCK_PROV = {
+  tag: 'derived' as const,
+  source: 'mock (invented test values)',
+  formula: 'mock',
+};
 
-/** The mock's square boxes: the equal split, padded 0.05° and snapped (as #156's). */
+/** The mock's square boxes, in the backend's split (scanGrid mirrors `scan.split`). */
 function mockSquares(region: ScanBox): ScanPlanSquare[] {
   const g = splitRegion(region);
   return g.squares.map((s) => {
     const c = squareCentre(s);
     return {
       index: s.index,
+      row: s.row,
+      col: s.col,
       box: {
-        ra: r6(c.ra),
-        dec: r6(c.dec),
-        width_deg: r6(snap(g.cellW + 0.1)),
-        height_deg: r6(snap(g.cellH + 0.1)),
+        ra: r6(snap(c.ra)),
+        dec: r6(snap(c.dec)),
+        width_deg: r6(Math.min(2, snap(g.cellW + 0.1))),
+        height_deg: r6(Math.min(2, snap(g.cellH + 0.1))),
       },
       area_id: null,
     };
   });
 }
 
-/** Square 4 is skipped (no visit pair), as in the mock-up; square 9 fails once. Invented. */
+/** Square 4 is skipped (no visit pair), as in the mock-up. Invented. */
 const MOCK_SKIP = 4;
+const MOCK_VISITS = ['2026-06-27T03:10:00Z', '2026-06-28T03:10:00Z'];
 
 /**
  * Invented objects of a mock square: a known object crossing it, one predicted-only object and, in
@@ -427,15 +329,15 @@ export function mockObjectsOf(region: ScanBox, index: number): FoundObject[] {
     '4179 Toutatis',
   ];
   const out: FoundObject[] = [];
+  const model = 'model_dependent' as const;
   if (index === 2 || index === 3) {
-    // 7051 Sean: from the middle of square 2 across the border into square 3.
     const u0 = index === 2 ? 0.55 : -0.05;
     out.push({
       kind: 'known',
       designation: '7051 Sean',
       square: index,
       positions: path(u0, 0.35, 0.22, 0.12),
-      v_mag: 17.7,
+      positions_tag: model,
     });
   } else {
     out.push({
@@ -443,7 +345,7 @@ export function mockObjectsOf(region: ScanBox, index: number): FoundObject[] {
       designation: index <= names.length ? names[index - 1]! : `2026 AB${index}`,
       square: index,
       positions: path(0.2, 0.25, 0.15, 0.1),
-      v_mag: 17 + (index % 5) * 0.4,
+      positions_tag: model,
     });
   }
   out.push({
@@ -451,7 +353,7 @@ export function mockObjectsOf(region: ScanBox, index: number): FoundObject[] {
     designation: `2014 HX${480 + index}`,
     square: index,
     positions: path(0.3, 0.7, 0.08, 0.06),
-    v_mag: 21.2,
+    positions_tag: model,
   });
   if (index % 3 === 0)
     out.push({
@@ -459,6 +361,7 @@ export function mockObjectsOf(region: ScanBox, index: number): FoundObject[] {
       track_id: `T${index}`,
       square: index,
       positions: path(0.6, 0.55, 0.1, 0.12).slice(0, 2),
+      positions_tag: 'measured',
     });
   return out;
 }
@@ -492,26 +395,32 @@ export function mockScanApi(
   load();
   const iso = (ms: number) => new Date(ms).toISOString().replace(/\.\d{3}Z$/, 'Z');
   const planOf = (req: ScanRequest): ScanPlanAnswer => {
-    const g = splitRegion(req);
-    if (Math.max(req.width_deg, req.height_deg) > 12.0001 || g.cols * g.rows > 36)
+    if (Math.max(req.width_deg, req.height_deg) > 12.0001 || !gridShape(req))
       return {
         kind: 'error',
         code: 'scan:too_large',
         detail: 'At most 12° a side and 36 squares.',
       };
     if (Math.abs(req.dec) + req.height_deg / 2 >= 89)
-      return { kind: 'error', code: 'area:bad_box', detail: 'The region reaches a pole.' };
+      return {
+        kind: 'error',
+        code: 'area:bad_box',
+        detail: 'Scans cannot reach a celestial pole.',
+      };
+    const g = splitRegion(req);
     const squares = mockSquares(req);
     if (squares[0]) squares[0].area_id = 'live-dr1-mock-1';
     return {
       kind: 'plan',
       plan: {
+        region: { ra: req.ra, dec: req.dec, width_deg: req.width_deg, height_deg: req.height_deg },
         release: 'spherex_dr1',
-        region: req,
+        kind: req.kind,
         cols: g.cols,
         rows: g.rows,
-        squares,
+        squares: squares as ScanPlan['squares'],
         estimate_s: (squares.length - 1) * SQUARE_ESTIMATE_S,
+        provenance: { squares: MOCK_PROV },
       },
     };
   };
@@ -538,26 +447,30 @@ export function mockScanApi(
       squares_skipped: 0,
     };
     let acc = 0;
-    let running = false;
+    let running: { index: number; areaId: string; f: number } | null = null;
+    const known = new Set<string>();
     for (const sq of plan.plan.squares) {
       const c = cost(sq.index);
       const startT = acc;
       acc += c;
+      const base = { index: sq.index, box: sq.box };
       const areaId = sq.area_id ?? `live-dr1-mock-${r.id.slice(-6)}-${sq.index}`;
       if (running || elapsed < startT) {
-        squares.push({ ...sq, area_id: null, state: 'todo' });
+        squares.push({ ...base, area_id: null, state: 'todo' });
         continue;
       }
       events.push({ t: startT / 1000, type: 'square_started', square: sq.index, area_id: areaId });
       if (elapsed < acc) {
-        running = r.stoppedAt === null;
-        squares.push({ ...sq, area_id: areaId, state: running ? 'running' : 'todo' });
+        if (r.stoppedAt === null) {
+          running = { index: sq.index, areaId, f: (elapsed - startT) / c };
+          squares.push({ ...base, area_id: areaId, state: 'running' });
+        } else squares.push({ ...base, area_id: null, state: 'todo' });
         continue;
       }
       if (sq.index === MOCK_SKIP) {
         events.push({ t: acc / 1000, type: 'square_skipped', square: sq.index });
         squares.push({
-          ...sq,
+          ...base,
           area_id: null,
           state: 'skipped',
           error: { code: 'area:no_visit_pair', detail: 'No two visits within 6 h there.' },
@@ -568,21 +481,18 @@ export function mockScanApi(
       events.push({ t: acc / 1000, type: 'square_done', square: sq.index, area_id: areaId });
       for (const o of mockObjectsOf(r.region, sq.index)) {
         events.push({ t: acc / 1000, type: 'found', square: sq.index, area_id: areaId, object: o });
-        if (o.kind === 'known') {
+        if (o.designation && !known.has(o.designation)) {
+          known.add(o.designation);
           totals.known++;
-          totals.found++;
-        } else if (o.kind === 'unexplained') {
+          if (o.kind === 'known') totals.found++;
+        }
+        if (o.kind === 'unexplained') {
           totals.found++;
           totals.unexplained++;
-        } else totals.known++;
+        }
       }
-      squares.push({ ...sq, area_id: areaId, state: 'done' });
+      squares.push({ ...base, area_id: areaId, state: 'done' });
       totals.squares_done++;
-    }
-    // 7051 Sean is one object in squares 2 and 3.
-    if (squares[1]?.state === 'done' && squares[2]?.state === 'done') {
-      totals.known--;
-      totals.found--;
     }
     const finished = squares.every((s) => s.state === 'done' || s.state === 'skipped');
     const state: RunState =
@@ -596,12 +506,19 @@ export function mockScanApi(
     if (state === 'done') events.push({ t: acc / 1000, type: 'run_done' });
     if (state === 'stopped') events.push({ t: elapsed / 1000, type: 'run_stopped' });
     if (state === 'paused') events.push({ t: elapsed / 1000, type: 'run_paused' });
+    const live =
+      running && state === 'running'
+        ? mockStatusAt(running.areaId, hold !== null ? 0.6 : Math.min(0.99, running.f), {
+            n_frames: 14,
+            estimate_s: SQUARE_ESTIMATE_S,
+          } as LivePlan)
+        : null;
     return {
       run_id: r.id,
       kind: r.kind,
       release: 'spherex_dr1',
       region: r.region,
-      squares,
+      squares: squares as RunRecord['squares'],
       state,
       created_at: iso(r.t0),
       started_at: iso(r.t0),
@@ -609,6 +526,17 @@ export function mockScanApi(
         state === 'done' ? iso(r.t0 + r.pausedMs + acc) : state === 'stopped' ? iso(tNow) : null,
       totals,
       events: events.sort((a, b) => a.t - b.t),
+      provenance: { known_positions: MOCK_PROV, track_positions: MOCK_PROV },
+      ...(running && live
+        ? {
+            progress: {
+              square: running.index,
+              area_id: running.areaId,
+              step: live.step ?? null,
+              steps: live.steps,
+            },
+          }
+        : {}),
     };
   };
   const get = (id: string) => {
@@ -664,100 +592,75 @@ export function mockScanApi(
     async results(id) {
       return mockResultsOf(recordOf(get(id)));
     },
-    async squareStatus(areaId) {
-      // The running square's progress: its share of the square's time.
-      for (const r of runs.values()) {
-        const rec = recordOf(r);
-        const sq = rec.squares.find((s) => s.area_id === areaId);
-        if (!sq) continue;
-        const start =
-          rec.events.find((e) => e.type === 'square_started' && e.square === sq.index)?.t ?? 0;
-        const tNow = Math.max(0, (r.pausedAt ?? now()) - r.t0 - r.pausedMs) / 1000;
-        const f =
-          hold !== null
-            ? 0.6
-            : sq.state === 'running'
-              ? Math.min(0.99, (tNow - start) / (squareMs / 1000))
-              : 1;
-        const plan = { n_frames: 14, estimate_s: SQUARE_ESTIMATE_S } as LivePlan;
-        return mockStatusAt(areaId, f, plan);
-      }
-      throw new Error('no such square');
-    },
   };
 }
 
-/** The mock's merged results, from its record (designations merged, as #156's). Pure. */
+/** The mock's merged results, in the contract's shape (designations merged, as #156's). Pure. */
 export function mockResultsOf(rec: RunRecord): RunResults {
   const known = new Map<string, RunKnownRow>();
   const tracks: RunTrackRow[] = [];
   for (const e of rec.events) {
     const o = e.object;
     if (e.type !== 'found' || !o) continue;
-    const date = o.positions[0]?.time.slice(0, 10) ?? '';
+    const areaId = e.area_id ?? 'live-dr1-mock';
     if (o.designation) {
       const prev = known.get(o.designation);
       if (prev) {
-        const t = tracks.find((x) => x.designation === o.designation);
-        if (t && !t.squares.includes(o.square)) t.squares.push(o.square);
-        prev.squares.push(o.square);
-        if (!prev.dates.includes(date)) prev.dates.push(date);
+        if (!prev.squares.includes(o.square)) prev.squares.push(o.square);
         prev.positions.push(...o.positions);
+        if (o.kind === 'known') prev.detected = true;
+        const t = tracks.find((x) => x.designation === o.designation);
+        if (t && o.kind === 'known') {
+          if (!t.squares.includes(o.square)) t.squares.push(o.square);
+          t.tracks.push({ square: o.square, area_id: areaId, track_id: `T${o.square}a` });
+          t.positions.push(...o.positions);
+        }
         continue;
       }
-      const [num, ...rest] = o.designation.split(' ');
-      const numbered = /^\d+$/.test(num ?? '');
+      const [num] = o.designation.split(' ');
       known.set(o.designation, {
         designation: o.designation,
-        number: numbered ? Number(num) : null,
-        name: numbered ? rest.join(' ') : null,
-        kind: 'asteroid',
-        v_mag: o.v_mag ?? null,
-        detected: o.kind === 'known',
+        number: /^\d+$/.test(num ?? '') ? Number(num) : null,
         object_id: null,
+        kind: 'asteroid',
+        v_mag: o.kind === 'predicted' ? 21.2 : 17.4,
+        detected: o.kind === 'known',
         track_available: false,
         squares: [o.square],
-        dates: [date],
+        visits: [...MOCK_VISITS],
         positions: [...o.positions],
       });
-      // A known object found in the frames is also a Discovery track matched to it (found blind).
+      // A known object found in the frames is also a Discovery track matched to it.
       if (o.kind === 'known')
         tracks.push({
-          track_id: `T${o.square}a`,
-          verdict: 'found_blind',
+          kind: 'found',
           designation: o.designation,
-          rate_deg_day: 0.3,
           squares: [o.square],
-          dates: [date],
-          area_id: e.area_id ?? '',
-          positions: o.positions,
+          tracks: [{ square: o.square, area_id: areaId, track_id: `T${o.square}a` }],
+          visits: [...MOCK_VISITS],
+          positions: [...o.positions],
         });
     } else if (o.track_id) {
       tracks.push({
-        track_id: o.track_id,
-        verdict: 'unexplained',
+        kind: 'unexplained',
         designation: null,
-        rate_deg_day: 0.31,
         squares: [o.square],
-        dates: [date],
-        area_id: e.area_id ?? '',
+        tracks: [{ square: o.square, area_id: areaId, track_id: o.track_id }],
+        visits: [...MOCK_VISITS],
         positions: o.positions,
       });
     }
   }
-  const done = rec.squares.filter((s) => s.state === 'done');
   return {
     run_id: rec.run_id,
+    kind: rec.kind,
     release: rec.release,
-    squares_total: rec.squares.length,
-    squares_done: done.length,
-    skipped: rec.squares
-      .filter((s) => s.state === 'skipped' || s.state === 'failed')
-      .map((s) => ({ index: s.index, error: s.error ?? { code: 'area:failed', detail: '' } })),
-    visits: done.length > 0 ? { start: '2026-06-24T02:00:00Z', end: '2026-07-02T06:30:00Z' } : null,
-    n_frames: done.length * 14,
+    region: rec.region,
+    state: rec.state,
+    squares: rec.squares.map((s) => ({ index: s.index, area_id: s.area_id, state: s.state })),
     known: [...known.values()],
     tracks,
+    provenance: { merge: MOCK_PROV, known_positions: MOCK_PROV, track_positions: MOCK_PROV },
   };
 }
 

@@ -19,8 +19,21 @@ export const MAX_SQUARES = 36;
 export const SQUARE_DEG = 2;
 /** Share of the screen's height the selection rectangle covers before the limit (design value). */
 export const SELECT_FRACTION = 0.35;
-/** Rough time of one square (s), for the pointer's label only (engineering value, #141's estimate). */
-export const SQUARE_ESTIMATE_S = 960;
+/** #141's estimate of one live area, as the backend computes it (`live.estimate_seconds`). */
+const ESTIMATE_BASE_S = 540;
+const ESTIMATE_PER_DEG2_S = 600;
+/** Rough time of one square box of w × h degrees (s): the backend's estimate, never a measurement. */
+export const squareEstimateS = (w: number, h: number): number =>
+  Math.round(ESTIMATE_BASE_S + ESTIMATE_PER_DEG2_S * w * h);
+/** A typical square's time, where no box is known (a one-square region, the mock). */
+export const SQUARE_ESTIMATE_S = squareEstimateS(1.9, 1.9);
+
+/** The scan's rough time before the plan answers: each square padded 0.05° a side, as #156 does. */
+export function regionEstimateS(region: Region, cols: number, rows: number): number {
+  const w = Math.min(SQUARE_DEG, region.width_deg / cols + 2 * PAD_DEG);
+  const h = Math.min(SQUARE_DEG, region.height_deg / rows + 2 * PAD_DEG);
+  return cols * rows * squareEstimateS(w, h);
+}
 
 const D2R = Math.PI / 180;
 const R2D = 180 / Math.PI;
@@ -63,6 +76,77 @@ export interface Grid {
 export const splitCount = (sideDeg: number): number =>
   Math.max(1, Math.ceil(sideDeg / SQUARE_DEG - 1e-6));
 
+/** The live areas' 0.05° grid and each square's padding (#156 Q-470, `core/area/scan.py`). */
+const GRID_DEG = 0.05;
+const PAD_DEG = 0.05;
+const snapGrid = (v: number) => Math.round(v / GRID_DEG) * GRID_DEG;
+const ceilGrid = (v: number) => Math.round(Math.ceil(v / GRID_DEG - 1e-9) * GRID_DEG * 100) / 100;
+
+/** Gnomonic projection about (ra0, dec0) in degrees (ξ east, η north); null on the far side. */
+export function project(
+  ra0: number,
+  dec0: number,
+  ra: number,
+  dec: number,
+): { xi: number; eta: number } | null {
+  const r = ra * D2R;
+  const d = dec * D2R;
+  const d0 = dec0 * D2R;
+  const dr = r - ra0 * D2R;
+  const cosc = Math.sin(d0) * Math.sin(d) + Math.cos(d0) * Math.cos(d) * Math.cos(dr);
+  if (cosc <= 1e-9) return null;
+  const xi = (Math.cos(d) * Math.sin(dr)) / cosc;
+  const eta = (Math.cos(d0) * Math.sin(d) - Math.sin(d0) * Math.cos(d) * Math.cos(dr)) / cosc;
+  return { xi: xi * R2D, eta: eta * R2D };
+}
+
+/** Whether a cols × rows split's padded squares stay within 2° a side (`_cover`, scan.py). */
+function fits(region: Region, cols: number, rows: number): { w: boolean; h: boolean } {
+  const sw = region.width_deg / cols;
+  const sh = region.height_deg / rows;
+  let w = true;
+  let h = true;
+  for (let r = 0; r < rows; r++) {
+    const e0 = region.height_deg / 2 - r * sh;
+    for (let c = 0; c < cols; c++) {
+      const x0 = region.width_deg / 2 - c * sw;
+      const mid = deproject(region.ra, region.dec, (x0 - sw / 2) * D2R, (e0 - sh / 2) * D2R);
+      const cra = snapGrid(mid.ra);
+      const cdec = snapGrid(mid.dec);
+      let hw = 0;
+      let hh = 0;
+      for (const x of [x0, x0 - sw])
+        for (const e of [e0, e0 - sh]) {
+          const q = deproject(region.ra, region.dec, x * D2R, e * D2R);
+          const p = project(cra, cdec, q.ra, q.dec);
+          if (!p) return { w: false, h: false };
+          hw = Math.max(hw, Math.abs(p.xi));
+          hh = Math.max(hh, Math.abs(p.eta));
+        }
+      w = w && ceilGrid(2 * (hw + PAD_DEG)) <= SQUARE_DEG + 1e-9;
+      h = h && ceilGrid(2 * (hh + PAD_DEG)) <= SQUARE_DEG + 1e-9;
+    }
+  }
+  return { w, h };
+}
+
+/**
+ * The backend's split (#156 Q-470, `scan.split`): ceil(side / 2) to start, then one more column
+ * or row while a padded square would pass the 2° cap (a 4° × 2° region is 3 × 2). Null when it
+ * needs more than MAX_SQUARES (`scan:too_large`). The UI's grid must match the run's squares.
+ */
+export function gridShape(region: Region): { cols: number; rows: number } | null {
+  let cols = splitCount(region.width_deg);
+  let rows = splitCount(region.height_deg);
+  while (cols * rows <= MAX_SQUARES) {
+    const f = fits(region, cols, rows);
+    if (f.w && f.h) return { cols, rows };
+    cols += f.w ? 0 : 1;
+    rows += f.h ? 0 : 1;
+  }
+  return null;
+}
+
 /** Gnomonic inverse: tangent-plane (ξ east, η north) around (ra0, dec0) to the sky. */
 export function deproject(ra0: number, dec0: number, xi: number, eta: number): RaDec {
   const d0 = dec0 * D2R;
@@ -74,10 +158,14 @@ export function deproject(ra0: number, dec0: number, xi: number, eta: number): R
 
 /** The equal split of a region and its squares, in scan order (#156 Q-470). */
 export function splitRegion(region: Region): Grid {
-  const cols = splitCount(region.width_deg);
-  const rows = splitCount(region.height_deg);
-  const X = Math.tan((region.width_deg / 2) * D2R);
-  const Y = Math.tan((region.height_deg / 2) * D2R);
+  const shape = gridShape(region) ?? {
+    cols: splitCount(region.width_deg),
+    rows: splitCount(region.height_deg),
+  };
+  const { cols, rows } = shape;
+  // Tangent-plane coordinates as the backend's (`scan.py`): the sides in degrees, in radians.
+  const X = (region.width_deg / 2) * D2R;
+  const Y = (region.height_deg / 2) * D2R;
   const squares: GridSquare[] = [];
   for (let row = 0; row < rows; row++) {
     for (let col = 0; col < cols; col++) {
@@ -146,25 +234,44 @@ export function selectionAt(
     MAX_REGION_DEG,
     2 * Math.atan(Math.tan((MAX_REGION_DEG / 2) * D2R) / aspect) * R2D,
   );
-  const held = h > hMax + 1e-9;
+  let held = h > hMax + 1e-9;
   if (held) h = hMax;
-  const { w } = sidesFor(h, aspect);
   const c = screenToRaDec(cam, x, y, width, height, { ra: 0, dec: 0 });
   const r6 = (v: number) => Math.round(v * 1e6) / 1e6;
-  const region = {
+  const regionOf = (hd: number) => ({
     ra: r6(c.ra),
     dec: r6(c.dec),
-    width_deg: r6(Math.min(w, MAX_REGION_DEG)),
-    height_deg: r6(h),
-  };
+    width_deg: r6(Math.min(sidesFor(hd, aspect).w, MAX_REGION_DEG)),
+    height_deg: r6(hd),
+  });
+  // As the backend counts them (on the 0.05° grid): past 36 squares, the largest height that fits.
+  const snapped = (r: Region): Region => ({
+    ...r,
+    width_deg: Math.max(GRID_DEG, snapGrid(r.width_deg)),
+    height_deg: Math.max(GRID_DEG, snapGrid(r.height_deg)),
+  });
+  let shape = gridShape(snapped(regionOf(h)));
+  if (!shape) {
+    held = true;
+    let lo = 0;
+    let hi = h;
+    for (let i = 0; i < 20; i++) {
+      const mid = (lo + hi) / 2;
+      if (gridShape(snapped(regionOf(mid)))) lo = mid;
+      else hi = mid;
+    }
+    h = lo;
+    shape = gridShape(snapped(regionOf(h))) ?? { cols: 6, rows: 6 };
+  }
+  const region = regionOf(h);
   // Pixels per tangent unit at the centre: (height / 2) / tan(fov / 2).
   const hPx = (height * Math.tan((h / 2) * D2R)) / tanFov;
   return {
     region,
     wPx: hPx * aspect,
     hPx,
-    cols: splitCount(region.width_deg),
-    rows: splitCount(region.height_deg),
+    cols: shape.cols,
+    rows: shape.rows,
     held,
     target: { ra: c.ra, dec: c.dec, fovDeg: clampFov(h) },
   };
@@ -186,9 +293,14 @@ export function selectionLabel(sel: Pick<Selection, 'region' | 'cols' | 'rows' |
   const parts = [
     `${sel.region.width_deg.toFixed(1)}° × ${sel.region.height_deg.toFixed(1)}°`,
     `${n} square${n === 1 ? '' : 's'}`,
-    aboutTime(n * SQUARE_ESTIMATE_S, true),
+    aboutTime(regionEstimateS(sel.region, sel.cols, sel.rows), true),
   ];
-  if (sel.held) parts.push(`${MAX_REGION_DEG}° max`);
+  if (sel.held)
+    parts.push(
+      Math.max(sel.region.width_deg, sel.region.height_deg) >= MAX_REGION_DEG - 0.01
+        ? `${MAX_REGION_DEG}° max`
+        : `${MAX_SQUARES} squares max`,
+    );
   return parts.join(' · ');
 }
 
@@ -214,8 +326,8 @@ export function regionBox(region: Region): {
   widthDeg: number;
   heightDeg: number;
 } {
-  const X = Math.tan((region.width_deg / 2) * D2R);
-  const Y = Math.tan((region.height_deg / 2) * D2R);
+  const X = (region.width_deg / 2) * D2R;
+  const Y = (region.height_deg / 2) * D2R;
   return {
     a: deproject(region.ra, region.dec, X, Y),
     b: deproject(region.ra, region.dec, -X, -Y),

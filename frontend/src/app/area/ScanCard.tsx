@@ -11,15 +11,15 @@ import { PanelCard } from '@/app/shell/PanelCard';
 import { useAreaStore } from '@/app/shell/areaStore';
 import { useShellStore } from '@/app/shell/shellStore';
 import { Alert, BoxIcon, RouteIcon } from './areaBits';
-import type { KnownObject } from './areaService';
+import { splitDesignation, type KnownObject } from './areaService';
 import { buildKnown, buildPlaceholder } from './buildFrom';
 import { NO_ID_NOTE } from './KnownList';
 import { failureText, releaseName, stepCount } from './liveJobStore';
 import { NO_ORBIT_NOTE } from './RealTrackCard';
 import type { RunKnownRow, RunRecord, RunResults, RunTrackRow, ScanBox, ScanPlan } from './scanApi';
 import { scanEcsv } from './scanExport';
-import { aboutTime, SQUARE_ESTIMATE_S, splitCount } from './scanGrid';
-import { objectsFromEvents, squaresText } from './scanObjects';
+import { aboutTime, gridShape, squareEstimateS, splitCount } from './scanGrid';
+import { objectsFromEvents, rateOf, squaresText } from './scanObjects';
 import { isFinished, scanFailureText, skippedText, useScanStore, type ScanView } from './scanStore';
 import { middleTime } from './trackJobStore';
 
@@ -114,8 +114,9 @@ function selectAgain(flow: 'known' | 'discovery') {
 function Offer({ view }: { view: Extract<ScanView, { kind: 'offer' }> }) {
   const busy = useScanStore((s) => s.busy);
   const plan: ScanPlan | null = view.plan;
-  const cols = plan?.cols ?? splitCount(view.region.width_deg);
-  const rows = plan?.rows ?? splitCount(view.region.height_deg);
+  const shape = gridShape(view.region);
+  const cols = plan?.cols ?? shape?.cols ?? splitCount(view.region.width_deg);
+  const rows = plan?.rows ?? shape?.rows ?? splitCount(view.region.height_deg);
   const n = cols * rows;
   const stored = plan?.squares.filter((s) => s.area_id !== null).length ?? 0;
   return (
@@ -303,17 +304,26 @@ function Scanning({
   const n = record.squares.length;
   const cur = record.squares.find((s) => s.state === 'running');
   const step = view.square?.steps.find((s) => s.state === 'running');
-  const left =
-    record.squares.filter((s) => s.state === 'todo').length * SQUARE_ESTIMATE_S +
-    (cur ? (view.square?.eta_s ?? SQUARE_ESTIMATE_S / 2) : 0);
+  // Rough: each square still to do by its box (the backend's estimate), half of the running one.
+  const left = record.squares.reduce(
+    (t, s) =>
+      t +
+      (s.state === 'todo'
+        ? squareEstimateS(s.box.width_deg, s.box.height_deg)
+        : s.state === 'running'
+          ? squareEstimateS(s.box.width_deg, s.box.height_deg) / 2
+          : 0),
+    0,
+  );
   const lastDone = Math.max(
     0,
     ...record.squares
       .filter((s) => s.state !== 'todo' && s.state !== 'running')
       .map((s) => s.index),
   );
-  const where =
-    record.state === 'queued'
+  const where = view.stopping
+    ? `Stopping after the current step · square ${cur?.index ?? lastDone} of ${n}`
+    : record.state === 'queued'
       ? `Waiting · square 1 of ${n} starts next`
       : record.state === 'paused'
         ? `Paused after square ${lastDone} of ${n}`
@@ -322,7 +332,8 @@ function Scanning({
               .filter(Boolean)
               .join(' · ')
           : `Square ${Math.min(n, lastDone + 1)} of ${n}`;
-  const cols = splitCount(record.region.width_deg);
+  // The run's squares in the backend's split (the record carries no cols).
+  const cols = gridShape(record.region)?.cols ?? splitCount(record.region.width_deg);
   return (
     <>
       <MiniGrid record={record} flowCols={cols} />
@@ -346,7 +357,7 @@ function Scanning({
           <button
             type="button"
             className="sx-btn-outline sx-scan-ib"
-            disabled={busy}
+            disabled={busy || view.stopping}
             aria-label="Resume the scan"
             title="Resume"
             onClick={() => void useScanStore.getState().resume()}
@@ -358,7 +369,7 @@ function Scanning({
           <button
             type="button"
             className="sx-btn-outline sx-scan-ib"
-            disabled={busy}
+            disabled={busy || view.stopping}
             aria-label="Pause the scan"
             title="Pause: finishes the current square, then waits"
             onClick={() => void useScanStore.getState().pause()}
@@ -370,7 +381,7 @@ function Scanning({
         <button
           type="button"
           className="sx-btn-outline"
-          disabled={busy}
+          disabled={busy || view.stopping}
           title="Every finished square is kept"
           onClick={() => void useScanStore.getState().stop()}
           data-testid="scan-stop"
@@ -401,7 +412,7 @@ function PauseIcon() {
   );
 }
 
-type Filter = 'found' | 'known' | 'possible';
+type Filter = 'found' | 'known';
 interface Row {
   key: string;
   num: string;
@@ -412,50 +423,54 @@ interface Row {
   track: RunTrackRow | null;
 }
 
-const whereOf = (squares: number[], dates: string[]) =>
-  [squaresText(squares), dates[0] ? dayOf(dates[0]) : ''].filter(Boolean).join(' · ');
+/** "squares 2–3 · 27 Jun": the row's squares and the first visit it comes from. */
+const whereOf = (squares: number[], visits: string[]) => {
+  const first = visits.slice().sort()[0];
+  return [squaresText(squares), first ? dayOf(first) : ''].filter(Boolean).join(' · ');
+};
 const vOf = (v: number | null) => (v === null ? null : `V ${v.toFixed(1)}`);
 
 function knownRow(k: RunKnownRow, how: string): Row {
+  const { id, name } = splitDesignation(k.designation, k.number);
   return {
     key: `k:${k.designation}`,
-    num: k.number !== null ? String(k.number) : '',
-    name: k.name ?? k.designation,
+    num: name ? id : '',
+    name: name || id,
     line: [k.kind, vOf(k.v_mag), how].filter(Boolean).join(' · '),
-    where: whereOf(k.squares, k.dates),
+    where: whereOf(k.squares, k.visits),
     known: k,
     track: null,
   };
 }
 
-/** The rows of a filter, from the merged results (#156). Pure, so the card is tested by its rows. */
+/**
+ * The rows of a filter, from the merged results (#156, Q-471). Found: the merged tracks (matched
+ * to a known object, or unexplained); Known: every known object, detected or predicted. The
+ * results carry no "possible" tracks, so there is no Possible filter. Pure, tested by its rows.
+ */
 export function scanRows(res: RunResults, f: Filter): Row[] {
   const byName = new Map(res.known.map((k) => [k.designation, k]));
   if (f === 'known')
     return res.known.map((k) => knownRow(k, k.detected ? 'detected' : 'predicted'));
-  const tracks = res.tracks.filter((t) =>
-    f === 'found'
-      ? t.verdict === 'found_blind' || t.verdict === 'unexplained'
-      : t.verdict === 'possible' || t.verdict === 'unchecked',
-  );
-  return tracks.map((t) => {
+  return res.tracks.map((t) => {
+    const first = t.tracks[0];
+    const key = `t:${first.area_id}:${first.track_id}`;
     const k = t.designation ? byName.get(t.designation) : undefined;
     if (k)
-      return {
-        ...knownRow(k, 'detected'),
-        key: `t:${t.track_id}:${t.area_id}`,
-        where: whereOf(t.squares, t.dates),
-        track: t,
-      };
-    const rate = t.rate_deg_day !== null ? `${t.rate_deg_day.toFixed(2)}°/day` : null;
+      return { ...knownRow(k, 'detected'), key, where: whereOf(t.squares, t.visits), track: t };
+    // The motion over its merged dots (derived from the measured positions).
+    const r = rateOf(t.positions.slice().sort((a, b) => Date.parse(a.time) - Date.parse(b.time)));
     return {
-      key: `t:${t.track_id}:${t.area_id}`,
-      num: t.track_id,
-      name: t.verdict === 'unexplained' ? 'Unexplained track' : 'Possible track',
-      line: [rate, t.verdict === 'unexplained' ? 'not in SkyBoT' : null]
+      key,
+      num: first.track_id,
+      name: t.kind === 'unexplained' ? 'Unexplained track' : (t.designation ?? 'Found track'),
+      line: [
+        r !== null ? `${r.toFixed(2)}°/day` : null,
+        t.kind === 'unexplained' ? 'not in SkyBoT' : null,
+      ]
         .filter(Boolean)
         .join(' · '),
-      where: whereOf(t.squares, t.dates),
+      where: whereOf(t.squares, t.visits),
       known: null,
       track: t,
     };
@@ -463,14 +478,16 @@ export function scanRows(res: RunResults, f: Filter): Row[] {
 }
 
 function asKnownObject(k: RunKnownRow): KnownObject {
+  const { id, name } = splitDesignation(k.designation, k.number);
   return {
-    id: k.number !== null ? String(k.number) : k.designation,
-    name: k.name ?? '',
+    id,
+    name,
     kind: k.kind,
     frames: 0,
     visits: 0,
     designation: k.designation,
     objectId: k.object_id,
+    number: k.number,
     trackAvailable: k.track_available,
     vMag: k.v_mag,
     positions: k.positions.map((p) => ({
@@ -484,7 +501,7 @@ function asKnownObject(k: RunKnownRow): KnownObject {
 function ResultRow({ row, release }: { row: Row; release: string }) {
   const k = row.known;
   const o = k ? asKnownObject(k) : null;
-  const around = k ? (middleTime(k.positions.map((p) => p.time)) ?? k.dates[0] ?? null) : null;
+  const around = k ? (middleTime(k.positions.map((p) => p.time)) ?? middleTime(k.visits)) : null;
   const track = o
     ? o.trackAvailable
       ? () => useAreaStore.getState().openEros(o)
@@ -496,13 +513,16 @@ function ResultRow({ row, release }: { row: Row; release: string }) {
   const build = o
     ? () => buildKnown(o)
     : row.track
-      ? () => buildPlaceholder(row.track!.area_id, row.track!, row.track!.track_id)
+      ? () => {
+          const ref = row.track!.tracks[0];
+          buildPlaceholder(ref.area_id, { track_id: ref.track_id }, ref.track_id);
+        }
       : null;
   return (
     <div
       className="sx-kr sx-scan-row"
       data-testid="scan-row"
-      data-object={k?.designation ?? row.track?.track_id}
+      data-object={k?.designation ?? row.track?.tracks[0].track_id}
     >
       <b className="sx-kr-num">{row.num}</b>
       <span className="sx-kr-nm">
@@ -564,10 +584,14 @@ function Done({
     ? {
         found: scanRows(results, 'found').length,
         known: results.known.length,
-        possible: scanRows(results, 'possible').length,
       }
     : null;
   const rows = results ? scanRows(results, filter) : [];
+  // First and last visit start over every row (the results carry each row's visits, not a frame count).
+  const visits = results
+    ? [...results.known, ...results.tracks].flatMap((r) => r.visits).sort()
+    : [];
+  const span = visits.length > 0 ? ([visits[0]!, visits[visits.length - 1]!] as const) : null;
   const download = () => {
     if (!results) return;
     const url = URL.createObjectURL(
@@ -585,10 +609,9 @@ function Done({
         <span>
           <b>{how}</b> · {release} · {doneN} of {n} squares
         </span>
-        {results?.visits && (
+        {span && (
           <span>
-            Visits {dayOf(results.visits.start)} to {dayOf(results.visits.end, true)}, each square
-            its own pair · {results.n_frames} frames
+            Visits {dayOf(span[0])} to {dayOf(span[1], true)}, each square its own pair
           </span>
         )}
         {off.map((s) => (
@@ -601,7 +624,7 @@ function Done({
       <Totals record={record} />
       {counts ? (
         <div className="sx-seg" role="group" aria-label="Show" data-testid="scan-filter">
-          {(['found', 'known', 'possible'] as const).map((f) => (
+          {(['found', 'known'] as const).map((f) => (
             <button
               key={f}
               type="button"
@@ -609,7 +632,7 @@ function Done({
               onClick={() => setFilter(f)}
               data-testid={`scan-filter-${f}`}
             >
-              {f === 'found' ? 'Found' : f === 'known' ? 'Known' : 'Possible'} {counts[f]}
+              {f === 'found' ? 'Found' : 'Known'} {counts[f]}
             </button>
           ))}
         </div>

@@ -4,7 +4,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { httpScanApi, mockScanApi, parseScanPlan, setScanApi, type RunRecord } from './scanApi';
 import { resetScans, scanFailureText, skippedText, useScanStore } from './scanStore';
 
-const REGION = { ra: 30, dec: 10, width_deg: 9.6, height_deg: 6 };
+// 5 × 3 squares, as the mock-up draws (#156's split: 1.8° parts stay under 2° when padded and snapped).
+const REGION = { ra: 30, dec: 10, width_deg: 9, height_deg: 5.4 };
+const n = 15;
 let clock = 0;
 const now = () => clock;
 const flush = async () => {
@@ -56,7 +58,7 @@ describe('scan store', () => {
     expect(run().record?.state).toBe('done');
     expect(states(run().record)).toBe('ddds' + 'd'.repeat(11));
     await flush();
-    expect(run().results?.squares_done).toBe(14);
+    expect(run().results?.squares.filter((s) => s.state === 'done').length).toBe(n - 1);
     // 7051 Sean, in squares 2 and 3, is one row.
     expect(run().results?.known.find((k) => k.designation === '7051 Sean')?.squares).toEqual([
       2, 3,
@@ -143,6 +145,21 @@ describe('start while the user moves on', () => {
     expect(useScanStore.getState().view).toBeNull();
     expect(stop).toHaveBeenCalledTimes(1);
     expect(useScanStore.getState().saved()).toBeNull();
+  });
+});
+
+describe('stop while a square is running', () => {
+  it('says it is stopping until the server stops it (a square stops at its next check)', async () => {
+    const api = mockScanApi({ squareMs: 1000, now, persist: false });
+    // The server accepts the stop but the square is still running (Q-470: next Progress.check).
+    setScanApi({ ...api, stop: async () => {} });
+    await useScanStore.getState().plan('discovery', REGION);
+    await useScanStore.getState().start();
+    await flush();
+    await useScanStore.getState().stop();
+    await flush();
+    expect(run().stopping).toBe(true);
+    expect(run().record?.state).toBe('running');
   });
 });
 

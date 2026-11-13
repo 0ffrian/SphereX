@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { raDecToScreen, separationDeg } from '@/viewer/sky/skyMath';
 import {
   aboutTime,
+  gridShape,
   deproject,
   inQuad,
   selectionAt,
@@ -13,17 +14,23 @@ import {
 } from './scanGrid';
 
 describe('splitRegion (equal split, #156)', () => {
-  it('4° × 2° is 2 × 1; 3° × 3° is 2 × 2 of 1.5°; 9.6° × 6° is 5 × 3', () => {
+  it('as the backend (scan.split): 4° × 2° is 3 × 2; 3° × 3° is 2 × 2 of 1.5°; 9.6° × 6° is 6 × 4; 9° × 5.4° is 5 × 3', () => {
     expect(splitRegion({ ra: 30, dec: 10, width_deg: 4, height_deg: 2 })).toMatchObject({
-      cols: 2,
-      rows: 1,
+      cols: 3,
+      rows: 2,
     });
     const g = splitRegion({ ra: 30, dec: 10, width_deg: 3, height_deg: 3 });
     expect(g).toMatchObject({ cols: 2, rows: 2, cellW: 1.5, cellH: 1.5 });
     expect(splitRegion({ ra: 30, dec: 10, width_deg: 9.6, height_deg: 6 })).toMatchObject({
+      cols: 6,
+      rows: 4,
+    });
+    expect(splitRegion({ ra: 30, dec: 10, width_deg: 9, height_deg: 5.4 })).toMatchObject({
       cols: 5,
       rows: 3,
     });
+    // Too many squares with their overlap: scan:too_large.
+    expect(gridShape({ ra: 30, dec: 10, width_deg: 12, height_deg: 12 })).toBeNull();
     expect(splitRegion({ ra: 30, dec: 10, width_deg: 1.9, height_deg: 1.2 }).squares).toHaveLength(
       1,
     );
@@ -36,7 +43,7 @@ describe('splitRegion (equal split, #156)', () => {
   });
 
   it('numbers 1..N from the top row, left to right (east to west), row by row', () => {
-    const g = splitRegion({ ra: 100, dec: 20, width_deg: 6, height_deg: 4 });
+    const g = splitRegion({ ra: 100, dec: 20, width_deg: 5.4, height_deg: 3.6 });
     expect(g.squares.map((s) => s.index)).toEqual([1, 2, 3, 4, 5, 6]);
     expect(g.squares.map((s) => [s.row, s.col])).toEqual([
       [0, 0],
@@ -52,7 +59,7 @@ describe('splitRegion (equal split, #156)', () => {
     expect(c[1]!.ra).toBeGreaterThan(c[2]!.ra);
     expect(c[0]!.dec).toBeGreaterThan(c[3]!.dec);
     // Equal squares: neighbours' centres are a cell apart.
-    expect(separationDeg(c[0]!.ra, c[0]!.dec, c[1]!.ra, c[1]!.dec)).toBeCloseTo(2, 1);
+    expect(separationDeg(c[0]!.ra, c[0]!.dec, c[1]!.ra, c[1]!.dec)).toBeCloseTo(1.8, 1);
   });
 
   it('squares tile the region: shared corners, the outer corners at the region edge', () => {
@@ -118,15 +125,15 @@ describe('selectionAt (state 1)', () => {
         rows: 3,
         held: false,
       }),
-    ).toBe('9.6° × 6.0° · 15 squares · about 4 h');
+    ).toBe('9.6° × 6.0° · 15 squares · about 12 h');
     expect(
       selectionLabel({
         region: { ra: 0, dec: 0, width_deg: 12, height_deg: 7.5 },
-        cols: 6,
-        rows: 4,
+        cols: 7,
+        rows: 5,
         held: true,
       }),
-    ).toBe('12.0° × 7.5° · 24 squares · about 6 h · 12° max');
+    ).toBe('12.0° × 7.5° · 35 squares · about 22 h · 12° max');
     expect(
       selectionLabel({
         region: { ra: 0, dec: 0, width_deg: 1.6, height_deg: 1 },
@@ -134,7 +141,7 @@ describe('selectionAt (state 1)', () => {
         rows: 1,
         held: false,
       }),
-    ).toBe('1.6° × 1.0° · 1 square · about 16 min');
+    ).toBe('1.6° × 1.0° · 1 square · about 28 min');
   });
 
   it('times: minutes, hours and minutes, rough hours', () => {

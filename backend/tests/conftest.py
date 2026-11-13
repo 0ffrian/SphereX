@@ -74,6 +74,17 @@ def block_network(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(socket, "getaddrinfo", getaddrinfo)
 
 
+@pytest.fixture(autouse=True)
+def fresh_cell_grids() -> Iterator[None]:
+    """Each test starts with an empty ``cell_grid`` cache, so a test that checks which grid is
+    cached does not depend on the order the tests ran in (PR #149 review)."""
+    from app.core.area import geometry
+
+    with geometry._GRID_LOCK:
+        geometry._GRIDS.clear()
+    yield
+
+
 def purge_derived(root: Path) -> None:
     for d in (root / "v1").glob("derived.*"):
         shutil.rmtree(d)
