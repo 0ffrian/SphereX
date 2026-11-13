@@ -101,12 +101,14 @@ def provenance() -> dict[str, dict[str, str]]:
 @dataclass(frozen=True)
 class Premeasured:
     """A frame measured while its cutout landed (issue #41). Used only if the cutout body
-    the spectrum reads has this SHA-256 and the frame record has this pixel position."""
+    the spectrum reads has this SHA-256, the frame record has this pixel position and the
+    measurement used the same method (``method_sha`` of the config it ran with, Q-459)."""
 
     body_sha256: str
     x_fits0: float
     y_fits0: float
     future: Future[Outcome]
+    method_sha: str = ""
 
 
 @dataclass
@@ -236,10 +238,11 @@ class SpectrumService:
             sha = str(entry.meta["body_sha256"])
             shas[f.frame_id] = sha
             pre = (premeasured or {}).get(f.frame_id)
-            if pre is not None and (pre.body_sha256, pre.x_fits0, pre.y_fits0) == (
+            if pre is not None and (pre.body_sha256, pre.x_fits0, pre.y_fits0, pre.method_sha) == (
                 sha,
                 f.x_fits0,
                 f.y_fits0,
+                method_sha(cfg),
             ):
                 pending[f.frame_id] = pre.future
             elif self.pool is not None:

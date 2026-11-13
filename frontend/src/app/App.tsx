@@ -30,7 +30,6 @@ import { SelectedCard } from './build/SelectedCard';
 import { useSelectedBodyLoader } from './build/selectedBody';
 import { Island } from './island/Island';
 import { SoundProvider } from '@/sound/SoundProvider';
-import { SoundSettings } from '@/sound/ui/SoundSettings';
 import { ErrorBoundary } from './ErrorBoundary';
 
 /**
@@ -105,7 +104,10 @@ export function App() {
   useHashSync();
   useSearchShortcut();
   useSelectedBodyLoader();
-  const split = useShellStore((s) => s.build.open);
+  const buildOpen = useShellStore((s) => s.build.open);
+  // Q-457: a minimised build stays mounted (hidden), and the sky is the view again.
+  const buildMini = useShellStore((s) => s.buildMinimised);
+  const split = buildOpen && !buildMini;
   // Under the phone sheet the sky must not be reachable by Tab or a screen reader.
   const phone = usePhoneWidth();
   const skyHidden = split && phone;
@@ -121,10 +123,7 @@ export function App() {
               {/* The page heading stays for assistive technology; the brand is not drawn (Q-124). */}
               <h1 className="sr-only">Shift &amp; Spectrum</h1>
               <FixtureBanner />
-              {/* R13.9 (Q-442): sound on/off, volume, ambience and Flashes; its click unlocks audio. */}
-              <ErrorBoundary area="The sound settings" resetKeys={resetKeys} className="ml-auto">
-                <SoundSettings className="ml-auto" />
-              </ErrorBoundary>
+              {/* Q-456: no Sound control on the sky; the sound settings sit in the build view's Ambience dropdown. */}
               <ErrorBoundary
                 area="The sky position"
                 resetKeys={resetKeys}
@@ -155,15 +154,17 @@ export function App() {
                   </SkyPane>
                 </ErrorBoundary>
               </div>
-              {split && (
-                <ErrorBoundary
-                  area="The build pane"
-                  resetKeys={resetKeys}
-                  action={CLOSE_BUILD}
-                  className="relative z-10 m-4"
-                >
-                  <BuildPane />
-                </ErrorBoundary>
+              {buildOpen && (
+                <div className={buildMini ? 'sx-bp-mini' : 'contents'} inert={buildMini || undefined} aria-hidden={buildMini || undefined}>
+                  <ErrorBoundary
+                    area="The build pane"
+                    resetKeys={resetKeys}
+                    action={CLOSE_BUILD}
+                    className="relative z-10 m-4"
+                  >
+                    <BuildPane />
+                  </ErrorBoundary>
+                </div>
               )}
             </main>
             {/* Mock-up floating layout: the dock (tools, then the search) bottom centre and the zoom

@@ -56,7 +56,7 @@ class Measurement:
 
     @property
     def flagged(self) -> bool:
-        return bool(self.dropped_flags)
+        return bool(self.dropped_flags or self.core_flagged)
 
 
 @dataclass(frozen=True)

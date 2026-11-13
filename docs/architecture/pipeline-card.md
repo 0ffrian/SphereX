@@ -38,7 +38,7 @@ A sketch from SPHEREx only is often a `candidate`, which gets no 3D body (render
 
 - Pre-baked assets are read from `backend/assets/<type>/<id>.json` (`SX_ASSETS_DIR`; the id is percent-encoded).
 - **Lookup order and the pack stand-in ([Q-206](../decisions/demo-pack.md), issue #75).** The generated asset is read first, then the pre-baked one. A pre-baked asset whose RenderParams list `spectrum` in `missing` (every demo-pack row, Q-164) is a stand-in: the object's job builds live and answers with that build when it has a measured spectrum, the same `type` and no catalogue gap the pack does not also have (`catalogue`, `star_catalogue` or `exoplanet_archive` in its `missing`; [Q-369](../decisions/demo-pack.md), issue #93). The pre-baked asset answers (`saved`) only when the live build has no spectrum, changes type (catalogue answer missing offline), loses a catalogue answer while keeping its type (Barnard's Star offline with no cached Gaia cone, Q-369), or fails. That live build publishes no intermediate answer and is baked and saved only if it wins, so a reply never flips back and a losing build never replaces the pack. Each layer passes the contract check on its own (an invalid generated asset falls through to the pack). A reply is never a mix of the two.
-- Generated assets are saved as `derived.asset` entries in the D-25 cache, keyed by id, data release, `ASSET_VERSION` and the stage 7 `GENERATOR_VERSION`, so a rule or release change never serves a stale asset.
+- Generated assets are saved as `derived.asset` entries in the D-25 cache, keyed by id, data release, `ASSET_VERSION`, the stage 7 `GENERATOR_VERSION` and `MEASURE_VERSION` (the asset carries the measured spectrum, Q-459), so a rule or release change never serves a stale asset.
 - An asset is saved only when its inputs are final: a spectrum from a complete frame list, and a catalogue match or typed coordinates. A truncated search, an intermediate answer ([A4.10](jobs.md#a410-object-job-and-fan-out)) or a card refused on its type (`type:*`) is never saved.
 - A saved asset is returned without re-running stages 3 and 7. A saved or pre-baked asset whose card id or params id is not the requested id, whose card and params disagree on `type`, or that fails the schema check is ignored with a warning, and the asset is built from the catalogues instead.
 - A saved asset whose card type is `candidate` is still reported as `sketch`, so the "Sketch from SPHEREx only" label survives the save.
@@ -51,7 +51,7 @@ A sketch from SPHEREx only is often a `candidate`, which gets no 3D body (render
   | `CARD_TO_PARAMS_VERSION` | `core/render/card_to_params.py` | `1` | a stage 7 rule changes the drawn body |
   | `BAKER_RULES_VERSION` | `core/render/bake.py` | `4` (3: issue #71 asteroid physics, Q-210; 4: crater depth and rubble relief, Q-326) | an R6.2 to R6.5 rule changes |
   | `GENERATOR_VERSION` | `core/render/card_to_params.py` | `p1-b4` | follows the two above; it also seeds every body (A5.1) |
-  | `MEASURE_VERSION` | `core/measure/config.py` | `measure-2` | a stage 2 rule changes (Q-139 bumped it from `measure-1`, Q-456) |
+  | `MEASURE_VERSION` | `core/measure/config.py` | `measure-2` | a stage 2 rule changes (Q-139 bumped it from `measure-1`, Q-459); also in the `derived.asset` key |
   | `DERIVATION_VERSION` | `core/find/version.py` | `1` | a stage 1 rule changes |
   | `COMPOSITE_VERSION` | `core/composite/config.py` | `composite-1` | a composite rule changes |
   | `PAINT_VERSION` | `core/render/gemini_paint.py` | `1` | the Gemini repaint method changes (A6.2) |
