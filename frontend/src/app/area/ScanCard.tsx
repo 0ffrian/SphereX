@@ -1,7 +1,8 @@
 // The scan card (issue #157; mock-up states 2, 10 and 11), for a region of more than one square:
 //   offer    the region fills the screen, gridded: Data, Squares, Time, Order; Start scan or Select again;
 //   scanning a mini grid of the squares' states, "Square 7 of 15 · <step and count>", time left,
-//            running totals, skipped squares as status-dot messages; Pause, Stop, Minimise;
+//            running totals, skipped squares as status-dot messages; Pause or Resume (icons) and Stop
+//            (the header's − and × minimise and close, so the card has no Minimise button);
 //   done     where the data came from, the totals, a Found / Known / Possible filter and rows that
 //            name their square(s) and date, with Track it and Build it; Export ECSV and Scan again.
 // Closing the card while the scan runs does not stop it (the dock button brings the card back).
@@ -344,23 +345,26 @@ function Scanning({
         {record.state === 'paused' ? (
           <button
             type="button"
-            className="sx-btn-outline"
+            className="sx-btn-outline sx-scan-ib"
             disabled={busy}
+            aria-label="Resume the scan"
+            title="Resume"
             onClick={() => void useScanStore.getState().resume()}
             data-testid="scan-resume"
           >
-            Resume
+            <PlayIcon />
           </button>
         ) : (
           <button
             type="button"
-            className="sx-btn-outline"
+            className="sx-btn-outline sx-scan-ib"
             disabled={busy}
-            title="Finishes the current square, then waits"
+            aria-label="Pause the scan"
+            title="Pause: finishes the current square, then waits"
             onClick={() => void useScanStore.getState().pause()}
             data-testid="scan-pause"
           >
-            Pause
+            <PauseIcon />
           </button>
         )}
         <button
@@ -373,16 +377,27 @@ function Scanning({
         >
           Stop
         </button>
-        <button
-          type="button"
-          className="sx-btn-outline"
-          onClick={() => useAreaStore.getState().setMinimised(true)}
-          data-testid="scan-minimise"
-        >
-          Minimise
-        </button>
       </div>
     </>
+  );
+}
+
+const ico = { viewBox: '0 0 24 24', 'aria-hidden': true, className: 'sx-btn-ico' } as const;
+/** Lucide `play` (Resume). */
+function PlayIcon() {
+  return (
+    <svg {...ico}>
+      <path d="M6 4.5v15l13-7.5z" />
+    </svg>
+  );
+}
+/** Lucide `pause` (Pause). */
+function PauseIcon() {
+  return (
+    <svg {...ico}>
+      <rect x="6" y="4.5" width="4" height="15" rx="1" />
+      <rect x="14" y="4.5" width="4" height="15" rx="1" />
+    </svg>
   );
 }
 
