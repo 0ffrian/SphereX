@@ -1,5 +1,4 @@
 // Known objects: the right-side card after the island's search (mock-up `openKnownCard`).
-// Known objects: the right-side card after the island's search (mock-up `openKnownCard`).
 // A prepared area's `/v1/areas/{id}/known` reply (Q-205, A18.5; issues #96, #130): one row per object
 // with its number and name, kind, frames and visits and the Estimated badge (SkyBoT and Horizons,
 // A16.5); the card's foot says when the area ran, when SkyBoT last answered, and what is missing.
@@ -8,7 +7,7 @@
 // the prepared Eros area, under the Demo tag; anywhere else the card says there is no prepared data
 // (Q-414).
 import { PanelCard } from '@/app/shell/PanelCard';
-import { useAreaStore } from '@/app/shell/areaStore';
+import { DEMO_OBJECT_ID, useAreaStore } from '@/app/shell/areaStore';
 import { useShellStore } from '@/app/shell/shellStore';
 import { useAppStore } from '@/state/store';
 import { ProvenanceBadge } from '@/app/Badge';
@@ -30,8 +29,17 @@ export function openObject(o: KnownObject): void {
   void useAppStore.getState().skySearch({ q: o.designation ?? `${o.id} ${o.name}`.trim(), kind: 'name', origin: 'sky' });
 }
 
+/**
+ * True when "Track it" opens the Eros card. The demo object (433 Eros) is always trackable: the card
+ * falls back to its demo frames, and the committed pack still answers `track_available: false` for it
+ * until backend #129 lands.
+ */
+export function canTrack(o: KnownObject): boolean {
+  return (o.trackAvailable ?? false) || o.objectId === DEMO_OBJECT_ID;
+}
+
 function Row({ o }: { o: KnownObject }) {
-  const track = o.trackAvailable ?? false;
+  const track = canTrack(o);
   return (
     <button
       type="button"

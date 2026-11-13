@@ -202,6 +202,9 @@ export const useAreaStore = create<AreaState>()((set, get) => {
     if (ctl.signal.aborted) return demo;
     // A real object: its frames and path from the API (issue #130).
     if (obj?.objectId) {
+      // Never blank (D-32): the demo Eros shows its demo frames at once (Demo tag), and the real
+      // frames and path replace them when the API answers, so a slow backend never leaves "Loading…".
+      if (demo) set({ eros: demo, erosFailed: false, trackSource: 'demo', trackPath: false, pathPending: false });
       try {
         const real = await loadObjectTrack(obj.objectId, ctl.signal);
         if (ctl.signal.aborted) return demo;

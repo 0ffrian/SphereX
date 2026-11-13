@@ -35,7 +35,7 @@ flowchart TB
   PACK[("assets/areas pack<br/>derived.area entries, Eros (issue #108)")]
   subgraph FE["frontend/src"]
     RAIL["app/shell SkyDock (Known objects, Discovery)<br/>ToolId area (D-38)"]
-    DEMO["app/area areaService<br/>Known objects: /v1/areas + /known (Q-455); Discovery: demo seam, only inside the Eros area (Q-414)"]
+    DEMO["app/area areaService<br/>Known objects: /v1/areas + /known (Q-455); Discovery: prepared area (Q-406), else the demo, only inside the Eros area (Q-414)"]
     CARDS["Feature cards in the object card's slot (proposed Q-172)<br/>Area, Options, Known, Discovery, Result, Checks (gated)"]
     ISL["Island progress pill (proposed)"]
     LAYER["app/sky/area AreaLayer<br/>sky layer slot"]
@@ -71,7 +71,7 @@ flowchart TB
   PACK --> API
   API --> STORE
   RAIL --> CARDS
-  DEMO -.->|"Known: /v1/areas and /known (Q-455); Discovery: demo stand-in (Q-414, #109)"| CARDS
+  DEMO -.->|"Known: /v1/areas and /known (Q-455); Discovery: prepared area (Q-406), else the demo (Q-414)"| CARDS
   STORE --> CARDS
   CARDS --> ISL
   STORE --> LAYER

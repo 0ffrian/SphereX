@@ -254,6 +254,8 @@ export function ErosCard({ title: given, back }: { title?: string; back?: () => 
   const n = useAreaStore((s) => erosList(s.eros, s.det).length);
   const index = useAreaStore((s) => s.index);
   const known = useAreaStore((s) => s.flow === 'known');
+  // The demo cutouts and their photometry are labelled only when some frame actually shows one.
+  const anyCutout = eros?.hops.some((h) => !h.no_cutout) ?? false;
   return (
     <Shell title={title}>
       {() => (
@@ -343,15 +345,17 @@ export function ErosCard({ title: given, back }: { title?: string; back?: () => 
               <div className="sx-kn-spec-h">
                 <span className="sx-kn-spec-t">
                   Wavelength
-                  <ProvenanceBadge
-                    tag={eros?.provenance?.['hops[].flux']?.tag ?? 'model_dependent'}
-                    tooltip={
-                      eros?.provenance?.['hops[].flux']?.note ??
-                      'Approximate photometry from the demo extraction; not a calibrated SPHEREx flux.'
-                    }
-                    srText
-                    variant="tag"
-                  />
+                  {anyCutout && (
+                    <ProvenanceBadge
+                      tag={eros?.provenance?.['hops[].flux']?.tag ?? 'model_dependent'}
+                      tooltip={
+                        eros?.provenance?.['hops[].flux']?.note ??
+                        'Approximate photometry from the demo extraction; not a calibrated SPHEREx flux.'
+                      }
+                      srText
+                      variant="tag"
+                    />
+                  )}
                 </span>
                 <small>Brightness of {title} in each exposure so far</small>
               </div>
@@ -359,11 +363,11 @@ export function ErosCard({ title: given, back }: { title?: string; back?: () => 
             </div>
             {eros && <Detectors eros={eros} name={title} />}
             <div className="sx-kn-foot">
-              {real ? (
-                <DemoTag label="Demo cutouts" note={DEMO_CUTOUT_NOTE} testId="demo-tag" />
-              ) : (
+              {!real ? (
                 <DemoTag />
-              )}
+              ) : anyCutout ? (
+                <DemoTag label="Demo cutouts" note={DEMO_CUTOUT_NOTE} testId="demo-tag" />
+              ) : null}
             </div>
           </div>
         </div>
