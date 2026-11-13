@@ -33,7 +33,7 @@ The log is split by topic so a task loads only what it needs. **Load this index 
 | [haptics-sound.md](haptics-sound.md) | audio pairing (D-10), spectrum pitch and voice hints, the body tone and the Track path sound | 1 D, 10 Q, 13 KB |
 | [haptics-built.md](haptics-built.md) | the haptic engine, calibration and source choices as built | 0 D, 9 Q, 20 KB |
 | [platform-hosting.md](platform-hosting.md) | the three.js pin, hardware and frame budgets, hosting, the demo machine and the event platform | 3 D, 5 Q, 7 KB |
-| [moving-objects.md](moving-objects.md) | Rainbow Trails, the Track tool, Area search and Discovery (agreed), the P3 frames and dots choices (Q-400 to Q-402), the P4 to P7 choices (Q-420) | 1 D, 22 Q, 47 KB |
+| [moving-objects.md](moving-objects.md) | Rainbow Trails, the Track tool, Area search and Discovery (agreed), the P3 frames and dots choices (Q-400 to Q-402), the P8 integration into the sky dock (Q-406 to Q-408), the P4 to P7 choices (Q-420) | 1 D, 25 Q, ~51 KB |
 | [moving-objects-review.md](moving-objects-review.md) | proposed fixes to Area search and Track after the 9 Nov 2026 audit, and Moon's review list (Q-202) | 0 D, 9 Q, 16 KB |
 | [moving-frames.md](moving-frames.md) | frames for moving objects: the path cone search, its tags and refusals, MOST | 0 D, 4 Q, 8 KB |
 | [exoplanets.md](exoplanets.md) | the exoplanet card fields (mass, orbit, host star), radius from the archive, tidal locking, mass in the physics layer, and the two demo exoplanet fixtures | 0 D, 5 Q, 15 KB |
@@ -298,7 +298,7 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | Q-202 | Review of the Area search fixes (9 Nov 2026) | Proposed | [moving-objects-review](moving-objects-review.md) |
 | Q-203 | Four research checks join the event build as gated extras | Decided (Moon, 10 Nov 2026); owners and thresholds Proposed | [moving-objects](moving-objects.md) |
 | Q-204 | PNG determinism across machines: chunks, not deflate bytes | Proposed (needs a second team member) | [demo-pack](demo-pack.md) |
-| Q-205 | Event cut: Area search and D4 to D7 hidden | Proposed | [scope-process](scope-process.md) |
+| Q-205 | Area search at the event: shown, precomputed (condition 4, the kill switch, amended by Q-406); D4 to D7 stay gated by Q-203 | Decided (Moon, 11 Nov 2026) | [scope-process](scope-process.md) |
 | Q-206 | Pre-built pack never hides a measured spectrum | Proposed (needs a second team member); amended by Q-369 | [demo-pack](demo-pack.md) |
 | Q-207 | Rainbow Trails: the UI rotates, frames stay native | Proposed (needs a second team member) | [moving-objects](moving-objects.md) |
 | Q-208 | Area contract: shape choices for the spec gaps | Proposed | [moving-objects](moving-objects.md) |
@@ -434,12 +434,15 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | Q-402 | Conflicts P3 met in the Area spec (incl. A17.3 star or fixed) | Open; (5) decided by Moon | [moving-objects](moving-objects.md) |
 | Q-403 | Star list for movers: choices for the spec gaps | Proposed | [moving-objects-review](moving-objects-review.md) |
 | Q-404 | Owner of the star list for movers (amends Q-183, D-17) | Proposed | [scope-process](scope-process.md) |
+| Q-406 | Area search P8 joins the sky dock: main's UI, PR #100's data layer (real areas first, demo fallback) | Decided (Moon, 13 Nov 2026) | [moving-objects](moving-objects.md) |
+| Q-407 | Honesty switch on the sky for Area search | Withdrawn | [moving-objects](moving-objects.md) |
+| Q-408 | Blink for n visits and reduced motion | Withdrawn | [moving-objects](moving-objects.md) |
 | Q-409 | Light theme for the panels | Open | [shell-surfaces](shell-surfaces.md) |
 | Q-410 | The "artist's impression" line removed from Details | Open | [shell-surfaces](shell-surfaces.md) |
 | Q-411 | Pause removed from the Details pane (P key instead) | Open | [shell-surfaces](shell-surfaces.md) |
 | Q-412 | Show (honesty level) moves into Details in the build pane | Proposed (Moon to confirm) | [shell-surfaces](shell-surfaces.md) |
 | Q-413 | The island's loader pulses at rest | Open | [shell-surfaces](shell-surfaces.md) |
-| Q-414 | Known objects and Discovery demo answers only inside the Eros area | Open | [shell-surfaces](shell-surfaces.md) |
+| Q-414 | Known objects and Discovery demo answers only inside the Eros area (real areas first: Q-406) | Answered by Q-406 | [shell-surfaces](shell-surfaces.md) |
 | Q-415 | Moulding animation is the mock-up's generic body (amends Q-113 item 3) | Open | [shell-surfaces](shell-surfaces.md) |
 | Q-416 | Hear it: Atmosphere and the spectrum sweep (amends Q-295); amended by Q-446 (sweep on `pitch.ts`) and Q-450 (opens from Details) | Open (Atish to wire after merge) | [shell-surfaces](shell-surfaces.md) |
 | Q-417 | The browser tab reads "Odysseus" | Decided (Moon, tab title only) | [shell-surfaces](shell-surfaces.md) |
