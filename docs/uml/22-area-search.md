@@ -308,6 +308,28 @@ sequenceDiagram
   end
 ```
 
+## Runs menu and replay (issue #158)
+
+> **As built (issue #158, [Q-473](../decisions/moving-objects.md); live-areas mock-up states 12 and 13):** the runs button sits right after the RA/Dec readout (`app/shell/RunsMenu.tsx`). Its list is `GET /v1/runs` (newest first, read again every 5 s while a run is going and the list is open). A row opens the run in #157's scan card (`scanStore.follow`): live progress for a run still going, the combined results for a finished one. Play reads `GET /v1/runs/{run_id}` once and replays it on #157's scan overlay (`app/area/replay.ts`, `runsStore.ts`, `app/sky/ReplayBar.tsx`): the record at time t is a pure function of the record and t, so nothing is computed again and the same position shows the same frame.
+
+```mermaid
+stateDiagram-v2
+  [*] --> Sky
+  Sky --> List: runs button (GET /v1/runs)
+  List --> Sky: Escape, close, a click elsewhere
+  List --> ScanCard: a row (scanStore.follow, the area tool, fly to the region)
+  List --> Replay: play (GET /v1/runs/run_id once; cards close, fly to the region)
+  state Replay {
+    [*] --> Playing
+    Playing --> Paused: pause, or the end
+    Paused --> Playing: play (from 0 at the end)
+    Playing --> Playing: seek (drag, click, keys), speed 1x 10x 60x 600x
+    Paused --> Paused: seek
+  }
+  Replay --> Sky: Escape, the runs button, another tool
+  ScanCard --> [*]
+```
+
 ## Aim, draw and the live card (issue #144)
 
 The frontend side of a live area, as built ([A18.1](../architecture/moving-objects/area-ui.md#a181-tool-and-drawing), Q-462): `areaStore` stages `aiming`, `drawing` and `set`, then the live card of `liveJobStore` for a box no prepared area holds. The job API is `app/area/liveAreaApi.ts` on the schemas of the sequence above. Closing the card leaves the job running (it is followed until done, failed or stopped); a done job opens in the existing Known and Discovery views.
