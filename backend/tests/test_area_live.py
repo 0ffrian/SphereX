@@ -147,7 +147,8 @@ def test_a_job_runs_its_steps_and_finishes(tmp_path: Path) -> None:
     assert reply["state"] == "done" and reply["eta_s"] is None
     assert [s["state"] for s in reply["steps"]] == ["done"] * 6
     assert seen == ["frames", "dots", "labels", "join", "known"]
-    assert jobs.submit(_plan()) is job  # done: not run again
+    assert jobs.submit(_plan()) is not job  # done here means the store lost it: run again
+    assert jobs.wait(10)
 
 
 def test_jobs_queue_one_at_a_time_and_can_be_stopped(tmp_path: Path) -> None:
@@ -310,3 +311,119 @@ def test_a_live_job_runs_the_pipeline_and_its_area_is_served(
         assert c.get(f"/v1/areas/live/{plan.area_id}").json()["state"] == "done"
         known = c.get(f"/v1/areas/{plan.area_id}/known").json()
         assert "433 Eros" in {k["designation"] for k in known["known"]}
+
+
+# --- review follow-ups: stopping mid-download, refusals, the routes ------------------------
+
+
+def test_a_stopped_job_is_replaced_by_a_fresh_one(tmp_path: Path) -> None:
+    gate = threading.Event()
+    started = threading.Event()
+
+    def runner(ctx: Context, plan: Plan, p: Progress) -> None:
+        p.step("frames")
+        started.set()
+        gate.wait(5)  # winding down: no check until the gate opens
+
+    jobs = LiveJobs(_ctx(tmp_path), runner)
+    first = jobs.submit(_plan())
+    assert started.wait(5)
+    assert jobs.cancel(first.area_id) and not first.active
+    second = jobs.submit(_plan())  # the same area while the first is still winding down
+    assert second is not first and second.state == "queued"
+    gate.set()
+    assert jobs.wait(10)
+    assert first.state == "done" and second.state == "done"  # first passed no check after DELETE
+
+
+def _job_progress(plan: Plan) -> tuple[Any, Progress]:
+    from app.core.area.live_jobs import Job
+
+    job = Job(plan)
+    job.state = "running"
+    return job, Progress(job, threading.Lock())
+
+
+def test_a_stop_reaches_the_cutout_download(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """``run_live_area``'s own fetch counts cutouts and raises ``Cancelled`` once stopped."""
+    from app.core.area.live_jobs import Cancelled
+
+    calls: list[int] = []
+
+    def fake_live_fetch(ctx: Context, **_: Any) -> Any:
+        return lambda row, cut: ("digest", b"body")
+
+    def find(ctx: Context, spec: Any, cfg: Any, *, fetch: Any, **_: Any) -> Any:
+        fetch("row", "cut")
+        calls.append(1)
+        job.cancel.set()
+        fetch("row", "cut")  # stopped: raises
+        calls.append(2)
+        raise AssertionError("not reached")
+
+    monkeypatch.setattr(area_frames, "live_fetch", fake_live_fetch)
+    monkeypatch.setattr(area_frames, "find_frames", find)
+    plan = _plan()
+    job, progress = _job_progress(plan)
+    with pytest.raises(Cancelled):
+        run_live_area(_ctx(tmp_path), plan, progress)
+    assert calls == [1]
+    assert job.steps["frames"].done == 1 and job.steps["frames"].total == plan.n_frames
+
+
+@pytest.mark.parametrize(
+    ("change", "code"),
+    [
+        ({"complete": False, "missing": ("frames:cone_failed:1",)}, "area:frames_incomplete"),
+        ({"missing": ("frames:cone_maxrec:2",)}, "area:frames_incomplete"),
+        ("no_bodies", "area:no_cutouts"),
+        ("no_dots", "area:no_dots"),
+    ],
+)
+def test_run_live_area_refuses_what_must_not_be_stored(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, change: Any, code: str
+) -> None:
+    from app.core.area import dots as area_dots
+
+    frames, bodies = recorded_frames()
+    out_frames = replace(frames, **change) if isinstance(change, dict) else frames
+    out_bodies = {} if change == "no_bodies" else bodies
+    monkeypatch.setattr(
+        area_frames, "find_frames", lambda ctx, spec, cfg, **_: (out_frames, out_bodies)
+    )
+    if change == "no_dots":
+        monkeypatch.setattr(area_dots, "run_dots", lambda *a, **k: [])
+    plan = _plan()
+    _, progress = _job_progress(plan)
+    with pytest.raises(LiveAreaError) as err:
+        run_live_area(_ctx(tmp_path), plan, progress)
+    assert err.value.code == code
+
+
+def test_the_routes_refuse_no_visit_pair(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def lonely(ctx: Context, box: Box, *, pair: Any = None) -> Plan:
+        return live.plan_from_times("spherex_dr1", box, _times(T0, 4))
+
+    monkeypatch.setattr(areas_api, "plan_area", lonely)
+    with TestClient(create_app(make_settings(tmp_path / "cache", offline=False))) as c:
+        r = c.post("/v1/areas/live", json=BOX)
+    assert (r.status_code, r.json()["error"]) == (422, "area:no_visit_pair")
+
+
+def test_the_same_box_twice_joins_the_same_job(client: TestClient) -> None:
+    gate = threading.Event()
+
+    def slow(ctx: Context, plan: Plan, p: Progress) -> None:
+        p.step("frames")
+        gate.wait(5)
+
+    client.app.state.live_jobs = LiveJobs(client.app.state.ctx, slow)  # type: ignore[attr-defined]
+    first = client.post("/v1/areas/live", json={**BOX, "start": True})
+    again = client.post("/v1/areas/live", json={**BOX, "start": False})
+    assert first.status_code == 202 and again.status_code == 200
+    assert again.json()["area_id"] == first.json()["area_id"]
+    assert again.json()["state"] in ("queued", "running")
+    gate.set()
+    client.app.state.live_jobs.wait(10)  # type: ignore[attr-defined]

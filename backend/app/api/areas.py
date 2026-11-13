@@ -25,6 +25,7 @@ from __future__ import annotations
 import base64
 import json
 import math
+import threading
 from typing import Annotated, Any, cast
 
 import numpy as np
@@ -98,11 +99,17 @@ class LiveAreaRequest(BaseModel):
     visits: list[str] | None = Field(default=None, min_length=2, max_length=2)
 
 
+_LIVE_JOBS_LOCK = threading.Lock()
+
+
 def get_live_jobs(request: Request) -> LiveJobs:
-    jobs = getattr(request.app.state, "live_jobs", None)
-    if jobs is None:
-        jobs = LiveJobs(cast(Context, request.app.state.ctx))
-        request.app.state.live_jobs = jobs
+    """The app's one ``LiveJobs`` (one worker, Q-462). Created under a lock: the routes are sync
+    and run in a thread pool, so two first requests must not each make a queue."""
+    with _LIVE_JOBS_LOCK:
+        jobs = getattr(request.app.state, "live_jobs", None)
+        if jobs is None:
+            jobs = LiveJobs(cast(Context, request.app.state.ctx))
+            request.app.state.live_jobs = jobs
     return cast(LiveJobs, jobs)
 
 
@@ -148,7 +155,7 @@ def post_live(
     if store.entry(plan.area_id, "summary") is not None:
         return _json(done_reply(plan.area_id), "area-job.schema.json")
     job = jobs.get(plan.area_id)
-    if job is not None and job.state in ("queued", "running"):
+    if job is not None and job.active:
         return _json(jobs.reply(job), "area-job.schema.json")
     if not req.start:
         return _json(plan.reply(), "area-live-plan.schema.json")
