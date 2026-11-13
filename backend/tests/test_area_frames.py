@@ -444,8 +444,28 @@ def test_coverage_needs_a_cutout_and_the_eroded_footprint() -> None:
     grid = CellGrid.of(box, 30.0)
     visit1 = next(f for f in result.frames if f.visit == 1 and f.detector == 1)
     body = bodies[visit1.frame_id]
-    loose = area_frames.cutout_cells(box, grid, body, 0.0)
-    tight = area_frames.cutout_cells(box, grid, body, 10.0)
+    radec = area_frames.grid_radec(box, grid)
+    loose = area_frames.cutout_cells(grid, body, 0.0, radec)
+    tight = area_frames.cutout_cells(grid, body, 10.0, radec)
     assert tight.sum() < loose.sum() and not (tight & ~loose).any()
     cov = result.coverage[0].mask
     assert not (cov & ~loose).any()  # nothing outside the cutout counts as covered
+
+
+def test_the_cached_grid_shares_read_only_centres_and_keeps_one_area() -> None:
+    """Issue #128 (2): every step of a run shares one grid; its centres cannot be changed in
+    place, and only the latest area's grid stays alive."""
+    from app.core.area.geometry import cell_grid
+
+    box = AreaBox.of(EROS_AREA)
+    grid = cell_grid(box, 30.0)
+    assert cell_grid(box, 30.0) is grid
+    gx, gy = grid.centres()
+    assert gx is grid.centres()[0]
+    with pytest.raises(ValueError):
+        gx += 1.0
+    assert not gy.flags.writeable
+    moved = AreaBox(box.ra0 + 5.0, box.dec0, box.half_w, box.half_h)
+    assert cell_grid(moved, 30.0) is grid  # same size, other centre: the same grid
+    cell_grid(box, 60.0)
+    assert cell_grid(box, 30.0) is not grid  # only the latest grid is kept

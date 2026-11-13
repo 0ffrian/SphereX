@@ -137,7 +137,8 @@ def test_label_rules_on_the_recorded_eros_area() -> None:
     from tests.test_area_join import eros_dot_ids, recorded_lists
 
     frames, bodies = recorded_frames()
-    lab = clean.label_dots(frames, bodies, recorded_dots(), recorded_lists())
+    geo = clean.area_geometry(frames)
+    lab = clean.label_dots(frames, bodies, recorded_dots(), recorded_lists(), geo=geo)
     label = {p.dot.dot_id: lab.label[p.index] for p in lab.points}
     assert len(eros_dot_ids()) == 14
     assert {label[i] for i in eros_dot_ids()} == {clean.MOVER}

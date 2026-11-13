@@ -187,7 +187,9 @@ def run_area(
     geo = clean.area_geometry(frames, cfg)
     cones = dict(star_cones) if star_cones is not None else clean.star_cones(frames)
     st = clean.star_lists(ctx, cones, refresh=refresh)
-    labels = clean.label_dots(frames, bodies, per_frame, st.lists, cfg, star_missing=st.missing)
+    labels = clean.label_dots(
+        frames, bodies, per_frame, st.lists, cfg, star_missing=st.missing, geo=geo
+    )
     w, w_served = join.spherex_w(ctx, frames, geo, refresh=refresh)
     joined = join.join(labels, frames, geo, w, cfg)
     known = match.known_step(ctx, frames, geo, cfg, refresh=refresh)
