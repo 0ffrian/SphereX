@@ -2,10 +2,10 @@
 // D-39). It plays into the events bus and holds the ambience duck while it sounds (R13.9).
 // Strength is continuous gain (× volume), `pitch` sets the frequency, `pan` a StereoPannerNode, and the provenance `tag` the timbre. Every sound is scheduled
 // on the shared AudioContext's clock (currentTime + lookahead), never with timers.
-import type { HapticEvent, HapticVoice, Tag } from '@/contract';
+import type { HapticEvent, HapticVoice, Tag, ToneId } from '@/contract';
 import { audioContextSupported, getAudioContext } from './audioContext';
 import { getBus, holdDuck, playBell, type DuckHold } from './audioGraph';
-import type { TrainCapableDriver, TrainWindow } from './engine';
+import type { ToneCapableDriver, ToneOutput, TrainCapableDriver, TrainWindow } from './engine';
 import { clamp01, pitchToHz } from './pitch';
 import {
   AUDIO_FLOOR_STRENGTH,
@@ -17,6 +17,7 @@ import {
   MAX_AUDIO_VOICES,
   DEFAULT_VOLUME,
   DOUBLE_ONSETS_PATTERN_MS,
+  DUCK_TAU_DIVISOR,
   GRAIN_BANDPASS_Q,
   HEARTBEAT_ONSETS_PATTERN_MS,
   HIGH_OUTPUT_LATENCY_S,
@@ -28,6 +29,11 @@ import {
   SURF_LOWPASS_HZ,
   TONE_ATTACK_S,
   TONE_BLIP_S,
+  TONE_FADE_IN_S,
+  TONE_FADE_OUT_S,
+  TONE_GLIDE_S,
+  TONE_SOFT_LOWPASS_HZ,
+  TONE_STOP_AFTER_FADES,
   TRAIN_MAX_RATE_HZ,
   TRAIN_MIN_RATE_HZ,
   TRAIN_WINDOW_MS,
@@ -110,6 +116,38 @@ export function audioGain(strength: number): number {
   return Math.max(AUDIO_FLOOR_STRENGTH, clamp01(strength)) * AUDIO_PEAK_GAIN;
 }
 
+/**
+ * R8.9 sustained timbre by tag (Q-190, proposed; the body tone and the Track path voice): `measured`
+ * a clean sine; the Estimated tags a softer sine (gain × SOFT_TONE_GAIN) through a low-pass;
+ * `artistic` noise band-passed at the pitch (GRAIN_BANDPASS_Q). The `voice` hint does not apply.
+ */
+export type SustainedTimbre = 'clean' | 'soft' | 'grain';
+
+export function sustainedTimbre(tag: Tag): SustainedTimbre {
+  if (tag === 'artistic') return 'grain';
+  return tag === 'measured' ? 'clean' : 'soft';
+}
+
+/** Gain of a sustained tone at volume 1: the R8.9 gain with its floor, × 0.6 for the soft timbre. */
+export function toneGain(strength: number, timbre: SustainedTimbre): number {
+  return audioGain(strength) * (timbre === 'soft' ? SOFT_TONE_GAIN : 1);
+}
+
+/** One sustained tone's nodes. `freq` is the oscillator's frequency or the band-pass's. */
+interface LiveTone {
+  readonly timbre: SustainedTimbre;
+  readonly src: AudioScheduledSourceNode;
+  readonly freq: AudioParam;
+  readonly env: GainNode;
+  readonly panner: StereoPannerNode | null;
+  /** Every non-source node, for disconnecting. */
+  readonly nodes: AudioNode[];
+}
+
+function clampPan(pan: number | undefined): number {
+  return pan === undefined || !Number.isFinite(pan) ? 0 : Math.max(-1, Math.min(1, pan));
+}
+
 interface Voice {
   sources: AudioScheduledSourceNode[];
   nodes: AudioNode[];
@@ -128,7 +166,7 @@ interface SoundSpec {
   voice?: HapticVoice;
 }
 
-export class AudioDriver implements TrainCapableDriver {
+export class AudioDriver implements TrainCapableDriver, ToneCapableDriver {
   readonly supported: boolean;
   private readonly getContext: () => AudioContext | null;
   private vol = DEFAULT_VOLUME;
@@ -141,6 +179,11 @@ export class AudioDriver implements TrainCapableDriver {
   private duck: DuckHold | null = null;
   /** Engine time ↔ audio time of the running train (`seq` −1: none yet). */
   private readonly anchor = { seq: -1, engineMs: 0, audioS: 0 };
+  /** R8.8 tone stream: the sounding tone per id, and tones still fading out. */
+  private readonly tones = new Map<ToneId, LiveTone>();
+  private readonly fading = new Set<LiveTone>();
+  /** R13.9: one duck hold while any tone sounds (no safety timeout: a tone has no set length). */
+  private toneDuck: DuckHold | null = null;
 
   constructor(options: AudioDriverOptions = {}) {
     this.getContext = options.context ?? getAudioContext;
@@ -165,7 +208,8 @@ export class AudioDriver implements TrainCapableDriver {
 
   /**
    * `AudioContext.outputLatency` in seconds, or null where it is missing (R12 #10). Its old UI
-   * (UnlockButton) went with D-39; kept for the sound-check page (#116, R13.9).
+   * (UnlockButton) went with D-39; read by the sound-check page (#116, R13.9) and the app's
+   * sound settings hint (SoundControls, #83).
    */
   outputLatency(): number | null {
     const ctx = this.getContext();
@@ -173,7 +217,7 @@ export class AudioDriver implements TrainCapableDriver {
     return typeof v === 'number' && Number.isFinite(v) ? v : null;
   }
 
-  /** R8.9: high output latency (likely Bluetooth): suggest the phone speaker or wired earphones. */
+  /** R8.9: high output latency (likely Bluetooth): suggest the laptop speaker or wired output (Q-132). */
   isHighLatency(): boolean {
     const l = this.outputLatency();
     return l !== null && l > HIGH_OUTPUT_LATENCY_S;
@@ -245,17 +289,192 @@ export class AudioDriver implements TrainCapableDriver {
     this.syncDuck();
   }
 
-  /** Cancel every scheduled and playing sound. */
+  /** Cancel every scheduled and playing sound; every tone fades out (TONE_FADE_OUT_S). */
   stop(): void {
     for (const v of this.live) this.release(v, true);
     this.live.clear();
     this.anchor.seq = -1;
     this.syncDuck();
+    for (const id of [...this.tones.keys()]) this.stopTone(id);
   }
 
   /** Whether this driver holds the ambience duck now (tests). */
   get ducking(): boolean {
-    return this.duck !== null && !this.duck.released;
+    return (
+      (this.duck !== null && !this.duck.released) ||
+      (this.toneDuck !== null && !this.toneDuck.released)
+    );
+  }
+
+  // ------------------------------------------------------------ tone stream (R8.8, Q-189)
+
+  /**
+   * Start, or replace, the tone `id`: fade in over TONE_FADE_IN_S from currentTime + lookahead.
+   * A no-op while the context is missing, locked or suspended (the engine's next update starts it).
+   */
+  startTone(id: ToneId, t: ToneOutput): void {
+    if (!this.supported) return;
+    const ctx = this.ready();
+    const old = this.tones.get(id);
+    if (!ctx) {
+      // An old voice must not come back at its old pitch and timbre on resume: cut it now.
+      if (old) this.fadeOutTone(id, old);
+      return;
+    }
+    if (old) this.fadeOutTone(id, old);
+    this.tones.set(id, this.makeTone(ctx, t));
+    this.syncToneDuck();
+  }
+
+  /**
+   * Glide the tone `id` to `t` (time constant TONE_GLIDE_S). Starts it when it is not sounding
+   * (output was locked or off when it started) and rebuilds it with a cross-fade when the tag
+   * changes the sustained timbre. Allocation-free on the glide path.
+   */
+  updateTone(id: ToneId, t: ToneOutput): void {
+    if (!this.supported) return;
+    const ctx = this.ready();
+    if (!ctx) return;
+    const live = this.tones.get(id);
+    const timbre = sustainedTimbre(t.tag);
+    if (!live || live.timbre !== timbre) {
+      this.startTone(id, t);
+      return;
+    }
+    const now = ctx.currentTime;
+    live.freq.setTargetAtTime(pitchToHz(t.pitch), now, TONE_GLIDE_S);
+    live.env.gain.setTargetAtTime(toneGain(t.strength, timbre), now, TONE_GLIDE_S);
+    live.panner?.pan.setTargetAtTime(clampPan(t.pan), now, TONE_GLIDE_S);
+  }
+
+  /** Fade the tone `id` out over TONE_FADE_OUT_S, then stop and disconnect its nodes. */
+  stopTone(id: ToneId): void {
+    const live = this.tones.get(id);
+    if (live) this.fadeOutTone(id, live);
+  }
+
+  /** Ids of the tones sounding now (tests). */
+  get toneIds(): ToneId[] {
+    return [...this.tones.keys()];
+  }
+
+  private makeTone(ctx: AudioContext, t: ToneOutput): LiveTone {
+    const timbre = sustainedTimbre(t.tag);
+    const when = ctx.currentTime + AUDIO_LOOKAHEAD_S;
+    const nodes: AudioNode[] = [];
+    let out: AudioNode = this.master!;
+    let panner: StereoPannerNode | null = null;
+    if (typeof ctx.createStereoPanner === 'function') {
+      panner = ctx.createStereoPanner();
+      panner.pan.value = clampPan(t.pan);
+      panner.connect(out);
+      nodes.push(panner);
+      out = panner;
+    }
+    const env = ctx.createGain();
+    env.gain.value = 0;
+    env.gain.setValueAtTime(0, when);
+    env.gain.setTargetAtTime(toneGain(t.strength, timbre), when, TONE_FADE_IN_S / DUCK_TAU_DIVISOR);
+    env.connect(out);
+    nodes.push(env);
+    const hz = pitchToHz(t.pitch);
+    let src: AudioScheduledSourceNode;
+    let freq: AudioParam;
+    if (timbre === 'grain') {
+      const noise = this.noiseSource(ctx);
+      noise.loop = true;
+      const bp = ctx.createBiquadFilter();
+      bp.type = 'bandpass';
+      bp.frequency.value = hz;
+      bp.Q.value = GRAIN_BANDPASS_Q;
+      noise.connect(bp);
+      bp.connect(env);
+      nodes.push(bp);
+      src = noise;
+      freq = bp.frequency;
+    } else {
+      const osc = ctx.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.value = hz;
+      if (timbre === 'soft') {
+        // CREATIVE: placeholder — Atish to decide (TONE_SOFT_LOWPASS_HZ, Q-190).
+        const lp = ctx.createBiquadFilter();
+        lp.type = 'lowpass';
+        lp.frequency.value = TONE_SOFT_LOWPASS_HZ;
+        osc.connect(lp);
+        lp.connect(env);
+        nodes.push(lp);
+      } else {
+        osc.connect(env);
+      }
+      src = osc;
+      freq = osc.frequency;
+    }
+    src.start(when);
+    return { timbre, src, freq, env, panner, nodes };
+  }
+
+  private fadeOutTone(id: ToneId, live: LiveTone): void {
+    if (this.tones.get(id) === live) this.tones.delete(id);
+    const ctx = this.ctx;
+    if (!ctx || ctx.state !== 'running') {
+      // A suspended context would never fire `onended`: cut it now (it is silent anyway).
+      this.releaseTone(live, true);
+    } else {
+      const now = ctx.currentTime;
+      const g = live.env.gain;
+      // Hold the current level: a plain cancel could drop the fade-in still inside the lookahead
+      // and jump the gain (a click).
+      const held = g as AudioParam & { cancelAndHoldAtTime?: (t: number) => AudioParam };
+      if (typeof held.cancelAndHoldAtTime === 'function') held.cancelAndHoldAtTime(now);
+      else {
+        g.cancelScheduledValues(now);
+        g.setValueAtTime(g.value, now);
+      }
+      g.setTargetAtTime(0, now, TONE_FADE_OUT_S / DUCK_TAU_DIVISOR);
+      this.fading.add(live);
+      live.src.onended = () => {
+        if (this.fading.delete(live)) this.releaseTone(live, false);
+      };
+      try {
+        live.src.stop(now + TONE_FADE_OUT_S * TONE_STOP_AFTER_FADES);
+      } catch {
+        this.fading.delete(live);
+        this.releaseTone(live, true);
+      }
+    }
+    this.syncToneDuck();
+  }
+
+  private releaseTone(live: LiveTone, cancel: boolean): void {
+    if (cancel) {
+      live.src.onended = null;
+      try {
+        live.src.stop();
+      } catch {
+        // Already stopped.
+      }
+    }
+    live.src.disconnect();
+    for (const n of live.nodes) n.disconnect();
+  }
+
+  /** Drop every tone at once (the context changed). */
+  private cutTones(): void {
+    for (const live of this.tones.values()) this.releaseTone(live, true);
+    for (const live of this.fading) this.releaseTone(live, true);
+    this.tones.clear();
+    this.fading.clear();
+    this.syncToneDuck();
+  }
+
+  private syncToneDuck(): void {
+    if (this.tones.size === 0 || !this.ctx) {
+      this.toneDuck?.release();
+      this.toneDuck = null;
+      return;
+    }
+    if (!this.toneDuck || this.toneDuck.released) this.toneDuck = holdDuck(this.ctx);
   }
 
   // ------------------------------------------------------------ graph
@@ -268,6 +487,8 @@ export class AudioDriver implements TrainCapableDriver {
       for (const v of this.live) this.release(v, true);
       this.live.clear();
       this.syncDuck();
+      this.cutTones();
+      this.toneDuck = null;
       this.ctx = ctx;
       this.anchor.seq = -1;
       // The driver's volume, into the events bus, the master and its limiter (audioGraph.ts).
