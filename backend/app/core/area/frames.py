@@ -503,6 +503,7 @@ def find_frames(
                 input_digests=tuple(sorted(cones.digests)),
                 cones=tuple(cones.logs),
                 stats={"cone_seconds": cone_s},
+                sia_fetched=tuple(sorted(set(cones.fetched))),
             ),
             {},
         )
