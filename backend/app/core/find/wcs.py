@@ -121,9 +121,9 @@ def flag_names(header: Any) -> dict[int, str]:
         if not (k.startswith("MSKN") and isinstance(v, str) and v.strip()):
             continue
         mask = header.get("MSKM" + k[4:])
-        if isinstance(mask, int) and not isinstance(mask, bool) and mask > 0:
-            if mask & (mask - 1) == 0:
-                out[mask.bit_length() - 1] = v.strip()
+        single_bit = isinstance(mask, int) and not isinstance(mask, bool) and mask > 0
+        if single_bit and mask & (mask - 1) == 0:
+            out[mask.bit_length() - 1] = v.strip()
     return out
 
 

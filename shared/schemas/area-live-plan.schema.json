@@ -1,0 +1,178 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "area-live-plan.schema.json",
+  "title": "LiveAreaPlan",
+  "description": "POST /v1/areas/live with start=false (Q-462): what a live area would use, before anything runs. A stored area answers state=done instead (area-job.schema.json).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "area_id",
+    "release",
+    "box",
+    "visits",
+    "n_frames",
+    "estimate_s",
+    "alternatives",
+    "provenance"
+  ],
+  "properties": {
+    "area_id": {
+      "$ref": "#/definitions/LiveAreaId"
+    },
+    "release": {
+      "type": "string",
+      "minLength": 1
+    },
+    "box": {
+      "$ref": "#/definitions/LiveBox"
+    },
+    "visits": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "$ref": "#/definitions/LiveVisit"
+      }
+    },
+    "n_frames": {
+      "type": "integer",
+      "minimum": 2,
+      "description": "Frames of the two visits over the box centre (the run may keep more over the whole box)."
+    },
+    "estimate_s": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Rough run time: 60 s + 500 s per square degree, from the 13 Nov 2026 QR3 runs."
+    },
+    "alternatives": {
+      "type": "array",
+      "maxItems": 10,
+      "items": {
+        "$ref": "#/definitions/LiveVisitPair"
+      },
+      "description": "Other visit pairs at most max_gap_h apart, closest first (for a visit pair picker)."
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "visits"
+      ],
+      "properties": {
+        "visits": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "tag",
+            "source",
+            "formula"
+          ],
+          "properties": {
+            "tag": {
+              "const": "measured"
+            },
+            "source": {
+              "type": "string"
+            },
+            "formula": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "LiveUtcTime": {
+      "title": "LiveUtcTime",
+      "description": "ISO-8601 UTC with a trailing Z.",
+      "type": "string",
+      "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\\.[0-9]{1,6})?Z$"
+    },
+    "LiveAreaId": {
+      "title": "LiveAreaId",
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9:_.-]*$",
+      "maxLength": 200
+    },
+    "LiveBox": {
+      "title": "LiveBox",
+      "description": "The drawn box snapped to a 0.05 degree grid (Q-462).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ra",
+        "dec",
+        "width_deg",
+        "height_deg"
+      ],
+      "properties": {
+        "ra": {
+          "type": "number",
+          "minimum": 0,
+          "exclusiveMaximum": 360
+        },
+        "dec": {
+          "type": "number",
+          "minimum": -90,
+          "maximum": 90
+        },
+        "width_deg": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 2
+        },
+        "height_deg": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 2
+        }
+      }
+    },
+    "LiveVisit": {
+      "title": "LiveVisit",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "start",
+        "end",
+        "n_frames"
+      ],
+      "properties": {
+        "start": {
+          "$ref": "#/definitions/LiveUtcTime"
+        },
+        "end": {
+          "$ref": "#/definitions/LiveUtcTime"
+        },
+        "n_frames": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "LiveVisitPair": {
+      "title": "LiveVisitPair",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "visits",
+        "gap_h"
+      ],
+      "properties": {
+        "visits": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "$ref": "#/definitions/LiveVisit"
+          }
+        },
+        "gap_h": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}

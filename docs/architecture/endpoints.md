@@ -42,6 +42,7 @@ Every HTTP route the backend serves or is planned to serve, in one list. D-16 de
 |---|---|---|---|
 | `GET /v1/objects/{id}/track.ecsv` | Track export (shared ECSV writer with Area search) | Q-145 (open, Kevin) | A19.9 ([moving-objects/track-contract.md](moving-objects/track-contract.md)) |
 | `/v1/areas/...` (list, one area, known objects, dots, tracks, stamps, export; checks gated and not served, D4 and D5 cut); errors 404 `area_not_found`, 404 `dot_not_found`, 503 `stamp_unavailable`. Built (issue #108, `backend/app/api/areas.py`) | Area search | Q-146 item 6; payload shapes Q-208 (proposed); as built Q-420 (proposed) | A17.8 ([moving-objects/area-contract.md](moving-objects/area-contract.md#a178-endpoints)) owns the route list |
+| `POST /v1/areas/live`, `GET` and `DELETE /v1/areas/live/{area_id}` (a box drawn anywhere: plan, background job, stop); errors 422 `area:too_large`, `area:bad_box`, `area:no_visit_pair`, 503 `offline`, `upstream_unavailable`, 404 `job_not_found`. Built (issue #141, `backend/app/api/areas.py`, `core/area/live.py`, `core/area/live_jobs.py`) | Area search, live areas | Q-462, Q-463, Q-467 (proposed) | A17.8 ([moving-objects/area-contract.md](moving-objects/area-contract.md#a178-endpoints)) |
 
 **Rules shared by every route.**
 
