@@ -17,6 +17,7 @@ Light on purpose (A16.2): plain JSON files and arithmetic, no pipeline module, n
 
 from __future__ import annotations
 
+import copy
 import json
 import logging
 import math
@@ -62,6 +63,11 @@ RUN_PROVENANCE: dict[str, dict[str, str]] = {
     },
     "track_positions": {"tag": "measured", "source": TRACK_POSITIONS_SOURCE},
 }
+
+
+def run_provenance() -> dict[str, dict[str, str]]:
+    """A fresh copy of ``RUN_PROVENANCE`` for one record (records never share one dict)."""
+    return copy.deepcopy(RUN_PROVENANCE)
 
 
 def new_run_id() -> str:
@@ -142,24 +148,36 @@ class RunStore:
                 self._written[run_id] = seq
 
     def _load(self) -> None:
-        if not self.root.is_dir():
+        """Read the records on disk. A record that cannot be read, or lacks a field the API
+        reads, is skipped with a warning (its file is left as it is); a record that cannot be
+        written back is kept in memory. Neither stops the server: live areas must keep working
+        whatever is in ``runs/`` (PR #160 review)."""
+        try:
+            paths = sorted(self.root.glob("run-*.json")) if self.root.is_dir() else []
+        except OSError:
+            log.warning("runs: cannot list %s", self.root, exc_info=True)
             return
-        for path in sorted(self.root.glob("run-*.json")):
+        for path in paths:
+            changed = False
             try:
                 run = json.loads(path.read_text(encoding="utf-8"))
-                ok = isinstance(run, dict) and run.get("run_id") == path.stem
-            except (OSError, ValueError):
+                ok = RUN_ID.match(path.stem) is not None and _valid(run, path.stem)
+                if ok:
+                    changed = "provenance" not in run
+                    run.setdefault("provenance", run_provenance())
+                    if run["state"] in LIVE_STATES:
+                        self._stop_on_load(run)
+                        changed = True
+            except (OSError, ValueError, TypeError, KeyError):
                 ok = False
-            if not ok or not RUN_ID.match(path.stem):
+            if not ok:
                 log.warning("runs: skipping unreadable run record %s", path)
                 continue
-            changed = "provenance" not in run
-            run.setdefault("provenance", RUN_PROVENANCE)
-            if run.get("state") in LIVE_STATES:
-                self._stop_on_load(run)
-                changed = True
             if changed:
-                self._write(run)
+                try:
+                    self._write(run)
+                except OSError:
+                    log.warning("runs: cannot write %s back", path, exc_info=True)
             self._runs[path.stem] = run
 
     @staticmethod
@@ -168,7 +186,7 @@ class RunStore:
         for sq in run.get("squares", []):
             if sq.get("state") == "running":
                 sq["state"] = "todo"
-        events = run.setdefault("events", [])
+        events = run["events"]
         last = float(events[-1]["t"]) if events else 0.0
         started = run.get("started_at")
         if started is not None:
@@ -209,7 +227,7 @@ class RunStore:
                 "finished_at": None,
                 "totals": empty_totals(),
                 "events": [],
-                "provenance": RUN_PROVENANCE,
+                "provenance": run_provenance(),
             }
             self._runs[run_id] = run
             snap = self._snapshot(run)
@@ -232,12 +250,17 @@ class RunStore:
         run_id: str,
         fn: Callable[[dict[str, Any]], None],
         defer: list[Snapshot] | None = None,
+        write: bool = True,
     ) -> None:
+        """Change a record in memory; with ``write=False`` its file is written with the next
+        change instead (the API reads from memory, so nothing it shows waits on the disk)."""
         with self._lock:
             run = self._runs.get(run_id)
             if run is None:
                 raise RunNotFound(run_id)
             fn(run)
+            if not write:
+                return
             snap = self._snapshot(run)
         self._flush_or_defer(snap, defer)
 
@@ -294,9 +317,13 @@ class RunStore:
         event: str | None = None,
         objects: Iterable[Mapping[str, Any]] = (),
         totals: Mapping[str, int] | None = None,
+        write: bool = True,
     ) -> None:
         """Set one square's state (and area id or error), append its event and its ``found``
-        events, and replace the totals, in one write."""
+        events, and replace the totals, in one write. ``write=False`` (a square starting)
+        leaves the file to the next change: a scan rewrites its record once per square, not
+        twice, and a crash loses nothing that matters, as a running square goes back to
+        ``todo`` on load anyway."""
 
         def fn(run: dict[str, Any]) -> None:
             sq = run["squares"][index - 1]
@@ -312,7 +339,7 @@ class RunStore:
             if totals is not None:
                 run["totals"] = dict(totals)
 
-        self._mutate(run_id, fn)
+        self._mutate(run_id, fn, write=write)
 
     # --- reads --------------------------------------------------------------------------
 
@@ -337,14 +364,53 @@ class RunStore:
             return [summary(r) for r in runs]
 
 
+def _valid(run: Any, run_id: str) -> bool:
+    """A loaded record holds every field the API reads (``summary``, ``run_reply``,
+    ``results``, ``_stop_on_load``); otherwise it is skipped. Raises ``ValueError``,
+    ``TypeError`` or ``KeyError`` for a bad time, which the caller also skips."""
+    if not isinstance(run, dict) or run.get("run_id") != run_id:
+        return False
+    if not isinstance(run.get("kind"), str) or not isinstance(run.get("release"), str):
+        return False
+    if run.get("state") not in LIVE_STATES + FINISHED_STATES:
+        return False
+    if not isinstance(run.get("region"), dict) or not isinstance(run.get("totals"), dict):
+        return False
+    if not isinstance(run.get("created_at"), str):
+        return False
+    for k in ("started_at", "finished_at"):
+        v = run.get(k)
+        if v is not None:
+            parse_utc(str(v))
+    squares, events = run.get("squares"), run.get("events")
+    if not isinstance(squares, list) or not isinstance(events, list):
+        return False
+    for i, sq in enumerate(squares, start=1):
+        if not isinstance(sq, dict) or sq.get("index") != i or "box" not in sq:
+            return False
+        if not isinstance(sq.get("state"), str) or "area_id" not in sq:
+            return False
+    for e in events:
+        if not isinstance(e, dict) or not isinstance(e.get("type"), str):
+            return False
+        float(e["t"])
+    return True
+
+
+# A pause ends when the scan runs again, not at ``run_resumed``: resume only queues the scan
+# again, and its wait behind other jobs is not running time (PR #160 review).
+_PAUSE_ENDS = ("square_started", "run_stopped", "run_done")
+
+
 def paused_s(events: Sequence[Mapping[str, Any]], until: float) -> float:
-    """Seconds spent paused: from each ``run_paused`` to the next ``run_resumed`` or
-    ``run_stopped``, or to ``until`` (seconds since the start) while still paused."""
+    """Seconds spent paused, or queued again after a resume: from each ``run_paused`` to the
+    next ``square_started``, ``run_stopped`` or ``run_done``, or to ``until`` (seconds since
+    the start) while still paused or queued."""
     total, since = 0.0, None
     for e in events:
         if e["type"] == "run_paused":
             since = float(e["t"])
-        elif since is not None and e["type"] in ("run_resumed", "run_stopped"):
+        elif since is not None and e["type"] in _PAUSE_ENDS:
             total += float(e["t"]) - since
             since = None
     if since is not None:
@@ -353,7 +419,8 @@ def paused_s(events: Sequence[Mapping[str, Any]], until: float) -> float:
 
 
 def duration_s(run: Mapping[str, Any]) -> float | None:
-    """Time the run was running: ``started_at`` to ``finished_at`` (or now), less its pauses."""
+    """Time the run was running: ``started_at`` to ``finished_at`` (or now), less its pauses
+    and the queue wait after each resume."""
     started = run.get("started_at")
     if started is None:
         return None
@@ -659,14 +726,20 @@ def square_boxes(run: Mapping[str, Any]) -> dict[int, Mapping[str, Any]]:
     return {int(s["index"]): s["box"] for s in run["squares"]}
 
 
+def square_counts(squares: Sequence[Mapping[str, Any]]) -> dict[str, int]:
+    return {
+        "squares_done": sum(1 for s in squares if s["state"] == "done"),
+        "squares_skipped": sum(1 for s in squares if s["state"] == "skipped"),
+    }
+
+
 def totals_of(merged: Mapping[str, Any], squares: Sequence[Mapping[str, Any]]) -> dict[str, int]:
     """``known`` = merged known objects, ``found`` and ``unexplained`` = merged tracks."""
     return {
         "known": len(merged["known"]),
         "found": sum(1 for t in merged["tracks"] if t["kind"] == "found"),
         "unexplained": sum(1 for t in merged["tracks"] if t["kind"] == "unexplained"),
-        "squares_done": sum(1 for s in squares if s["state"] == "done"),
-        "squares_skipped": sum(1 for s in squares if s["state"] == "skipped"),
+        **square_counts(squares),
     }
 
 
@@ -686,12 +759,7 @@ def results_reply(run: Mapping[str, Any], merged: Mapping[str, Any]) -> dict[str
         "tracks": list(merged["tracks"]),
         "provenance": {
             "merge": {"tag": "derived", "formula": MERGE_FORMULA},
-            "known_positions": {
-                "tag": "model_dependent",
-                "source": "JPL Horizons, as stored with each area",
-                "assumption": KNOWN_POSITIONS_ASSUMPTION,
-            },
-            "track_positions": {"tag": "measured", "source": TRACK_POSITIONS_SOURCE},
+            **run_provenance(),
         },
     }
 
@@ -708,8 +776,10 @@ __all__ = [
     "new_run_id",
     "read_square",
     "results_reply",
+    "run_provenance",
     "sep_arcsec",
     "square_boxes",
+    "square_counts",
     "square_objects",
     "summary",
     "totals_of",

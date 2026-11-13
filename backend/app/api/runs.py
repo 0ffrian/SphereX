@@ -17,7 +17,6 @@ stored areas. Every reply is checked against its schema before it is sent. Error
 
 from __future__ import annotations
 
-import json
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, Path
@@ -28,14 +27,7 @@ from app.api.areas import LIVE_ERRORS, _json, get_area_store, get_live_jobs
 from app.api.models import ErrorResponse
 from app.core.area.live import LiveAreaError
 from app.core.area.live_jobs import MAX_WAITING, LiveJobs, QueueFull, RunConflict
-from app.core.area.runs import (
-    RUN_ID,
-    RunNotFound,
-    merge,
-    read_square,
-    results_reply,
-    square_boxes,
-)
+from app.core.area.runs import RUN_ID, RunNotFound, results_reply
 from app.core.area.scan import ScanPlan, plan_scan
 from app.core.area.store import AreaStore
 from app.errors import ApiError
@@ -153,26 +145,12 @@ def delete_run(run_id: RunIdPath, jobs: Annotated[LiveJobs, Depends(get_live_job
 @router.get("/runs/{run_id}/results", responses=RUN_ERRORS)
 def get_results(
     run_id: RunIdPath,
-    store: Annotated[AreaStore, Depends(get_area_store)],
     jobs: Annotated[LiveJobs, Depends(get_live_jobs)],
 ) -> Response:
-    """The finished squares' stored replies, merged (Q-471). Nothing is computed."""
+    """The finished squares' stored replies, merged (Q-471). Nothing is computed; the merge is
+    kept per run until another square is done (``LiveJobs.results``)."""
     try:
-        run = jobs.runs.get(run_id)
+        run, merged = jobs.results(run_id)
     except RunNotFound as exc:
         raise _not_found(run_id) from exc
-
-    def read(area_id: str, stage: str) -> dict[str, Any] | None:
-        got = store.entry(area_id, stage)
-        if got is None:
-            return None
-        body: dict[str, Any] = json.loads(got.body)
-        return body
-
-    finished = [
-        read_square(s["index"], s["area_id"], read)
-        for s in run["squares"]
-        if s["state"] == "done" and s["area_id"] is not None
-    ]
-    merged = merge(square_boxes(run), finished)
     return _json(results_reply(run, merged), "run-results.schema.json")

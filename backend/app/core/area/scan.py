@@ -6,7 +6,9 @@ and the plan shown before anything runs. Pure math, no pipeline module and no nu
 
 - **Region:** centre and sides snapped to the 0.05 degree grid, each side at most
   ``MAX_REGION_SIDE_DEG``, at most ``MAX_SQUARES`` squares (else ``scan:too_large``), and no
-  region reaching a pole (``|dec| + h/2 < 89``, else ``area:bad_box``).
+  region reaching a pole (``|dec| + h/2 < 89``, else ``area:bad_box``); ``split`` also
+  refuses a region whose padded squares would reach it (``area:bad_box``, with the scan's
+  message rather than ``snap_box``'s), so near a pole the limit is about 0.1 degree tighter.
 - **Split:** ``cols = ceil(width / 2)`` and ``rows = ceil(height / 2)``, all squares the same size
   (``width/cols`` by ``height/rows``), so there are no thin edge slivers; one more column or
   row while a padded square would pass the 2 degree cap (a 4 x 2 degree region is 3 x 2).
@@ -190,6 +192,12 @@ def _cover(region: Box, cols: int, rows: int) -> tuple[bool, bool, list[Square]]
             w, h = _ceil_grid(2 * (hw + PAD_DEG)), _ceil_grid(2 * (hh + PAD_DEG))
             w_ok = w_ok and w <= MAX_SIDE_DEG + 1e-9
             h_ok = h_ok and h <= MAX_SIDE_DEG + 1e-9
+            # A square under the cap whose padding reaches the pole: no split can avoid it,
+            # as a smaller square at the region's edge still reaches past it with its pad.
+            if h <= MAX_SIDE_DEG + 1e-9 and abs(cdec) + h / 2.0 >= POLE_LIMIT_DEG:
+                raise LiveAreaError(
+                    "area:bad_box", "Scans cannot reach a celestial pole (with their overlap)."
+                )
             if w_ok and h_ok:
                 out.append(Square(r * cols + c + 1, r, c, snap_box(cra, cdec, w, h)))
     return w_ok, h_ok, out

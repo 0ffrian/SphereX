@@ -45,6 +45,7 @@ from app.core.area.runs import (
     merge,
     read_square,
     square_boxes,
+    square_counts,
     square_objects,
     totals_of,
 )
@@ -68,6 +69,9 @@ INPUTS = "live_area"
 # finished jobs are remembered (the oldest are forgotten; a stored area still answers done).
 MAX_WAITING = 5
 MAX_FINISHED = 50
+# Merged results kept per run (``results``), keyed by the squares done, so polling
+# ``/v1/runs/{id}/results`` does not re-read and re-merge every stored square each time.
+MAX_RESULTS = 16
 
 
 class QueueFull(Exception):
@@ -312,6 +316,8 @@ class LiveJobs:
         self._queue: deque[QueueItem] = deque()
         self._thread: threading.Thread | None = None
         self._running: QueueItem | None = None
+        self._results_lock = threading.Lock()
+        self._results: dict[str, tuple[tuple[tuple[int, str], ...], dict[str, Any]]] = {}
 
     # --- single live areas --------------------------------------------------------------
 
@@ -398,6 +404,12 @@ class LiveJobs:
             item = self._live_item(run_id)
             if not isinstance(item, ScanJob) or item.state != "running" or item.cancel.is_set():
                 raise RunConflict("run_not_pausable", "Only a running scan can be paused.")
+            # A pause takes effect before the next square; with none left it would never
+            # apply, so it is refused rather than answered and then dropped (PR #160 review).
+            if not any(s.index != item.current_square for s in item._todo()):
+                raise RunConflict(
+                    "run_not_pausable", "The last square is running; the scan ends after it."
+                )
             item.pause_requested = True
 
     def resume(self, run_id: str) -> None:
@@ -451,8 +463,8 @@ class LiveJobs:
     def run_reply(self, run_id: str) -> dict[str, Any]:
         """The ``run.schema.json`` body: the record, and while live its queue position or the
         running square's progress."""
+        out = self.runs.get(run_id)  # the copy is made outside ``_lock`` (the worker needs it)
         with self._lock:
-            out = self.runs.get(run_id)
             item = self._by_run.get(run_id)
             if item is None:
                 return out
@@ -468,6 +480,37 @@ class LiveJobs:
                     "steps": _steps_reply(job.steps),
                 }
             return out
+
+    def results(self, run_id: str) -> tuple[dict[str, Any], dict[str, Any]]:
+        """The run record and its finished squares merged (Q-471). A live scan's squares come
+        from the replies it already holds; the rest are read from the store once. The merge is
+        kept per run until another square is done. Raises ``RunNotFound``."""
+        run = self.runs.get(run_id)
+        done = tuple(
+            (int(s["index"]), str(s["area_id"]))
+            for s in run["squares"]
+            if s["state"] == "done" and s["area_id"] is not None
+        )
+        with self._results_lock:
+            got = self._results.get(run_id)
+        if got is not None and got[0] == done:
+            return run, got[1]
+        with self._lock:
+            item = self._by_run.get(run_id)
+            held = dict(item.cache) if isinstance(item, ScanJob) else {}
+        squares = []
+        for index, area_id in done:
+            sq = held.get(index)
+            if sq is None or sq.area_id != area_id:
+                sq = read_square(index, area_id, self._read)
+            squares.append(sq)
+        merged = merge(square_boxes(run), squares)
+        with self._results_lock:
+            self._results.pop(run_id, None)
+            self._results[run_id] = (done, merged)
+            while len(self._results) > MAX_RESULTS:
+                del self._results[next(iter(self._results))]
+        return run, merged
 
     def wait(self, timeout: float | None = None) -> bool:
         """Block until the queue is empty and the worker idle (tests). True when it is."""
@@ -566,7 +609,7 @@ class LiveJobs:
             area_id=area_id,
             error={"code": code, "detail": detail},
             event="square_skipped" if skipped else "square_failed",
-            totals={**record["totals"], **_square_counts(record["squares"])},
+            totals={**record["totals"], **square_counts(record["squares"])},
         )
 
     def _finish_job(self, job: Job, state: str, exc: BaseException | None = None) -> None:
@@ -587,7 +630,13 @@ class LiveJobs:
         if run_id is not None:
             self._record(self.runs.start, run_id)
             self._record(
-                self.runs.square, run_id, 1, "running", area_id=job.area_id, event="square_started"
+                self.runs.square,
+                run_id,
+                1,
+                "running",
+                area_id=job.area_id,
+                event="square_started",
+                write=False,
             )
         try:
             # Stored meanwhile (by a scan's square, say): done at once, nothing is recomputed.
@@ -612,7 +661,9 @@ class LiveJobs:
     def _run_square(self, scan: ScanJob, sq: Square) -> str:
         """One square of a scan: ``"next"`` to go on, ``"stop"`` once the scan is stopped."""
         run_id = scan.run_id
-        self._record(self.runs.square, run_id, sq.index, "running", event="square_started")
+        self._record(
+            self.runs.square, run_id, sq.index, "running", event="square_started", write=False
+        )
         area_id = scan.stored.get(sq.index)
         if not self._stored(area_id):  # the plan's stored area: no SIA call (Q-470)
             try:
@@ -749,14 +800,9 @@ class LiveJobs:
                 out["eta_s"] = wait + job.plan.estimate_s()
             if job.error is not None:
                 out["error"] = {"code": job.error[0], "detail": job.error[1]}
+            if job.run_id is not None:
+                out["run_id"] = job.run_id
             return out
-
-
-def _square_counts(squares: list[dict[str, Any]]) -> dict[str, int]:
-    return {
-        "squares_done": sum(1 for s in squares if s["state"] == "done"),
-        "squares_skipped": sum(1 for s in squares if s["state"] == "skipped"),
-    }
 
 
 def _steps_reply(steps: Mapping[str, _StepState]) -> list[dict[str, Any]]:

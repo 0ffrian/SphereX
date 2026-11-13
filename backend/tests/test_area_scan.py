@@ -698,16 +698,28 @@ def test_a_single_area_run_cannot_pause(
     from app.api import areas as areas_api
 
     monkeypatch.setattr(areas_api, "plan_area", lambda ctx, box, pair=None: _plan_of(box))
-    r = client.post(
-        "/v1/areas/live",
-        json={"ra": 10.0, "dec": 10.0, "width_deg": 0.5, "height_deg": 0.5, "start": True},
-    )
+    box = {"ra": 10.0, "dec": 10.0, "width_deg": 0.5, "height_deg": 0.5, "start": True}
+    r = client.post("/v1/areas/live", json={**box, "kind": "discovery"})
     assert r.status_code == 202
-    run_id = client.get("/v1/runs").json()["runs"][0]["run_id"]
-    assert client.get(f"/v1/runs/{run_id}").json()["kind"] == "known"  # the default
+    run_id = r.json()["run_id"]  # the reply names its run (PR #160 review)
+    assert client.get(f"/v1/runs/{run_id}").json()["kind"] == "discovery"
     r = client.post(f"/v1/runs/{run_id}/pause")
     assert (r.status_code, r.json()["error"]) == (409, "run_not_pausable")
     assert client.delete(f"/v1/runs/{run_id}").status_code == 204
+
+
+def test_a_live_area_without_kind_records_no_run(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """PR #160 review: a client that does not say which tool it is (the #144 card) records no
+    run, rather than one listed under the wrong tool."""
+    from app.api import areas as areas_api
+
+    monkeypatch.setattr(areas_api, "plan_area", lambda ctx, box, pair=None: _plan_of(box))
+    box = {"ra": 20.0, "dec": 10.0, "width_deg": 0.5, "height_deg": 0.5, "start": True}
+    r = client.post("/v1/areas/live", json=box)
+    assert r.status_code == 202 and "run_id" not in r.json()
+    assert client.get("/v1/runs").json()["runs"] == []
 
 
 def test_offline_refuses_to_start_a_scan(tmp_path: Path) -> None:
@@ -990,10 +1002,12 @@ def test_the_duration_leaves_out_pauses() -> None:
             {"t": 0.0, "type": "run_started"},
             {"t": 60.0, "type": "run_paused"},
             {"t": 360.0, "type": "run_resumed"},
+            {"t": 420.0, "type": "square_started"},  # after a minute queued behind others
             {"t": 600.0, "type": "run_done"},
         ],
     }
-    assert runs.duration_s(run) == 300.0
+    # PR #160 review: the queue wait after a resume is not running time either.
+    assert runs.duration_s(run) == 240.0
     stopped_while_paused = {
         **run,
         "events": [*run["events"][:2], {"t": 600.0, "type": "run_stopped"}],
@@ -1056,3 +1070,142 @@ def test_the_store_reads_each_summary_once(tmp_path: Path, monkeypatch: pytest.M
     by_box = store.areas_by_box("spherex_qr2")
     assert "eros-2026-03" in by_box.values()
     assert sorted(calls) == sorted(set(calls))
+
+
+# --- PR #160 code review ------------------------------------------------------------------
+
+
+def test_a_bad_run_record_never_stops_the_live_routes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Review #1: a record with a bad or missing field is skipped (and left on disk); one that
+    cannot be written back is kept in memory; the store, and so ``LiveJobs``, still loads."""
+    jobs = _scan_jobs(tmp_path, lambda ctx, plan, p: None)
+    good = jobs.submit_scan(scan.plan_scan(180.0, 0.0, 2.0, 2.0), "discovery", RELEASE)
+    assert jobs.wait(10)
+    root = jobs.runs.root
+    rec = json.loads((root / f"{good}.json").read_text())
+    bad: dict[str, Any] = {
+        "run-20261113T120000-aaaaaa": {**rec, "events": [{"type": "run_started"}]},  # no t
+        "run-20261113T120000-bbbbbb": {**rec, "started_at": "not a time"},
+        "run-20261113T120000-cccccc": {k: v for k, v in rec.items() if k != "created_at"},
+        "run-20261113T120000-dddddd": {**rec, "squares": [{"index": 1}]},
+        "run-20261113T120000-eeeeee": [],
+    }
+    for run_id, body in bad.items():
+        if isinstance(body, dict):
+            body = {**body, "run_id": run_id}
+        (root / f"{run_id}.json").write_text(json.dumps(body))
+    live_id = "run-20261113T120000-ffffff"
+    (root / f"{live_id}.json").write_text(
+        json.dumps({**rec, "run_id": live_id, "state": "running", "finished_at": None})
+    )
+
+    def no_disk(path: Path, body: bytes) -> None:
+        raise OSError("read-only file system")
+
+    monkeypatch.setattr(runs, "write_atomic", no_disk)
+    again = _scan_jobs(tmp_path, lambda ctx, plan, p: None)
+    assert {r["run_id"] for r in again.runs.summaries()} == {good, live_id}
+    assert _run(again, live_id)["state"] == "stopped"  # kept in memory, not written
+    for run_id in bad:
+        assert (root / f"{run_id}.json").exists()  # left as it was
+
+
+def test_a_scan_whose_padded_squares_reach_a_pole_is_refused() -> None:
+    """Review #2: the region edge (88.9) is under the limit but the padded top squares pass
+    it: refused with the scan's message, not the single live area's."""
+    for dec in (87.85, 87.9, 87.95, -87.9):
+        with pytest.raises(LiveAreaError) as err:
+            scan.plan_scan(10.0, dec, 2.0, 2.0)
+        assert err.value.code == "area:bad_box" and "Scans" in err.value.detail
+    assert scan.plan_scan(10.0, 87.5, 2.0, 2.0).rows == 2
+
+
+def test_a_pause_while_the_last_square_runs_is_refused(tmp_path: Path) -> None:
+    """Review #5: with no square after the running one, a pause could never take effect."""
+    p = scan.plan_scan(180.0, 0.0, 3.0, 1.0)  # 2 squares
+    last = _plan_of(p.squares[1].box)
+    gates = {last.area_id: threading.Event()}
+    started = threading.Event()
+
+    def runner(ctx: Context, pl: Plan, prog: Progress) -> None:
+        gate = gates.get(pl.area_id)
+        if gate is None:
+            return
+        started.set()
+        while not gate.wait(0.01):
+            prog.check()
+
+    jobs = _scan_jobs(tmp_path, runner)
+    run_id = jobs.submit_scan(p, "discovery", RELEASE)
+    assert started.wait(5)
+    with pytest.raises(RunConflict) as err:
+        jobs.pause(run_id)
+    assert err.value.code == "run_not_pausable"
+    gates[last.area_id].set()
+    assert jobs.wait(10)
+    assert _run(jobs, run_id)["state"] == "done"
+
+
+def test_a_square_starting_is_written_with_the_next_change(tmp_path: Path) -> None:
+    """Review #8: one record write per square. The API, which reads memory, still shows the
+    running square."""
+    p = scan.plan_scan(180.0, 0.0, 1.5, 1.5)  # one square
+    gate, started = threading.Event(), threading.Event()
+
+    def runner(ctx: Context, pl: Plan, prog: Progress) -> None:
+        started.set()
+        while not gate.wait(0.01):
+            prog.check()
+
+    jobs = _scan_jobs(tmp_path, runner)
+    run_id = jobs.submit_scan(p, "discovery", RELEASE)
+    assert started.wait(5)
+    on_disk = json.loads((jobs.runs.root / f"{run_id}.json").read_text())
+    assert [e["type"] for e in on_disk["events"]] == ["run_started"]
+    assert _run(jobs, run_id)["events"][-1]["type"] == "square_started"
+    gate.set()
+    assert jobs.wait(10)
+    on_disk = json.loads((jobs.runs.root / f"{run_id}.json").read_text())
+    types = [e["type"] for e in on_disk["events"]]
+    assert types[:2] == ["run_started", "square_started"] and types[-1] == "run_done"
+
+
+class CountingStore(FakeStore):
+    def __init__(self) -> None:
+        super().__init__()
+        self.reads = 0
+
+    def entry(self, area_id: str, stage: str) -> Any:
+        self.reads += 1
+        return super().entry(area_id, stage)
+
+
+def test_results_are_merged_once_per_finished_square(tmp_path: Path) -> None:
+    """Review #9: polling the results of a run re-reads nothing until another square is done."""
+    p = scan.plan_scan(180.0, 0.0, 1.5, 1.5)  # one square
+    plan = _plan_of(p.squares[0].box)
+    store = CountingStore()
+
+    def runner(ctx: Context, pl: Plan, prog: Progress) -> None:
+        store.areas[pl.area_id] = _replies(pl.area_id, eros_at=180.0)
+
+    jobs = _scan_jobs(tmp_path, runner, store=store)
+    run_id = jobs.submit_scan(p, "discovery", RELEASE)
+    assert jobs.wait(10)
+    run, merged = jobs.results(run_id)
+    reads = store.reads
+    check(runs.results_reply(run, merged), "run-results.schema.json")
+    again_run, again = jobs.results(run_id)
+    assert store.reads == reads and again is merged
+    assert again_run["squares"][0]["area_id"] == plan.area_id
+
+
+def test_run_records_never_share_a_provenance_dict(tmp_path: Path) -> None:
+    store = runs.RunStore(tmp_path / "runs")
+    box = live.snap_box(1.0, 1.0, 1.0, 1.0)
+    a, b = (store.create("known", RELEASE, box, [(1, box, None)]) for _ in range(2))
+    pa, pb = store._runs[a]["provenance"], store._runs[b]["provenance"]
+    assert pa == pb == runs.RUN_PROVENANCE
+    assert pa is not pb and pa["known_positions"] is not runs.RUN_PROVENANCE["known_positions"]
