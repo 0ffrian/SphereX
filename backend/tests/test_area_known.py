@@ -154,4 +154,13 @@ def test_a_match_needs_two_thirds_of_the_dots(tmp_path: Path) -> None:
         for p in pos
     ]  # fmt: skip
     step = KnownStep(r.known.skybot, r.known.candidates, {"433 Eros": shifted}, [], [])
-    assert ids and match.match_track(t, step) is None
+    assert (
+        ids
+        and match.match_track(
+            t,
+            step,
+            by_frame=match.positions_by_frame(step),
+            by_name={c.designation: c for c in step.candidates},
+        )
+        is None
+    )

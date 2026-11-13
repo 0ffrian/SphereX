@@ -40,7 +40,7 @@ from numpy.lib.stride_tricks import sliding_window_view
 from numpy.typing import NDArray
 
 from app.core.area.config import DEFAULT_AREA_CONFIG, AreaConfig
-from app.core.area.geometry import AreaBox, CellGrid, radec_inside
+from app.core.area.geometry import AreaBox, cell_grid, radec_inside
 from app.core.area.records import AreaFrame, AreaFrames, Coverage, Dot, FrameDots
 from app.core.find import wcs
 from app.core.measure import aperture, flags
@@ -411,7 +411,7 @@ def find_dots(
         dec_r = np.round(dec, 7)
         xi, eta, okp = box.project_many(ra_r, dec_r)
         in_box = okp & box.inside_many(xi, eta)
-        grid = CellGrid.of(box, cfg.coverage_cell_arcsec)
+        grid = cell_grid(box, cfg.coverage_cell_arcsec)
         row, col, valid = grid.cell_of(xi, eta)
 
         stamper = Stamper(hdul, cfg)
