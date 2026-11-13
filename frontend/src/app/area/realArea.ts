@@ -19,6 +19,7 @@ import { snapToArea } from '@/app/sky/area/snap';
 import type { SkySquare } from '@/app/sky/area/geometry';
 import { formatUtc } from '@/app/format';
 import { deltaRa, wrapRa } from '@/viewer/sky/skyMath';
+import { getSpectraApi, SPECTRA_NOT_RUN, SPECTRA_UNAVAILABLE, type AreaSpectra, type SpectraAnswer, type SpectraApi } from './spectraApi';
 
 /** The drawn rectangle as the snap reads it: its centre and its larger side. */
 export interface DrawnBox {
@@ -42,6 +43,11 @@ export interface RealDiscovery {
   summary: AreaSummary;
   dots: AreaDots | null;
   tracks: AreaTracks | null;
+  /**
+   * The spectrum check (A17.13, issue #162); null when it was not run (404, `spectra:not_run`) or
+   * did not load (`spectra:unavailable`). The demo never has one.
+   */
+  spectra: AreaSpectra | null;
   /** Codes of what is not there: the replies' `missing`, parts that failed, unmatched dot ids. */
   missing: string[];
   /** Synthetic test data (the fixture server, or a synthetic data release). */
@@ -130,20 +136,32 @@ function areaFailed(e: unknown): never {
   );
 }
 
-/** Summary, dots and tracks of one area. The summary is needed; dots and tracks may be missing. */
+/**
+ * Summary, dots, tracks and the spectrum check of one area. The summary is needed; the rest may be
+ * missing. The spectrum check is read with the tracks (A18.7) and never fails the area.
+ */
 export async function loadDiscovery(
   api: ApiClient,
   entry: AreaIndexEntry,
   fixture: string | null,
   signal?: AbortSignal,
+  spectraApi: SpectraApi = getSpectraApi(),
 ): Promise<RealDiscovery> {
   const missing: string[] = [];
-  const [summary, dots, tracks] = await Promise.all([
+  const [summary, dots, tracks, sp] = await Promise.all([
     api.area(entry.area_id, signal).catch(areaFailed),
     part(() => api.areaDots(entry.area_id, signal), 'area:dots_unavailable', missing),
     part(() => api.areaTracks(entry.area_id, signal), 'area:tracks_unavailable', missing),
+    spectraApi.areaSpectra(entry.area_id, signal).catch((e: unknown): SpectraAnswer => {
+      if (signal?.aborted) throw e;
+      return { kind: 'unavailable' };
+    }),
   ]);
-  missing.push(...summary.data.missing, ...(dots?.missing ?? []), ...(tracks?.missing ?? []));
+  // Verdicts only for the tracks the card shows: with no tracks there is nothing to put them on.
+  const spectra = sp.kind === 'ok' && tracks ? sp.data : null;
+  if (sp.kind === 'not_run') missing.push(SPECTRA_NOT_RUN);
+  if (sp.kind === 'unavailable') missing.push(SPECTRA_UNAVAILABLE);
+  missing.push(...summary.data.missing, ...(dots?.missing ?? []), ...(tracks?.missing ?? []), ...(spectra?.missing ?? []));
   const unmatched = unmatchedDotIds(dots, tracks);
   if (unmatched.length > 0) missing.push(`area:unmatched_dots:${unmatched.length}`);
   return {
@@ -151,6 +169,7 @@ export async function loadDiscovery(
     summary: summary.data,
     dots,
     tracks,
+    spectra,
     missing: [...new Set(missing)],
     synthetic: isSynthetic(summary.fixture ?? fixture, summary.data.data_release),
   };
@@ -267,6 +286,12 @@ export function missingText(code: string): string {
       return 'The rate grid needs more visits.';
     case 'checks':
       return 'The checks were not run for this area.';
+    case 'spectra':
+      if (rest === 'not_run') return 'Spectrum check not run.';
+      if (rest === 'unavailable') return 'The spectrum check could not be loaded, so no colour verdicts are shown.';
+      if (rest === 'calibration_default')
+        return 'Too few stars to measure the scatter in one visit and detector, so the spectrum check used the default.';
+      return code;
     default:
       return code;
   }

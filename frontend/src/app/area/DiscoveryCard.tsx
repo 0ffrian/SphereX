@@ -16,7 +16,13 @@ import { RealTrackCard } from './RealTrackCard';
 import { Alert, AreaAlert } from './areaBits';
 import { API_BASE } from '@/app/api/config';
 import { visitNumbers } from '@/app/sky/area/blink';
-import type { DiscoveryMover } from './areaService';
+import { SPECTRUM_STEP, type DiscoveryMover } from './areaService';
+import { SpectrumRowWord } from './SpectrumCard';
+import { dotInfoFrom } from './spectrumWords';
+import { ToggleGroup } from '@/app/PanelControls';
+import { useAppStore } from '@/state/store';
+import { useMemo, useState } from 'react';
+import type { RealDiscovery } from './realArea';
 
 /** The result chip of a mover row: the stored verdict for a prepared area, the demo's kind else. */
 function MoverChip({ m, step }: { m: DiscoveryMover; step: number }) {
@@ -32,6 +38,24 @@ function MoverChip({ m, step }: { m: DiscoveryMover; step: number }) {
       Unexplained
     </span>
   );
+}
+
+type MoverFilter = 'all' | 'rock' | 'known';
+/** The results filter (mock-up state A): all, the Rock-like spectrum verdicts, or the known objects. */
+const keep = (m: DiscoveryMover, f: MoverFilter) =>
+  f === 'all' || (f === 'rock' ? m.spectrum?.verdict === 'rock' : m.known !== null);
+
+/** A dot's visit, time, detector and flags, from the area's `/dots` and its frames (Points used). */
+function useDotInfo(real: RealDiscovery | null) {
+  return useMemo(() => {
+    const dots = new Map(
+      (real?.dots?.visits ?? []).flatMap((v) =>
+        v.dots.map((d) => [d.dot_id, { visit: v.visit, time: d.time, detector: d.detector, flags: d.flags }] as const),
+      ),
+    );
+    const frames = new Map((real?.summary.frames ?? []).map((f) => [f.frame_id, { visit: f.visit, time: f.time }] as const));
+    return dotInfoFrom(dots, frames);
+  }, [real]);
 }
 
 /** smoothui's demo looks (loaderLooks.ts) at the row's size; the current step shows one of them. */
@@ -51,10 +75,17 @@ export function DiscoveryCard() {
   const visit = useAreaStore((s) => s.visit);
   const real = disc?.real ?? null;
   const visits = real ? visitNumbers(real.summary, real.dots) : [];
+  // The spectrum check (A18.7, issue #162): the row verdicts show once its step is done.
+  const [filter, setFilter] = useState<MoverFilter>('all');
   const steps = disc?.steps ?? [];
   const total = steps.length;
   const nowStep = running ? step + 1 : -1;
   const done = total > 0 && !running && step >= total - 1;
+  const spectrumAt = steps.findIndex((s) => s.label === SPECTRUM_STEP);
+  const showVerdicts = spectrumAt >= 0 && step >= spectrumAt;
+  const movers = disc?.movers ?? [];
+  const active: MoverFilter = showVerdicts ? filter : 'all';
+  const shown = movers.map((m, i) => ({ m, i })).filter(({ m }) => keep(m, active));
   const announce =
     total === 0
       ? ''
@@ -142,9 +173,23 @@ export function DiscoveryCard() {
           })}
         </div>
       )}
+      {step >= 3 && showVerdicts && movers.length > 0 && (
+        <ToggleGroup<MoverFilter>
+          label="Show"
+          hideLabel
+          options={[
+            { value: 'all', label: `All ${movers.length}`, testId: 'disc-filter-all' },
+            { value: 'rock', label: `Rock-like ${movers.filter((m) => keep(m, 'rock')).length}`, testId: 'disc-filter-rock' },
+            { value: 'known', label: `Known ${movers.filter((m) => keep(m, 'known')).length}`, testId: 'disc-filter-known' },
+          ]}
+          value={active}
+          onChange={setFilter}
+          testId="disc-filter"
+        />
+      )}
       {step >= 3 && (
         <div className="sx-lk-list" data-testid="disc-list">
-          {disc?.movers.map((m, i) => (
+          {shown.map(({ m, i }) => (
             <button
               key={m.id}
               type="button"
@@ -160,7 +205,10 @@ export function DiscoveryCard() {
                     ? `Moves across ${m.visits} visits`
                     : 'Moves across both visits'}
               </span>
-              <MoverChip m={m} step={step} />
+              <span className="sx-lk-end">
+                <MoverChip m={m} step={step} />
+                {showVerdicts && m.spectrum && <SpectrumRowWord spectrum={m.spectrum} />}
+              </span>
             </button>
           ))}
         </div>
@@ -201,11 +249,15 @@ export function MoverCard() {
   const sel = useAreaStore((s) => s.sel);
   const disc = useAreaStore((s) => s.disc);
   const openDisc = useAreaStore((s) => s.openDisc);
+  const measuredOnly = useAppStore((s) => s.honesty === 'measured');
+  const info = useDotInfo(disc?.real ?? null);
   const m = disc?.movers[sel];
   if (!m) return null;
   if (m.track && disc?.real?.tracks) {
+    const spectra = disc.real.spectra;
     return (
       <RealTrackCard
+        spectrum={spectra && m.spectrum ? { track: m.spectrum, spectra, info, measuredOnly } : null}
         track={m.track}
         provenance={disc.real.tracks.provenance}
         synthetic={disc.real.synthetic}
