@@ -82,6 +82,8 @@ def spherex_w(
 ) -> tuple[dict[int, SkyVelocity], list[Served]]:
     """One Horizons vector per visit at its mid-time (A17.4 step 3). A visit whose vector fails
     is absent; the join then falls back to the rate window for its pairs."""
+    # No ``cfg`` here: this step reads no setting, only the visits' mid-times, which the frames
+    # part of the key already covers.
     geo.require(frames)
     out: dict[int, SkyVelocity] = {}
     served: list[Served] = []

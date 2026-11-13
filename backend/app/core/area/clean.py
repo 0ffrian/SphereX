@@ -67,8 +67,9 @@ class AreaGeometry:
     def require(self, frames: AreaFrames, cfg: AreaConfig | None = None) -> None:
         """Raise ``ValueError`` unless this is ``area_geometry(frames, cfg)``: built for these
         frames' area, frame times and visits (not the same area's frames before a filter, so
-        another ``t0``, visit times or rate limit) and, when ``cfg`` is given, its settings. A
-        comparison of keys, with no pass over the times; skipped for a hand-built geometry."""
+        another ``t0``, visit times or rate limit) and, when ``cfg`` is given, its settings. It
+        rebuilds the key, one ``(visit, time)`` per frame, and compares it, so it is O(frames)
+        but parses no time and rebuilds no geometry; skipped for a hand-built geometry."""
         if self.built_from is None:
             return
         f_key, c_key = _geometry_key(frames, cfg)
