@@ -50,3 +50,8 @@ class LiveAreaJob(BaseModel):
     )
     queue_position: int | None = Field(None, description="1 = next; only while queued.", ge=1)
     error: LiveJobError | None = None
+    run_id: str | None = Field(
+        None,
+        description="The run recording this job (Q-471): only for a job started with kind; GET, DELETE /v1/runs/{run_id}.",
+        pattern="^run-[0-9]{8}T[0-9]{6}-[0-9a-f]{6}$",
+    )
