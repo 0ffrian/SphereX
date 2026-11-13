@@ -10,7 +10,9 @@ Plane coordinates are in degrees (tangent-plane units times 180/pi).
 
 from __future__ import annotations
 
+import functools
 import math
+import threading
 from collections.abc import Sequence
 from dataclasses import dataclass
 
@@ -230,10 +232,15 @@ class CellGrid:
 
     @classmethod
     def of(cls, box: AreaBox, cell_arcsec: float) -> CellGrid:
+        return cls.sized(box.half_w, box.half_h, cell_arcsec)
+
+    @classmethod
+    def sized(cls, half_w: float, half_h: float, cell_arcsec: float) -> CellGrid:
+        """The grid depends only on the box's half sizes and the cell size, not its centre."""
         c = cell_arcsec / 3600.0
-        nx = max(1, math.ceil(round(2.0 * box.half_w / c, 9)))
-        ny = max(1, math.ceil(round(2.0 * box.half_h / c, 9)))
-        return cls(box.half_w, box.half_h, c, nx, ny)
+        nx = max(1, math.ceil(round(2.0 * half_w / c, 9)))
+        ny = max(1, math.ceil(round(2.0 * half_h / c, 9)))
+        return cls(half_w, half_h, c, nx, ny)
 
     @property
     def x0(self) -> float:
@@ -244,10 +251,24 @@ class CellGrid:
         return -self.ny * self.cell_deg / 2.0
 
     def centres(self) -> tuple[FloatArray, FloatArray]:
+        """Cell centres ``(gx, gy)``, shape ``(ny, nx)``, built once per grid. The arrays are
+        shared by every caller of the cached grid (``cell_grid``), so they are read-only: an
+        in-place update raises ``ValueError``; work on a copy (``gx - x0``, not ``gx -= x0``)."""
+        return self._centres
+
+    @functools.cached_property
+    def _centres(self) -> tuple[FloatArray, FloatArray]:
         xs = self.x0 + (np.arange(self.nx, dtype=np.float64) + 0.5) * self.cell_deg
         ys = self.y0 + (np.arange(self.ny, dtype=np.float64) + 0.5) * self.cell_deg
         gx, gy = np.meshgrid(xs, ys)
+        gx.flags.writeable = False
+        gy.flags.writeable = False
         return gx, gy
+
+    def masked_centres(self, mask: NDArray[np.bool_]) -> tuple[FloatArray, FloatArray]:
+        """The centres of the cells ``mask`` keeps, flattened in row order."""
+        gx, gy = self._centres
+        return gx[mask], gy[mask]
 
     def cell_of(
         self, xi: NDArray[np.float64], eta: NDArray[np.float64]
@@ -260,6 +281,28 @@ class CellGrid:
 
     def vertex(self, col: int, row: int) -> Point:
         return (self.x0 + col * self.cell_deg, self.y0 + row * self.cell_deg)
+
+
+_GRID_LOCK = threading.Lock()
+
+
+@functools.lru_cache(maxsize=1)
+def _sized_grid(half_w: float, half_h: float, cell_arcsec: float) -> CellGrid:
+    return CellGrid.sized(half_w, half_h, cell_arcsec)
+
+
+def cell_grid(box: AreaBox, cell_arcsec: float) -> CellGrid:
+    """``CellGrid.of`` built once per box size and cell size, so every step of a run shares one
+    grid and its centres (issue #128 (2)). The key is the box's half sizes, not its centre (the
+    plane is centred on the box), so two areas of the same size share one grid. Only the latest
+    grid is kept: a 10 x 10 deg box at 30" holds about 23 MB of centres. Two areas of different
+    sizes run at once would rebuild it in turn: correct but slower; raise ``maxsize`` if areas
+    are ever served live. The lock makes the lookup and the first build of the centres happen
+    once, even from several threads."""
+    with _GRID_LOCK:
+        grid = _sized_grid(box.half_w, box.half_h, cell_arcsec)
+        grid.centres()
+    return grid
 
 
 def label_pieces(mask: NDArray[np.bool_]) -> tuple[NDArray[np.int64], int]:

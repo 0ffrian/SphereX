@@ -26,7 +26,7 @@ import math
 import time
 from collections.abc import Callable, Sequence
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from datetime import datetime
 
 import numpy as np
@@ -40,6 +40,7 @@ from app.core.area.config import DEFAULT_AREA_CONFIG, AreaConfig, AreaSpec
 from app.core.area.geometry import (
     AreaBox,
     CellGrid,
+    cell_grid,
     clipped_bbox,
     cone_grid,
     count_holes,
@@ -84,6 +85,7 @@ class ConeSearch:
     digests: list[str]  # SHA-256 of every SIA body used
     maxrec_hits: int
     failed: int
+    fetched: list[str] = field(default_factory=list)  # ISO-Z ``fetched_at`` of every SIA body
 
 
 def search_cones(
@@ -100,6 +102,7 @@ def search_cones(
     found: dict[str, SiaRow] = {}
     logs: list[ConeLog] = []
     digests: list[str] = []
+    fetched: list[str] = []
     maxrec_hits = failed = 0
     for ra, dec in cone_grid(box, cfg.grid_step_deg):
         key = irsa_sia.sia_key(spec.data_release, ra, dec, cfg.cone_radius_deg)
@@ -129,6 +132,7 @@ def search_cones(
             continue
         maxrec_hits += sia.truncated
         digests.append(hashlib.sha256(sia.served.entry.body).hexdigest())
+        fetched.append(iso_utc_z(sia.served.entry.fetched_at))
         logs.append(
             ConeLog(
                 ra,
@@ -141,7 +145,7 @@ def search_cones(
         )
         for row in sia.rows:
             found.setdefault(row.frame_id, row)
-    return ConeSearch(list(found.values()), logs, digests, maxrec_hits, failed)
+    return ConeSearch(list(found.values()), logs, digests, maxrec_hits, failed, fetched)
 
 
 # --- 2. selection --------------------------------------------------------------------------
@@ -279,10 +283,15 @@ def fetch_cutouts(
 # --- 5. coverage ---------------------------------------------------------------------------
 
 
-def cutout_cells(box: AreaBox, grid: CellGrid, body: bytes, erode_px: float) -> np.ndarray:
-    """Cells whose centre lies ``erode_px`` or more inside the cutout's pixels."""
-    gx, gy = grid.centres()
-    ra, dec = box.deproject_many(gx.ravel(), gy.ravel())
+def cutout_cells(
+    grid: CellGrid,
+    body: bytes,
+    erode_px: float,
+    radec: tuple[np.ndarray, np.ndarray],
+) -> np.ndarray:
+    """Cells whose centre lies ``erode_px`` or more inside the cutout's pixels. ``radec`` is
+    ``grid_radec(box, grid)``, built once by the caller, not once per frame (issue #128 (2))."""
+    ra, dec = radec
     with wcs.open_fits(body) as hdul:
         ny, nx = np.asarray(hdul["IMAGE"].data).shape
         w = wcs.celestial_wcs(hdul["IMAGE"].header)
@@ -291,7 +300,13 @@ def cutout_cells(box: AreaBox, grid: CellGrid, body: bytes, erode_px: float) -> 
     y = np.asarray(y, dtype=np.float64)
     lo = erode_px - 0.5
     ok = (x >= lo) & (x <= nx - 0.5 - erode_px) & (y >= lo) & (y <= ny - 0.5 - erode_px)
-    return np.asarray(ok, dtype=np.bool_).reshape(gx.shape)
+    return np.asarray(ok, dtype=np.bool_).reshape(grid.ny, grid.nx)
+
+
+def grid_radec(box: AreaBox, grid: CellGrid) -> tuple[np.ndarray, np.ndarray]:
+    """The cell centres of ``grid`` on the sky, flattened in row order."""
+    gx, gy = grid.centres()
+    return box.deproject_many(gx.ravel(), gy.ravel())
 
 
 def footprint_cells(box: AreaBox, grid: CellGrid, row: SiaRow, erode_deg: float) -> np.ndarray:
@@ -314,8 +329,9 @@ def build_coverage(
     cfg: AreaConfig = DEFAULT_AREA_CONFIG,
 ) -> list[Coverage]:
     """One ``Coverage`` per visit; only frames with a usable cutout count (Q-400 (4))."""
-    grid = CellGrid.of(box, cfg.coverage_cell_arcsec)
+    grid = cell_grid(box, cfg.coverage_cell_arcsec)
     visits = sorted({g.visit for g in grouped})
+    radec: tuple[np.ndarray, np.ndarray] | None = None
     out: list[Coverage] = []
     for v in visits:
         mask = np.zeros((grid.ny, grid.nx), dtype=np.bool_)
@@ -325,7 +341,9 @@ def build_coverage(
                 continue
             fp = footprint_cells(box, grid, g.row, cfg.coverage_erode_deg)
             if fp.any():
-                mask |= fp & cutout_cells(box, grid, body, cfg.coverage_erode_px)
+                if radec is None:
+                    radec = grid_radec(box, grid)
+                mask |= fp & cutout_cells(grid, body, cfg.coverage_erode_px, radec)
         piece, pieces = largest_piece(mask)
         polygon: tuple[tuple[float, float], ...] = ()
         if piece.any():
@@ -399,6 +417,7 @@ def assemble(
     workers: int = 1,
     head_missing: Sequence[str] = (),
     sia_digests: Sequence[str] = (),
+    sia_fetched: Sequence[str] = (),
     n_cones: int = 0,
     cones: Sequence[ConeLog] = (),
 ) -> tuple[AreaFrames, dict[str, bytes]]:
@@ -444,6 +463,7 @@ def assemble(
         input_digests=tuple(sorted(digests)),
         cones=tuple(cones),
         stats=stats,
+        sia_fetched=tuple(sorted(set(sia_fetched))),
     )
     return result, bodies
 
@@ -494,6 +514,7 @@ def find_frames(
         workers=ctx.settings.cutout_concurrency,
         head_missing=head,
         sia_digests=cones.digests,
+        sia_fetched=cones.fetched,
         n_cones=len(cones.logs),
         cones=cones.logs,
     )

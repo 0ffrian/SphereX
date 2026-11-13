@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import math
 import re
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
@@ -69,16 +70,113 @@ def jd_list(times: list[datetime]) -> list[str]:
     return [f"{utc_to_jd(t):.6f}" for t in times]
 
 
-def horizons_key(
-    spkid: str, jds: list[str], *, comet: bool = False, center: str = CENTER
-) -> CacheKey:
+# --- Shared request building (issue #128 (3)) --------------------------------------------------
+# Every call below is one of two request shapes: an OBSERVER table (RA/Dec and quantities, at a
+# TLIST or over a range) or a VECTORS table at one JD. The cache keys are built separately and
+# stay exactly as recorded (``tests/fixtures/cache/v1/horizons/``).
+
+
+def _tlist_key(spkid: str, jds: list[str], *, comet: bool, center: str, **extra: str) -> CacheKey:
+    """Key of an OBSERVER TLIST request; ``extra`` holds the keyed options (``quantities``)."""
     return CacheKey.make(
         SOURCE,
         None,
         command=command(spkid, comet, min(jds, key=float, default=None)),
         center=center,
         tlist=",".join(jds),
+        **extra,
     )
+
+
+def _vectors_key(cmd: str, center: str, jd: str, **extra: str) -> CacheKey:
+    """Key of a VECTORS request at one JD; ``extra`` holds the keyed options (``vec_table``)."""
+    return CacheKey.make(
+        SOURCE, None, command=cmd, center=center, tlist=jd, ephem_type="VECTORS", **extra
+    )
+
+
+def _tlist_times(jds: list[str]) -> dict[str, str]:
+    # TLIST read as UT: recorded JD 2461119.856750 is answered as 2026-Mar-20 08:33:43.200
+    return {"TLIST_TYPE": "JD", "TIME_TYPE": "UT", "TLIST": " ".join(f"'{j}'" for j in jds)}
+
+
+def _observer_params(
+    cmd: str, center: str, times: dict[str, str], quantities: str
+) -> dict[str, str]:
+    """An OBSERVER table request: ``times`` is ``_tlist_times`` or a START/STOP/STEP range."""
+    return {
+        "format": "json",
+        "COMMAND": f"'{cmd}'",
+        "OBJ_DATA": "NO",
+        "MAKE_EPHEM": "YES",
+        "EPHEM_TYPE": "OBSERVER",
+        "CENTER": f"'{center}'",
+        **times,
+        "QUANTITIES": f"'{quantities}'",
+        "ANG_FORMAT": "DEG",
+        "CSV_FORMAT": "YES",
+        "EXTRA_PREC": "YES",
+    }
+
+
+def _vectors_params(cmd: str, center: str, jd: str, vec_table: str) -> dict[str, str]:
+    """A VECTORS table request at one JD, ICRF equatorial (not the ecliptic default), au and
+    au/day. No TIME_TYPE: the JD is read as TDB."""
+    return {
+        "format": "json",
+        "COMMAND": f"'{cmd}'",
+        "OBJ_DATA": "NO",
+        "MAKE_EPHEM": "YES",
+        "EPHEM_TYPE": "VECTORS",
+        "CENTER": f"'{center}'",
+        "TLIST_TYPE": "JD",
+        "TLIST": f"'{jd}'",
+        "VEC_TABLE": vec_table,
+        "REF_PLANE": "FRAME",
+        "OUT_UNITS": "AU-D",
+        "CSV_FORMAT": "YES",
+    }
+
+
+def _fetch(
+    ctx: Context,
+    key: CacheKey,
+    params: dict[str, str],
+    check: Callable[[bytes], object],
+    *,
+    refresh: bool,
+    on_bad: Callable[[bytes, ValueError], UpstreamError] | None = None,
+) -> Served:
+    """Read-through fetch of one Horizons request. A live answer that ``check`` rejects (a
+    ``ValueError``) is raised as ``UpstreamError`` (or what ``on_bad`` makes of it), so it is
+    never cached."""
+
+    def live() -> LiveResponse:
+        resp = ctx.http.get(ctx.settings.horizons_url, params)
+        try:
+            check(resp.body)
+        except ValueError as exc:
+            raise (on_bad(resp.body, exc) if on_bad else UpstreamError(str(exc))) from exc
+        return resp
+
+    return ctx.cache.fetch(key, live, refresh=refresh)
+
+
+def _nonempty(parser: Callable[[bytes], Sequence[object]]) -> Callable[[bytes], object]:
+    """``parser`` as a check that also refuses an empty ephemeris block."""
+
+    def check(body: bytes) -> object:
+        if not parser(body):
+            raise ValueError("Horizons ephemeris block is empty")
+        return None
+
+    return check
+
+
+def horizons_key(
+    spkid: str, jds: list[str], *, comet: bool = False, center: str = CENTER
+) -> CacheKey:
+    return _tlist_key(spkid, jds, comet=comet, center=center)
 
 
 def parse(body: bytes) -> list[tuple[str, float, float]]:
@@ -115,32 +213,9 @@ def ephemeris(
     # whole list is computed from the apparition before that epoch. Epochs across a later
     # perihelion would still use that record; accepted for the demo's single-epoch use.
     key = horizons_key(spkid, jds, comet=comet, center=center)
-
-    def live() -> LiveResponse:
-        params = {
-            "format": "json",
-            "COMMAND": f"'{command(spkid, comet, min(jds, key=float))}'",
-            "OBJ_DATA": "NO",
-            "MAKE_EPHEM": "YES",
-            "EPHEM_TYPE": "OBSERVER",
-            "CENTER": f"'{center}'",
-            "TLIST_TYPE": "JD",
-            # TLIST read as UT: recorded JD 2461119.856750 is answered as 2026-Mar-20 08:33:43.200
-            "TIME_TYPE": "UT",
-            "TLIST": " ".join(f"'{j}'" for j in jds),
-            "QUANTITIES": "'1'",
-            "ANG_FORMAT": "DEG",
-            "CSV_FORMAT": "YES",
-            "EXTRA_PREC": "YES",
-        }
-        resp = ctx.http.get(ctx.settings.horizons_url, params)
-        try:
-            parse(resp.body)
-        except ValueError as exc:
-            raise UpstreamError(str(exc)) from exc
-        return resp
-
-    served = ctx.cache.fetch(key, live, refresh=refresh)
+    cmd = command(spkid, comet, min(jds, key=float))
+    params = _observer_params(cmd, center, _tlist_times(jds), "1")
+    served = _fetch(ctx, key, params, parse, refresh=refresh)
     return range_points(served.entry.body), served
 
 
@@ -240,81 +315,36 @@ def sun_unit_vector(r: tuple[float, float, float]) -> tuple[tuple[float, float, 
     return (-r[0] / norm, -r[1] / norm, -r[2] / norm), norm
 
 
+PHASE_QUANTITIES = "1,24"
+
+
 def phase_key(spkid: str, jd: str, center: str, comet: bool = False) -> CacheKey:
-    return CacheKey.make(
-        SOURCE, None, command=command(spkid, comet, jd), center=center, tlist=jd, quantities="1,24"
-    )
+    return _tlist_key(spkid, [jd], comet=comet, center=center, quantities=PHASE_QUANTITIES)
 
 
 def vectors_key(spkid: str, jd: str, comet: bool = False) -> CacheKey:
-    return CacheKey.make(
-        SOURCE,
-        None,
-        command=command(spkid, comet, jd),
-        center=SUN_CENTER,
-        tlist=jd,
-        ephem_type="VECTORS",
-    )
+    return _vectors_key(command(spkid, comet, jd), SUN_CENTER, jd)
+
+
+def _bad_phase(body: bytes, exc: ValueError) -> UpstreamError:
+    return NoEphemeris(str(exc)) if _is_no_ephemeris(body) else UpstreamError(str(exc))
 
 
 def _fetch_phase(
     ctx: Context, spkid: str, jd: str, center: str, refresh: bool, comet: bool
 ) -> tuple[float, Served]:
-    def live() -> LiveResponse:
-        params = {
-            "format": "json",
-            "COMMAND": f"'{command(spkid, comet, jd)}'",
-            "OBJ_DATA": "NO",
-            "MAKE_EPHEM": "YES",
-            "EPHEM_TYPE": "OBSERVER",
-            "CENTER": f"'{center}'",
-            "TLIST_TYPE": "JD",
-            "TIME_TYPE": "UT",
-            "TLIST": f"'{jd}'",
-            "QUANTITIES": "'1,24'",
-            "ANG_FORMAT": "DEG",
-            "CSV_FORMAT": "YES",
-            "EXTRA_PREC": "YES",
-        }
-        resp = ctx.http.get(ctx.settings.horizons_url, params)
-        try:
-            parse_phase_angle(resp.body)
-        except ValueError as exc:
-            if _is_no_ephemeris(resp.body):
-                raise NoEphemeris(str(exc)) from exc
-            raise UpstreamError(str(exc)) from exc
-        return resp
-
-    served = ctx.cache.fetch(phase_key(spkid, jd, center, comet), live, refresh=refresh)
+    cmd = command(spkid, comet, jd)
+    params = _observer_params(cmd, center, _tlist_times([jd]), PHASE_QUANTITIES)
+    key = phase_key(spkid, jd, center, comet)
+    served = _fetch(ctx, key, params, parse_phase_angle, refresh=refresh, on_bad=_bad_phase)
     return parse_phase_angle(served.entry.body), served
 
 
 def _fetch_vectors(
     ctx: Context, spkid: str, jd: str, refresh: bool, comet: bool
 ) -> tuple[tuple[float, float, float], Served]:
-    def live() -> LiveResponse:
-        params = {
-            "format": "json",
-            "COMMAND": f"'{command(spkid, comet, jd)}'",
-            "OBJ_DATA": "NO",
-            "MAKE_EPHEM": "YES",
-            "EPHEM_TYPE": "VECTORS",
-            "CENTER": f"'{SUN_CENTER}'",
-            "TLIST_TYPE": "JD",
-            "TLIST": f"'{jd}'",
-            "VEC_TABLE": "1",
-            "REF_PLANE": "FRAME",  # ICRF equatorial, not the ecliptic default
-            "OUT_UNITS": "AU-D",
-            "CSV_FORMAT": "YES",
-        }
-        resp = ctx.http.get(ctx.settings.horizons_url, params)
-        try:
-            parse_vectors(resp.body)
-        except ValueError as exc:
-            raise UpstreamError(str(exc)) from exc
-        return resp
-
-    served = ctx.cache.fetch(vectors_key(spkid, jd, comet), live, refresh=refresh)
+    params = _vectors_params(command(spkid, comet, jd), SUN_CENTER, jd, "1")
+    served = _fetch(ctx, vectors_key(spkid, jd, comet), params, parse_vectors, refresh=refresh)
     return parse_vectors(served.entry.body), served
 
 
@@ -394,34 +424,15 @@ def ephemeris_range(
     """
     key = range_key(spkid, start, stop, step_min, comet=comet, center=center)
     q = dict(key.query)
-
-    def live() -> LiveResponse:
-        params = {
-            "format": "json",
-            "COMMAND": f"'{q['command']}'",
-            "OBJ_DATA": "NO",
-            "MAKE_EPHEM": "YES",
-            "EPHEM_TYPE": "OBSERVER",
-            "CENTER": f"'{center}'",
-            "START_TIME": f"'{q['start']}'",
-            "STOP_TIME": f"'{q['stop']}'",
-            "STEP_SIZE": f"'{int(step_min)} m'",
-            "TIME_TYPE": "UT",  # START/STOP read as UT, as for TLIST (recorded fixtures)
-            "TIME_DIGITS": "FRACSEC",
-            "QUANTITIES": "'1'",
-            "ANG_FORMAT": "DEG",
-            "CSV_FORMAT": "YES",
-            "EXTRA_PREC": "YES",
-        }
-        resp = ctx.http.get(ctx.settings.horizons_url, params)
-        try:
-            if not parse(resp.body):
-                raise ValueError("Horizons ephemeris block is empty")
-        except ValueError as exc:
-            raise UpstreamError(str(exc)) from exc
-        return resp
-
-    served = ctx.cache.fetch(key, live, refresh=refresh)
+    times = {
+        "START_TIME": f"'{q['start']}'",
+        "STOP_TIME": f"'{q['stop']}'",
+        "STEP_SIZE": f"'{int(step_min)} m'",
+        "TIME_TYPE": "UT",  # START/STOP read as UT, as for TLIST (recorded fixtures)
+        "TIME_DIGITS": "FRACSEC",
+    }
+    params = _observer_params(q["command"], center, times, "1")
+    served = _fetch(ctx, key, params, _nonempty(parse), refresh=refresh)
     rows = parse(served.entry.body)
     points = [EphemPoint(_parse_horizons_time(t), ra, dec) for t, ra, dec in rows]
     return points, served
@@ -450,14 +461,7 @@ class SigmaPoint:
 def sigma_key(
     spkid: str, jds: list[str], *, comet: bool = False, center: str = OBSERVER_SPHEREX
 ) -> CacheKey:
-    return CacheKey.make(
-        SOURCE,
-        None,
-        command=command(spkid, comet, min(jds, key=float, default=None)),
-        center=center,
-        tlist=",".join(jds),
-        quantities=SIGMA_QUANTITIES,
-    )
+    return _tlist_key(spkid, jds, comet=comet, center=center, quantities=SIGMA_QUANTITIES)
 
 
 def _opt_arcsec(text: str) -> float | None:
@@ -495,45 +499,14 @@ def ephemeris_sigma(
     if not jds:
         raise UpstreamError("no epochs requested: Horizons needs at least one time")
     key = sigma_key(spkid, jds, comet=comet, center=center)
-
-    def live() -> LiveResponse:
-        params = {
-            "format": "json",
-            "COMMAND": f"'{command(spkid, comet, min(jds, key=float))}'",
-            "OBJ_DATA": "NO",
-            "MAKE_EPHEM": "YES",
-            "EPHEM_TYPE": "OBSERVER",
-            "CENTER": f"'{center}'",
-            "TLIST_TYPE": "JD",
-            "TIME_TYPE": "UT",
-            "TLIST": " ".join(f"'{j}'" for j in jds),
-            "QUANTITIES": f"'{SIGMA_QUANTITIES}'",
-            "ANG_FORMAT": "DEG",
-            "CSV_FORMAT": "YES",
-            "EXTRA_PREC": "YES",
-        }
-        resp = ctx.http.get(ctx.settings.horizons_url, params)
-        try:
-            if not parse_sigma(resp.body):
-                raise ValueError("Horizons ephemeris block is empty")
-        except ValueError as exc:
-            raise UpstreamError(str(exc)) from exc
-        return resp
-
-    served = ctx.cache.fetch(key, live, refresh=refresh)
+    cmd = command(spkid, comet, min(jds, key=float))
+    params = _observer_params(cmd, center, _tlist_times(jds), SIGMA_QUANTITIES)
+    served = _fetch(ctx, key, params, _nonempty(parse_sigma), refresh=refresh)
     return parse_sigma(served.entry.body), served
 
 
 def velocity_key(jd: str) -> CacheKey:
-    return CacheKey.make(
-        SOURCE,
-        None,
-        command=SPHEREX_COMMAND,
-        center=GEOCENTRE,
-        tlist=jd,
-        ephem_type="VECTORS",
-        vec_table=VELOCITY_TABLE,
-    )
+    return _vectors_key(SPHEREX_COMMAND, GEOCENTRE, jd, vec_table=VELOCITY_TABLE)
 
 
 def parse_velocity(body: bytes) -> tuple[float, float, float]:
@@ -555,28 +528,6 @@ def spherex_velocity(
 ) -> tuple[tuple[float, float, float], Served]:
     """SPHEREx's velocity relative to the geocentre at ``when`` (A17.4 ``w``, before projection)."""
     jd = f"{utc_to_jd(when):.6f}"
-
-    def live() -> LiveResponse:
-        params = {
-            "format": "json",
-            "COMMAND": f"'{SPHEREX_COMMAND}'",
-            "OBJ_DATA": "NO",
-            "MAKE_EPHEM": "YES",
-            "EPHEM_TYPE": "VECTORS",
-            "CENTER": f"'{GEOCENTRE}'",
-            "TLIST_TYPE": "JD",
-            "TLIST": f"'{jd}'",
-            "VEC_TABLE": VELOCITY_TABLE,
-            "REF_PLANE": "FRAME",
-            "OUT_UNITS": "AU-D",
-            "CSV_FORMAT": "YES",
-        }
-        resp = ctx.http.get(ctx.settings.horizons_url, params)
-        try:
-            parse_velocity(resp.body)
-        except ValueError as exc:
-            raise UpstreamError(str(exc)) from exc
-        return resp
-
-    served = ctx.cache.fetch(velocity_key(jd), live, refresh=refresh)
+    params = _vectors_params(SPHEREX_COMMAND, GEOCENTRE, jd, VELOCITY_TABLE)
+    served = _fetch(ctx, velocity_key(jd), params, parse_velocity, refresh=refresh)
     return parse_velocity(served.entry.body), served
