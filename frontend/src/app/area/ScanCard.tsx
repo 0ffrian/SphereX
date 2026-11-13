@@ -22,7 +22,8 @@ import { objectsFromEvents, squaresText } from './scanObjects';
 import { isFinished, scanFailureText, skippedText, useScanStore, type ScanView } from './scanStore';
 import { middleTime } from './trackJobStore';
 
-const flowTitle = (flow: 'known' | 'discovery') => (flow === 'known' ? 'Known objects' : 'Discovery');
+const flowTitle = (flow: 'known' | 'discovery') =>
+  flow === 'known' ? 'Known objects' : 'Discovery';
 const dims = (r: ScanBox) => `${r.width_deg.toFixed(1)}° × ${r.height_deg.toFixed(1)}°`;
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 /** "27 Jun" (UTC); with the year: "2 Jul 2026". */
@@ -38,19 +39,37 @@ export function ScanCard() {
   const bodyRef = useRef<HTMLDivElement>(null);
   const record = view?.kind === 'run' ? view.record : null;
   const done = record !== null && isFinished(record.state);
-  const stateKey = view ? `${view.kind}:${record?.state ?? ''}:${view.kind === 'offer' ? !!view.plan : ''}` : '';
+  const stateKey = view
+    ? `${view.kind}:${record?.state ?? ''}:${view.kind === 'offer' ? !!view.plan : ''}`
+    : '';
   // The card changes under the button just pressed (Start scan, Stop): focus goes to its title.
   useEffect(() => {
     const a = document.activeElement;
     if (a && a !== document.body) return;
-    bodyRef.current?.closest('section')?.querySelector<HTMLElement>('h2')?.focus({ preventScroll: true });
+    bodyRef.current
+      ?.closest('section')
+      ?.querySelector<HTMLElement>('h2')
+      ?.focus({ preventScroll: true });
   }, [stateKey]);
   if (!view) return null;
-  const release = record ? releaseName(record.release) : view.kind === 'offer' && view.plan ? releaseName(view.plan.release) : '';
+  const release = record
+    ? releaseName(record.release)
+    : view.kind === 'offer' && view.plan
+      ? releaseName(view.plan.release)
+      : '';
   const region = view.kind === 'run' ? (record?.region ?? view.region) : view.region;
   const subtitle =
     view.kind === 'run' && !done
-      ? [record?.state === 'paused' ? 'Paused' : record?.state === 'queued' ? 'Waiting' : 'Scanning', release].filter(Boolean).join(' · ')
+      ? [
+          record?.state === 'paused'
+            ? 'Paused'
+            : record?.state === 'queued'
+              ? 'Waiting'
+              : 'Scanning',
+          release,
+        ]
+          .filter(Boolean)
+          .join(' · ')
       : `Scan · ${dims(region)}`;
   const running = view.kind === 'run' && !done;
   const close = () => {
@@ -64,7 +83,9 @@ export function ScanCard() {
       subtitle={subtitle}
       onClose={close}
       onMinimise={() => useAreaStore.getState().setMinimised(true)}
-      returnFocusTo={view.flow === 'known' ? '[data-testid="tool-known"]' : '[data-testid="tool-area"]'}
+      returnFocusTo={
+        view.flow === 'known' ? '[data-testid="tool-known"]' : '[data-testid="tool-area"]'
+      }
       testId="area-card"
     >
       <div
@@ -96,7 +117,9 @@ function Offer({ view }: { view: Extract<ScanView, { kind: 'offer' }> }) {
   const stored = plan?.squares.filter((s) => s.area_id !== null).length ?? 0;
   return (
     <>
-      <p className="sx-live-p">The {n} squares on screen are analysed one after another, left to right.</p>
+      <p className="sx-live-p">
+        The {n} squares on screen are analysed one after another, left to right.
+      </p>
       <dl className="sx-live-facts" data-testid="scan-facts">
         <dt>Data</dt>
         <dd>{plan ? releaseName(plan.release) : 'Checking…'}</dd>
@@ -109,7 +132,9 @@ function Offer({ view }: { view: Extract<ScanView, { kind: 'offer' }> }) {
         <dt>Order</dt>
         <dd>left to right, row by row, from the top</dd>
       </dl>
-      <p className="sx-live-m">Each square&rsquo;s result is saved as soon as it finishes. You can keep using the app.</p>
+      <p className="sx-live-m">
+        Each square&rsquo;s result is saved as soon as it finishes. You can keep using the app.
+      </p>
       <div className="sx-live-btns">
         <button
           type="button"
@@ -120,7 +145,12 @@ function Offer({ view }: { view: Extract<ScanView, { kind: 'offer' }> }) {
         >
           Start scan
         </button>
-        <button type="button" className="sx-btn-outline" onClick={() => selectAgain(view.flow)} data-testid="scan-select-again">
+        <button
+          type="button"
+          className="sx-btn-outline"
+          onClick={() => selectAgain(view.flow)}
+          data-testid="scan-select-again"
+        >
           Select again
         </button>
       </div>
@@ -134,7 +164,12 @@ function Failed({ view }: { view: Extract<ScanView, { kind: 'failed' }> }) {
     <>
       <Alert title={t.title} line={t.line} testId="scan-failed" code={view.code} />
       <div className="sx-live-btns">
-        <button type="button" className="sx-btn-outline" onClick={() => selectAgain(view.flow)} data-testid="scan-select-again">
+        <button
+          type="button"
+          className="sx-btn-outline"
+          onClick={() => selectAgain(view.flow)}
+          data-testid="scan-select-again"
+        >
           Select again
         </button>
       </div>
@@ -154,7 +189,13 @@ function MiniGrid({ record, flowCols }: { record: RunRecord; flowCols: number })
   const label = `Squares: ${c.done} done, ${c.skipped} skipped, ${c.running} analysing, ${c.todo} to do`;
   const flow = record.kind;
   return (
-    <div className="sx-scan-mini" role="group" aria-label={label} style={{ gridTemplateColumns: `repeat(${flowCols}, 1fr)` }} data-testid="scan-mini">
+    <div
+      className="sx-scan-mini"
+      role="group"
+      aria-label={label}
+      style={{ gridTemplateColumns: `repeat(${flowCols}, 1fr)` }}
+      data-testid="scan-mini"
+    >
       {record.squares.map((s) =>
         s.state === 'done' ? (
           <button
@@ -164,7 +205,9 @@ function MiniGrid({ record, flowCols }: { record: RunRecord; flowCols: number })
             aria-label={`Square ${s.index}, done. Open its results`}
             onClick={() => {
               const { a, b } = boxOf(s.box);
-              useAreaStore.getState().openSquare({ a, b, widthDeg: s.box.width_deg, heightDeg: s.box.height_deg }, flow);
+              useAreaStore
+                .getState()
+                .openSquare({ a, b, widthDeg: s.box.width_deg, heightDeg: s.box.height_deg }, flow);
             }}
           />
         ) : (
@@ -206,7 +249,10 @@ function Totals({ record }: { record: RunRecord }) {
 /** Predicted-only known objects are hidden on the sky by default; this shows them. */
 function PredictedToggle({ record }: { record: RunRecord }) {
   const on = useScanStore((s) => s.showPredicted);
-  const n = useMemo(() => objectsFromEvents(record.events).filter((o) => o.kind === 'predicted').length, [record.events]);
+  const n = useMemo(
+    () => objectsFromEvents(record.events).filter((o) => o.kind === 'predicted').length,
+    [record.events],
+  );
   if (n === 0) return null;
   return (
     <button
@@ -228,27 +274,50 @@ function Skipped({ record }: { record: RunRecord }) {
     <>
       {off.map((s) => {
         const t = skippedText(s.index, s.error?.code, s.state === 'failed');
-        return <Alert key={s.index} title={t.title} line={t.line} testId="scan-skipped" code={s.error?.code} />;
+        return (
+          <Alert
+            key={s.index}
+            title={t.title}
+            line={t.line}
+            testId="scan-skipped"
+            code={s.error?.code}
+          />
+        );
       })}
     </>
   );
 }
 
-function Scanning({ view, record }: { view: Extract<ScanView, { kind: 'run' }>; record: RunRecord | null }) {
+function Scanning({
+  view,
+  record,
+}: {
+  view: Extract<ScanView, { kind: 'run' }>;
+  record: RunRecord | null;
+}) {
   const busy = useScanStore((s) => s.busy);
   if (!record) return <p className="sx-live-m">Reading the scan…</p>;
   const n = record.squares.length;
   const cur = record.squares.find((s) => s.state === 'running');
   const step = view.square?.steps.find((s) => s.state === 'running');
-  const left = record.squares.filter((s) => s.state === 'todo').length * SQUARE_ESTIMATE_S + (cur ? (view.square?.eta_s ?? SQUARE_ESTIMATE_S / 2) : 0);
-  const lastDone = Math.max(0, ...record.squares.filter((s) => s.state !== 'todo' && s.state !== 'running').map((s) => s.index));
+  const left =
+    record.squares.filter((s) => s.state === 'todo').length * SQUARE_ESTIMATE_S +
+    (cur ? (view.square?.eta_s ?? SQUARE_ESTIMATE_S / 2) : 0);
+  const lastDone = Math.max(
+    0,
+    ...record.squares
+      .filter((s) => s.state !== 'todo' && s.state !== 'running')
+      .map((s) => s.index),
+  );
   const where =
     record.state === 'queued'
       ? `Waiting · square 1 of ${n} starts next`
       : record.state === 'paused'
         ? `Paused after square ${lastDone} of ${n}`
         : cur
-          ? [`Square ${cur.index} of ${n}`, step ? `${step.label} ${stepCount(step)}`.trim() : null].filter(Boolean).join(' · ')
+          ? [`Square ${cur.index} of ${n}`, step ? `${step.label} ${stepCount(step)}`.trim() : null]
+              .filter(Boolean)
+              .join(' · ')
           : `Square ${Math.min(n, lastDone + 1)} of ${n}`;
   const cols = splitCount(record.region.width_deg);
   return (
@@ -260,11 +329,24 @@ function Scanning({ view, record }: { view: Extract<ScanView, { kind: 'run' }>; 
       </div>
       <Totals record={record} />
       <Skipped record={record} />
-      {view.stale && <Alert tone="warn" title="Lost touch with the scan" line="Trying again." testId="scan-stale" />}
+      {view.stale && (
+        <Alert
+          tone="warn"
+          title="Lost touch with the scan"
+          line="Trying again."
+          testId="scan-stale"
+        />
+      )}
       <PredictedToggle record={record} />
       <div className="sx-live-btns">
         {record.state === 'paused' ? (
-          <button type="button" className="sx-btn-outline" disabled={busy} onClick={() => void useScanStore.getState().resume()} data-testid="scan-resume">
+          <button
+            type="button"
+            className="sx-btn-outline"
+            disabled={busy}
+            onClick={() => void useScanStore.getState().resume()}
+            data-testid="scan-resume"
+          >
             Resume
           </button>
         ) : (
@@ -289,7 +371,12 @@ function Scanning({ view, record }: { view: Extract<ScanView, { kind: 'run' }>; 
         >
           Stop
         </button>
-        <button type="button" className="sx-btn-outline" onClick={() => useAreaStore.getState().setMinimised(true)} data-testid="scan-minimise">
+        <button
+          type="button"
+          className="sx-btn-outline"
+          onClick={() => useAreaStore.getState().setMinimised(true)}
+          data-testid="scan-minimise"
+        >
           Minimise
         </button>
       </div>
@@ -308,7 +395,8 @@ interface Row {
   track: RunTrackRow | null;
 }
 
-const whereOf = (squares: number[], dates: string[]) => [squaresText(squares), dates[0] ? dayOf(dates[0]) : ''].filter(Boolean).join(' · ');
+const whereOf = (squares: number[], dates: string[]) =>
+  [squaresText(squares), dates[0] ? dayOf(dates[0]) : ''].filter(Boolean).join(' · ');
 const vOf = (v: number | null) => (v === null ? null : `V ${v.toFixed(1)}`);
 
 function knownRow(k: RunKnownRow, how: string): Row {
@@ -326,17 +414,30 @@ function knownRow(k: RunKnownRow, how: string): Row {
 /** The rows of a filter, from the merged results (#156). Pure, so the card is tested by its rows. */
 export function scanRows(res: RunResults, f: Filter): Row[] {
   const byName = new Map(res.known.map((k) => [k.designation, k]));
-  if (f === 'known') return res.known.map((k) => knownRow(k, k.detected ? 'detected' : 'predicted'));
-  const tracks = res.tracks.filter((t) => (f === 'found' ? t.verdict === 'found_blind' || t.verdict === 'unexplained' : t.verdict === 'possible' || t.verdict === 'unchecked'));
+  if (f === 'known')
+    return res.known.map((k) => knownRow(k, k.detected ? 'detected' : 'predicted'));
+  const tracks = res.tracks.filter((t) =>
+    f === 'found'
+      ? t.verdict === 'found_blind' || t.verdict === 'unexplained'
+      : t.verdict === 'possible' || t.verdict === 'unchecked',
+  );
   return tracks.map((t) => {
     const k = t.designation ? byName.get(t.designation) : undefined;
-    if (k) return { ...knownRow(k, 'detected'), key: `t:${t.track_id}:${t.area_id}`, where: whereOf(t.squares, t.dates), track: t };
+    if (k)
+      return {
+        ...knownRow(k, 'detected'),
+        key: `t:${t.track_id}:${t.area_id}`,
+        where: whereOf(t.squares, t.dates),
+        track: t,
+      };
     const rate = t.rate_deg_day !== null ? `${t.rate_deg_day.toFixed(2)}°/day` : null;
     return {
       key: `t:${t.track_id}:${t.area_id}`,
       num: t.track_id,
       name: t.verdict === 'unexplained' ? 'Unexplained track' : 'Possible track',
-      line: [rate, t.verdict === 'unexplained' ? 'not in SkyBoT' : null].filter(Boolean).join(' · '),
+      line: [rate, t.verdict === 'unexplained' ? 'not in SkyBoT' : null]
+        .filter(Boolean)
+        .join(' · '),
       where: whereOf(t.squares, t.dates),
       known: null,
       track: t,
@@ -355,14 +456,18 @@ function asKnownObject(k: RunKnownRow): KnownObject {
     objectId: k.object_id,
     trackAvailable: k.track_available,
     vMag: k.v_mag,
-    positions: k.positions.map((p) => ({ time: p.time, ra: p.ra, dec: p.dec })) as KnownObject['positions'],
+    positions: k.positions.map((p) => ({
+      time: p.time,
+      ra: p.ra,
+      dec: p.dec,
+    })) as KnownObject['positions'],
   };
 }
 
 function ResultRow({ row, release }: { row: Row; release: string }) {
   const k = row.known;
   const o = k ? asKnownObject(k) : null;
-  const around = k ? middleTime(k.positions.map((p) => p.time)) ?? (k.dates[0] ?? null) : null;
+  const around = k ? (middleTime(k.positions.map((p) => p.time)) ?? k.dates[0] ?? null) : null;
   const track = o
     ? o.trackAvailable
       ? () => useAreaStore.getState().openEros(o)
@@ -377,7 +482,11 @@ function ResultRow({ row, release }: { row: Row; release: string }) {
       ? () => buildPlaceholder(row.track!.area_id, row.track!, row.track!.track_id)
       : null;
   return (
-    <div className="sx-kr sx-scan-row" data-testid="scan-row" data-object={k?.designation ?? row.track?.track_id}>
+    <div
+      className="sx-kr sx-scan-row"
+      data-testid="scan-row"
+      data-object={k?.designation ?? row.track?.track_id}
+    >
       <b className="sx-kr-num">{row.num}</b>
       <span className="sx-kr-nm">
         <span>{row.name}</span>
@@ -397,7 +506,14 @@ function ResultRow({ row, release }: { row: Row; release: string }) {
           <RouteIcon />
           Track it
         </button>
-        <button type="button" className="sx-btn-outline sx-btn-sm" disabled={!build} onClick={build ?? undefined} aria-label={`Build it: ${label}`} data-testid="scan-build">
+        <button
+          type="button"
+          className="sx-btn-outline sx-btn-sm"
+          disabled={!build}
+          onClick={build ?? undefined}
+          aria-label={`Build it: ${label}`}
+          data-testid="scan-build"
+        >
           <BoxIcon />
           Build it
         </button>
@@ -416,13 +532,22 @@ function Done({ record, results }: { record: RunRecord; results: RunResults | nu
   const n = record.squares.length;
   const doneN = record.totals.squares_done;
   const release = releaseName(record.release);
-  const how = record.state === 'done' ? 'Computed live' : record.state === 'stopped' ? 'Stopped' : 'Failed';
+  const how =
+    record.state === 'done' ? 'Computed live' : record.state === 'stopped' ? 'Stopped' : 'Failed';
   const off = record.squares.filter((s) => s.state === 'skipped' || s.state === 'failed');
-  const counts = results ? { found: scanRows(results, 'found').length, known: results.known.length, possible: scanRows(results, 'possible').length } : null;
+  const counts = results
+    ? {
+        found: scanRows(results, 'found').length,
+        known: results.known.length,
+        possible: scanRows(results, 'possible').length,
+      }
+    : null;
   const rows = results ? scanRows(results, filter) : [];
   const download = () => {
     if (!results) return;
-    const url = URL.createObjectURL(new Blob([scanEcsv(results, record.region)], { type: 'text/plain' }));
+    const url = URL.createObjectURL(
+      new Blob([scanEcsv(results, record.region)], { type: 'text/plain' }),
+    );
     const a = document.createElement('a');
     a.href = url;
     a.download = `${record.run_id}.ecsv`;
@@ -437,12 +562,14 @@ function Done({ record, results }: { record: RunRecord; results: RunResults | nu
         </span>
         {results?.visits && (
           <span>
-            Visits {dayOf(results.visits.start)} to {dayOf(results.visits.end, true)}, each square its own pair · {results.n_frames} frames
+            Visits {dayOf(results.visits.start)} to {dayOf(results.visits.end, true)}, each square
+            its own pair · {results.n_frames} frames
           </span>
         )}
         {off.map((s) => (
           <span key={s.index}>
-            Square {s.index} {s.state === 'failed' ? 'failed' : 'skipped'}: {skippedShort(s.error?.code)}
+            Square {s.index} {s.state === 'failed' ? 'failed' : 'skipped'}:{' '}
+            {skippedShort(s.error?.code)}
           </span>
         ))}
       </div>
@@ -450,7 +577,13 @@ function Done({ record, results }: { record: RunRecord; results: RunResults | nu
       {counts ? (
         <div className="sx-seg" role="group" aria-label="Show" data-testid="scan-filter">
           {(['found', 'known', 'possible'] as const).map((f) => (
-            <button key={f} type="button" aria-pressed={filter === f} onClick={() => setFilter(f)} data-testid={`scan-filter-${f}`}>
+            <button
+              key={f}
+              type="button"
+              aria-pressed={filter === f}
+              onClick={() => setFilter(f)}
+              data-testid={`scan-filter-${f}`}
+            >
               {f === 'found' ? 'Found' : f === 'known' ? 'Known' : 'Possible'} {counts[f]}
             </button>
           ))}
@@ -460,16 +593,36 @@ function Done({ record, results }: { record: RunRecord; results: RunResults | nu
       )}
       {results && (
         <div className="sx-scan-rows" data-testid="scan-rows">
-          {rows.length === 0 ? <p className="sx-live-m">None in this scan.</p> : rows.map((r) => <ResultRow key={r.key} row={r} release={record.release} />)}
+          {rows.length === 0 ? (
+            <p className="sx-live-m">None in this scan.</p>
+          ) : (
+            rows.map((r) => <ResultRow key={r.key} row={r} release={record.release} />)
+          )}
         </div>
       )}
       <PredictedToggle record={record} />
-      <Alert tone="warn" title="Detection rates not measured yet" line="Treat possible tracks as leads." testId="scan-rates" />
+      <Alert
+        tone="warn"
+        title="Detection rates not measured yet"
+        line="Treat possible tracks as leads."
+        testId="scan-rates"
+      />
       <div className="sx-live-btns">
-        <button type="button" className="sx-btn-outline" disabled={!results} onClick={download} data-testid="scan-export">
+        <button
+          type="button"
+          className="sx-btn-outline"
+          disabled={!results}
+          onClick={download}
+          data-testid="scan-export"
+        >
           Export ECSV
         </button>
-        <button type="button" className="sx-btn-outline" onClick={() => selectAgain(record.kind)} data-testid="scan-again">
+        <button
+          type="button"
+          className="sx-btn-outline"
+          onClick={() => selectAgain(record.kind)}
+          data-testid="scan-again"
+        >
           Scan again
         </button>
       </div>

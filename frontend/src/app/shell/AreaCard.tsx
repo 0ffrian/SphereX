@@ -97,8 +97,14 @@ export function AreaCard() {
   useFitSquare();
   useReportAreaBox();
 
-  // Leaving the tool (close, Escape, another tool) drops drawing mode.
-  useEffect(() => () => useAreaStore.getState().reset(), []);
+  // Leaving the tool (close, Escape, another tool) drops drawing mode. A scan's card is kept: the
+  // scan runs on, and its dock button or a page reload brings the card back (issue #157).
+  useEffect(
+    () => () => {
+      if (useAreaStore.getState().screen !== 'scan') useAreaStore.getState().reset();
+    },
+    [],
+  );
   // Escape cancels from anywhere (the card handles it itself when focus is inside it).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

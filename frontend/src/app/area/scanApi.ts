@@ -415,7 +415,7 @@ export function mockObjectsOf(region: ScanBox, index: number): FoundObject[] {
   const s = g.squares[index - 1];
   if (!s) return [];
   const at = (u: number, v: number) => squareCentre(s, u, v);
-  const times = ['2026-06-27T03:10:00Z', '2026-06-27T04:40:00Z', '2026-06-27T06:10:00Z'];
+  const times = ['2026-06-27T03:10:00Z', '2026-06-28T03:10:00Z', '2026-06-29T03:10:00Z'];
   const path = (u0: number, v0: number, du: number, dv: number): RunPosition[] =>
     times.map((time, k) => ({ ...at(u0 + du * k, v0 + dv * k), time }));
   const names = [
@@ -440,7 +440,7 @@ export function mockObjectsOf(region: ScanBox, index: number): FoundObject[] {
   } else {
     out.push({
       kind: 'known',
-      designation: names[index % names.length]!,
+      designation: index <= names.length ? names[index - 1]! : `2026 AB${index}`,
       square: index,
       positions: path(0.2, 0.25, 0.15, 0.1),
       v_mag: 17 + (index % 5) * 0.4,
@@ -698,6 +698,8 @@ export function mockResultsOf(rec: RunRecord): RunResults {
     if (o.designation) {
       const prev = known.get(o.designation);
       if (prev) {
+        const t = tracks.find((x) => x.designation === o.designation);
+        if (t && !t.squares.includes(o.square)) t.squares.push(o.square);
         prev.squares.push(o.square);
         if (!prev.dates.includes(date)) prev.dates.push(date);
         prev.positions.push(...o.positions);
@@ -718,6 +720,18 @@ export function mockResultsOf(rec: RunRecord): RunResults {
         dates: [date],
         positions: [...o.positions],
       });
+      // A known object found in the frames is also a Discovery track matched to it (found blind).
+      if (o.kind === 'known')
+        tracks.push({
+          track_id: `T${o.square}a`,
+          verdict: 'found_blind',
+          designation: o.designation,
+          rate_deg_day: 0.3,
+          squares: [o.square],
+          dates: [date],
+          area_id: e.area_id ?? '',
+          positions: o.positions,
+        });
     } else if (o.track_id) {
       tracks.push({
         track_id: o.track_id,
