@@ -11,7 +11,11 @@ import {
   type SkyCamera,
 } from '@/viewer/sky/skyMath';
 import { useAreaStore, type AreaBox, type AreaDrag } from '@/app/shell/areaStore';
-import { AIM_HEIGHT_DEG, clampCentred, clampDrag } from '@/app/area/aim';
+import { clampCentred, clampDrag } from '@/app/area/aim';
+import { regionBox, selectionAt, type Selection } from '@/app/area/scanGrid';
+import { isFinished, runningScan, useScanStore, viewRegion } from '@/app/area/scanStore';
+import { getScanApi, RunGone } from '@/app/area/scanApi';
+import { useShellStore } from '@/app/shell/shellStore';
 
 export interface AreaViewAccess {
   getView(): SkyCamera;
@@ -76,28 +80,95 @@ export function centreRect(): AreaBox | null {
   return boxFromPixels(clampCentred(width / 2, height / 2, m * 0.3, m * 0.18, measurePixels));
 }
 
-/** Aim (issue #144): the view after a click at (x, y): north up, AIM_HEIGHT_DEG tall, centred there. */
-export function aimViewAt(x: number, y: number): SkyCamera | null {
+/** The selection rectangle at (x, y) now (issue #157, state 1), or null with no view. */
+export function selectionNow(x: number, y: number): Selection | null {
   if (!access) return null;
   const { width, height } = access.getSize();
-  const p = screenToRaDec(access.getView(), x, y, width, height, { ra: 0, dec: 0 });
-  return { ra: p.ra, dec: p.dec, fovDeg: clampFov(AIM_HEIGHT_DEG) };
+  return selectionAt(access.getView(), x, y, width, height);
 }
 
 /**
- * Enter in the area tools (the keyboard way to draw): while aiming at a view much wider than the
- * next one, it zooms to the middle as a click there would; otherwise it sets a centred box of at
- * most 2° a side, so a box is never a few pixels on a wide sky.
+ * Select a region (issue #157; mock-up states 1 and 2): the sky zooms north up so the region fills
+ * the screen. A region of one square is a single area (the cards of #144 and #145); a larger one
+ * is gridded and offered for a scan (scanStore).
+ */
+export function pickRegionAt(x: number, y: number): void {
+  // One scan at a time (one worker, #156): while one is going, its card comes back instead.
+  const going = runningScan(useScanStore.getState().view);
+  if (going) {
+    reopenScan(going.flow);
+    return;
+  }
+  const sel = selectionNow(x, y);
+  if (!sel) return;
+  const s = useAreaStore.getState();
+  flyToView(sel.target, reducedMotion());
+  const box = regionBox(sel.region);
+  if (sel.cols * sel.rows === 1) {
+    s.setBox(box);
+    return;
+  }
+  s.openScan(s.flow, box);
+  void useScanStore.getState().plan(s.flow, sel.region);
+}
+
+/**
+ * The dock button of a tool with a scan still held (running, or finished and not closed): the
+ * scan card comes back and the sky flies to its region. False when there is none.
+ */
+export function reopenScan(flow: 'known' | 'discovery'): boolean {
+  const v = useScanStore.getState().view;
+  const region = viewRegion(v);
+  if (!v || v.kind !== 'run' || !region) return false;
+  // A finished scan comes back from its own tool only; one still going, from either tool.
+  if (v.flow !== flow && !runningScan(v)) return false;
+  useAreaStore.getState().openScan(v.flow, regionBox(region));
+  flyToView({ ra: region.ra, dec: region.dec, fovDeg: clampFov(region.height_deg) }, reducedMotion());
+  return true;
+}
+
+/** Back to the scan card from an object or square opened in it: the card, and the sky on its region. */
+export function backToScan(): void {
+  const v = useScanStore.getState().view;
+  if (!v || !reopenScan(v.flow)) useAreaStore.getState().backToScan();
+}
+
+/**
+ * A scan saved in this browser (a page reload mid-scan): follow it again, and when it is still
+ * going and the user is on the plain sky, open its tool and fly to its region. Its squares redraw
+ * from GET /v1/runs/{id}. A finished one is only followed: its dock button brings it back.
+ */
+export function restoreSavedScan(): void {
+  const s = useScanStore.getState();
+  const saved = s.saved();
+  if (!saved || s.view) return;
+  // A run the server no longer has, or one that cannot be read now, is not brought back.
+  void getScanApi()
+    .run(saved.runId)
+    .then(
+      (record) => {
+        if (useScanStore.getState().view) return;
+        useScanStore.getState().follow(saved.runId, saved.flow, record.region, record);
+        if (isFinished(record.state) || useShellStore.getState().tool !== 'sky') return;
+        useShellStore.getState().setTool('area');
+        reopenScan(saved.flow);
+      },
+      (e: unknown) => {
+        if (e instanceof RunGone) useScanStore.getState().clear();
+      },
+    );
+}
+
+/**
+ * Enter in the area tools (the keyboard way to select): while selecting, the region in the middle
+ * of the screen, as a click there would; in the #144 draw step, a centred box of at most 2° a side.
  */
 export function enterInArea(): void {
   if (!access) return;
   const s = useAreaStore.getState();
-  if (s.stage === 'aiming' && access.getView().fovDeg > 2 * AIM_HEIGHT_DEG) {
+  if (s.stage === 'aiming') {
     const { width, height } = access.getSize();
-    const to = aimViewAt(width / 2, height / 2);
-    if (!to) return;
-    s.pickPatch();
-    flyToView(to, reducedMotion());
+    pickRegionAt(width / 2, height / 2);
     return;
   }
   const b = centreRect();
