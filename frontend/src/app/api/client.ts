@@ -19,6 +19,7 @@ import type {
   AreaTracks,
   ObjectCard,
   RenderParams,
+  TrackPath,
 } from '@/contract';
 import type {
   CombineInfo,
@@ -38,6 +39,7 @@ import {
   parseAreaKnown,
   parseAreaSummary,
   parseAreaTracks,
+  parseTrackPath,
   parseCombineInfo,
   parseComposite,
   parseFrames,
@@ -100,6 +102,8 @@ export interface ApiClient {
   areaTracks(id: string, signal?: AbortSignal): Promise<ApiResult<AreaTracks>>;
   /** `GET /v1/areas/{area_id}/known` (P9's Known card). */
   areaKnown(id: string, signal?: AbortSignal): Promise<ApiResult<AreaKnown>>;
+  /** `GET /v1/objects/{id}/path` (A19.5, issue #130): the Horizons path seen from SPHEREx. */
+  path(id: string, signal?: AbortSignal): Promise<ApiResult<TrackPath>>;
 }
 
 export interface ApiClientOptions {
@@ -251,6 +255,7 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
     areaDots: (id, signal) => getJson(`${areaPath(id)}/dots`, parseAreaDots, signal),
     areaTracks: (id, signal) => getJson(`${areaPath(id)}/tracks`, parseAreaTracks, signal),
     areaKnown: (id, signal) => getJson(`${areaPath(id)}/known`, parseAreaKnown, signal),
+    path: (id, signal) => getJson(`${objectPath(id)}/path`, parseTrackPath, signal),
     getCombine: (id, op, a, b, signal) => {
       const query = new URLSearchParams({ op, a, b }).toString();
       return request(

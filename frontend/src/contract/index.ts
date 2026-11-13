@@ -69,6 +69,10 @@ export type {
   AreaTag,
   AreaRaDec,
   AreaError,
+  TrackPath,
+  TrackPathPoint,
+  TrackPathFramePoint,
+  TrackPathWindow,
 } from './generated';
 export { AREA_DOT_LABELS, AREA_VERDICTS, AREA_SED_LABELS, AREA_LINKERS } from './generated';
 /** D-23: IRMode uses the same shape as VisibleMode; `channels_um` is set on IRMode only. */

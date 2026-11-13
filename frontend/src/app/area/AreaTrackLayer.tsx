@@ -2,14 +2,16 @@
 // view, drawn only inside the square. It repaints with the view (the square follows the sky), when
 // the area state changes and while the marker glides to the time of the shown exposure.
 // A prepared area's answer (Q-205) is drawn at its dots' and tracks' own RA/Dec instead, through
-// sky/area/drawLayer.ts (one gnomonic geometry); the demo, at its image pixels. See areaService.ts.
+// sky/area/drawLayer.ts (one gnomonic geometry); the demo, at its image pixels. The sky image under
+// the Eros card's path is a demo extraction; in the Known flow the path itself is the real Horizons
+// path (issue #130). See areaService.ts.
 import { useEffect, useRef } from 'react';
 import { useAppStore } from '@/state/store';
 import { effectiveHonesty } from '@/viewer/honesty';
 import { drawArea } from '@/app/sky/area/drawLayer';
 import { prepareScene, type AreaScene } from '@/app/sky/area/scene';
 import type { RealDiscovery } from './realArea';
-import { DemoTag } from './DemoTag';
+import { DEMO_CUTOUT_NOTE, DemoTag } from './DemoTag';
 import type { SkyView } from '@/viewer/sky/SkyView';
 import { currentHop, useAreaStore } from '@/app/shell/areaStore';
 import { boxToPixels } from '@/app/sky/areaDraw';
@@ -18,11 +20,14 @@ import { drawTrackWindow } from './erosDraw';
 export function AreaTrackLayer({ view }: { view: SkyView | null }) {
   const ref = useRef<HTMLCanvasElement>(null);
   // The canvas draws demo data (Eros's real frames, made-up dots): it wears the tag too (Q-414).
+  const real = useAreaStore((s) => s.trackSource === 'real');
   const demoOn = useAreaStore(
     (s) =>
       (s.screen === 'eros' || s.screen === 'disc' || s.screen === 'mover') &&
       !!s.box &&
       !!s.eros &&
+      // An object with no demo sky image draws nothing here, so no tag either.
+      s.eros.wide.w > 0 &&
       !s.refusal &&
       !s.disc?.real,
   );
@@ -83,11 +88,21 @@ export function AreaTrackLayer({ view }: { view: SkyView | null }) {
       const hop = currentHop(s);
       const target = hop ? hop.mjd_avg : (s.eros.hops[0]?.mjd_avg ?? 0);
       if (now === null) now = target;
+      // Every path here is Horizons (the real `/path` or the demo file's): Estimated (model_dependent),
+      // so "Measured only" hides it (D-21, R5.3, A18.2).
+      const hidePath = effectiveHonesty(useAppStore.getState().honesty) === 'measured';
       drawTrackWindow(
         g,
         rect,
-        s.eros,
-        { mode: s.flow === 'known' ? 'eros' : 'disc', now, step: s.step, sel: s.screen === 'mover' ? s.sel : -1, disc: s.disc },
+        hidePath ? { ...s.eros, track: [] } : s.eros,
+        {
+          mode: s.flow === 'known' ? 'eros' : 'disc',
+          now,
+          step: s.step,
+          sel: s.screen === 'mover' ? s.sel : -1,
+          disc: s.disc,
+          name: s.focus?.name || s.focus?.id || 'Eros',
+        },
         () => paint(),
       );
     };
@@ -129,7 +144,10 @@ export function AreaTrackLayer({ view }: { view: SkyView | null }) {
       <canvas ref={ref} className="sx-area-track" aria-hidden="true" data-testid="area-track" />
       {demoOn && (
         <span className="sx-area-track-tag" data-testid="area-track-demo">
-          <DemoTag testId="area-track-demo-tag" />
+          <DemoTag
+            testId="area-track-demo-tag"
+            {...(real ? { label: 'Demo image', note: DEMO_CUTOUT_NOTE } : {})}
+          />
         </span>
       )}
     </>
