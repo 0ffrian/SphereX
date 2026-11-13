@@ -1,8 +1,14 @@
 // The #track window inside the drawn square (mock-up `knDraw` / `discDraw`): one canvas over the sky
 // view, drawn only inside the square. It repaints with the view (the square follows the sky), when
 // the area state changes and while the marker glides to the time of the shown exposure.
-// Demo data: see areaService.ts.
+// A prepared area's answer (Q-205) is drawn at its dots' and tracks' own RA/Dec instead, through
+// sky/area/drawLayer.ts (one gnomonic geometry); the demo, at its image pixels. See areaService.ts.
 import { useEffect, useRef } from 'react';
+import { useAppStore } from '@/state/store';
+import { effectiveHonesty } from '@/viewer/honesty';
+import { drawArea } from '@/app/sky/area/drawLayer';
+import { prepareScene, type AreaScene } from '@/app/sky/area/scene';
+import type { RealDiscovery } from './realArea';
 import { DemoTag } from './DemoTag';
 import type { SkyView } from '@/viewer/sky/SkyView';
 import { currentHop, useAreaStore } from '@/app/shell/areaStore';
@@ -13,7 +19,12 @@ export function AreaTrackLayer({ view }: { view: SkyView | null }) {
   const ref = useRef<HTMLCanvasElement>(null);
   // The canvas draws demo data (Eros's real frames, made-up dots): it wears the tag too (Q-414).
   const demoOn = useAreaStore(
-    (s) => (s.screen === 'eros' || s.screen === 'disc' || s.screen === 'mover') && !!s.box && !!s.eros && !s.refusal,
+    (s) =>
+      (s.screen === 'eros' || s.screen === 'disc' || s.screen === 'mover') &&
+      !!s.box &&
+      !!s.eros &&
+      !s.refusal &&
+      !s.disc?.real,
   );
 
   useEffect(() => {
@@ -23,6 +34,9 @@ export function AreaTrackLayer({ view }: { view: SkyView | null }) {
     let now: number | null = null;
     let raf = 0;
     let last = 0;
+    // The scene of a prepared area, built once per answer (no allocation per frame).
+    let sceneOf: RealDiscovery | null = null;
+    let scene: AreaScene | null = null;
 
     const paint = () => {
       const s = useAreaStore.getState();
@@ -39,6 +53,30 @@ export function AreaTrackLayer({ view }: { view: SkyView | null }) {
       g.setTransform(dpr, 0, 0, dpr, 0, 0);
       g.clearRect(0, 0, width, height);
       const on = s.screen === 'eros' || s.screen === 'disc' || s.screen === 'mover';
+      const real = s.disc?.real ?? null;
+      if (on && s.box && real && !s.refusal && (s.screen === 'disc' || s.screen === 'mover')) {
+        if (sceneOf !== real) {
+          sceneOf = real;
+          scene = real.dots ? prepareScene(real.summary, real.dots, real.tracks) : null;
+        }
+        const visit = s.visit ?? scene?.visits[0]?.visit ?? 0;
+        drawArea(g, {
+          scene,
+          visit,
+          // The card's step is the last one done (-1 before the first); the layer counts steps done.
+          step: s.step + 1,
+          layers: { dots: !!real.dots, tracks: !!real.tracks },
+          measured: effectiveHonesty(useAppStore.getState().honesty) === 'measured',
+          selected: s.screen === 'mover' ? (s.disc?.movers[s.sel]?.id ?? null) : null,
+          outline: null,
+          draft: null,
+          cam: view.getView(),
+          width,
+          height,
+          safe: { x: 0, y: 0, w: width, h: height },
+        });
+        return;
+      }
       if (!on || !s.box || !s.eros || s.refusal) return;
       const rect = boxToPixels(s.box);
       if (!rect) return;
@@ -74,10 +112,14 @@ export function AreaTrackLayer({ view }: { view: SkyView | null }) {
 
     paint();
     const offStore = useAreaStore.subscribe(kick);
+    const offHonesty = useAppStore.subscribe((a, b) => {
+      if (a.honesty !== b.honesty) kick();
+    });
     const offRender = view.onRender(paint);
     return () => {
       cancelAnimationFrame(raf);
       offStore();
+      offHonesty();
       offRender();
     };
   }, [view]);

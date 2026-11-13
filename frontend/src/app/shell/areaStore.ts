@@ -2,8 +2,8 @@
 // on the sky (any aspect), which flow started it and where that flow is. It is kept in sky coordinates
 // (two opposite corners), so it stays on the same patch of sky while the view moves.
 //
-// The area search backend is not built (Q-205 pending): the results come from app/area/areaService.ts,
-// a dummy that is marked `demo: true`. Nothing here is a real search of the area.
+// The results come from app/area/areaService.ts: a prepared area's precomputed replies when one holds
+// the square (Q-205), else the demo, which is marked `demo: true` and is not a search of the area.
 import { create } from 'zustand';
 import {
   AreaRefused,
@@ -89,6 +89,8 @@ export interface AreaState {
   running: boolean;
   /** The mover whose card is open (or ringed on the sky), -1 for none. */
   sel: number;
+  /** A prepared area's visit whose dots are drawn (null: the first visit). */
+  visit: number | null;
   /** Eros exposure shown (an index into the detector-filtered list) and the player's state. */
   index: number;
   playing: boolean;
@@ -109,6 +111,7 @@ export interface AreaState {
   openMover(i: number): void;
   setMinimised(on: boolean): void;
   setIndex(i: number): void;
+  setVisit(visit: number | null): void;
   setPlaying(on: boolean): void;
   setDet(det: number | null): void;
   toggleOv(k: keyof ErosOverlays): void;
@@ -145,6 +148,7 @@ const FRESH = {
   step: -1,
   running: false,
   sel: -1,
+  visit: null as number | null,
   index: 0,
   playing: false,
   det: null,
@@ -203,7 +207,7 @@ export const useAreaStore = create<AreaState>()((set, get) => {
           }
           const res = a.res;
           const n = res.objects.length;
-          const names = res.objects.map((o) => `${o.id} ${o.name}`).join(', ');
+          const names = res.objects.map((o) => [o.id, o.name].filter(Boolean).join(' ')).join(', ');
           set({
             say: {
               kind: 'found',
@@ -284,6 +288,7 @@ export const useAreaStore = create<AreaState>()((set, get) => {
       const n = erosList(get().eros, get().det).length;
       if (n > 0) set({ index: Math.min(n - 1, Math.max(0, i)) });
     },
+    setVisit: (visit) => set({ visit }),
     setPlaying: (playing) => set({ playing }),
     setDet: (det) => {
       const s = get();
@@ -301,13 +306,16 @@ export const useAreaStore = create<AreaState>()((set, get) => {
 });
 
 /** What the island's pill calls the open card while it is minimised. */
-export function areaMiniTitle(s: Pick<AreaState, 'screen' | 'sel' | 'disc'>): string {
+export function areaMiniTitle(s: Pick<AreaState, 'screen' | 'sel' | 'disc' | 'known'>): string {
   if (s.screen === 'eros') return '433 Eros (demo)';
+  // Only an answer known to be the demo says "(demo)"; a prepared area's, one still loading or a
+  // refused one do not.
+  const tag = (s.screen === 'list' ? s.known?.demo : s.disc?.demo) === true ? ' (demo)' : '';
   if (s.screen === 'mover') {
     const m = s.disc?.movers[s.sel];
-    return m ? `${m.known ? `${m.id} · ${m.known}` : m.id} (demo)` : 'Discovery';
+    return m ? `${m.known ? `${m.id} · ${m.known}` : m.id}${tag}` : 'Discovery';
   }
-  return s.screen === 'list' ? 'Known objects (demo)' : 'Discovery (demo)';
+  return s.screen === 'list' ? `Known objects${tag}` : `Discovery${tag}`;
 }
 
 /** The Eros exposure on show, or null. */
@@ -317,8 +325,12 @@ export function currentHop(s: Pick<AreaState, 'eros' | 'det' | 'index'>): ErosHo
 }
 
 /** True while the top-left player drives the Eros exposures (the Eros card is open). */
-export function demoPlayerOn(s: Pick<AreaState, 'screen' | 'sel' | 'eros'>): boolean {
-  return s.eros !== null && (s.screen === 'eros' || (s.screen === 'mover' && s.sel === 0));
+export function demoPlayerOn(s: Pick<AreaState, 'screen' | 'sel' | 'eros' | 'disc'>): boolean {
+  // Mover T1 is Eros only in the demo; a prepared area's movers have no demo frames.
+  return (
+    s.eros !== null &&
+    (s.screen === 'eros' || (s.screen === 'mover' && s.sel === 0 && !s.disc?.real))
+  );
 }
 
 /** One length: "3.2°", "42′" (arcminutes under one degree) or "30″". */

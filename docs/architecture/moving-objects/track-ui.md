@@ -69,7 +69,7 @@ The honesty toggle is the app's global one (D-21); Track adds no second toggle. 
 ### A20.7 Spectrum, hop by hop
 
 - Wavelength (µm) against flux (µJy) with error bars, one point per frame (A20.3). An exposure's points appear when the slider passes it; the current exposure's points are ringed. A count reads "n of N frames".
-- **Flagged points are hollow** with the note naming the reason: "flagged OUTLIER" for `outlier_core` (Q-139). On Eros all 14 points are hollow: 13 for `outlier_core`, and the 14th because it also carries `OUTLIER` and `PERSIST` dropped off the core (flagged, no `outlier_core`); checked offline on the recorded frames (issue #72, [Q-459](../../decisions/moving-objects.md)).
+- **Flagged points are hollow** with the note naming the reason: "flagged OUTLIER" for `outlier_core` (Q-139). On Eros all 14 points are hollow: 13 for `outlier_core`, and the 14th because it also carries `OUTLIER` and `PERSIST` dropped off the core (flagged, no `outlier_core`); checked offline on the recorded frames (issue #72, [Q-460](../../decisions/moving-objects.md)).
 - **Refused frames** are listed under the plot with their reasons ("2 frames not measured: hardware flags NONFUNC, SUR_ERROR, TRANSIENT on the object"), never drawn.
 - **Caption:** "Each point is one frame. Points mix wavelength with time: the two visits are a day apart and Eros spins every 5.27 h, so a dip is not automatically chemistry." The period comes from SBDB; without one the sentence drops it.
 - **3I/ATLAS** (stretch): the caption "aperture, not total flux; background taken from inside the coma" (A19.8).
@@ -84,6 +84,8 @@ The honesty toggle is the app's global one (D-21); Track adds no second toggle. 
 ### A20.9 Sound
 
 Track's path sound (Q-134: one tick per exposure, wavelength to pitch, drawn x to pan, the path voice, the reference click, the mute, the desktop unlock gesture, direction never by pan alone) is specified in **R8.9.2** ([audio-pairing.md](../../rendering/haptics/audio-pairing.md)) and not repeated here. A20 only places its controls in the time bar: a **Sound** toggle (off until pressed; the press unlocks audio on desktop) and the visible **mute** for the reference click.
+
+**As built (#78, [Q-460](../../decisions/sound-ambience.md)):** until the Track screen exists the control is a **Hear the Shift** toggle on the Eros card in Area search (the event's Track-lite; Q-455, PR #131, pending). The reference click and its mute are not built yet.
 
 ### A20.10 Honesty toggle
 

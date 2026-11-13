@@ -319,7 +319,7 @@ def test_report_targets(ctx: Context, capsys: pytest.CaptureFixture[str]) -> Non
     assert "'cutout': 1" in capsys.readouterr().out
 
 
-# --- OUTLIER on a mover's core (Q-139, Q-459) ---------------------------------------------
+# --- OUTLIER on a mover's core (Q-139, Q-460) ---------------------------------------------
 
 OUTLIER_CORE = Synth().standard().set_flag(18, 13, "OUTLIER").fits_bytes()
 MOVER = ResolvedObject(
