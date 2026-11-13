@@ -6009,3 +6009,14 @@ li[data-state='running'] > .sx-live-mk {
     animation: none;
   }
 }
+/* Pause and Resume are icon buttons, square, beside Stop (Moon, 13 Nov 2026). */
+.sx-live .sx-btn-outline.sx-scan-ib {
+  width: 40px;
+  padding: 0;
+  display: inline-grid;
+  place-items: center;
+}
+.sx-scan-ib .sx-btn-ico {
+  width: 16px;
+  height: 16px;
+}

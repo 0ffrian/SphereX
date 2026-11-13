@@ -117,6 +117,12 @@ test('Stop keeps the finished squares; Escape leaves while selecting', async ({ 
   await expect(page.getByTestId('scan-card')).toHaveAttribute('data-state', 'offer');
   await page.getByTestId('scan-start').click();
   await expect(square(page, 2)).toHaveAttribute('data-state', 'running');
+  // Pause and Resume are icon buttons with their names; the card has no Minimise button.
+  await expect(page.getByTestId('scan-minimise')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Pause the scan' }).click();
+  await expect(page.getByTestId('scan-card')).toHaveAttribute('data-state', 'paused');
+  await page.getByRole('button', { name: 'Resume the scan' }).click();
+  await expect(page.getByTestId('scan-card')).toHaveAttribute('data-state', 'running');
   await page.getByTestId('scan-stop').click();
   await expect(page.getByTestId('scan-card')).toHaveAttribute('data-state', 'stopped');
   await expect(square(page, 1)).toHaveAttribute('data-state', 'done');
