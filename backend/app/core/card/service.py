@@ -298,7 +298,12 @@ class ObjectPipeline:
             # The card is saved, but the flipbook, spectrum and composite still need the
             # cutouts: download them, then answer with the saved asset.
             with contextlib.suppress(CacheMissOffline, UpstreamUnavailable):
-                self._frames(obj, job, premeasured, measure=False)  # card saved: no spectrum
+                frames = self._frames(obj, job, premeasured, measure=False)
+                if obj.moving and is_complete(frames.missing):
+                    # Track (A19.12, Q-468): a mover's spectrum is part of what Track opens,
+                    # so the job stores it even when the card is saved (a cache hit after once).
+                    job.update(stage="spectrum")
+                    self._spectrum(obj, frames, premeasured)
             return saved
         # A pre-built pack asset has no spectrum (Q-164 (3)). Measure if this backend can (the
         # D-25 cache or the network has the frames); the pack answers only when it cannot. The

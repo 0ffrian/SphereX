@@ -5,9 +5,10 @@ One cone cannot find a body that moves, so (issue #26):
 1. One Horizons ephemeris per search window (A3.4), seen from the SPHEREx spacecraft, through
    the cache (D-25). A target in ``targets.toml`` may list its own ``moving_windows`` (the spans
    where SPHEREx saw it), matched by its ``spkid`` so every spelling of the name gets the same
-   windows; any other object uses the whole release window. Each window is split
-   into several requests when it would pass the Horizons line limit. Windows are never joined,
-   so no position is ever interpolated across the gap between two of them.
+   windows; any other object uses the whole release window. Track on demand (issue #142,
+   Q-468) narrows either to the windows asked for the object (``add_track_window``). Each
+   window is split into several requests when it would pass the Horizons line limit. Windows
+   are never joined, so no position is ever interpolated across the gap between two of them.
 2. A small SIA cone (radius R) at the ephemeris position along the path. The step between cones
    follows the ephemeris rate, ``dt <= R / rate`` (so a frame taken between two cones still
    overlaps one of them), clamped to ``[moving_min_step_h, moving_max_step_h]``. The answers are
@@ -55,6 +56,7 @@ Every setting is a ``[verify]`` placeholder (A3.1).
 from __future__ import annotations
 
 import bisect
+import json
 import logging
 import math
 import threading
@@ -71,9 +73,9 @@ from app.adapters import horizons, irsa_sia
 from app.adapters.horizons import EphemPoint
 from app.adapters.irsa_sia import SiaRow, frame_time
 from app.cache.keys import CacheKey, norm_float
-from app.cache.store import CacheMissOffline, Served, UpstreamUnavailable
+from app.cache.store import CacheMissOffline, LiveResponse, Served, UpstreamUnavailable
 from app.context import Context
-from app.timefmt import parse_utc
+from app.timefmt import iso_utc_z, parse_utc
 
 log = logging.getLogger("shift_spectrum")
 
@@ -159,6 +161,117 @@ def target_windows(ctx: Context, spkid: str | None) -> tuple[Window, ...] | None
     return _windows_in(str(f), mtime).get(spkid.strip())
 
 
+# --- Track on demand (issue #142, Q-468) -----------------------------------------------------
+#
+# ``POST /v1/objects/{id}/track`` limits an object's path search to a window around a given time
+# instead of the whole release. The windows asked for are kept per ``spkid`` in one small derived
+# cache entry, so every reader that builds ``MovingConfig.from_context`` (``/frames``, ``/path``,
+# ``/spectrum``, the pre-fetch and ``track_available``, A19.12) uses the same windows and the same
+# keys without a new parameter. The record holds the union of every window asked for (sorted,
+# overlaps merged), so the result does not depend on the order of the requests; the search uses
+# that union clipped to the target's own windows or the release window.
+
+TRACK_WINDOW_SOURCE = "derived.track_window"
+TRACK_WINDOW_VERSION = "1"
+# Half-width of the window, in days: the ticket's +-3 days around the area visit (issue #142).
+TRACK_WINDOW_DAYS = 3.0
+# ASSUMPTION ("wider on request", bounded): at most +-15 days, so the whole window (30 days) stays
+# under the /path span cap (SX_PATH_MAX_SPAN_DAYS, 31 days, A19.5) and one reply serves it.
+TRACK_WINDOW_MAX_DAYS = 15.0
+# Held by every read and write of the record: ``CacheStore.put`` writes the body, then the
+# meta, so an unlocked read between the two would see a torn entry (a miss) and search the
+# base windows instead. Reentrant: ``add_track_window`` reads under it.
+_TRACK_WINDOW_LOCK = threading.RLock()
+
+
+def track_window_key(ctx: Context, spkid: str) -> CacheKey:
+    return CacheKey.make(
+        TRACK_WINDOW_SOURCE, ctx.settings.data_release, spkid=spkid.strip(), v=TRACK_WINDOW_VERSION
+    )
+
+
+def merge_windows(windows: list[Window] | tuple[Window, ...]) -> tuple[Window, ...]:
+    """Sorted, with overlapping or touching windows merged into one."""
+    out: list[Window] = []
+    for a, b in sorted(windows):
+        if out and a <= out[-1][1]:
+            out[-1] = (out[-1][0], max(out[-1][1], b))
+        else:
+            out.append((a, b))
+    return tuple(out)
+
+
+def clip_windows(base: tuple[Window, ...], asked: tuple[Window, ...]) -> tuple[Window, ...]:
+    """The parts of ``asked`` inside ``base`` (each sorted, neither overlapping itself)."""
+    out = [
+        (max(a0, b0), min(a1, b1))
+        for a0, a1 in asked
+        for b0, b1 in base
+        if max(a0, b0) < min(a1, b1)
+    ]
+    return tuple(sorted(out))
+
+
+def requested_windows(ctx: Context, spkid: str | None) -> tuple[Window, ...]:
+    """The Track windows asked for this ``spkid`` (the cache record), or ``()``. A record that
+    does not parse is logged and ignored, never guessed from."""
+    if not spkid:
+        return ()
+    with _TRACK_WINDOW_LOCK:
+        entry = ctx.cache.get(track_window_key(ctx, spkid))
+    if entry is None:
+        return ()
+    try:
+        doc = json.loads(entry.body)
+        return merge_windows([(parse_utc(str(a)), parse_utc(str(b))) for a, b in doc["windows"]])
+    except (KeyError, TypeError, ValueError):
+        log.warning("ignoring a bad Track window record for spkid %s", spkid)
+        return ()
+
+
+def base_windows(ctx: Context, spkid: str | None) -> tuple[Window, ...]:
+    """The target's own ``moving_windows``, else the release window (before any Track window)."""
+    s = ctx.settings
+    return target_windows(ctx, spkid) or (
+        (parse_utc(s.moving_window_start), parse_utc(s.moving_window_end)),
+    )
+
+
+def track_window(around: datetime, days: float) -> Window:
+    """``around`` +- ``days`` (the caller checks the bounds), truncated to whole milliseconds,
+    the precision the record keeps (``iso_utc_z``), so a stored window reads back equal and a
+    repeated request does not rewrite it. Raises ``OverflowError`` past year 1 or 9999."""
+    half = timedelta(days=days)
+    return _to_ms(around - half), _to_ms(around + half)
+
+
+def _to_ms(t: datetime) -> datetime:
+    return t.replace(microsecond=t.microsecond // 1000 * 1000)
+
+
+def add_track_window(ctx: Context, spkid: str, window: Window) -> tuple[Window, ...] | None:
+    """Add ``window`` to the record of ``spkid`` and return the windows the search will use, or
+    ``None`` (nothing stored) when ``window`` misses every base window. The record is rewritten
+    only when the union changes, so a repeated request leaves the cache untouched."""
+    base = base_windows(ctx, spkid)
+    if not clip_windows(base, (window,)):
+        return None
+    with _TRACK_WINDOW_LOCK:
+        old = requested_windows(ctx, spkid)
+        new = merge_windows([*old, window])
+        if new != old:
+            doc = {
+                "spkid": spkid.strip(),
+                "windows": [[iso_utc_z(a), iso_utc_z(b)] for a, b in new],
+            }
+            body = json.dumps(doc, sort_keys=True).encode("utf-8")
+            ctx.cache.put(
+                track_window_key(ctx, spkid),
+                LiveResponse(body, TRACK_WINDOW_SOURCE, 200, "application/json"),
+            )
+    return clip_windows(base, new)
+
+
 @dataclass(frozen=True)
 class MovingConfig:
     windows: tuple[Window, ...]
@@ -174,9 +287,12 @@ class MovingConfig:
     @classmethod
     def from_context(cls, ctx: Context, spkid: str | None = None) -> MovingConfig:
         s = ctx.settings
-        windows = target_windows(ctx, spkid) or (
-            (parse_utc(s.moving_window_start), parse_utc(s.moving_window_end)),
-        )
+        windows = base_windows(ctx, spkid)
+        # Track on demand (Q-468): the windows asked for, clipped to the base windows. A record
+        # that no longer meets them (the settings changed) is ignored: the base windows stay.
+        asked = requested_windows(ctx, spkid)
+        if asked:
+            windows = clip_windows(windows, asked) or windows
         return cls(
             windows=windows,
             ephem_step_min=s.moving_ephem_step_min,
