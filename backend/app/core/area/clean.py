@@ -523,9 +523,11 @@ def label_dots(
     geo: AreaGeometry,
 ) -> Labels:
     """A17.3 on one area. ``geo`` is the run's ``area_geometry(frames, cfg)``, built once by the
-    caller (issue #128 (2)); a ``geo`` built for another area raises ``ValueError``."""
-    if geo.box != AreaBox.of(frames.spec):
-        raise ValueError("geo was built for another area than frames")
+    caller (issue #128 (2)); a ``geo`` built from other frames or settings (another area, or the
+    same area's frames before a filter, so another ``t0``, visit times or rate limit) raises
+    ``ValueError``. Rebuilding it to compare is a pass over the frame times, not the grids."""
+    if geo != area_geometry(frames, cfg):
+        raise ValueError("geo was not built from these frames and settings")
     pts = dot_points(per_frame, frames, geo, cfg)
     label: dict[int, str] = {}
     cover = covering_frames(frames, bodies, pts, cfg)
