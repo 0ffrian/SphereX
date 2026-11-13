@@ -14,22 +14,33 @@ area still answers ``done`` through the store, and a lost job is simply asked fo
 At most ``MAX_WAITING`` jobs wait (more: ``QueueFull``) and ``MAX_FINISHED`` finished jobs
 are remembered. A job that fails in any way, even with a ``BaseException``, is marked failed
 and the worker goes on with the queue.
+
+**Scans (issue #156, Q-470):** a ``ScanJob`` takes one queue slot and runs its squares in order
+on the same worker: skipped without a visit pair, done at once when stored, else run; a failed
+square is marked and the scan goes on. A pause takes effect after the current square and the
+paused scan leaves the worker; resume puts it at the front of the queue; stop is at the next
+check. **Runs (Q-471):** every scan, and every single job submitted with a ``kind``, is
+recorded in ``runs.RunStore`` with its timeline.
 """
 
 from __future__ import annotations
 
+import json
 import logging
 import threading
 import time
 from collections import deque
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Protocol
 
 from app.adapters.http import UpstreamError
 from app.cache.store import CacheMissOffline, UpstreamUnavailable
 from app.context import Context
-from app.core.area.live import LiveAreaError, Plan
+from app.core.area.live import Box, LiveAreaError, Plan, estimate_seconds, plan_area
+from app.core.area.runs import RunStore, merge, read_square, square_objects, totals_of
+from app.core.area.scan import ScanPlan, Square
+from app.core.area.store import AreaStore
 
 log = logging.getLogger(__name__)
 
@@ -65,7 +76,7 @@ class _StepState:
     total: int | None = None
 
 
-@dataclass
+@dataclass(eq=False)
 class Job:
     plan: Plan
     state: str = "queued"
@@ -75,6 +86,7 @@ class Job:
     finished: float | None = None
     error: tuple[str, str] | None = None
     cancel: threading.Event = field(default_factory=threading.Event)
+    run_id: str | None = None  # the run recording this job (Q-471), if any
 
     def __post_init__(self) -> None:
         self.steps = {s: _StepState() for s in STEP_IDS}
@@ -83,6 +95,9 @@ class Job:
     @property
     def area_id(self) -> str:
         return self.plan.area_id
+
+    def estimate_s(self) -> int:
+        return self.plan.estimate_s()
 
     @property
     def active(self) -> bool:
@@ -190,27 +205,87 @@ def _error_of(exc: BaseException) -> tuple[str, str]:
     return "internal", "Something went wrong on the server. Nothing was saved."
 
 
-class LiveJobs:
-    """The queue and its one worker thread. Thread-safe; the worker starts on demand."""
+class RunConflict(Exception):
+    """A pause, resume or stop that does not apply to the run's state: 409 with ``code``."""
 
-    def __init__(self, ctx: Context, runner: Runner | None = None) -> None:
+    def __init__(self, code: str, detail: str) -> None:
+        super().__init__(detail)
+        self.code = code
+        self.detail = detail
+
+
+@dataclass(eq=False)
+class ScanJob:
+    """A scan (Q-470): one queue slot, its squares run one after another on the worker."""
+
+    run_id: str
+    release: str
+    squares: tuple[Square, ...]
+    state: str = "queued"  # queued, running, paused, done, stopped, failed
+    started: float | None = None
+    pause_requested: bool = False
+    current: Job | None = None  # the running square's job (its steps and counts)
+    current_square: int | None = None
+    done: set[int] = field(default_factory=set)  # squares finished (done, skipped or failed)
+    cancel: threading.Event = field(default_factory=threading.Event)
+
+    def estimate_s(self) -> int:
+        return sum(estimate_seconds(s.box) for s in self.squares if s.index not in self.done)
+
+
+QueueItem = Job | ScanJob
+Planner = Callable[[Context, Box], Plan]
+
+
+class _Stage(Protocol):
+    def entry(self, area_id: str, stage: str) -> Any: ...
+
+
+def _default_planner(ctx: Context, box: Box) -> Plan:
+    return plan_area(ctx, box)
+
+
+class LiveJobs:
+    """The queue and its one worker thread. Thread-safe; the worker starts on demand.
+
+    A queue item is a single live area (``Job``) or a scan (``ScanJob``); each takes one slot
+    and the worker runs one at a time (Q-470). Every scan, and every single job submitted with
+    a ``kind``, is recorded in ``runs`` (Q-471). Lock order: ``self._lock`` before the run
+    store's lock, never the other way round."""
+
+    def __init__(
+        self,
+        ctx: Context,
+        runner: Runner | None = None,
+        *,
+        planner: Planner | None = None,
+        store: _Stage | None = None,
+        runs: RunStore | None = None,
+    ) -> None:
         self.ctx = ctx
         self._runner = runner or run_live_area
+        self._planner = planner or _default_planner
+        self.store: _Stage = store or AreaStore(ctx, ctx.settings.area_pack_dir)
+        self.runs = runs or RunStore(ctx.settings.cache_dir / "runs")
         self._lock = threading.Lock()
         self._jobs: dict[str, Job] = {}
-        self._queue: deque[str] = deque()
+        self._by_run: dict[str, QueueItem] = {}  # live runs only; finished ones are on disk
+        self._queue: deque[QueueItem] = deque()
         self._thread: threading.Thread | None = None
-        self._running: Job | None = None
+        self._running: QueueItem | None = None
+
+    # --- single live areas --------------------------------------------------------------
 
     def get(self, area_id: str) -> Job | None:
         with self._lock:
             return self._jobs.get(area_id)
 
-    def submit(self, plan: Plan) -> Job:
+    def submit(self, plan: Plan, kind: str | None = None) -> Job:
         """Queue a plan; an area already queued or running (and not stopped) is returned as it
         is. A done job is run again: the caller checks the store first, so a done job reaching
         here means its stored area is gone. A stopped job that is still winding down is
-        replaced by a fresh job queued after it."""
+        replaced by a fresh job queued after it. With ``kind``, a new job is recorded as a run
+        of one square (Q-471)."""
         with self._lock:
             job = self._jobs.get(plan.area_id)
             if job is not None and job.active:
@@ -219,13 +294,14 @@ class LiveJobs:
                 raise QueueFull()
             self._prune()
             job = Job(plan)
-            self._jobs[plan.area_id] = job
-            self._queue.append(plan.area_id)
-            if self._thread is None or not self._thread.is_alive():
-                self._thread = threading.Thread(
-                    target=self._work, name="live-area-jobs", daemon=True
+            if kind is not None:
+                job.run_id = self.runs.create(
+                    kind, plan.release, plan.box, [(1, plan.box, plan.area_id)]
                 )
-                self._thread.start()
+                self._by_run[job.run_id] = job
+            self._jobs[plan.area_id] = job
+            self._queue.append(job)
+            self._ensure_worker()
             return job
 
     def cancel(self, area_id: str) -> bool:
@@ -236,11 +312,107 @@ class LiveJobs:
                 return False
             job.cancel.set()
             if job.state == "queued":
-                self._queue.remove(area_id)
+                self._queue.remove(job)
                 job.state = "failed"
                 job.error = _error_of(Cancelled())
                 job.finished = time.monotonic()
+                if job.run_id is not None:
+                    self._by_run.pop(job.run_id, None)
+                    self._record(self.runs.set_state, job.run_id, "stopped", "run_stopped")
             return True
+
+    # --- scans --------------------------------------------------------------------------
+
+    def submit_scan(
+        self, scan: ScanPlan, kind: str, release: str, stored: dict[int, str] | None = None
+    ) -> str:
+        """Queue a scan; returns its run id. Raises ``QueueFull``."""
+        stored = stored or {}
+        with self._lock:
+            if len(self._queue) >= MAX_WAITING:
+                raise QueueFull()
+            run_id = self.runs.create(
+                kind,
+                release,
+                scan.region,
+                [(s.index, s.box, stored.get(s.index)) for s in scan.squares],
+            )
+            job = ScanJob(run_id, release, scan.squares)
+            self._by_run[run_id] = job
+            self._queue.append(job)
+            self._ensure_worker()
+            return run_id
+
+    def pause(self, run_id: str) -> None:
+        """Pause a running scan after its current square (Q-470)."""
+        with self._lock:
+            item = self._live_item(run_id)
+            if not isinstance(item, ScanJob) or item.state != "running" or item.cancel.is_set():
+                raise RunConflict("run_not_pausable", "Only a running scan can be paused.")
+            item.pause_requested = True
+
+    def resume(self, run_id: str) -> None:
+        """Resume a paused scan (it goes to the front of the queue), or drop a pause that has
+        not taken effect yet."""
+        with self._lock:
+            item = self._live_item(run_id)
+            if isinstance(item, ScanJob) and item.state == "running" and item.pause_requested:
+                item.pause_requested = False
+                return
+            if not isinstance(item, ScanJob) or item.state != "paused":
+                raise RunConflict("run_not_paused", "Only a paused scan can be resumed.")
+            item.state = "queued"
+            self._queue.appendleft(item)
+            self._record(self.runs.set_state, run_id, "queued", "run_resumed")
+            self._ensure_worker()
+
+    def stop(self, run_id: str) -> None:
+        """Stop a run: at once when queued or paused, at the next check when running. Squares
+        already finished stay stored. Raises ``RunNotFound`` or ``RunConflict``."""
+        self.runs.get(run_id)  # RunNotFound for an unknown id
+        with self._lock:
+            item = self._live_item(run_id)
+            if item is None or item.cancel.is_set():
+                raise RunConflict("run_finished", "This run has already finished or is stopping.")
+            if isinstance(item, Job):
+                pass  # cancel() below takes the lock again
+            else:
+                item.cancel.set()
+                if item.state in ("queued", "paused"):
+                    if item in self._queue:
+                        self._queue.remove(item)
+                    item.state = "stopped"
+                    self._by_run.pop(run_id, None)
+                    self._record(self.runs.set_state, run_id, "stopped", "run_stopped")
+                return
+        self.cancel(item.area_id)
+
+    def _live_item(self, run_id: str) -> QueueItem | None:
+        item = self._by_run.get(run_id)
+        if item is None:
+            self.runs.get(run_id)  # RunNotFound for an unknown id
+        return item
+
+    def run_reply(self, run_id: str) -> dict[str, Any]:
+        """The ``run.schema.json`` body: the record, and while live its queue position or the
+        running square's progress."""
+        with self._lock:
+            out = self.runs.get(run_id)
+            item = self._by_run.get(run_id)
+            if item is None:
+                return out
+            if out["state"] == "queued" and item in self._queue:
+                out["queue_position"] = list(self._queue).index(item) + 1
+            job = item if isinstance(item, Job) else item.current
+            if job is not None and job.state == "running":
+                square = 1 if isinstance(item, Job) else item.current_square
+                out["progress"] = {
+                    "square": square,
+                    "area_id": job.area_id,
+                    "step": job.step,
+                    "steps": _steps_reply(job.steps),
+                }
+            return out
 
     def wait(self, timeout: float | None = None) -> bool:
         """Block until the queue is empty and the worker idle (tests). True when it is."""
@@ -249,35 +421,191 @@ class LiveJobs:
             t.join(timeout)
         return t is None or not t.is_alive()
 
+    # --- the worker ---------------------------------------------------------------------
+
+    def _ensure_worker(self) -> None:
+        """Start the worker if it is not running (call with the lock held)."""
+        if self._thread is None or not self._thread.is_alive():
+            self._thread = threading.Thread(target=self._work, name="live-area-jobs", daemon=True)
+            self._thread.start()
+
+    def _record(self, fn: Callable[..., None], *args: Any, **kw: Any) -> None:
+        """A run-record write; a failure (disk full, say) is logged and never stops the queue."""
+        try:
+            fn(*args, **kw)
+        except Exception:
+            log.exception("run record write failed")
+
     def _work(self) -> None:
         while True:
             with self._lock:
                 if not self._queue:
                     self._thread = None
                     return
-                job = self._jobs[self._queue.popleft()]
-                job.state = "running"
-                job.started = time.monotonic()
-                self._running = job
+                item = self._queue.popleft()
+                item.state = "running"
+                item.started = time.monotonic() if item.started is None else item.started
+                self._running = item
             try:
-                self._runner(self.ctx, job.plan, Progress(job, self._lock))
-            except BaseException as exc:
-                if not isinstance(exc, (Cancelled, LiveAreaError)):
-                    log.exception("live area %s failed", job.area_id)
+                if isinstance(item, Job):
+                    self._run_job(item)
+                else:
+                    self._run_scan(item)
+            finally:
                 with self._lock:
-                    job.state = "failed"
-                    job.error = _error_of(exc)
-                    job.step = None
-                    job.finished = time.monotonic()
                     self._running = None
-                continue
+
+    def _square_done(self, run_id: str, index: int, area_id: str) -> None:
+        """Mark a square done; its ``found`` events and the run's totals come from the stored
+        replies of every square done so far (Q-471)."""
+        record = self.runs.get(run_id)
+        record["squares"][index - 1]["state"] = "done"
+        record["squares"][index - 1]["area_id"] = area_id
+        finished = [
+            read_square(s["index"], s["area_id"], self._read)
+            for s in record["squares"]
+            if s["state"] == "done" and s["area_id"] is not None
+        ]
+        this = next(r for r in finished if r.index == index)
+        totals = totals_of(merge(record["region"], finished), record["squares"])
+        self.runs.square(
+            run_id,
+            index,
+            "done",
+            area_id=area_id,
+            event="square_done",
+            objects=square_objects(this),
+            totals=totals,
+        )
+
+    def _read(self, area_id: str, stage: str) -> dict[str, Any] | None:
+        got = self.store.entry(area_id, stage)
+        if got is None:
+            return None
+        body: dict[str, Any] = json.loads(got.body)
+        return body
+
+    def _square_failed(
+        self, run_id: str, index: int, exc: BaseException, area_id: str | None = None
+    ) -> None:
+        code, detail = _error_of(exc)
+        skipped = isinstance(exc, LiveAreaError) and code == "area:no_visit_pair"
+        record = self.runs.get(run_id)
+        record["squares"][index - 1]["state"] = "skipped" if skipped else "failed"
+        self.runs.square(
+            run_id,
+            index,
+            "skipped" if skipped else "failed",
+            area_id=area_id,
+            error={"code": code, "detail": detail},
+            event="square_skipped" if skipped else "square_failed",
+            totals={**record["totals"], **_square_counts(record["squares"])},
+        )
+
+    def _run_job(self, job: Job) -> None:
+        run_id = job.run_id
+        if run_id is not None:
+            self._record(self.runs.start, run_id)
+            self._record(
+                self.runs.square, run_id, 1, "running", area_id=job.area_id, event="square_started"
+            )
+        try:
+            self._runner(self.ctx, job.plan, Progress(job, self._lock))
+        except BaseException as exc:
+            if not isinstance(exc, (Cancelled, LiveAreaError)):
+                log.exception("live area %s failed", job.area_id)
             with self._lock:
-                job.state = "done"
+                job.state = "failed"
+                job.error = _error_of(exc)
                 job.step = None
-                for st in job.steps.values():
-                    st.state = "done"
                 job.finished = time.monotonic()
-                self._running = None
+                if run_id is not None:
+                    self._by_run.pop(run_id, None)
+            if run_id is not None:
+                if isinstance(exc, Cancelled):
+                    self._record(self.runs.set_state, run_id, "stopped", "run_stopped")
+                else:  # the run itself finished: its one square failed (as in a scan)
+                    self._record(self._square_failed, run_id, 1, exc, job.area_id)
+                    self._record(self.runs.set_state, run_id, "done", "run_done")
+            return
+        with self._lock:
+            job.state = "done"
+            job.step = None
+            for st in job.steps.values():
+                st.state = "done"
+            job.finished = time.monotonic()
+            if run_id is not None:
+                self._by_run.pop(run_id, None)
+        if run_id is not None:
+            self._record(self._square_done, run_id, 1, job.area_id)
+            self._record(self.runs.set_state, run_id, "done", "run_done")
+
+    def _run_scan(self, scan: ScanJob) -> None:
+        """The squares in order (Q-470): skipped without a visit pair, done at once when stored,
+        else run; any other failure marks that square and the scan goes on."""
+        run_id = scan.run_id
+        self._record(self.runs.start, run_id)
+        try:
+            for sq in scan.squares:
+                if sq.index in scan.done:
+                    continue
+                with self._lock:
+                    if scan.cancel.is_set():
+                        break
+                    if scan.pause_requested:
+                        scan.pause_requested = False
+                        scan.state = "paused"
+                        self._record(self.runs.set_state, run_id, "paused", "run_paused")
+                        return
+                    scan.current_square = sq.index
+                self._record(self.runs.square, run_id, sq.index, "running", event="square_started")
+                try:
+                    plan = self._planner(self.ctx, sq.box)
+                except BaseException as exc:
+                    if not isinstance(exc, LiveAreaError):
+                        log.warning("scan %s square %d: no plan: %r", run_id, sq.index, exc)
+                    self._record(self._square_failed, run_id, sq.index, exc)
+                    scan.done.add(sq.index)
+                    continue
+                if self.store.entry(plan.area_id, "summary") is None:
+                    inner = Job(plan, cancel=scan.cancel)
+                    inner.state = "running"
+                    inner.started = time.monotonic()
+                    with self._lock:
+                        scan.current = inner
+                    try:
+                        self._runner(self.ctx, plan, Progress(inner, self._lock))
+                    except Cancelled:
+                        self._record(self.runs.square, run_id, sq.index, "todo")
+                        break
+                    except BaseException as exc:
+                        if not isinstance(exc, LiveAreaError):
+                            log.exception("scan %s square %d failed", run_id, sq.index)
+                        self._record(self._square_failed, run_id, sq.index, exc, plan.area_id)
+                        scan.done.add(sq.index)
+                        continue
+                    finally:
+                        with self._lock:
+                            scan.current = None
+                scan.done.add(sq.index)
+                self._record(self._square_done, run_id, sq.index, plan.area_id)
+        except BaseException:  # the scan loop itself broke: the run failed, the queue goes on
+            log.exception("scan %s failed", run_id)
+            with self._lock:
+                scan.state = "failed"
+                scan.current_square = None
+                self._by_run.pop(run_id, None)
+            self._record(self.runs.set_state, run_id, "failed", "run_done")
+            return
+        with self._lock:
+            stopped = scan.cancel.is_set()
+            scan.state = "stopped" if stopped else "done"
+            scan.current_square = None
+            self._by_run.pop(run_id, None)
+        if stopped:
+            self._record(self.runs.set_state, run_id, "stopped", "run_stopped")
+        else:
+            self._record(self.runs.set_state, run_id, "done", "run_done")
 
     def _prune(self) -> None:
         """Forget the oldest finished jobs beyond ``MAX_FINISHED`` (call with the lock held)."""
@@ -306,17 +634,24 @@ class LiveJobs:
                 out["eta_s"] = max(0, job.plan.estimate_s() - int(elapsed))
             elif job.state == "queued":
                 ahead = list(self._queue)
-                pos = ahead.index(job.area_id) + 1 if job.area_id in ahead else 1
+                pos = ahead.index(job) + 1 if job in ahead else 1
                 out["queue_position"] = pos
-                wait = sum(self._jobs[a].plan.estimate_s() for a in ahead[: pos - 1])
+                wait = sum(a.estimate_s() for a in ahead[: pos - 1])
                 r = self._running  # also a stopped job still winding down, replaced in _jobs
                 if r is not None:
                     started = r.started if r.started is not None else now
-                    wait += max(0, r.plan.estimate_s() - int(now - started))
+                    wait += max(0, r.estimate_s() - int(now - started))
                 out["eta_s"] = wait + job.plan.estimate_s()
             if job.error is not None:
                 out["error"] = {"code": job.error[0], "detail": job.error[1]}
             return out
+
+
+def _square_counts(squares: list[dict[str, Any]]) -> dict[str, int]:
+    return {
+        "squares_done": sum(1 for s in squares if s["state"] == "done"),
+        "squares_skipped": sum(1 for s in squares if s["state"] == "skipped"),
+    }
 
 
 def _steps_reply(steps: Mapping[str, _StepState]) -> list[dict[str, Any]]:
@@ -352,6 +687,8 @@ __all__ = [
     "LiveJobs",
     "Progress",
     "QueueFull",
+    "RunConflict",
+    "ScanJob",
     "done_reply",
     "run_live_area",
 ]

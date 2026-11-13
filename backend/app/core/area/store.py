@@ -138,6 +138,30 @@ class AreaStore:
                         ids.add(str(q["id"]))
         return sorted(i for i in ids if self.entry(i, "summary") is not None)
 
+    def areas_by_box(self, release: str) -> dict[tuple[float, float, float, float], str]:
+        """Stored areas of ``release`` by their box ``(ra, dec, width, height)``, rounded to the
+        0.05 degree grid (issue #156: a scan plan shows the squares already computed, without
+        an SIA call). Several areas of one box (other visit pairs): the latest computed, then
+        the smallest id."""
+        found: list[tuple[tuple[float, float, float, float], str, str]] = []
+        for area_id in self.area_ids():
+            got = self.entry(area_id, "summary")
+            if got is None:
+                continue
+            s = json.loads(got.body)
+            if s.get("data_release") != release:
+                continue
+            ra, dec, w, h = (
+                round(float(s[k]), 2) for k in ("ra", "dec", "width_deg", "height_deg")
+            )
+            found.append(((ra, dec, w, h), str(s["computed_at"]), area_id))
+        found.sort(key=lambda f: f[2])  # smallest id first on a tie...
+        found.sort(key=lambda f: f[1], reverse=True)  # ...after the latest computed (stable)
+        out: dict[tuple[float, float, float, float], str] = {}
+        for box, _, area_id in found:
+            out.setdefault(box, area_id)
+        return out
+
     def index(self) -> dict[str, Any]:
         out = []
         for area_id in self.area_ids():
