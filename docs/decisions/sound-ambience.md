@@ -1,6 +1,6 @@
 # Decisions: Sound and ambience
 
-> **Part of:** the decision log ([index](README.md)) · **Holds:** the haptics cut and the move of the audio code to `frontend/src/sound/` (D-39), pitch polarity (Q-430) and the flyover soundscape, weather, stage audibility and spectrum chord (Q-431 to Q-446), the tone stream and the grouped exposure tick (Q-458; spec [R13](../rendering/sound/overview.md)) · **Authority:** highest; an entry here wins over [rendering/](../rendering/README.md) and [architecture/](../architecture/README.md) (see the index for precedence)
+> **Part of:** the decision log ([index](README.md)) · **Holds:** the haptics cut and the move of the audio code to `frontend/src/sound/` (D-39), pitch polarity (Q-430) and the flyover soundscape, weather, stage audibility and spectrum chord (Q-431 to Q-446), the tone stream and the grouped exposure tick (Q-458; spec [R8.8](../rendering/haptics/engine-api.md) and [R8.9.2](../rendering/haptics/audio-pairing.md)); spec for the rest: [R13](../rendering/sound/overview.md) · **Authority:** highest; an entry here wins over [rendering/](../rendering/README.md) and [architecture/](../architecture/README.md) (see the index for precedence)
 
 ## D-39 Haptics cut; the audio moves to frontend/src/sound
 
