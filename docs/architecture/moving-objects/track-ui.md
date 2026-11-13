@@ -85,6 +85,8 @@ The honesty toggle is the app's global one (D-21); Track adds no second toggle. 
 
 Track's path sound (Q-134: one tick per exposure, wavelength to pitch, drawn x to pan, the path voice, the reference click, the mute, the desktop unlock gesture, direction never by pan alone) is specified in **R8.9.2** ([audio-pairing.md](../../rendering/haptics/audio-pairing.md)) and not repeated here. A20 only places its controls in the time bar: a **Sound** toggle (off until pressed; the press unlocks audio on desktop) and the visible **mute** for the reference click.
 
+**As built (#78, [Q-459](../../decisions/sound-ambience.md)):** until the Track screen exists the control is a **Hear the Shift** toggle on the Eros card in Area search (Track-lite, Q-455). The reference click and its mute are not built yet.
+
 ### A20.10 Honesty toggle
 
 | D-21 state | Shown | Heard (R8.9.2) |
