@@ -102,7 +102,7 @@ def provenance() -> dict[str, dict[str, str]]:
 class Premeasured:
     """A frame measured while its cutout landed (issue #41). Used only if the cutout body
     the spectrum reads has this SHA-256, the frame record has this pixel position and the
-    measurement used the same method (``method_sha`` of the config it ran with, Q-459)."""
+    measurement used the same method (``method_sha`` of the config it ran with, Q-460)."""
 
     body_sha256: str
     x_fits0: float
