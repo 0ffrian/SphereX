@@ -190,6 +190,57 @@ describe('Known flow on the API (issue #130)', () => {
     expect(useAreaStore.getState().trackPath).toBe(false);
     expect(useAreaStore.getState().pathPending).toBe(true);
   });
+  it('never blank: the demo Eros shows the demo frames at once, then the real frames replace them', async () => {
+    const hop = { frame_id: 'd_1_D1', exposure: 1, detector: 'D1', mjd_avg: 61119.36, flux: 1, stars: [], seg: [] };
+    vi.stubGlobal('fetch', async () => ({
+      ok: true,
+      json: async () => ({ object: { name: 'Eros' }, wide: { png: '', w: 10, h: 10 }, track: [], hops: [hop] }),
+    }));
+    let answer!: (v: unknown) => void;
+    const frames = new Promise((r) => { answer = r; });
+    setSkyApi({
+      frames: async () => frames,
+      path: async () => { throw new ApiError('not_found', null, 404); },
+    } as unknown as ApiClient);
+    // The committed pack says track_available: false for Eros (backend #129 pending).
+    useAreaStore.getState().openEros({ id: '433', name: 'Eros', kind: 'asteroid', frames: 3, visits: 1, objectId: 'sbdb-20000433', trackAvailable: false });
+    await vi.advanceTimersByTimeAsync(50);
+    let s = useAreaStore.getState();
+    expect(s.eros).not.toBeNull(); // not "Loading the frames…" while /frames is slow
+    expect(s.trackSource).toBe('demo');
+    expect(s.erosFailed).toBe(false);
+    const f = (id: string) => ({ frame_id: id, time: '2026-03-20T08:30:00.000Z', wavelength_um: 1, x: 1, y: 1, cutout_url: '', flags: [] });
+    answer({ data: { frames: [f('r_1_D1'), f('r_1_D2'), f('r_2_D1')] }, fixture: null });
+    await vi.advanceTimersByTimeAsync(50);
+    s = useAreaStore.getState();
+    expect(s.trackSource).toBe('real');
+    expect(erosList(s.eros, null)).toHaveLength(3);
+  });
+  it('a late real answer for an Eros card that was left does not overwrite the new card', async () => {
+    vi.stubGlobal('fetch', async () => ({
+      ok: true,
+      json: async () => ({ object: { name: 'Eros' }, wide: { png: '', w: 10, h: 10 }, track: [], hops: [] }),
+    }));
+    let answer!: (v: unknown) => void;
+    const slow = new Promise((r) => { answer = r; });
+    setSkyApi({
+      frames: async (id: string) =>
+        id === 'sbdb-20000433'
+          ? slow
+          : { data: { frames: [{ frame_id: 'x_1_D1', time: '2026-03-20T08:30:00.000Z', wavelength_um: 1, x: 1, y: 1, cutout_url: '', flags: [] }] }, fixture: null },
+      path: async () => { throw new ApiError('not_found', null, 404); },
+    } as unknown as ApiClient);
+    useAreaStore.getState().openEros({ id: '433', name: 'Eros', kind: 'asteroid', frames: 3, visits: 1, objectId: 'sbdb-20000433' });
+    await vi.advanceTimersByTimeAsync(10);
+    useAreaStore.getState().openEros({ id: '9', name: 'Other', kind: 'asteroid', frames: 1, visits: 1, objectId: 'sbdb-9', trackAvailable: true });
+    await vi.advanceTimersByTimeAsync(50);
+    answer({ data: { frames: [] }, fixture: null });
+    await vi.advanceTimersByTimeAsync(50);
+    const s = useAreaStore.getState();
+    expect(s.focus?.objectId).toBe('sbdb-9');
+    expect(s.trackSource).toBe('real');
+    expect(erosList(s.eros, null)).toHaveLength(1);
+  });
   it('another object never borrows the Eros demo, and leaving the card aborts its request', async () => {
     const signals: AbortSignal[] = [];
     setSkyApi({

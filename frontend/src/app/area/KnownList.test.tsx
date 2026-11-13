@@ -66,6 +66,21 @@ describe('KnownList rows (A18.5)', () => {
     // SkyBoT answers per visit of the area, so the date is the card's, said once.
     expect(host.querySelector('[data-testid="known-skybot"]')?.textContent).toContain('SkyBoT last answered');
   });
+  it('433 Eros is Track it even when the pack says track_available: false (until backend #129)', async () => {
+    const eros = { id: '433', name: 'Eros', kind: 'asteroid', frames: 16, visits: 2, objectId: 'sbdb-20000433', designation: '433 Eros', trackAvailable: false };
+    const other = { ...eros, id: '9', name: 'Metis', objectId: 'sbdb-20000009', designation: '9 Metis' };
+    useAreaStore.setState({ known: { ...RESULT, objects: [eros, other] } });
+    const open = vi.spyOn(useAreaStore.getState(), 'openEros').mockImplementation(() => {});
+    useAreaStore.setState({ openEros: open });
+    await act(async () => root.render(<KnownList />));
+    const rows = [...host.querySelectorAll<HTMLElement>('[data-testid="known-row"]')];
+    expect(rows[0]!.dataset.track).toBe('yes');
+    expect(rows[0]!.textContent).toContain('Track it');
+    expect(rows[0]!.textContent).not.toContain(NO_TRACK_NOTE);
+    expect(rows[1]!.dataset.track).toBe('no');
+    await act(async () => rows[0]!.click());
+    expect(open).toHaveBeenCalledWith(eros);
+  });
   it('Track it opens the Eros card for that object', async () => {
     const open = vi.spyOn(useAreaStore.getState(), 'openEros').mockImplementation(() => {});
     useAreaStore.setState({ openEros: open });

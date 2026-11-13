@@ -97,6 +97,24 @@ describe('Eros card honesty (D-21)', () => {
   });
 });
 
+describe('demo labels follow the cutouts', () => {
+  const brightnessBadge = () => host.querySelector('.sx-kn-spec-t [data-testid="provenance-badge"]');
+  it('real frames with demo cutouts: the "Demo cutouts" tag and the demo-photometry badge show', async () => {
+    useAreaStore.setState({ flow: 'known', screen: 'eros', eros: EROS, focus: OBJ, trackSource: 'real' });
+    await act(async () => root.render(<ErosCard />));
+    expect(q('demo-tag')?.textContent).toContain('Demo cutouts');
+    expect(brightnessBadge()).not.toBeNull();
+  });
+  it('real frames with no cutout at all: neither the tag nor the badge is shown', async () => {
+    const bare: ErosDemo = { ...EROS, hops: EROS.hops.map((h) => ({ ...h, no_cutout: true, flux: Number.NaN })) };
+    useAreaStore.setState({ flow: 'known', screen: 'eros', eros: bare, focus: OBJ, trackSource: 'real' });
+    await act(async () => root.render(<ErosCard />));
+    expect(q('demo-tag')).toBeNull();
+    expect(host.textContent).not.toContain('Demo cutouts');
+    expect(brightnessBadge()).toBeNull();
+  });
+});
+
 /** A 2D context that records the labels drawn; every other call is a no-op. */
 function recordingContext(): { g: CanvasRenderingContext2D; labels: string[] } {
   const labels: string[] = [];
