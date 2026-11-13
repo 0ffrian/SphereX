@@ -32,7 +32,8 @@ export function TrackJobCard() {
     if (back === 'mover') {
       const s = useAreaStore.getState();
       s.openMover(s.sel);
-    } else useAreaStore.getState().openList();
+    } else if (back === 'scan') useAreaStore.getState().backToScan();
+    else useAreaStore.getState().openList();
   };
   if (!view) return null;
   const o = view.obj;

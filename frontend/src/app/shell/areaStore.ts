@@ -53,7 +53,7 @@ export interface AreaDrag {
  * the live card (offer, computing, waiting, failure; issue #144), or a Track computed on demand
  * (issue #145, trackJobStore).
  */
-export type AreaScreen = 'draw' | 'search' | 'list' | 'eros' | 'disc' | 'mover' | 'live' | 'track';
+export type AreaScreen = 'draw' | 'search' | 'list' | 'eros' | 'disc' | 'mover' | 'live' | 'track' | 'scan';
 
 /** The checkboxes of the Eros card: which layers show on the cutout. */
 export interface ErosOverlays {
@@ -165,8 +165,10 @@ export interface AreaState {
    * `around` (ISO) and show its progress; the Track view opens when it is done.
    */
   openTrack(obj: KnownObject, around: string, release: string): void;
-  /** Where the Track card's "Back to the results" goes: the Known list, or the Discovery track. */
-  trackBack: 'list' | 'mover';
+  /** Where the Track card's "Back to the results" goes: the Known list, the Discovery track, or the scan. */
+  trackBack: 'list' | 'mover' | 'scan';
+  /** Back to the scan card (from an object opened in its results, issue #157). */
+  backToScan(): void;
   setMinimised(on: boolean): void;
   setIndex(i: number): void;
   setVisit(visit: number | null): void;
@@ -175,7 +177,22 @@ export interface AreaState {
   toggleOv(k: keyof ErosOverlays): void;
   /** Leaving the tool: back to the start, keeping the last area. */
   reset(): void;
+  /**
+   * A region of more than one square fills the screen, gridded (issue #157, mock-up state 2): the
+   * scan card (scanStore) shows its offer, run or results.
+   */
+  openScan(flow: AreaFlow, box: AreaBox): void;
+  /**
+   * A finished square of a scan (or an object circled in it) opens that square's stored results in
+   * the single-area cards (#144, #145); `focus` opens one object of them once they are read.
+   */
+  openSquare(box: AreaBox, flow: AreaFlow, focus?: AreaFocus | null): void;
 }
+
+/** One object to open in a square's results: a known object by designation, or a track by id. */
+export type AreaFocus = { designation: string } | { trackId: string };
+/** Set by openSquare, applied once the square's results are read. */
+let pendingFocus: AreaFocus | null = null;
 
 const SEARCH_MS = 1900;
 const FOUND_MS = 1000;
@@ -333,6 +350,11 @@ export const useAreaStore = create<AreaState>()((set, get) => {
             setTimeout(() => {
               if (mine !== token) return;
               set({ say: null, screen: 'list', known: res });
+              const f = pendingFocus;
+              pendingFocus = null;
+              const o = f && 'designation' in f ? res.objects.find((x) => (x.designation ?? x.id) === f.designation) : null;
+              // Track-available (or the demo): the Track view at once; else the row stays in view.
+              if (o && (o.trackAvailable || o.objectId === DEMO_OBJECT_ID)) get().openEros(o);
             }, FOUND_MS),
           );
         });
@@ -397,6 +419,10 @@ export const useAreaStore = create<AreaState>()((set, get) => {
         if (mine !== token) return;
         set({ disc });
         startRun();
+        const f = pendingFocus;
+        pendingFocus = null;
+        const i = f && 'trackId' in f ? disc.movers.findIndex((m) => m.id === f.trackId) : -1;
+        if (i >= 0) get().openMover(i);
       },
       async (e: unknown) => {
         if (mine !== token) return;
@@ -449,7 +475,7 @@ export const useAreaStore = create<AreaState>()((set, get) => {
       set((s) => ({
         screen: 'eros',
         // Back from the Track view: to the Discovery track it was opened from, else none (Known).
-        trackBack: s.screen === 'mover' ? 'mover' : s.screen === 'track' ? s.trackBack : 'list',
+        trackBack: s.screen === 'mover' ? 'mover' : s.screen === 'track' ? s.trackBack : s.screen === 'scan' ? 'scan' : 'list',
         minimised: false,
         index: 0,
         det: null,
@@ -470,7 +496,7 @@ export const useAreaStore = create<AreaState>()((set, get) => {
     trackBack: 'list',
     openTrack: (obj, around, release) => {
       const from = get().screen;
-      set({ screen: 'track', minimised: false, focus: obj, trackBack: from === 'mover' ? 'mover' : 'list', playing: false });
+      set({ screen: 'track', minimised: false, focus: obj, trackBack: from === 'mover' ? 'mover' : from === 'scan' ? 'scan' : 'list', playing: false });
       void useTrackJobStore.getState().start(obj, around, release);
     },
     openMover: (i) =>
@@ -492,9 +518,24 @@ export const useAreaStore = create<AreaState>()((set, get) => {
     toggleOv: (k) => set((s) => ({ ov: { ...s.ov, [k]: !s.ov[k] } })),
     reset: () => {
       clearTimers();
+      pendingFocus = null;
       useLiveJobStore.getState().clearView();
       useTrackJobStore.getState().clear();
       set({ ...FRESH });
+    },
+    openScan: (flow, box) => {
+      clearTimers();
+      useLiveJobStore.getState().clearView();
+      set({ ...FRESH, flow, stage: 'set', box, last: box, screen: 'scan' });
+    },
+    backToScan: () => set({ screen: 'scan', minimised: false, playing: false, focus: null }),
+    openSquare: (box, flow, focus = null) => {
+      clearTimers();
+      useLiveJobStore.getState().clearView();
+      pendingFocus = focus;
+      set({ ...FRESH, flow, stage: 'set', box, last: box });
+      if (flow === 'known') runKnown(box, true);
+      else openDiscFor(true);
     },
   };
 });
@@ -517,6 +558,8 @@ export function areaMiniTitle(
   }
   // The live card's pill is liveMiniTitle (Island.tsx); this is only its fallback.
   if (s.screen === 'live') return 'Live area';
+  // The scan card's pill is scanMiniTitle (Island.tsx); this is only its fallback.
+  if (s.screen === 'scan') return 'Scan';
   if (s.screen === 'track') {
     const name = s.focus ? [s.focus.id, s.focus.name].filter(Boolean).join(' ') : 'Track';
     return `${name} · Preparing Track`;

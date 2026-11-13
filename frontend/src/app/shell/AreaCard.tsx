@@ -11,6 +11,7 @@ import { ErosCard } from '@/app/area/ErosCard';
 import { KnownList } from '@/app/area/KnownList';
 import { LiveAreaCard } from '@/app/area/LiveAreaCard';
 import { TrackJobCard } from '@/app/area/TrackJobCard';
+import { ScanCard } from '@/app/area/ScanCard';
 import { fitCamera, flyToView, enterInArea, safeRect } from '@/app/sky/areaDraw';
 import { MAX_SIDE_DEG } from '@/app/area/aim';
 import { formatAreaDims, useAreaStore } from './areaStore';
@@ -115,7 +116,17 @@ export function AreaCard() {
     case 'list':
       return <KnownList />;
     case 'eros':
-      return <ErosCard back={trackBack === 'mover' ? () => useAreaStore.getState().openMover(useAreaStore.getState().sel) : undefined} />;
+      return (
+        <ErosCard
+          back={
+            trackBack === 'mover'
+              ? () => useAreaStore.getState().openMover(useAreaStore.getState().sel)
+              : trackBack === 'scan'
+                ? () => useAreaStore.getState().backToScan()
+                : undefined
+          }
+        />
+      );
     case 'disc':
       return <DiscoveryCard />;
     case 'mover':
@@ -124,6 +135,8 @@ export function AreaCard() {
       return <LiveAreaCard />;
     case 'track':
       return <TrackJobCard />;
+    case 'scan':
+      return <ScanCard />;
     default:
       return <DrawCard />;
   }
@@ -150,11 +163,11 @@ function DrawCard() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
-  // Issue #144 (mock-up states 1 and 2): aim, then draw in the picked patch.
+  // Issue #157 (mock-up state 1): the pointer is the region; a click or tap selects it.
   const coarse = typeof window !== 'undefined' && (window.matchMedia?.('(pointer: coarse)').matches ?? false);
   const [lead, rest] =
     stage === 'aiming'
-      ? [`${coarse ? 'Tap' : 'Click'} a patch to zoom in`, 'drag to turn the sky']
+      ? [`${coarse ? 'Tap' : 'Click'} a region to scan`, `${coarse ? 'pinch' : 'scroll'} to resize · drag to turn the sky`]
       : ['Drag to draw your area', `up to ${MAX_SIDE_DEG}° a side`];
   return (
     <div className="sx-area-hint" data-testid="area-card" data-stage={stage}>
@@ -164,7 +177,9 @@ function DrawCard() {
       <span role="status" data-testid="area-hint">
         <span className="sr-only">{flow === 'known' ? 'Known objects' : 'Discovery'}: </span>
         {lead} <span className="sx-area-hint-keys">· {rest}</span>
-        <span className="sr-only">. Press Enter for an area in the middle, Escape to leave.</span>
+        <span className="sr-only">
+          {stage === 'aiming' ? '. Press Enter to select the region in the middle, Escape to leave.' : '. Press Enter for an area in the middle, Escape to leave.'}
+        </span>
       </span>
     </div>
   );
