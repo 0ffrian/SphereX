@@ -371,11 +371,18 @@ def _run(args: argparse.Namespace, steps: list[str], settings: Settings) -> int:
             target = ReadThroughCache(args.pack, offline=True) if args.pack else ctx.cache
             service.store_area(target, result, prepared)
             print(f"[export] stored {args.area} p={prepared.params_hash[:12]} in {target.root}")
-            spectra = spectrum.store_prepared(
-                target, result.frames.spec.data_release, prepared.params_hash, prepared.bodies
-            )
-            counts = Counter(t["verdict"] for t in spectra["tracks"])
-            print(f"[spectra] stored: {dict(sorted(counts.items()))}")
+            # As in live_jobs: the area is stored and served, so a failed spectrum check only
+            # leaves /spectra answering spectra_not_prepared (scripts/area_spectra.py fills it).
+            try:
+                spectra = spectrum.store_prepared(
+                    target, result.frames.spec.data_release, prepared.params_hash, prepared.bodies
+                )
+            except Exception:
+                log.exception("the spectrum check failed for %s", args.area)
+                print("[spectra] not prepared: run scripts/area_spectra.py after fixing the cause")
+            else:
+                counts = Counter(t["verdict"] for t in spectra["tracks"])
+                print(f"[spectra] stored: {dict(sorted(counts.items()))}")
     print("DONE")
     return EXIT_DONE
 

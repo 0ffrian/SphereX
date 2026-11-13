@@ -365,6 +365,23 @@ def test_heat_allowance_is_the_hottest_corner() -> None:
     assert g == pytest.approx(spectrum.heat_ratio(3.3, 1.2, 60.0, CFG.pv_min, CFG.eta_min, CFG))
 
 
+def test_heat_allowance_stays_finite_next_to_the_sun() -> None:
+    # Near 180 deg the HG phase function underflows to 0; the cap keeps G finite and huge.
+    g = spectrum.heat_allowance(3.3, 1.0, 179.999, CFG)
+    assert math.isfinite(g) and g > 1e4
+    assert g == spectrum.heat_allowance(3.3, 1.0, spectrum.HEAT_PHASE_MAX_DEG, CFG)
+
+
+def test_a_track_whose_dots_are_not_in_dots_is_refused() -> None:
+    summary, dots_reply, tracks_reply = _area()
+    tracks_reply["tracks"][0]["tracklets"][0]["dot_ids"].append("nope")
+    with pytest.raises(ValueError, match="not in /dots"):
+        spectrum.compute_spectra(summary, dots_reply, tracks_reply)
+    tracks_reply["tracks"][0]["tracklets"] = []
+    with pytest.raises(ValueError, match="has no dots"):
+        spectrum.compute_spectra(summary, dots_reply, tracks_reply)
+
+
 @pytest.mark.parametrize(
     "when",
     [datetime(2026, 3, 20, 8, 50, tzinfo=UTC), datetime(2026, 11, 14, 0, 0, tzinfo=UTC)],

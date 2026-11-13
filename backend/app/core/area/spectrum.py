@@ -69,6 +69,10 @@ MAG_TO_FRAC = 0.4 * math.log(10.0)  # 0.921: d(flux)/flux per magnitude
 # NEATM quadrature: midpoint rule on the lit hemisphere, about the subsolar point.
 N_THETA = 180
 N_PHI = 360
+# The heat allowance takes the phase angle at most this far from the Sun: near 180 deg the HG
+# phase function underflows to 0 and G (thermal over reflected) would divide by zero. G is
+# already about 3e4 at 175 deg (3.3 um, 1 au), so the cap cannot turn a rock into too_red.
+HEAT_PHASE_MAX_DEG = 175.0
 
 FORMULAS = {
     "points": "a dot of the track with snr >= snr_min is a point; arm = short if wavelength_um "
@@ -273,7 +277,8 @@ def heat_allowance(
     lambda_um: float, r_au: float, alpha_deg: float, cfg: SpectrumConfig = DEFAULT_SPECTRUM_CONFIG
 ) -> float:
     """G of step 5: the largest ratio over the p_V and eta corners (the ratio is monotone in
-    both: darker and lower eta are hotter)."""
+    both: darker and lower eta are hotter). The phase angle is capped at HEAT_PHASE_MAX_DEG."""
+    alpha_deg = min(alpha_deg, HEAT_PHASE_MAX_DEG)
     return max(
         heat_ratio(lambda_um, r_au, alpha_deg, pv, eta, cfg)
         for pv in (cfg.pv_min, cfg.pv_max)
@@ -502,6 +507,13 @@ def check_track(
     cfg: SpectrumConfig,
 ) -> dict[str, Any]:
     ids = sorted({i for tl in track["tracklets"] for i in tl["dot_ids"]})
+    absent = [i for i in ids if i not in dots]
+    if not ids or absent:
+        # The stored /tracks and /dots disagree: refuse the area rather than guess.
+        raise ValueError(
+            f"track {track.get('track_id')}: "
+            + (f"dots {absent[:3]} are not in /dots" if absent else "has no dots")
+        )
     rows = sorted((dots[i] for i in ids), key=lambda d: (d.time, d.detector, d.dot_id))
     times = [d.time for d in rows]
     mid = times[0] + (times[-1] - times[0]) / 2
