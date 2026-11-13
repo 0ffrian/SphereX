@@ -9,6 +9,7 @@
 //   CREATIVE placeholder — Atish to decide (D-13)   a neutral stand-in; how it sounds is Atish's call
 
 // ---------------------------------------------------------------- engine (R8.3, R8.8)
+// DUCK_TAU_DIVISOR (below, R13.9) is also the tone stream's fade divisor.
 
 /** SPEC R8.3: at most 40 events in any 1 s window; extra events are dropped, never queued. */
 export const MAX_EVENTS_PER_SECOND = 40;
@@ -26,6 +27,38 @@ export const TRAIN_LATE_TOLERANCE_MS = 40;
 /** Engineering: train rates are clamped to this range so a bad rate cannot stall or flood the motor. */
 export const TRAIN_MIN_RATE_HZ = 0.25;
 export const TRAIN_MAX_RATE_HZ = 40;
+/**
+ * Engineering (Q-458): the most notes one `emitTogether` group may carry (an exposure's frames; 2 on
+ * Eros). A longer group is refused, so it cannot be used to slip a burst past the R8.3 cap.
+ */
+export const MAX_GROUP_NOTES = 4;
+
+// ---------------------------------------------------------------- tone stream (R8.8, Q-189)
+
+/**
+ * SPEC R8.8 (Q-189, proposed values): fade in over this time (s), read as a ~95 % settle time
+ * (`setTargetAtTime` τ = time / DUCK_TAU_DIVISOR, as the duck). [verify on the A15] (R12)
+ */
+export const TONE_FADE_IN_S = 0.03;
+/** SPEC R8.8 (Q-189): the time constant (s) of every pitch, gain and pan glide. [verify on the A15] */
+export const TONE_GLIDE_S = 0.02;
+/** SPEC R8.8 (Q-189): fade out over this time (s), read as TONE_FADE_IN_S is. [verify on the A15] */
+export const TONE_FADE_OUT_S = 0.06;
+/**
+ * Engineering: after the fade out starts, the source stops this many fade-out times later (two
+ * fade-out times = 6 τ, about −52 dB), so the stop itself cannot click.
+ */
+export const TONE_STOP_AFTER_FADES = 2;
+/**
+ * SPEC R8.8 (Q-189): updates are coalesced to about one per animation frame (60 Hz). Engineering: a
+ * timer stands in for the frame, so the engine stays testable without a browser.
+ */
+export const TONE_UPDATE_MIN_MS = 16;
+/**
+ * R8.9 sustained timbre (Q-190, proposed): the Estimated tags' "softer sine … through a low-pass
+ * filter". Cut-off (Hz). CREATIVE placeholder — Atish to decide (D-13).
+ */
+export const TONE_SOFT_LOWPASS_HZ = 1500;
 
 // ---------------------------------------------------------------- audio driver (R8.9, D-10)
 
