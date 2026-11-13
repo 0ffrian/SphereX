@@ -11,7 +11,9 @@ job fails with ``cancelled``). A queued job stops at once; a running one at its 
 step and each cutout), so it reads ``running`` for a moment after ``DELETE``, and a job past its
 last check before storing finishes ``done``. Jobs live in memory: after a restart a stored
 area still answers ``done`` through the store, and a lost job is simply asked for again.
-Finished jobs are kept for the life of the process (a few per demo; nothing prunes them).
+At most ``MAX_WAITING`` jobs wait (more: ``QueueFull``) and ``MAX_FINISHED`` finished jobs
+are remembered. A job that fails in any way, even with a ``BaseException``, is marked failed
+and the worker goes on with the queue.
 """
 
 from __future__ import annotations
@@ -41,6 +43,15 @@ STEPS: tuple[tuple[str, str], ...] = (
 )
 STEP_IDS = tuple(s for s, _ in STEPS)
 INPUTS = "live_area"
+# A public server must not be flooded: at most this many jobs wait behind the running one
+# (each takes minutes of SIA, cutout, SkyBoT and Horizons load), and at most this many
+# finished jobs are remembered (the oldest are forgotten; a stored area still answers done).
+MAX_WAITING = 5
+MAX_FINISHED = 50
+
+
+class QueueFull(Exception):
+    """``MAX_WAITING`` jobs already wait; the API answers 429 ``queue_full``."""
 
 
 class Cancelled(Exception):
@@ -189,6 +200,7 @@ class LiveJobs:
         self._jobs: dict[str, Job] = {}
         self._queue: deque[str] = deque()
         self._thread: threading.Thread | None = None
+        self._running: Job | None = None
 
     def get(self, area_id: str) -> Job | None:
         with self._lock:
@@ -203,6 +215,9 @@ class LiveJobs:
             job = self._jobs.get(plan.area_id)
             if job is not None and job.active:
                 return job
+            if len(self._queue) >= MAX_WAITING:
+                raise QueueFull()
+            self._prune()
             job = Job(plan)
             self._jobs[plan.area_id] = job
             self._queue.append(plan.area_id)
@@ -243,6 +258,7 @@ class LiveJobs:
                 job = self._jobs[self._queue.popleft()]
                 job.state = "running"
                 job.started = time.monotonic()
+                self._running = job
             try:
                 self._runner(self.ctx, job.plan, Progress(job, self._lock))
             except BaseException as exc:
@@ -253,8 +269,7 @@ class LiveJobs:
                     job.error = _error_of(exc)
                     job.step = None
                     job.finished = time.monotonic()
-                if not isinstance(exc, Exception):
-                    raise
+                    self._running = None
                 continue
             with self._lock:
                 job.state = "done"
@@ -262,6 +277,15 @@ class LiveJobs:
                 for st in job.steps.values():
                     st.state = "done"
                 job.finished = time.monotonic()
+                self._running = None
+
+    def _prune(self) -> None:
+        """Forget the oldest finished jobs beyond ``MAX_FINISHED`` (call with the lock held)."""
+        done = [j for j in self._jobs.values() if j.state in ("done", "failed")]
+        done.sort(key=lambda j: j.finished or 0.0)
+        for j in done[: max(0, len(done) - MAX_FINISHED)]:
+            if self._jobs.get(j.area_id) is j:
+                del self._jobs[j.area_id]
 
     def reply(self, job: Job) -> dict[str, Any]:
         """The ``area-job.schema.json`` body of one job."""
@@ -285,8 +309,8 @@ class LiveJobs:
                 pos = ahead.index(job.area_id) + 1 if job.area_id in ahead else 1
                 out["queue_position"] = pos
                 wait = sum(self._jobs[a].plan.estimate_s() for a in ahead[: pos - 1])
-                running = [j for j in self._jobs.values() if j.state == "running"]
-                for r in running:
+                r = self._running  # also a stopped job still winding down, replaced in _jobs
+                if r is not None:
                     started = r.started if r.started is not None else now
                     wait += max(0, r.plan.estimate_s() - int(now - started))
                 out["eta_s"] = wait + job.plan.estimate_s()
@@ -320,4 +344,14 @@ def done_reply(area_id: str) -> dict[str, Any]:
     }
 
 
-__all__ = ["STEPS", "Cancelled", "Job", "LiveJobs", "Progress", "done_reply", "run_live_area"]
+__all__ = [
+    "MAX_WAITING",
+    "STEPS",
+    "Cancelled",
+    "Job",
+    "LiveJobs",
+    "Progress",
+    "QueueFull",
+    "done_reply",
+    "run_live_area",
+]

@@ -39,7 +39,7 @@ from app.cache.store import CacheMissOffline, UpstreamUnavailable
 from app.context import Context
 from app.core.area.config import AREA_ID
 from app.core.area.live import LiveAreaError, Plan, plan_area, snap_box
-from app.core.area.live_jobs import LiveJobs, done_reply
+from app.core.area.live_jobs import MAX_WAITING, LiveJobs, QueueFull, done_reply
 from app.core.area.store import AreaStore
 from app.core.card.validate import check
 from app.core.find.png import encode_png
@@ -56,6 +56,7 @@ ERRORS: dict[int | str, dict[str, Any]] = {404: {"model": ErrorResponse}}
 LIVE_ERRORS: dict[int | str, dict[str, Any]] = {
     404: {"model": ErrorResponse},
     422: {"model": ErrorResponse},
+    429: {"model": ErrorResponse},
     503: {"model": ErrorResponse},
 }
 JSON = "application/json"
@@ -161,7 +162,15 @@ def post_live(
         return _json(plan.reply(), "area-live-plan.schema.json")
     if jobs.ctx.settings.offline:
         raise ApiError(503, "offline", "Live areas need the network (SX_OFFLINE=1).")
-    return _json(jobs.reply(jobs.submit(plan)), "area-job.schema.json", status=202)
+    try:
+        job = jobs.submit(plan)
+    except QueueFull as exc:
+        raise ApiError(
+            429,
+            "queue_full",
+            f"{MAX_WAITING} areas are already waiting. Try again in a few minutes.",
+        ) from exc
+    return _json(jobs.reply(job), "area-job.schema.json", status=202)
 
 
 @router.get("/live/{area_id}", responses=LIVE_ERRORS)

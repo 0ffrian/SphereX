@@ -433,3 +433,93 @@ def test_the_same_box_twice_joins_the_same_job(client: TestClient) -> None:
     assert again.json()["state"] in ("queued", "running")
     gate.set()
     client.app.state.live_jobs.wait(10)  # type: ignore[attr-defined]
+
+
+# --- PR #147 review: queue cap, a crash never stalls the queue, pruning, eta -------------
+
+
+class _Boom(BaseException):
+    """Not an ``Exception``: the worker must still mark the job failed and go on."""
+
+
+def test_a_base_exception_fails_one_job_and_the_queue_goes_on(tmp_path: Path) -> None:
+    def runner(ctx: Context, plan: Plan, p: Progress) -> None:
+        if plan.box.ra == 10.0:
+            raise _Boom()
+        p.step("known")
+
+    jobs = LiveJobs(_ctx(tmp_path), runner)
+    bad, good = jobs.submit(_plan(0)), jobs.submit(_plan(1))
+    assert jobs.wait(10)
+    assert jobs.reply(bad)["error"]["code"] == "internal"
+    assert jobs.reply(good)["state"] == "done"  # the queued job ran: the worker went on
+    again = jobs.submit(_plan(2))  # and a later submit starts a worker again
+    assert jobs.wait(10) and again.state == "done"
+
+
+def test_the_queue_is_capped(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.core.area import live_jobs
+
+    gate = threading.Event()
+    started = threading.Event()
+
+    def runner(ctx: Context, plan: Plan, p: Progress) -> None:
+        started.set()
+        gate.wait(5)
+
+    monkeypatch.setattr(live_jobs, "MAX_WAITING", 2)
+    jobs = LiveJobs(_ctx(tmp_path), runner)
+    jobs.submit(_plan(0))
+    assert started.wait(5)
+    jobs.submit(_plan(1))
+    jobs.submit(_plan(2))
+    with pytest.raises(live_jobs.QueueFull):
+        jobs.submit(_plan(3))
+    assert jobs.submit(_plan(1)).state == "queued"  # joining a waiting job is still fine
+    gate.set()
+    assert jobs.wait(10)
+
+
+def test_old_finished_jobs_are_forgotten(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.core.area import live_jobs
+
+    monkeypatch.setattr(live_jobs, "MAX_FINISHED", 2)
+    jobs = LiveJobs(_ctx(tmp_path), lambda ctx, plan, p: None)
+    first = jobs.submit(_plan(0))
+    assert jobs.wait(10)
+    for i in (1, 2, 3):
+        jobs.submit(_plan(i))
+        assert jobs.wait(10)
+    assert jobs.get(first.area_id) is None
+    assert jobs.get(_plan(3).area_id) is not None
+
+
+def test_a_waiting_job_counts_a_stopped_job_still_winding_down(tmp_path: Path) -> None:
+    gate = threading.Event()
+    started = threading.Event()
+
+    def runner(ctx: Context, plan: Plan, p: Progress) -> None:
+        started.set()
+        gate.wait(5)
+
+    jobs = LiveJobs(_ctx(tmp_path), runner)
+    first = jobs.submit(_plan(0))
+    assert started.wait(5)
+    jobs.cancel(first.area_id)
+    fresh = jobs.submit(_plan(0))  # replaces the winding-down job in the job list
+    reply = jobs.reply(fresh)
+    assert reply["queue_position"] == 1
+    assert reply["eta_s"] > fresh.plan.estimate_s()  # the stopping job is still counted
+    gate.set()
+    assert jobs.wait(10)
+
+
+def test_a_full_queue_answers_429(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.core.area import live_jobs
+
+    def full(plan: Plan) -> Any:
+        raise live_jobs.QueueFull()
+
+    monkeypatch.setattr(client.app.state.live_jobs, "submit", full)  # type: ignore[attr-defined]
+    r = client.post("/v1/areas/live", json={**BOX, "start": True})
+    assert (r.status_code, r.json()["error"]) == (429, "queue_full")
