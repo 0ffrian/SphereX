@@ -14,13 +14,20 @@ import { Alert, BoxIcon, RouteIcon } from './areaBits';
 import { splitDesignation, type KnownObject } from './areaService';
 import { buildKnown, buildPlaceholder } from './buildFrom';
 import { NO_ID_NOTE } from './KnownList';
-import { failureText, releaseName, stepCount } from './liveJobStore';
+import { releaseName, stepCount } from './liveJobStore';
 import { NO_ORBIT_NOTE } from './RealTrackCard';
 import type { RunKnownRow, RunRecord, RunResults, RunTrackRow, ScanBox, ScanPlan } from './scanApi';
 import { scanEcsv } from './scanExport';
 import { aboutTime, gridShape, squareEstimateS, splitCount } from './scanGrid';
 import { objectsFromEvents, rateOf, squaresText } from './scanObjects';
-import { isFinished, scanFailureText, skippedText, useScanStore, type ScanView } from './scanStore';
+import {
+  isFinished,
+  scanFailureText,
+  skippedText,
+  squareReason,
+  useScanStore,
+  type ScanView,
+} from './scanStore';
 import { middleTime } from './trackJobStore';
 
 const flowTitle = (flow: 'known' | 'discovery') =>
@@ -560,8 +567,8 @@ function ResultRow({ row, release }: { row: Row; release: string }) {
 }
 
 function skippedShort(code: string | undefined): string {
-  if (code === 'area:no_visit_pair') return 'no two visits close in time';
-  return code ? failureText(code).title.toLowerCase() : 'not computed';
+  const r = squareReason(code);
+  return r.charAt(0).toLowerCase() + r.slice(1);
 }
 
 function Done({

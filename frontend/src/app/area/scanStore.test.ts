@@ -126,6 +126,10 @@ describe('scan store', () => {
     await flush();
     expect(useScanStore.getState().view).toMatchObject({ kind: 'failed', code: 'run_not_found' });
     expect(scanFailureText('scan:too_large').title).toBe('Region too large');
+    expect(skippedText(1, 'area:frames_incomplete', true)).toEqual({
+      title: 'Square 1 failed',
+      line: 'Some of its frames could not be downloaded.',
+    });
     expect(skippedText(4, 'area:no_visit_pair', false)).toEqual({
       title: 'Square 4 skipped',
       line: 'No two visits close in time there.',
