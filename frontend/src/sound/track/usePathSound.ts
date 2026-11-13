@@ -7,8 +7,8 @@ import { PathSoundController, type PathFrame, type PathSoundOutput } from './pat
 export interface PathSoundApi {
   /** The path sound is on (pressed). */
   on: boolean;
-  /** Call from the click: unlocks audio (Q-73) and starts the sound. */
-  start(): Promise<boolean>;
+  /** Call from the click: unlocks audio (Q-73) and starts the sound. Null when cancelled first. */
+  start(): Promise<boolean | null>;
   stop(): void;
 }
 

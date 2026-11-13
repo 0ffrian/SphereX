@@ -1,5 +1,5 @@
 // #78: Track's path sound "Hear the Shift" (R8.9.2, Q-134, Q-194, Q-458), driven by the Eros card's
-// exposure stepping (Track-lite, Q-455). Two parts:
+// exposure stepping (the Eros card is the event's Track-lite). Two parts:
 //   - pure mapping: which frames make one exposure, the drawn x as pan, the tick notes, the path voice;
 //   - PathSoundController: start (in the click, unlocks audio) / scrub (every hop or play change) / stop.
 // The reference click and its mute are not built here (see Q-459): the card steps exposure to
@@ -135,6 +135,8 @@ export class PathSoundController {
   private gen = 0;
   private lastExposure: number | null = null;
   private latest: PathScrub | null = null;
+  /** This controller started the `path` tone and has not released it (so it never stops another owner's). */
+  private ownsTone = false;
   private readonly listeners = new Set<() => void>();
 
   constructor(private readonly sound: PathSoundOutput) {}
@@ -155,8 +157,11 @@ export class PathSoundController {
     for (const fn of this.listeners) fn();
   }
 
-  /** Call synchronously from the click. Resolves to whether audio is running. */
-  start(): Promise<boolean> {
+  /**
+   * Call synchronously from the click. Resolves to whether audio is running, or null when a later
+   * `stop()` (or `start()`) cancelled this start before its unlock resolved.
+   */
+  start(): Promise<boolean | null> {
     if (this.on) return Promise.resolve(true);
     this.on = true;
     this.ready = false;
@@ -165,14 +170,14 @@ export class PathSoundController {
     this.notify();
     return this.sound.unlock().then(
       (running) => {
-        if (g !== this.gen || !this.on) return false;
+        if (g !== this.gen || !this.on) return null;
         // The tick and voice wait for the unlock: a tick sent to a locked context is silent but
         // still takes the 25 ms gap (R8.3), which would swallow the first audible one.
         this.ready = true;
         this.apply();
         return running;
       },
-      () => false,
+      () => (g !== this.gen || !this.on ? null : false),
     );
   }
 
@@ -193,15 +198,21 @@ export class PathSoundController {
     this.ready = false;
     this.gen++;
     this.lastExposure = null;
-    this.sound.stopTone('path');
+    this.releaseTone();
     if (was) this.notify();
+  }
+
+  private releaseTone(): void {
+    if (!this.ownsTone) return;
+    this.ownsTone = false;
+    this.sound.stopTone('path');
   }
 
   private apply(): void {
     const s = this.latest;
     if (!s || !s.hop) {
       this.lastExposure = null;
-      this.sound.stopTone('path');
+      this.releaseTone();
       return;
     }
     const hop = s.hop;
@@ -211,13 +222,12 @@ export class PathSoundController {
       if (notes.length > 0) this.sound.emitTogether(notes);
     }
     if (!s.playing) {
-      this.sound.stopTone('path');
+      this.releaseTone();
       return;
     }
     const params = pathVoiceParams(hop);
     // updateTone is false after stop(), a hidden page or a honesty change: start the tone again.
-    if (!this.sound.hasTone('path') || !this.sound.updateTone('path', params)) {
-      this.sound.startTone('path', params);
-    }
+    if (this.ownsTone && this.sound.hasTone('path') && this.sound.updateTone('path', params)) return;
+    this.ownsTone = this.sound.startTone('path', params);
   }
 }
