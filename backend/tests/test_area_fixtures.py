@@ -85,12 +85,10 @@ def test_main_area_has_the_a179_shape() -> None:
     ]
     assert by_id["T3"]["unchecked_by"] == ["horizons:Synthetic fixture A2"]
     assert by_id["T4"]["reason"] == "one_visit"
-    assert [by_id[f"T{i}"]["sed"]["label"] for i in range(1, 5)] == [
-        "smooth",
-        "rough",
-        "smooth",
-        "too_few",
-    ]
+    # The spectrum check (A17.13) is its own reply: one entry per track, in the same order.
+    spectra = _load(AREA / "spectra.json")
+    assert [t["track_id"] for t in spectra["tracks"]] == [t["track_id"] for t in tracks["tracks"]]
+    assert all("sed" not in t for t in tracks["tracks"])
     assert {t["linker"] for t in tracks["tracks"]} == {"pairs"}
     # One OUTLIER on the found-blind mover is kept and flagged (Q-139, Q-178).
     t1 = {i for tl in by_id["T1"]["tracklets"] for i in tl["dot_ids"]}
@@ -150,7 +148,6 @@ MUTATIONS: dict[str, Mutation] = {
     "track ids out of order": lambda a: a["tracks"]["tracks"].reverse(),
     "unsorted missing": lambda a: a["tracks"]["missing"].reverse(),
     "summary missing not the union": lambda a: a["summary"]["missing"].pop(),
-    "smooth above the threshold": lambda a: _t(a, "T1")["sed"].__setitem__("chi2_red", 9.0),
     "checks partly run": lambda a: a["checks"].pop("control"),
     "wilson interval": lambda a: a["checks"]["completeness"]["cells"][0].__setitem__(
         "wilson95", [0.0, 1.0]
@@ -168,7 +165,6 @@ MUTATIONS: dict[str, Mutation] = {
     ),
     "derived without formula": lambda a: a["summary"]["provenance"]["steps"].pop("formula"),
     "rate grid on two visits": lambda a: _t(a, "T2").__setitem__("linker", "rate_grid"),
-    "too_few with a chi2_red": lambda a: _t(a, "T4")["sed"].__setitem__("chi2_red", 1.0),
     "one_visit possible with a rate": lambda a: _t(a, "T4").__setitem__("rate_deg_day", 0.3),
     "one_visit possible with a distance": lambda a: _t(a, "T4").__setitem__("u_inv_au", 0.5),
     "track with a PA but no rate": lambda a: _t(a, "T2").__setitem__("rate_deg_day", None),

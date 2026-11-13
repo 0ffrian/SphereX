@@ -49,8 +49,6 @@ export type {
   AreaTrack,
   AreaTracklet,
   AreaMatch,
-  AreaSed,
-  AreaSedLabel,
   AreaVerdict,
   AreaLinker,
   AreaChecks,
@@ -79,8 +77,21 @@ export type {
   LiveJobError,
   LiveVisit,
   LiveVisitPair,
+  AreaSpectra,
+  AreaSpectraProvenance,
+  AreaSpectraMethod,
+  AreaSpectraSun,
+  AreaSpectraCalibration,
+  AreaSpectraTrack,
+  AreaSpectraPair,
+  AreaSpectraStep,
+  AreaSpectraPoint,
+  AreaSpectraVerdict,
+  AreaSpectraRSource,
+  AreaSpectraLimit,
+  AreaSpectraArm,
 } from './generated';
-export { AREA_DOT_LABELS, AREA_VERDICTS, AREA_SED_LABELS, AREA_LINKERS } from './generated';
+export { AREA_DOT_LABELS, AREA_VERDICTS, AREA_LINKERS } from './generated';
 /** D-23: IRMode uses the same shape as VisibleMode; `channels_um` is set on IRMode only. */
 export type IRMode = VisibleMode;
 export type {

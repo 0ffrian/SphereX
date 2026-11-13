@@ -226,7 +226,6 @@ def check_tracks(
     frame_index = {fid: i for i, fid in enumerate(frames)}
     by_id = {d["dot_id"]: d for d in all_dots(dots)}
     coverage = {c["visit"]: c["polygon"] for c in summary["coverage"]}
-    settings = summary["method"]["settings"]
     n_visits = summary["n_visits"]
     missing = set(tracks["missing"])
     skybot = {a["visit"]: a["fetched_at"] for a in tracks["skybot"]}
@@ -265,7 +264,6 @@ def check_tracks(
                 seen.add(dot_id)
                 track_dots.append(d)
         _check_verdict(t, track_dots, coverage, missing, skybot, designations)
-        _check_sed(t, track_dots, settings)
         _check_match(t, track_dots, known, strict=strict)
     if n_visits < 3:
         _check(
@@ -323,28 +321,6 @@ def _check_verdict(
             _check(f"skybot:{v}" not in missing, f"{tid}: unexplained with skybot:{v} missing")
     if t["linker"] == "rate_grid":
         _check(len(t["visits"]) >= 3, f"{tid}: rate_grid with fewer than 3 visits")
-
-
-def _check_sed(t: dict[str, Any], track_dots: list[dict[str, Any]], settings: Reply) -> None:
-    sed = t.get("sed")
-    if sed is None:
-        return
-    tid = t["track_id"]
-    label, chi2 = sed["label"], sed["chi2_red"]
-    if label == "too_few":
-        _check(chi2 is None, f"{tid}: too_few with a chi2_red")
-    if label in {"smooth", "rough"}:
-        _check(chi2 is not None, f"{tid}: {label} without chi2_red")
-    if "sed_sigma_floor" in settings:
-        _check(sed["sigma_floor"] == settings["sed_sigma_floor"], f"{tid}: sed sigma_floor")
-    used = [d for d in track_dots if d["snr"] >= float(settings.get("sed_snr_min", 3.0))]
-    _check(sed["n_dots"] == len(used), f"{tid}: sed n_dots != dots with snr >= sed_snr_min")
-    detectors = {d["detector"] for d in used}
-    few = len(used) < int(settings.get("sed_min_dots", 6)) or len(detectors) < 2
-    _check((label == "too_few") == few, f"{tid}: too_few iff < sed_min_dots or one detector")
-    if label in {"smooth", "rough"} and "sed_chi2_max" in settings:
-        smooth = chi2 <= float(settings["sed_chi2_max"])
-        _check((label == "smooth") == smooth, f"{tid}: smooth iff chi2_red <= sed_chi2_max")
 
 
 def _check_match(
@@ -506,10 +482,6 @@ def check_area(
     )
     union = sorted({m for r in (known, dots, tracks, checks) for m in r["missing"]})
     _check(summary["missing"] == union, "summary.missing != union of the other replies'")
-    _check(
-        ("sed" in tracks["provenance"]) == any("sed" in t for t in tracks["tracks"]),
-        "tracks.provenance.sed present iff a track has sed",
-    )
     if summary["n_visits"] < 3 and "checks:not_run" not in checks["missing"]:
         _check("rate_grid:visits" in tracks["missing"], "fewer than 3 visits: rate_grid:visits")
     check_summary(summary, index_entry)

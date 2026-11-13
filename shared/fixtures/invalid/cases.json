@@ -1924,13 +1924,7 @@
           "verdict": "discovery",
           "match": null,
           "linker": "pairs",
-          "unchecked_by": [],
-          "sed": {
-            "label": "rough",
-            "chi2_red": 7.8,
-            "n_dots": 16,
-            "sigma_floor": 0.15
-          }
+          "unchecked_by": []
         }
       ],
       "skybot": [
@@ -1956,11 +1950,6 @@
           "tag": "model_dependent",
           "source": "synthetic fixture: made-up known objects",
           "assumption": "orbit solutions from SkyBoT (candidates) and JPL Horizons (positions) as of fetched_at, seen from SPHEREx (500@-163182)"
-        },
-        "sed": {
-          "tag": "derived",
-          "source": "synthetic fixture: made-up scores",
-          "formula": "weighted degree-2 fit of ln F against ln wavelength, chi2_red against sed_chi2_max (A17.13)"
         }
       }
     }
@@ -2159,7 +2148,7 @@
     "name": "area provenance tagged artistic",
     "schema": "area-tracks",
     "expect": {
-      "path": "/provenance/sed/tag",
+      "path": "/provenance/match/tag",
       "keyword": "enum"
     },
     "instance": {
@@ -2184,13 +2173,8 @@
           "formula": "tracklets and visit pairs of A17.4 (A17.12 for rate_grid) with the thresholds in method.settings"
         },
         "match": {
-          "tag": "model_dependent",
-          "source": "synthetic fixture: made-up known objects",
-          "assumption": "orbit solutions from SkyBoT (candidates) and JPL Horizons (positions) as of fetched_at, seen from SPHEREx (500@-163182)"
-        },
-        "sed": {
           "tag": "artistic",
-          "source": "synthetic fixture: not a real value"
+          "source": "synthetic fixture: made-up known objects"
         }
       }
     }

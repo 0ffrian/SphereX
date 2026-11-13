@@ -449,7 +449,6 @@ export type AreaTrackId = string;
 export type AreaAngleDeg = number;
 export type AreaVerdict = 'found_blind' | 'unexplained' | 'unchecked' | 'possible';
 export type AreaLinker = 'pairs' | 'rate_grid';
-export type AreaSedLabel = 'smooth' | 'rough' | 'too_few' | 'not_informative';
 /**
  * GET /v1/areas/{area_id}/checks (A17.8, A17.6; gated, Q-203). Each part appears only if it ran (A18.11): checks:d4_not_run drops test_mover and completeness, checks:d5_not_run drops control, checks:not_run drops every part and the linker (Q-208 (12)).
  */
@@ -471,6 +470,20 @@ export type AreaChecks = {
  * @maxItems 2
  */
 export type AreaInterval = [number, number];
+/**
+ * A17.13 step 7: the first row that applies.
+ */
+export type AreaSpectraVerdict =
+  'rock' | 'very_red' | 'too_red' | 'too_blue' | 'flickers' | 'too_faint' | 'one_colour';
+/**
+ * parallax: r from u_inv_au (derived); worst_case: the closest the line of sight comes to the Sun (model_dependent).
+ */
+export type AreaSpectraRSource = 'parallax' | 'worst_case';
+/**
+ * null: a measured ratio; lower or upper: a limit, one dot below snr_min.
+ */
+export type AreaSpectraLimit = ('lower' | 'upper') | null;
+export type AreaSpectraArm = 'short' | 'long';
 /**
  * ISO-8601 UTC with milliseconds and a trailing Z.
  */
@@ -513,6 +526,7 @@ export interface ContractSchemas {
   areaDots: AreaDots;
   areaTracks: AreaTracks;
   areaChecks: AreaChecks;
+  areaSpectra: AreaSpectra;
   areaError: AreaError;
   trackPath: TrackPath;
   liveAreaPlan: LiveAreaPlan;
@@ -996,7 +1010,7 @@ export interface AreaDotsProvenance {
   label: AreaProvenanceEntry;
 }
 /**
- * GET /v1/areas/{area_id}/tracks (A17.8): tracks and possibles (A17.4) with match and verdict (A17.5), sed (A17.13) and linker (A17.12).
+ * GET /v1/areas/{area_id}/tracks (A17.8): tracks and possibles (A17.4) with match and verdict (A17.5) and linker (A17.12); the spectrum check is /spectra (A17.13).
  */
 export interface AreaTracks {
   tracks: AreaTrack[];
@@ -1022,7 +1036,6 @@ export interface AreaTrack {
   match: AreaMatch | null;
   linker: AreaLinker;
   unchecked_by: AreaMissingCode[];
-  sed?: AreaSed;
 }
 export interface AreaTracklet {
   visit: AreaVisit;
@@ -1042,16 +1055,9 @@ export interface AreaMatch {
   median_sep_px: number;
   fetched_at: AreaUtcTime;
 }
-export interface AreaSed {
-  label: AreaSedLabel;
-  chi2_red: number | null;
-  n_dots: number;
-  sigma_floor: number;
-}
 export interface AreaTracksProvenance {
   tracks: AreaProvenanceEntry;
   match: AreaProvenanceEntry;
-  sed?: AreaProvenanceEntry;
 }
 export interface AreaTestMover {
   ra: AreaRa;
@@ -1111,6 +1117,120 @@ export interface AreaChecksProvenance {
   test_mover?: AreaProvenanceEntry;
   completeness?: AreaProvenanceEntry;
   control?: AreaProvenanceEntry;
+}
+/**
+ * GET /v1/areas/{area_id}/spectra (A17.8, A17.13, Q-474): the spectrum check of every track of /tracks, in the same order. Colours are taken only within one exposure (short arm below the 2.42 um dichroic, long arm at or above it); the check never changes a track or its verdict (A17.5).
+ */
+export interface AreaSpectra {
+  area_id: AreaId;
+  cached_at: AreaUtcTime;
+  computed_at: AreaUtcTime;
+  missing: AreaMissingCode[];
+  provenance: AreaSpectraProvenance;
+  method: AreaSpectraMethod;
+  calibration: AreaSpectraCalibration[];
+  tracks: AreaSpectraTrack[];
+}
+export interface AreaSpectraProvenance {
+  points: AreaProvenanceEntry;
+  rel: AreaProvenanceEntry;
+  calibration: AreaProvenanceEntry;
+  colour: AreaProvenanceEntry;
+  distance: AreaProvenanceEntry;
+  distance_worst_case: AreaProvenanceEntry;
+  verdict: AreaProvenanceEntry;
+  sun: AreaProvenanceEntry;
+}
+export interface AreaSpectraMethod {
+  spectrum_version: string;
+  settings: AreaSettings;
+  formulas: {
+    [k: string]: string;
+  };
+  sun: AreaSpectraSun;
+}
+export interface AreaSpectraSun {
+  source: string;
+  sha256: string;
+  join_um: number;
+}
+/**
+ * A17.13 step 2: the calibration floor of one visit and detector (derived).
+ */
+export interface AreaSpectraCalibration {
+  visit: AreaVisit;
+  detector: AreaDetector;
+  sigma_sys: number;
+  n_pairs: number;
+  source: 'stars' | 'default';
+}
+export interface AreaSpectraTrack {
+  track_id: AreaTrackId;
+  verdict: AreaSpectraVerdict;
+  /**
+   * true: a parallax rock with a pair above r_max; null: the distance is unknown (worst case); false otherwise.
+   */
+  heat_glow: boolean | null;
+  r_au: number;
+  r_source: AreaSpectraRSource;
+  phase_deg: number;
+  pairs: AreaSpectraPair[];
+  steps: AreaSpectraStep[];
+  points: AreaSpectraPoint[];
+}
+/**
+ * A17.13 step 3: one short-arm and one long-arm dot of the same exposure; rho is the colour relative to the Sun (model_dependent).
+ */
+export interface AreaSpectraPair {
+  visit: AreaVisit;
+  exposure: AreaExposure;
+  time: AreaUtcTime;
+  short_dot_id: AreaDotId;
+  long_dot_id: AreaDotId;
+  lambda_short_um: number;
+  lambda_long_um: number;
+  rho: number;
+  rho_err: number | null;
+  limit: AreaSpectraLimit;
+  rho_max: number;
+}
+/**
+ * A17.13 step 6: consecutive points of one visit and detector; ok when |change| <= allowed.
+ */
+export interface AreaSpectraStep {
+  visit: AreaVisit;
+  detector: AreaDetector;
+  dot_id_a: AreaDotId;
+  dot_id_b: AreaDotId;
+  time_a: AreaUtcTime;
+  time_b: AreaUtcTime;
+  change: number;
+  allowed: number;
+  ok: boolean;
+}
+/**
+ * A17.13 step 1 and 8: every dot of the track (measured), with rel for the chart (derived).
+ */
+export interface AreaSpectraPoint {
+  dot_id: AreaDotId;
+  visit: AreaVisit;
+  detector: AreaDetector;
+  exposure: AreaExposure;
+  time: AreaUtcTime;
+  lambda_um: number;
+  flux_uJy: number;
+  flux_err: number;
+  snr: number;
+  arm: AreaSpectraArm;
+  /**
+   * snr >= snr_min; below it the dot is used only as a limit.
+   */
+  point: boolean;
+  rel: number | null;
+  /**
+   * The dot entered a colour pair or a steadiness step.
+   */
+  used: boolean;
 }
 /**
  * Error body: 404 area_not_found, 404 dot_not_found, 503 stamp_unavailable (A17.8).
@@ -1349,13 +1469,6 @@ export const AREA_VERDICTS: readonly AreaVerdict[] = [
   'unexplained',
   'unchecked',
   'possible',
-];
-
-export const AREA_SED_LABELS: readonly AreaSedLabel[] = [
-  'smooth',
-  'rough',
-  'too_few',
-  'not_informative',
 ];
 
 export const AREA_LINKERS: readonly AreaLinker[] = ['pairs', 'rate_grid'];
