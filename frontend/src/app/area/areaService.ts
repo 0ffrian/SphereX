@@ -30,6 +30,8 @@ import {
   type RealDiscovery,
   type RealKnown,
 } from './realArea';
+import type { TrackSpectrum } from './spectraApi';
+import { verdictCounts } from './spectrumWords';
 
 /** One exposure of 433 Eros (the demo frames). Fields as in the demo file's `hops`. */
 export interface ErosHop {
@@ -127,6 +129,8 @@ export interface DiscoveryMover {
   visits: number;
   /** The prepared area's track (null for the demo). */
   track: AreaTrack | null;
+  /** The track's spectrum check (A17.13); null for the demo, or when the check was not run. */
+  spectrum: TrackSpectrum | null;
 }
 export interface DiscoveryDot {
   p: [number, number];
@@ -136,6 +140,11 @@ export interface DiscoveryStep {
   label: string;
   /** What the step reports once done (dummy numbers, labelled "(demo)"). */
   result: string;
+  /**
+   * The result under Measured only (D-21), when `result` carries a model_dependent verdict: the
+   * spectrum check's "3 rock-like, ..." becomes "9 tracks checked". Absent: `result` shows as it is.
+   */
+  measuredResult?: string;
 }
 export interface DiscoveryResult {
   /** True for the made-up demo answer; false for a prepared area's stored replies. */
@@ -437,9 +446,9 @@ async function demoDiscoverIn(box: AreaBox): Promise<DiscoveryResult> {
   const X = () => 30 + r() * 1220;
   const Y = () => 30 + r() * 660;
   const movers: DiscoveryMover[] = [
-    { id: 'T1', known: '433 Eros', kind: 'known', pts: [a, z], visits: 2, track: null },
-    { id: 'T2', known: null, kind: 'unexplained', pts: [[430, 540], [700, 330]], visits: 2, track: null },
-    { id: 'T3', known: null, kind: 'once', pts: [[1010, 560]], visits: 1, track: null },
+    { id: 'T1', known: '433 Eros', kind: 'known', pts: [a, z], visits: 2, track: null, spectrum: null },
+    { id: 'T2', known: null, kind: 'unexplained', pts: [[430, 540], [700, 330]], visits: 2, track: null, spectrum: null },
+    { id: 'T3', known: null, kind: 'once', pts: [[1010, 560]], visits: 1, track: null, spectrum: null },
   ];
   const dots: DiscoveryDot[] = [];
   for (let i = 0; i < 58; i++) dots.push({ p: [X(), Y()], k: 'glitch' });
@@ -481,11 +490,29 @@ export function realSteps(r: RealDiscovery): DiscoveryStep[] {
       result: `${n.n_tracks} tracks` + (n.n_possible > 0 ? `, ${n.n_possible} possible` : ''),
     },
     { label: 'Check known objects (SkyBoT)', result: checked },
+    // A17.13: only when the area has a stored spectrum check (else "Spectrum check not run" is
+    // listed under Not shown).
+    ...(r.spectra
+      ? [
+          {
+            label: SPECTRUM_STEP,
+            result: verdictCounts(r.spectra.tracks),
+            measuredResult: tracksChecked(r.spectra.tracks.length),
+          },
+        ]
+      : []),
   ];
 }
 
+/** The spectrum step's neutral result under Measured only (the verdicts are model_dependent, D-21). */
+const tracksChecked = (n: number) => `${n} track${n === 1 ? '' : 's'} checked`;
+
+/** The step of the spectrum check (A18.7); the row verdicts show once it is done. */
+export const SPECTRUM_STEP = 'Check the spectrum';
+
 /** A prepared area's tracks as the card's movers (verdicts as stored, A16.5). */
 export function realMovers(r: RealDiscovery): DiscoveryMover[] {
+  const spectra = new Map((r.spectra?.tracks ?? []).map((s) => [s.track_id, s]));
   return (r.tracks?.tracks ?? []).map((t) => ({
     id: t.track_id,
     known: t.verdict === 'found_blind' && t.match ? matchName(t.match) : null,
@@ -493,6 +520,7 @@ export function realMovers(r: RealDiscovery): DiscoveryMover[] {
     pts: [],
     visits: t.visits.length,
     track: t,
+    spectrum: spectra.get(t.track_id) ?? null,
   }));
 }
 
