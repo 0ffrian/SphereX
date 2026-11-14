@@ -69,7 +69,7 @@ export function ReplayBack() {
       type="button"
       className="sx-replay-back"
       aria-label="Back: end the replay"
-      title="End the replay"
+      title="End the replay (Esc)"
       onClick={endReplayToRuns}
       data-testid="replay-back"
     >

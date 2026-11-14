@@ -26,6 +26,7 @@ export function PanelCard({
   bare = false,
   testId,
   back,
+  wrapSubtitle = false,
   children,
 }: {
   title: string;
@@ -54,6 +55,8 @@ export function PanelCard({
    * same, and × still closes everything.
    */
   back?: { label: string; go(): void } | null;
+  /** The subtitle wraps to two lines instead of being cut (a sentence, not a name). */
+  wrapSubtitle?: boolean;
   children: ReactNode | ((close: () => void) => ReactNode);
 }) {
   // The area cards (Known objects, Discovery) are travelled to by the island like the object panel:
@@ -138,7 +141,10 @@ export function PanelCard({
           </h2>
           {subtitle && (
             // A long name is cut with an ellipsis; the tooltip has it in full.
-            <p className="truncate" title={typeof subtitle === 'string' ? subtitle : undefined}>
+            <p
+              className={wrapSubtitle ? 'line-clamp-2' : 'truncate'}
+              title={typeof subtitle === 'string' ? subtitle : undefined}
+            >
               {subtitle}
             </p>
           )}

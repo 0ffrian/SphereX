@@ -4811,6 +4811,9 @@ body {
 /* #173: the card's ← sits before the title, pulled toward the edge; the title follows it. */
 .sx-panel-head .sx-panel-back {
   margin: -6px 0 0 -8px;
+  /* Full text colour (not the muted − and ×): it is the way back, and it keeps 3:1 on the glass.
+     Its 32 px target (44 px on coarse pointers) is .sx-panel-x's. */
+  color: var(--color-sx-fg);
 }
 .sx-panel-head .sx-panel-x + .sx-panel-x {
   margin-left: -7px;
@@ -6576,7 +6579,8 @@ li[data-state='running'] > .sx-live-mk {
 @media (min-width: 641px) {
   .sx-bezel .sx-sdock.sx-sdock[data-replay] {
     left: 50%;
-    width: min(760px, calc(100% - 32px));
+    /* Clear of the zoom card at the bottom left (about 240 px) on both sides. */
+    width: min(760px, max(480px, calc(100% - 512px)));
   }
 }
 /* The player may wrap (coarse pointers): the glass grows with it. */

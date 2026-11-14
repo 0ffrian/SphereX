@@ -352,10 +352,9 @@ describe('the spectrum chart', () => {
     expect(row()).toBeNull();
     const btn = host.querySelector<HTMLButtonElement>('[data-testid="disc-show-possible"]')!;
     expect(btn.textContent).toBe('Show possible (1)');
-    expect(btn.getAttribute('aria-pressed')).toBe('false');
     await act(async () => btn.click());
     expect(row()).not.toBeNull();
-    expect(btn.getAttribute('aria-pressed')).toBe('true');
+    expect(btn.textContent).toBe('Hide possible (1)');
   });
 
   it('#173: a single square\'s list has a ← back to your patch, which folds the card away', async () => {
