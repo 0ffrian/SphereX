@@ -30,11 +30,11 @@ flowchart TB
     ECSV["core/export/ecsv.py shared writer (A19.9)"]
   end
   CACHE[("Read-through cache D-25<br/>raw replies + derived.area entries")]
-  API["api/areas.py: /v1/areas, /area_id, /known, /dots, /tracks,<br/>/stamps/dot_id.png, /export.ecsv, /spectra (proposed, Q-474)<br/>(no /checks: D4 to D7 cut),<br/>POST /live, GET and DELETE /live/area_id (Q-462)"]
+  API["api/areas.py: /v1/areas, /area_id, /known, /dots, /tracks,<br/>/stamps/dot_id.png, /export.ecsv, /spectra (Q-474, PR #163)<br/>(no /checks: D4 to D7 cut),<br/>POST /live, GET and DELETE /live/area_id (Q-462)"]
   subgraph Live["backend/app/core/area/ live areas (issue #141)"]
     LIVE["live.py<br/>box rules, visit pair at the centre, plan, area id"]
     JOBS["live_jobs.py<br/>queue, one worker thread, run_live_area (pipeline imported lazily)"]
-    SPEC["spectrum.py (proposed, Q-474)<br/>colour per exposure vs the Sun, heat glow, steadiness, verdict per track"]
+    SPEC["spectrum.py (Q-474, issue #161)<br/>colour per exposure vs the Sun, heat glow, steadiness, verdict per track"]
     SUN[("assets/solar/sun.json<br/>CALSPEC + Kurucz, R = 41")]
   end
   PACK[("assets/areas pack<br/>derived.area entries, Eros (issue #108)")]
@@ -43,6 +43,7 @@ flowchart TB
     DEMO["app/area areaService<br/>Known objects: /v1/areas + /known (Q-455); Discovery: prepared area (Q-406), else the demo, only inside the Eros area (Q-414)"]
     CARDS["Feature cards in the object card's slot (proposed Q-172)<br/>Area, Options, Known, Discovery, Result, Checks (gated)"]
     ISL["Island progress pill (proposed)"]
+    SPUI["app/area spectraApi.ts + SpectrumCard.tsx (issue #162)<br/>/spectra client; row word, verdict, chart, rows on the Result card"]
     LAYER["app/sky/area AreaLayer<br/>sky layer slot"]
     STORE["state/store.ts area slice"]
     TRK["Track pane, split kind track (A20)"]
@@ -88,6 +89,8 @@ flowchart TB
   STORE --> LAYER
   SKY --> LAYER
   CARDS --> TRK
+  API -->|"/spectra"| SPUI
+  SPUI --> CARDS
 ```
 
 `join.py` asks Horizons for SPHEREx's velocity relative to the geocentre, one vector per visit, for the parallax-aware test (A17.4; built in issue #108, `horizons.spherex_velocity`).
