@@ -75,6 +75,15 @@ def block_network(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture(autouse=True)
+def no_second_pass_waits(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The cutout second pass (Q-481) waits 5, 15 and 30 s before its attempts; tests never
+    wait (a test that needs the waits sets them itself)."""
+    from app.core.area import live_jobs
+
+    monkeypatch.setattr(live_jobs, "CUTOUT_SECOND_PASS_S", (0.0, 0.0, 0.0))
+
+
+@pytest.fixture(autouse=True)
 def fresh_cell_grids() -> Iterator[None]:
     """Each test starts with an empty ``cell_grid`` cache, so a test that checks which grid is
     cached does not depend on the order the tests ran in (PR #149 review)."""
