@@ -163,6 +163,13 @@ export interface AreaState {
   trackBack: 'list' | 'mover' | 'scan';
   /** Back to the scan card (from an object opened in its results, issue #157). */
   backToScan(): void;
+  /** The area is one square of a scan, opened from the scan (its list's ← goes back to it, #173). */
+  fromScan: boolean;
+  /** Back to your patch (#173): the card folds away and the sky frames the area. */
+  backToPatch(): void;
+  /** Single-visit possibles are drawn and listed (#173: hidden until "Show possible (n)"). */
+  showPossible: boolean;
+  setShowPossible(on: boolean): void;
   setMinimised(on: boolean): void;
   setIndex(i: number): void;
   setVisit(visit: number | null): void;
@@ -238,6 +245,8 @@ const FRESH = {
   playing: false,
   det: null,
   ov: { mask: true, pred: true, path: true, flags: false },
+  fromScan: false,
+  showPossible: false,
 };
 
 /** Exposures shown: all of them, or those of one detector (D1..D6 is 0..5). */
@@ -303,7 +312,7 @@ export const useAreaStore = create<AreaState>()((set, get) => {
     const mine = token;
     const ctl = new AbortController();
     knownAbort = ctl;
-    set({ ...FRESH, stage: 'set', box, last: box, screen: 'search', say: { kind: 'searching', text: 'Known objects in this area' } });
+    set({ ...FRESH, stage: 'set', box, last: box, screen: 'search', say: { kind: 'searching', text: 'Known objects in this area' }, fromScan: handoff && get().fromScan });
     // Settled at once (a refusal must not sit unhandled while the island "searches"). No prepared
     // area: the coverage check runs inside the same search (issue #144).
     type Answer =
@@ -534,12 +543,14 @@ export const useAreaStore = create<AreaState>()((set, get) => {
       set({ ...FRESH, flow, stage: 'set', box, last: box, screen: 'scan' });
     },
     backToScan: () => set({ screen: 'scan', minimised: false, playing: false, focus: null }),
+    setShowPossible: (showPossible) => set({ showPossible }),
+    backToPatch: () => set((s) => ({ minimised: true, playing: false, sel: -1, fitSeq: s.fitSeq + 1 })),
     openSquare: (box, flow, focus = null) => {
       // clearTimers first: it bumps the token, so an older read never applies this new focus.
       clearTimers();
       useLiveJobStore.getState().clearView();
       pendingFocus = focus;
-      set({ ...FRESH, flow, stage: 'set', box, last: box });
+      set({ ...FRESH, flow, stage: 'set', box, last: box, fromScan: true });
       if (flow === 'known') runKnown(box, true);
       else openDiscFor(true);
     },

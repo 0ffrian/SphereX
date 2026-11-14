@@ -66,7 +66,7 @@ import { useAreaStore } from '@/app/shell/areaStore';
 import { AreaOverlay } from './AreaOverlay';
 import { AreaTrackLayer } from '@/app/area/AreaTrackLayer';
 import { KnownPositionsLayer } from '@/app/area/KnownPositionsLayer';
-import { enterInArea, pickRegionAt, registerAreaView, restoreSavedScan } from './areaDraw';
+import { enterInArea, patchClickAt, pickRegionAt, registerAreaView, restoreSavedScan } from './areaDraw';
 import { ScanOverlay, scanClickAt } from './ScanOverlay';
 import { AimOverlay } from './AimOverlay';
 import { ReplayBar } from './ReplayBar';
@@ -661,6 +661,8 @@ export function SkyPane({ children }: { children?: ReactNode }) {
         }
         // A scan's finished square opens its results (mock-up state 10).
         if (scanClickAt(p.x, p.y)) return;
+        // Your patch, folded away by its list's ←, opens the list again (#173).
+        if (patchClickAt(p.x, p.y)) return;
         pickAt(p.x, p.y);
       }
     };

@@ -5,6 +5,9 @@
 //   discovery: the sky flies to the area, the steps run and the movers are listed.
 // The results are a DEMO (app/area/areaService.ts, Q-205 pending) and are tagged as such.
 import { useEffect, useLayoutEffect } from 'react';
+import { areaBackOf, useAreaBack } from '@/app/area/areaBack';
+import { useRunsStore } from '@/app/area/runsStore';
+import { isEditableTarget } from './shortcuts';
 import { boxInBezel, useIslandStore } from '@/app/island/islandStore';
 import { DiscoveryCard, MoverCard } from '@/app/area/DiscoveryCard';
 import { ErosCard } from '@/app/area/ErosCard';
@@ -12,7 +15,7 @@ import { KnownList } from '@/app/area/KnownList';
 import { LiveAreaCard } from '@/app/area/LiveAreaCard';
 import { TrackJobCard } from '@/app/area/TrackJobCard';
 import { ScanCard } from '@/app/area/ScanCard';
-import { backToScan, fitCamera, flyToView, enterInArea, safeRect } from '@/app/sky/areaDraw';
+import { fitCamera, flyToView, enterInArea, safeRect } from '@/app/sky/areaDraw';
 import { formatAreaDims, useAreaStore } from './areaStore';
 import { useShellStore } from './shellStore';
 
@@ -92,7 +95,7 @@ export function AreaCard() {
   const closePanel = useShellStore((s) => s.closePanel);
   const screen = useAreaStore((s) => s.screen);
   const minimised = useAreaStore((s) => s.minimised);
-  const trackBack = useAreaStore((s) => s.trackBack);
+  const back = useAreaBack();
   useFitSquare();
   useReportAreaBox();
 
@@ -104,12 +107,18 @@ export function AreaCard() {
     },
     [],
   );
-  // Escape cancels from anywhere (the card handles it itself when focus is inside it).
+  // Escape steps back one level from anywhere (#173), else cancels (the card handles it itself when
+  // focus is inside it).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape' || e.defaultPrevented) return;
+      if (e.key !== 'Escape' || e.defaultPrevented || isEditableTarget(e.target)) return;
+      // A replay owns Escape (ReplayBar ends it).
+      if (useRunsStore.getState().replay) return;
       e.preventDefault();
-      closePanel();
+      const s = useAreaStore.getState();
+      const b = s.minimised ? null : areaBackOf(s);
+      if (b) b.go();
+      else closePanel();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -121,17 +130,7 @@ export function AreaCard() {
     case 'list':
       return <KnownList />;
     case 'eros':
-      return (
-        <ErosCard
-          back={
-            trackBack === 'mover'
-              ? () => useAreaStore.getState().openMover(useAreaStore.getState().sel)
-              : trackBack === 'scan'
-                ? backToScan
-                : undefined
-          }
-        />
-      );
+      return <ErosCard back={back} />;
     case 'disc':
       return <DiscoveryCard />;
     case 'mover':

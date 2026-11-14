@@ -169,3 +169,27 @@ test('Discovery: rates caveat, Export ECSV; an unexplained track builds a placeh
   await expect(page.getByTestId('build-pane')).toContainText('T7 · unexplained track');
   await expect(page.getByTestId('build-pane')).toContainText('Placeholder · size and shape not measured');
 });
+
+test('#173: ← steps back one level: track to its list (row in focus), list to your patch; a click on the patch reopens it', async ({
+  page,
+}) => {
+  test.setTimeout(60_000);
+  await draw(page, 'tool-area');
+  await expect(page.getByTestId('disc-rates')).toBeVisible({ timeout: 20_000 });
+  await page.getByTestId('disc-mover-T7').click();
+  await expect(page.getByTestId('real-track-card')).toBeVisible();
+  await page.screenshot({ path: 'test-results/173-track-card.png' });
+  const back = page.getByTestId('area-back');
+  await expect(back).toHaveAccessibleName('Back to the Discovery list');
+  await back.click();
+  await expect(page.getByTestId('disc-card')).toBeVisible();
+  await expect(page.getByTestId('disc-mover-T7')).toBeFocused();
+  await page.screenshot({ path: 'test-results/173-disc-list.png' });
+  await expect(page.getByTestId('area-back')).toHaveAccessibleName('Back to your patch');
+  await page.getByTestId('area-back').click();
+  await expect(page.getByTestId('disc-card')).toHaveCount(0);
+  await page.waitForTimeout(1200);
+  const pane = await page.getByTestId('sky-pane').boundingBox();
+  await page.mouse.click(pane!.x + pane!.width / 2, pane!.y + pane!.height / 2);
+  await expect(page.getByTestId('disc-card')).toBeVisible();
+});

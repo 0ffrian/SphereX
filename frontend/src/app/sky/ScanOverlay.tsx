@@ -11,6 +11,8 @@
 // and a dashed edge, so colour is not the only sign; a track the known-object check could not judge
 // (#169) is a dotted amber ring; under Measured only (D-21) every track is the same neutral ring on
 // its measured dots, named by its id, and no known name, kind word or predicted path is drawn.
+// Issue #173 (approved mock-up): the square being analysed carries the scanning rings (ScanRings),
+// live while the scan runs and in a replay while it plays.
 import { useEffect, useLayoutEffect, useMemo, useRef, type KeyboardEvent } from 'react';
 import type { SkyView } from '@/viewer/sky/SkyView';
 import { useAreaStore } from '@/app/shell/areaStore';
@@ -30,6 +32,7 @@ import { clock, foundAtOf, recordAt } from '@/app/area/replay';
 import type { SquareState } from '@/app/area/scanApi';
 import { skyToPixels } from './areaDraw';
 import { placeScanLabels, ringBox, type Pt } from './scanLabels';
+import { ScanRings } from './ScanRings';
 
 type Look = SquareState | 'plain';
 
@@ -84,6 +87,7 @@ export function ScanOverlay({ view }: { view: SkyView | null }) {
   const showPredicted = useScanStore((s) => s.showPredicted);
   const replayRun = useRunsStore((s) => s.replay?.run ?? null);
   const replayT = useRunsStore((s) => s.replay?.t ?? 0);
+  const replayPlaying = useRunsStore((s) => s.replay?.playing ?? false);
   // A replay (#158) draws its run as it was at the replay time, in place of the scan of the tool.
   const replayView = useMemo<ScanView | null>(
     () =>
@@ -134,6 +138,11 @@ export function ScanOverlay({ view }: { view: SkyView | null }) {
   );
   const record = scan?.kind === 'run' ? scan.record : null;
   const flow = scan?.flow ?? 'discovery';
+  // The rings: on the square being analysed, while the scan runs or the replay plays.
+  const runningAt = squareLooks.indexOf('running');
+  const ringsOn =
+    runningAt >= 0 && (replaying ? replayPlaying : record !== null && record.state !== 'paused');
+  const ringQuad = useRef<Pt[] | null>(null);
 
   const openSquare = (
     index: number,
@@ -160,6 +169,7 @@ export function ScanOverlay({ view }: { view: SkyView | null }) {
     const svg = svgRef.current;
     if (!svg || !grid) return;
     const quads: { index: number; pts: Pt[] }[] = [];
+    ringQuad.current = null;
     grid.squares.forEach((s: GridSquare, i) => {
       const p = s.corners.map((c) => skyToPixels(c.ra, c.dec));
       const g = svg.querySelector<SVGGElement>(`[data-sq="${s.index}"]`);
@@ -170,6 +180,7 @@ export function ScanOverlay({ view }: { view: SkyView | null }) {
       }
       const q = p as Pt[];
       g.style.display = '';
+      if (i === runningAt) ringQuad.current = inset(q, 4);
       const plain = squareLooks[i] === 'plain';
       g.querySelector('polygon.sx-scan-cell')?.setAttribute(
         'points',
@@ -296,6 +307,7 @@ export function ScanOverlay({ view }: { view: SkyView | null }) {
           </g>
         ))}
       </g>
+      <ScanRings quad={ringQuad} active={ringsOn} />
       {objects.map((o) => {
         const line = lineOf(o);
         return (
