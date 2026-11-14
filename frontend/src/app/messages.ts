@@ -596,7 +596,9 @@ export function nonLayerMissingText(id: string): string | null {
 /**
  * Why a measured point is flagged (backend/app/core/measure: the FITS FLAGS names in REJECT_FLAGS,
  * NONFINITE, NONPOSITIVE_VARIANCE, `<name>_core`, `no_proper_motion`). Short lower-case phrases;
- * the flag names are the pipeline's own, so wording stays at what the name says.
+ * hardware flags follow the IRSA FLAGS header (MSKD) and Data Explorer bit descriptions
+ * (caltech-ipac.github.io/irsa-tutorials/spherex-intro; irsa.ipac.caltech.edu/onlinehelp/spherex/spherex/sp.html);
+ * NONFINITE and NONPOSITIVE_VARIANCE are this project's own names (measure/photometry.py).
  */
 const FLAG_TEXT: Readonly<Record<string, string>> = {
   outlier_core: 'the object’s centre looked unusual (kept, as expected for a moving object)',
@@ -604,15 +606,15 @@ const FLAG_TEXT: Readonly<Record<string, string>> = {
     'the object’s drift across the sky is unknown, so its catalogue position was used',
   NONFINITE: 'some pixels had no value',
   NONPOSITIVE_VARIANCE: 'some pixels had no usable uncertainty',
-  TRANSIENT: 'some pixels showed a brief flash',
-  OVERFLOW: 'some pixels were saturated',
-  NONFUNC: 'some pixels were not working',
-  MISSING_DATA: 'some pixels had missing data',
-  HOT: 'some pixels were unusually bright',
-  COLD: 'some pixels were unusually dark',
-  NONLINEAR: 'some pixels responded unevenly to light',
-  PERSIST: 'some pixels held a faint trace of an earlier bright source',
-  OUTLIER: 'some pixels looked unusual',
+  TRANSIENT: 'some pixels were hit by a brief spike, such as a cosmic ray',
+  OVERFLOW: 'some pixels were close to saturating',
+  NONFUNC: 'some pixels are permanently out of order',
+  MISSING_DATA: 'some pixel data was lost on board',
+  HOT: 'some pixels were unusually noisy',
+  COLD: 'some pixels were barely responding',
+  NONLINEAR: 'some pixels could not be reliably corrected for how they respond to bright light',
+  PERSIST: 'some pixels still held leftover charge from an earlier bright exposure',
+  OUTLIER: 'some pixels stood out statistically from their neighbours',
 };
 const FLAG_GENERIC = 'some pixels carried a quality flag';
 
