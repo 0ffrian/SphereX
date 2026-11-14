@@ -14,6 +14,7 @@
 //
 // Issue #130 (Q-455): a known object's "Track it" reads its `/frames` and `/path`
 // (loadObjectTrack); the Eros card keeps the demo's cutouts, mask and brightness under the Demo tag.
+import type { TrackWindow } from '@/app/api/client';
 import { ApiError } from '@/app/api/errors';
 import type { Frame } from '@/app/api/types';
 import { deltaRa, wrapRa } from '@/viewer/sky/skyMath';
@@ -96,6 +97,11 @@ export interface KnownObject {
   objectId?: string | null;
   /** True: the Track pane could open it offline (A17.5). The demo row is always true. */
   trackAvailable?: boolean;
+  /**
+   * Set when Track it computed this object's Track for a window (Q-468): the Track view reads
+   * that window's frames and path. Absent: the base windows (a prepared object).
+   */
+  trackWindow?: TrackWindow;
   /** Horizons positions at each frame time, seen from SPHEREx: `model_dependent` (A16.5). */
   positions?: AreaKnownPosition[];
   /** Real rows: the number, null for an unnumbered object. */
@@ -407,11 +413,15 @@ export function skyToPx(d: ErosDemo, ra: number, dec: number): [number, number] 
 }
 
 /** What the Eros card reads for an object: its frames and path from the API. Throws on failure. */
-export async function loadObjectTrack(objectId: string, signal?: AbortSignal): Promise<{ frames: Frame[]; path: TrackPath | null }> {
+export async function loadObjectTrack(
+  objectId: string,
+  signal?: AbortSignal,
+  window?: TrackWindow | null,
+): Promise<{ frames: Frame[]; path: TrackPath | null }> {
   const api = getSkyApi();
   const [frames, path] = await Promise.all([
-    api.frames(objectId, signal),
-    api.path(objectId, signal).then(
+    api.frames(objectId, signal, window),
+    api.path(objectId, signal, window).then(
       (p) => p.data,
       (e: unknown) => {
         if (e instanceof ApiError && e.kind === 'aborted') throw e;

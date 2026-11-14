@@ -9,7 +9,7 @@ import { createApiClient } from '@/app/api/client';
 import { setSkyApi } from '@/state/store';
 import { areaFixture, areaIndexFixture } from '@/test/areaFixtures';
 import { AreaRefused, discoverIn, knownObjectsIn, type ErosDemo } from './areaService';
-import { areaTrackLabel, missingText, squareOf, unmatchedDotIds } from './realArea';
+import { areaTrackLabel, missingLines, missingText, squareOf, unmatchedDotIds } from './realArea';
 
 const box = (ra: number, dec: number, w = 0.3, h = 0.3): AreaBox => ({
   a: { ra: ra - w / 2, dec: dec + h / 2 },
@@ -140,7 +140,47 @@ describe('real area helpers', () => {
     expect(missingText('skybot:2')).toContain('visit 2');
     expect(missingText('area:tracks_unavailable')).toContain('not');
     expect(missingText('area:unmatched_dots:3')).toContain('3 track points');
-    expect(missingText('weird')).toBe('weird');
+  });
+
+  it('never shows a raw code (issue #146): every namespace has words, and so has an unknown one', () => {
+    const codes = [
+      'cutout:2026W12_2A_0340_1_D1',
+      'no_footprint:2026W12_2A_0340_1_D4',
+      'frames:cone_maxrec:5000',
+      'frames:cone_failed',
+      'stars:gaia:1',
+      'stars:wise:2',
+      'area:visits',
+      'area:something_new',
+      'checks:not_run',
+      'checks:d4_not_run',
+      'rate_grid:visits',
+      'spectra:something_new',
+      'stamp:d17',
+      'horizons:2015 HW370',
+      'weird',
+      'weird:thing',
+    ];
+    for (const code of codes) {
+      const text = missingText(code);
+      expect(text, code).toMatch(/^[A-Z].*\.$/);
+      expect(text, code).not.toMatch(/[a-z_]+:[a-z0-9_]/i);
+      expect(text, code).not.toContain('2026W12');
+      expect(text, code).not.toContain('weird');
+    }
+    expect(missingText('stars:gaia:1')).toBe('The Gaia star list for visit 1 could not be loaded.');
+    expect(missingText('stars:wise:2')).toContain('CatWISE');
+  });
+
+  it('lists a wording once, with its codes (one cutout code per frame is one line)', () => {
+    const lines = missingLines([
+      'checks:not_run',
+      'cutout:2026W12_2A_0340_1_D1',
+      'cutout:2026W12_2A_0340_1_D4',
+      'rate_grid:visits',
+    ]);
+    expect(lines.map((l) => l.codes.length)).toEqual([1, 2, 1]);
+    expect(lines[1]!.text).toBe('A frame could not be read, so its dots are not shown.');
   });
 
   it('never says asteroid, new or discover in a track label (Q-205)', () => {

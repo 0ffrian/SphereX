@@ -72,7 +72,7 @@ export type ScanErrorCode = string;
 export type ScanPlanAnswer =
   | { kind: 'plan'; plan: ScanPlan }
   | { kind: 'error'; code: ScanErrorCode; detail: string }
-  /** No scan routes (not served, not reachable): the region falls back to the single-area flow. */
+  /** No scan routes on this server (an answer that is not a plan or a scan error). */
   | { kind: 'unavailable' };
 export type ScanStartAnswer =
   | { kind: 'started'; run: RunRecord }
@@ -208,6 +208,11 @@ export function parseRunResults(body: unknown): RunResults {
 
 /** One poll waits at most this long (engineering value, as the live areas'). */
 export const RUN_TIMEOUT_MS = 10_000;
+/**
+ * The plan and Start wait at most this long. A server that takes the connection and never answers
+ * ends as `unavailable` instead of leaving "Checking…" and a disabled Start scan for good.
+ */
+export const SCAN_POST_TIMEOUT_MS = 60_000;
 
 export function httpScanApi(
   base = API_BASE,
@@ -219,17 +224,17 @@ export function httpScanApi(
     return res.json().catch(() => null);
   };
   const aborted = (e: unknown) => e instanceof DOMException && e.name === 'AbortError';
+  const timed = (signal?: AbortSignal, ms = RUN_TIMEOUT_MS) => {
+    const t = AbortSignal.timeout(ms);
+    return signal ? AbortSignal.any([signal, t]) : t;
+  };
   const post = (req: ScanRequest, start: boolean, signal?: AbortSignal) =>
     fetchImpl(`${base}/scans`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ ...req, start }),
-      signal,
+      signal: timed(signal, SCAN_POST_TIMEOUT_MS),
     });
-  const timed = (signal?: AbortSignal) => {
-    const t = AbortSignal.timeout(RUN_TIMEOUT_MS);
-    return signal ? AbortSignal.any([signal, t]) : t;
-  };
   const runUrl = (id: string, tail = '') => `${base}/runs/${encodeURIComponent(id)}${tail}`;
   const readRun = async (res: Response, id: string) => {
     const body = await json(res);
@@ -243,12 +248,16 @@ export function httpScanApi(
         return parseScanPlan(await json(await post(req, false, signal)));
       } catch (e) {
         if (aborted(e)) throw e;
-        return { kind: 'unavailable' };
+        // No answer at all (no network, or the time limit): the server is not reachable, which is
+        // not the same as a server with no scan routes.
+        return { kind: 'error', code: 'scan:unreachable', detail: '' };
       }
     },
     async start(req, signal) {
+      let answered = false;
       try {
         const res = await post(req, true, signal);
+        answered = true;
         const body = await json(res);
         if (isObj(body) && isStr(body.error) && isScanError(body.error))
           return { kind: 'error', code: body.error, detail: isStr(body.detail) ? body.detail : '' };
@@ -256,20 +265,32 @@ export function httpScanApi(
         return { kind: 'started', run: parseRunRecord(body) };
       } catch (e) {
         if (aborted(e)) throw e;
-        return { kind: 'unavailable' };
+        // The time limit, or a reply that could not be read: the server may have queued the scan,
+        // so the card must not say nothing started (Select again would start a second one).
+        // Only a request that never got through (no network) is `scan:unreachable`.
+        const timedOut = e instanceof DOMException && e.name === 'TimeoutError';
+        const code = answered || timedOut ? 'scan:no_answer' : 'scan:unreachable';
+        return { kind: 'error', code, detail: '' };
       }
     },
     async run(id, signal) {
       return readRun(await fetchImpl(runUrl(id), { signal: timed(signal) }), id);
     },
     async pause(id) {
-      return readRun(await fetchImpl(runUrl(id, '/pause'), { method: 'POST' }), id);
+      // Timed like a poll: a hung reply must not leave Pause, Resume and Stop disabled for good.
+      return readRun(
+        await fetchImpl(runUrl(id, '/pause'), { method: 'POST', signal: timed() }),
+        id,
+      );
     },
     async resume(id) {
-      return readRun(await fetchImpl(runUrl(id, '/resume'), { method: 'POST' }), id);
+      return readRun(
+        await fetchImpl(runUrl(id, '/resume'), { method: 'POST', signal: timed() }),
+        id,
+      );
     },
     async stop(id) {
-      const res = await fetchImpl(runUrl(id), { method: 'DELETE' });
+      const res = await fetchImpl(runUrl(id), { method: 'DELETE', signal: timed() });
       // 404: no such run; 409 run_finished: it has finished or is already stopping.
       if (!res.ok && res.status !== 404 && res.status !== 409)
         throw new Error(`Stop failed (${res.status}).`);

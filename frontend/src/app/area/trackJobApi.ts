@@ -8,13 +8,16 @@
 //        -> 202 the `/job` body (JobStatus): {id, state, stage, frames_done, frames_total, error, …}
 //        |  400 {error: "bad_request" | "track_window_outside"} | 404 {error: "not_found" |
 //           "not_moving" | "no_ephemeris"}: nothing stored, no job started
-//   GET  /v1/objects/{id}/job    -> JobStatus; state "idle" | "running" | "done" | "failed"
-// When `state` is `done`, `/frames`, `/path` and `/spectrum` are served from the cache and the
-// object's `track_available` reads true: the Track view (the Eros card) opens on them.
+//   GET  /v1/objects/{id}/job?around=…&days=…   -> JobStatus of that window's Track job; state
+//        "idle" | "running" | "done" | "failed"; when done, `track_available` and `reason`.
+//        Without the two parameters the route answers for the object's base job, not this one.
+// When `state` is `done` and `track_available` is true, `/frames` and `/path` with the same two
+// parameters are served from the cache: the Track view (the Eros card) opens on them.
 //
 // The MOCK answers only when asked, on the dev server only (`?track=mock`, or VITE_SX_TRACK=mock),
 // so a public build never shows invented progress. Its job ends `done` but stores nothing: the
 // Track view then reads the real `/frames` and `/path` (or says they are not there).
+import { trackQuery, type TrackWindow } from '@/app/api/client';
 import { API_BASE } from '@/app/api/config';
 
 /** `GET /v1/objects/{id}/job` (backend `JobStatus`, issue #41, Q-111). */
@@ -27,6 +30,9 @@ export interface TrackJobStatus {
   started_at?: string | null;
   finished_at?: string | null;
   error?: string | null;
+  /** On a done Track job: false when the Track still cannot open, with the first `reason`. */
+  track_available?: boolean;
+  reason?: string | null;
 }
 
 export type TrackStartAnswer =
@@ -42,13 +48,14 @@ export interface TrackJobApi {
     days?: number,
     signal?: AbortSignal,
   ): Promise<TrackStartAnswer>;
-  /** Throws when the job cannot be read (the poll is asked again). */
-  status(objectId: string, signal?: AbortSignal): Promise<TrackJobStatus>;
+  /** The Track job of that window. Throws when it cannot be read (the poll is asked again). */
+  status(objectId: string, window: TrackWindow, signal?: AbortSignal): Promise<TrackJobStatus>;
 }
 
 /** The window either side of `around`, in days (Q-468: ±3 days, not the whole release). */
 export const TRACK_DAYS = 3;
 export const STATUS_TIMEOUT_MS = 10_000;
+export const START_TIMEOUT_MS = 60_000;
 
 const STATES: readonly string[] = ['idle', 'running', 'done', 'failed'];
 const isObj = (v: unknown): v is Record<string, unknown> =>
@@ -76,11 +83,13 @@ export function httpTrackJobApi(
   return {
     async start(objectId, around, days = TRACK_DAYS, signal) {
       try {
+        // A server that takes the connection and never answers ends as `unavailable`.
+        const timeout = AbortSignal.timeout(START_TIMEOUT_MS);
         const res = await fetchImpl(`${base}/objects/${encodeURIComponent(objectId)}/track`, {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ around, days }),
-          signal,
+          signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
         });
         const body = await json(res);
         if (res.ok) return { kind: 'started', status: parseTrackStatus(body) };
@@ -97,9 +106,10 @@ export function httpTrackJobApi(
         return { kind: 'unavailable' };
       }
     },
-    async status(objectId, signal) {
+    async status(objectId, window, signal) {
       const timeout = AbortSignal.timeout(STATUS_TIMEOUT_MS);
-      const res = await fetchImpl(`${base}/objects/${encodeURIComponent(objectId)}/job`, {
+      const url = `${base}/objects/${encodeURIComponent(objectId)}/job${trackQuery(window)}`;
+      const res = await fetchImpl(url, {
         signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
       });
       return parseTrackStatus(await json(res));

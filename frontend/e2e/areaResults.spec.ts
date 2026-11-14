@@ -91,13 +91,18 @@ async function routes(page: Page) {
       provenance: { frames: prov, coverage: prov, steps: prov },
     })),
   );
-  await page.route('**/v1/objects/sbdb-7347/frames', (r) =>
-    r.fulfill(json({
+  // The Track computed on demand is read with its window (Q-468): `/frames?around=…&days=3`.
+  // Without the window the backend answers for the object's base windows, so that reads 404 here.
+  await page.route('**/v1/objects/sbdb-7347/frames**', (r) => {
+    const q = new URL(r.request().url()).searchParams;
+    if (!q.get('around') || q.get('days') !== '3')
+      return r.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ error: 'not_found', detail: 'no base frames' }) });
+    return r.fulfill(json({
       id: 'sbdb-7347',
       frames: FRAMES.map((frame_id, i) => ({ frame_id, time: timeOf(i), wavelength_um: 1 + i * 0.1, x: 5, y: 5, cutout_url: `/v1/objects/sbdb-7347/cutouts/${frame_id}.png`, flags: [] })),
       north_up: true, stretch: { kind: 'asinh', params: {} }, data_release: 'spherex_dr1', cached_at: NOW, missing: [],
-    })),
-  );
+    }));
+  });
 }
 
 async function draw(page: Page, tool: 'tool-known' | 'tool-area', query = '') {

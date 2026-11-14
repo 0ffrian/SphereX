@@ -25,6 +25,7 @@ recorded in ``runs.RunStore`` with its timeline.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import threading
@@ -39,6 +40,7 @@ from app.cache.store import CacheMissOffline, UpstreamUnavailable
 from app.context import Context
 from app.core.area.live import Box, LiveAreaError, Plan, estimate_seconds, plan_area
 from app.core.area.runs import (
+    RunNotFound,
     RunStore,
     Snapshot,
     SquareReplies,
@@ -324,6 +326,7 @@ class LiveJobs:
         self._queue: deque[QueueItem] = deque()
         self._thread: threading.Thread | None = None
         self._running: QueueItem | None = None
+        self._closed = False  # set by ``close()``: nothing new is queued during shutdown
         self._results_lock = threading.Lock()
         self._results: dict[str, tuple[tuple[tuple[int, str], ...], dict[str, Any]]] = {}
 
@@ -346,7 +349,7 @@ class LiveJobs:
             job = self._jobs.get(plan.area_id)
             if job is not None and job.joinable:
                 return job
-            if len(self._queue) >= MAX_WAITING:
+            if self._closed or len(self._queue) >= MAX_WAITING:
                 raise QueueFull()
             self._prune()
             job = Job(plan)
@@ -390,7 +393,7 @@ class LiveJobs:
         stored = dict(stored or {})
         post: list[Snapshot] = []
         with self._lock:
-            if len(self._queue) >= MAX_WAITING:
+            if self._closed or len(self._queue) >= MAX_WAITING:
                 raise QueueFull()
             run_id = self.runs.create(
                 kind,
@@ -431,7 +434,7 @@ class LiveJobs:
                 return
             if not isinstance(item, ScanJob) or item.state != "paused":
                 raise RunConflict("run_not_paused", "Only a paused scan can be resumed.")
-            if len(self._queue) >= MAX_WAITING:
+            if self._closed or len(self._queue) >= MAX_WAITING:
                 raise QueueFull()
             item.state = "queued"
             self._queue.append(item)
@@ -519,6 +522,25 @@ class LiveJobs:
             while len(self._results) > MAX_RESULTS:
                 del self._results[next(iter(self._results))]
         return run, merged
+
+    def close(self, timeout: float = 15.0) -> bool:
+        """Server shutdown: stop every queued, paused and running item, then wait for the
+        worker. A queued or paused item ends at once and its run is recorded ``stopped``; the
+        running one ends at its next check, which every queued cutout download makes, so the
+        downloads still waiting in its pool end at once. Without this the process could not
+        exit until every queued download had run (minutes when the archive is slow).
+        True when the worker has ended. Afterwards nothing new is queued (``QueueFull``): a
+        request racing the shutdown must not start the worker again."""
+        with self._lock:
+            self._closed = True
+            runs = [run_id for run_id, item in self._by_run.items() if isinstance(item, ScanJob)]
+            areas = [a for a, job in self._jobs.items() if job.state in ("queued", "running")]
+        for run_id in runs:
+            with contextlib.suppress(RunConflict, RunNotFound):  # it ended in between
+                self.stop(run_id)
+        for area_id in areas:
+            self.cancel(area_id)
+        return self.wait(timeout)
 
     def wait(self, timeout: float | None = None) -> bool:
         """Block until the queue is empty and the worker idle (tests). True when it is."""
