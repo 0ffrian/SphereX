@@ -186,7 +186,7 @@ export const useLiveJobStore = create<LiveJobStoreState>()((set, get) => {
       // The pair of the offer, so a pair picked in the picker is the one computed.
       const pair: VisitPick = [view.plan.visits[0].start, view.plan.visits[1].start];
       const answer = await getLiveAreaApi()
-        .start(liveBoxOf(view.box), undefined, pair)
+        .start(liveBoxOf(view.box), undefined, pair, view.flow)
         .catch(() => ({ kind: 'unavailable' as const }));
       set({ busy: false });
       if (get().view !== view) return; // the card moved on meanwhile

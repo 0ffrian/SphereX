@@ -77,3 +77,27 @@ describe('RunsMenu Escape', () => {
     }
   });
 });
+
+describe('RunsMenu filter', () => {
+  it('says so when a filter has no runs, instead of an empty list', async () => {
+    const run = {
+      run_id: 'run-20261113T070000-aaaaaa',
+      kind: 'discovery',
+      release: 'spherex_dr1',
+      region: { ra: 207.9, dec: -11.45, width_deg: 3.6, height_deg: 1.2 },
+      state: 'done',
+      created_at: '2026-11-13T07:00:00Z',
+      duration_s: 540,
+      squares_total: 3,
+      squares_done: 3,
+      totals: { known: 2, found: 1, unexplained: 1, squares_done: 3, squares_skipped: 0 },
+    };
+    await act(async () => useRunsStore.setState({ runs: [run as never], filter: 'known' }));
+    const q = (id: string) => host.querySelector<HTMLElement>(`[data-testid="${id}"]`);
+    expect(q('runs-rows')).toBeNull();
+    expect(q('runs-none')?.textContent).toBe('No Known objects runs yet.');
+    await act(async () => useRunsStore.setState({ filter: 'discovery' }));
+    expect(q('runs-none')).toBeNull();
+    expect(host.querySelectorAll('[data-testid="runs-row"]')).toHaveLength(1);
+  });
+});

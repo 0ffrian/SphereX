@@ -95,6 +95,19 @@ describe('HTTP client', () => {
     await api.start(BOX);
     expect(JSON.parse((fetchImpl.mock.calls[1] as unknown as [string, RequestInit])[1].body as string).start).toBe(true);
   });
+  it('names the tool when it starts, so the server records the run (Q-471 (2))', async () => {
+    const fetchImpl = vi.fn(async () => reply(PLAN));
+    const api = httpLiveAreaApi('/v1', fetchImpl as unknown as typeof fetch);
+    const bodyOf = (i: number) =>
+      JSON.parse((fetchImpl.mock.calls[i] as unknown as [string, RequestInit])[1].body as string) as Record<string, unknown>;
+    await api.start(BOX, undefined, undefined, 'discovery');
+    expect(bodyOf(0)).toEqual({ ...BOX, start: true, kind: 'discovery' });
+    await api.start(BOX, undefined, undefined, 'known');
+    expect(bodyOf(1).kind).toBe('known');
+    // The coverage check starts nothing, so it records nothing.
+    await api.plan(BOX);
+    expect('kind' in bodyOf(2)).toBe(false);
+  });
   it('a route the backend does not serve, an HTML page or no backend: unavailable', async () => {
     const notFound = httpLiveAreaApi('/v1', (async () => reply({ error: 'not_found', detail: 'Not Found' }, 404)) as unknown as typeof fetch);
     expect(await notFound.plan(BOX)).toEqual({ kind: 'unavailable' });
