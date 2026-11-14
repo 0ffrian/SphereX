@@ -65,7 +65,7 @@ import { useAreaStore } from '@/app/shell/areaStore';
 import { AreaOverlay } from './AreaOverlay';
 import { AreaTrackLayer } from '@/app/area/AreaTrackLayer';
 import { KnownPositionsLayer } from '@/app/area/KnownPositionsLayer';
-import { boxFromPixels, clampedRect, enterInArea, pickRegionAt, registerAreaView, restoreSavedScan } from './areaDraw';
+import { enterInArea, pickRegionAt, registerAreaView, restoreSavedScan } from './areaDraw';
 import { ScanOverlay, scanClickAt } from './ScanOverlay';
 import { AimOverlay } from './AimOverlay';
 import { useCachedMarkers } from './useCachedMarkers';
@@ -534,16 +534,12 @@ export function SkyPane({ children }: { children?: ReactNode }) {
     });
     // A scan left running in this browser comes back after a reload (issue #157).
     restoreSavedScan();
-    let drawing: { id: number; x: number; y: number } | null = null;
-    // Issue #144: aiming (a drag turns the sky, a click zooms to the patch), then drawing (a drag
-    // draws the box, each side stopped at 2°).
+    // Issue #157 (Q-472): selecting a region (a drag turns the sky, a click selects the region).
     const areaStage = () => (useShellStore.getState().tool === 'area' ? useAreaStore.getState().stage : null);
-    const areaDrawing = () => areaStage() === 'drawing';
-    const areaPlacing = () => areaStage() === 'aiming' || areaStage() === 'drawing';
-    // The pointer: the aim rectangle (the canvas hides its own) or a + while drawing (index.css).
+    const areaPlacing = () => areaStage() === 'aiming';
+    // The pointer is the selection rectangle (the canvas hides its own, index.css).
     const setMode = () => {
-      const st = areaStage();
-      const mode = st === 'aiming' ? 'aim' : st === 'drawing' ? 'draw' : '';
+      const mode = areaStage() === 'aiming' ? 'aim' : '';
       if (canvas.dataset.areaMode !== mode) canvas.dataset.areaMode = mode;
     };
     setMode();
@@ -588,11 +584,6 @@ export function SkyPane({ children }: { children?: ReactNode }) {
       stopFly();
       canvas.setPointerCapture?.(e.pointerId);
       const p = local(e);
-      if (areaDrawing() && !drawing && pointers.size === 0) {
-        drawing = { id: e.pointerId, x: p.x, y: p.y };
-        useAreaStore.getState().setDrag({ x0: p.x, y0: p.y, x1: p.x, y1: p.y });
-        return;
-      }
       pointers.set(e.pointerId, p);
       if (pointers.size === 1) {
         start = p;
@@ -607,10 +598,6 @@ export function SkyPane({ children }: { children?: ReactNode }) {
     };
     const onMove = (e: PointerEvent) => {
       const p = local(e);
-      if (drawing && drawing.id === e.pointerId) {
-        useAreaStore.getState().setDrag(clampedRect(drawing.x, drawing.y, p.x, p.y));
-        return;
-      }
       const prev = pointers.get(e.pointerId);
       if (!prev) {
         if (e.pointerType === 'mouse') {
@@ -640,19 +627,6 @@ export function SkyPane({ children }: { children?: ReactNode }) {
       }
     };
     const onUp = (e: PointerEvent) => {
-      if (drawing && drawing.id === e.pointerId) {
-        const p = local(e);
-        const d = clampedRect(drawing.x, drawing.y, p.x, p.y);
-        drawing = null;
-        // The tool may have been left mid-drag (Escape): then nothing is set and no search starts.
-        const box =
-          areaDrawing() && e.type === 'pointerup' && Math.abs(d.x1 - d.x0) >= 12 && Math.abs(d.y1 - d.y0) >= 12
-            ? boxFromPixels(d)
-            : null;
-        if (box) useAreaStore.getState().setBox(box);
-        else useAreaStore.getState().setDrag(null);
-        return;
-      }
       if (!pointers.has(e.pointerId)) return;
       const p = local(e);
       const wasSingle = pointers.size === 1;
@@ -721,8 +695,7 @@ export function SkyPane({ children }: { children?: ReactNode }) {
         case 'Enter':
         case ' ':
           e.preventDefault();
-          // Known objects / Discovery: Enter sets an area in the middle (the keyboard way to draw
-          // one), at most 2° a side, from the aim step too.
+          // Known objects / Discovery: Enter selects the region in the middle (the keyboard way).
           if (areaPlacing()) {
             enterInArea();
             return;

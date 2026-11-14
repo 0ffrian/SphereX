@@ -68,10 +68,9 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-/** Draw a box in a flow and wait out the island's search and the coverage check. */
+/** Select a one-square region in a flow and wait out the island's search and the coverage check. */
 async function draw(flow: 'known' | 'discovery'): Promise<void> {
   useAreaStore.getState().startFlow(flow);
-  useAreaStore.getState().pickPatch();
   useAreaStore.getState().setBox(box);
   await vi.advanceTimersByTimeAsync(2000);
 }

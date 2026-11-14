@@ -19,13 +19,11 @@ afterEach(() => {
 });
 
 describe('area store', () => {
-  it('startFlow aims for that flow, and picking the patch goes to drawing (issue #144)', () => {
+  it('startFlow selects for that flow (issue #157: the pointer is the region)', () => {
     useAreaStore.getState().startFlow('known');
     const s = useAreaStore.getState();
     expect(s.flow).toBe('known');
     expect(s.stage).toBe('aiming');
-    useAreaStore.getState().pickPatch();
-    expect(useAreaStore.getState().stage).toBe('drawing');
     expect(s.screen).toBe('draw');
     expect(s.box).toBeNull();
   });
