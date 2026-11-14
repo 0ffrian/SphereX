@@ -315,7 +315,7 @@ sequenceDiagram
 
 ## Aim, draw and the live card (issue #144)
 
-> **Changed by issue #157 ([Q-472](../decisions/moving-objects.md)):** the aim and draw steps below are replaced by selecting a region (see the last diagram). A region of one square goes to `Set` directly; `Drawing` is no longer entered.
+> **Changed by issue #157 ([Q-472](../decisions/moving-objects.md)):** the aim and draw steps below are replaced by selecting a region (see the last diagram). A region of one square goes to `Set` directly. The `Drawing` stage and its 2° drag clamp were removed (PR #166); the diagram below is the history of #144.
 
 The frontend side of a live area, as built ([A18.1](../architecture/moving-objects/area-ui.md#a181-tool-and-drawing), Q-462): `areaStore` stages `aiming`, `drawing` and `set`, then the live card of `liveJobStore` for a box no prepared area holds. The job API is `app/area/liveAreaApi.ts` on the schemas of the sequence above. Closing the card leaves the job running (it is followed until done, failed or stopped); a done job opens in the existing Known and Discovery views.
 
