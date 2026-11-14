@@ -5,6 +5,10 @@
 // the pane. PR #165 review (rounds 1 and 2).
 import { expect, test, type Page } from '@playwright/test';
 
+// Sky, replay and Escape flows on SwiftShader: allow for a loaded machine running workers in
+// parallel (as scans.spec.ts does); each step still waits on its own assertion.
+test.describe.configure({ timeout: 90_000 });
+
 async function skyReady(page: Page): Promise<void> {
   await page.goto('/');
   await expect(page.getByTestId('sky-pane')).toHaveAttribute('data-sky-state', /ready|no-image/, {

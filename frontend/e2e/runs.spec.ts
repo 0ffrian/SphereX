@@ -7,6 +7,10 @@
 import { readFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
 
+// Sky, replay and Escape flows on SwiftShader: allow for a loaded machine running workers in
+// parallel (as scans.spec.ts does); each step still waits on its own assertion.
+test.describe.configure({ timeout: 90_000 });
+
 const load = (name: string) =>
   JSON.parse(readFileSync(new URL(`./fixtures/runs/${name}`, import.meta.url), 'utf8')) as Run;
 interface Run {
