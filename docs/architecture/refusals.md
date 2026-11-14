@@ -8,7 +8,7 @@ A value the backend cannot compute is never guessed: the reply leaves it out (or
 
 **Format.** A code is `<reason>`, `<namespace>:<reason>` or `<reason>:<frame_id>`. A frame code names one frame; the others describe the whole reply. Order follows the stages, so a reply lists Stage 1's codes before its own.
 
-**UI.** `frontend/src/app/refusals.ts` groups codes by reason (frame codes counted, whole-reply codes as notes) and `frontend/src/app/messages.ts` holds the plain-English line for each known code. A code with no wording is shown as is, never hidden (A11). `backendReasons.test.ts` checks that `FRAME_REASONS` matches the backend's Stage 1 and Stage 2 reasons. **Proposed (Q-196):** extend that test to every code in this table, so a new backend code without wording fails CI.
+**UI.** `frontend/src/app/refusals.ts` groups codes by reason (frame codes counted, whole-reply codes as notes) and `frontend/src/app/messages.ts` holds the plain-English line for each known code. A code with no wording is still listed, never hidden, but in generic plain words, not as the raw code ("Some data for this object is not available."; frames: "N frames not used for another reason."). Codes that are not layers (`catalogue`, `exoplanet_archive`, `star_catalogue`, `spectrum`, `measuring:*`, `type:exoplanet_*`, `composite:flags_unmasked`, `extended_source`, `flag_reasons`) have their own wording (issue #146, #84). The raw code stays only in a `data-code` attribute, for debugging ([Q-477](../decisions/contract.md), accepted; amends Q-196). `backendReasons.test.ts` checks that `FRAME_REASONS` matches the backend's Stage 1 and Stage 2 reasons. **Proposed (Q-196):** extend that test to every code in this table, so a new backend code without wording fails CI.
 
 #### Stage 1 (`/frames`, A4.1)
 
@@ -47,7 +47,7 @@ Per frame, `<reason>:<frame_id>`: `saturated` (core `OVERFLOW`, or a NaN core wi
 | Code | Meaning |
 |---|---|
 | `spectrum:saturated` | every listed frame was refused as `saturated` (D-31) |
-| `spectrum:extended_source` | **To build** ([Q-144](../decisions/moving-objects.md)): a comet whose coma fills the aperture; otherwise the aperture brightness is shown with "aperture, not total flux". Per-frame form `extended_source:<frame_id>`: A19.8 and A19.10 ([moving-objects/track-contract.md](moving-objects/track-contract.md)) |
+| `spectrum:extended_source` | **To build** ([Q-144](../decisions/moving-objects.md)); the backend does not emit it yet, but its UI wording is already in `messages.ts` (issue #146): a comet whose coma fills the aperture; otherwise the aperture brightness is shown with "aperture, not total flux". Per-frame form `extended_source:<frame_id>`: A19.8 and A19.10 ([moving-objects/track-contract.md](moving-objects/track-contract.md)) |
 
 Not a refusal: a point kept with dropped pixels is `flagged`, with `dropped_flags` and `flag_reasons` (incl. `no_proper_motion`). For moving objects, `OUTLIER` on the core is a flag, not a refusal: the point is `flagged` and `flag_reasons` gains `outlier_core` ([Q-139](../decisions/moving-objects.md), A19.7; built in issue #72, [Q-460](../decisions/moving-objects.md)). For fixed objects the core `OUTLIER` still refuses the frame as `aperture_flags`.
 

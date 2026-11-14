@@ -9,8 +9,14 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { describeRefusalGroup } from './messages';
-import { countedCode, FRAME_REASONS, groupMissing } from './refusals';
+import {
+  describeRefusal,
+  describeRefusalGroup,
+  flagReasonsText,
+  nonLayerMissingText,
+  UNKNOWN_CODE_TEXT,
+} from './messages';
+import { countedCode, FRAME_REASONS, groupCompositeMissing, groupMissing } from './refusals';
 
 // Read with node:fs (Vite does not serve files outside frontend/). A plain path, not
 // `new URL(…, import.meta.url)`, which Vite would rewrite into an asset import.
@@ -80,5 +86,120 @@ describe('moving-object path search codes (find/moving.py)', () => {
       const text = describeRefusalGroup(group!);
       expect(text, code).not.toMatch(/Not available|reason code/);
     }
+  });
+});
+
+// ---- Card, params, spectrum and composite codes (issue #146 section 3, A4.12, Q-196) -----------
+
+// A raw code: a snake_case word or a `prefix:code` pair. Plain words such as "catalogue" are fine.
+const RAW = /[a-zA-Z]+_[a-zA-Z]+|[a-z]+:[a-z]/;
+
+/** Every `type:exoplanet_*` the classifier emits (classify/rules.py). */
+const typeCodes = [
+  ...new Set(
+    [...backend('classify/rules.py').matchAll(/"(type:exoplanet_[a-z_]+)"/g)].map((m) => m[1]!),
+  ),
+];
+
+describe('card and params codes that are not layers', () => {
+  it('found the type codes in the backend', () => {
+    expect(typeCodes.length).toBeGreaterThanOrEqual(5);
+  });
+
+  it.each([
+    'catalogue',
+    'exoplanet_archive',
+    'star_catalogue',
+    'spectrum',
+    'measuring:spectrum',
+    'measuring:frames',
+    'measuring:mesh',
+    ...typeCodes,
+  ])('%s has plain wording and no raw code', (code) => {
+    const text = nonLayerMissingText(code);
+    expect(text, code).not.toBeNull();
+    expect(text, code).not.toBe(UNKNOWN_CODE_TEXT);
+    expect(text!, code).not.toMatch(RAW);
+    const line = describeRefusal({ id: code, reason: 'backend' });
+    expect(line).toBe(text);
+    expect(line).not.toMatch(/Layer|“/);
+  });
+
+  it('a layer id is still worded as a layer', () => {
+    expect(nonLayerMissingText('mesh')).toBeNull();
+    expect(describeRefusal({ id: 'mesh', reason: 'backend' })).toBe(
+      'Shape model: not drawn. The data pipeline left it out.',
+    );
+  });
+
+  it('an unknown prefixed or layer code gets generic words, never the code', () => {
+    const line = describeRefusal({ id: 'zzz_unknown', reason: 'backend' });
+    expect(line).not.toContain('zzz');
+    expect(describeRefusal({ id: 'type:exoplanet_zzz', reason: 'backend' })).toBe(
+      UNKNOWN_CODE_TEXT,
+    );
+    expect(describeRefusal({ id: 'measuring:zzz_unknown', reason: 'backend' })).not.toContain(
+      'zzz',
+    );
+  });
+});
+
+describe('spectrum and composite codes', () => {
+  it('words extended_source (whole and per frame) without the code', () => {
+    const [whole] = groupMissing(['spectrum:extended_source']);
+    expect(whole!.known).toBe(true);
+    expect(describeRefusalGroup(whole!)).not.toMatch(RAW);
+    const [frame] = groupMissing(['extended_source:2026W17_1B_0634_4_D3']);
+    expect(frame!.known).toBe(true);
+    expect(describeRefusalGroup(frame!)).toMatch(/^1 frame where/);
+    expect(describeRefusalGroup(frame!)).not.toMatch(RAW);
+  });
+
+  it('words composite:flags_unmasked:<id> as a frame group', () => {
+    const [g] = groupCompositeMissing([
+      'composite:flags_unmasked:f1',
+      'composite:flags_unmasked:f2',
+    ]);
+    expect(g!.kind).toBe('frames');
+    expect(g!.known).toBe(true);
+    expect(g!.count).toBe(2);
+    expect(describeRefusalGroup(g!)).not.toMatch(RAW);
+    expect(describeRefusalGroup(g!)).toMatch(/^2 frames whose bad-pixel map/);
+  });
+
+  it('unknown codes never print the raw code', () => {
+    for (const code of ['spectrum:zzz_new', 'zzz_new:f1', 'composite:zzz', 'zzz_plain']) {
+      const [g] = groupMissing([code]);
+      expect(describeRefusalGroup(g!), code).not.toContain('zzz');
+    }
+  });
+});
+
+describe('flag_reasons', () => {
+  it('words outlier_core and the backend flag names, never raw', () => {
+    const text = flagReasonsText([
+      'outlier_core',
+      'no_proper_motion',
+      'OUTLIER',
+      'NONFINITE',
+      'HOT',
+    ]);
+    expect(text).not.toMatch(/outlier_core|no_proper_motion|OUTLIER|NONFINITE|HOT/);
+    expect(text).toMatch(/moving object/);
+  });
+
+  it('a name with no wording gets the generic phrase', () => {
+    expect(flagReasonsText(['SUR_ERROR', 'ZZZ_NEW'])).toBe('some pixels carried a quality flag');
+  });
+
+  it('covers every flag the backend can drop', () => {
+    const cfg = backend('measure/config.py');
+    const names = [
+      ...(/REJECT_FLAGS: tuple\[str, \.\.\.\] = \(([^)]*)\)/.exec(cfg)?.[1] ?? '').matchAll(
+        /"([A-Z_]+)"/g,
+      ),
+    ].map((m) => m[1]!);
+    expect(names.length).toBeGreaterThan(10);
+    for (const n of names) expect(flagReasonsText([n]), n).not.toMatch(/[A-Z]{3}/);
   });
 });

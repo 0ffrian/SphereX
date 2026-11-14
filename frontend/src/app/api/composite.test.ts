@@ -2,7 +2,12 @@
 // its `missing` codes and errors.
 import { describe, expect, it } from 'vitest';
 import { fixtureFetch } from '@/test/fixtureFetch';
-import { compositeAnnouncement, compositeErrorMessage, describeRefusalGroup } from '@/app/messages';
+import {
+  compositeAnnouncement,
+  compositeErrorMessage,
+  describeRefusalGroup,
+  UNKNOWN_CODE_TEXT,
+} from '@/app/messages';
 import { groupCompositeMissing } from '@/app/refusals';
 import type { SkyError } from '@/state/store';
 import { createApiClient } from './client';
@@ -154,7 +159,7 @@ describe('composite refusals in plain words', () => {
     expect(sat?.frameIds).toEqual(['f1', 'f2']);
     expect(describeRefusalGroup(sat!)).toMatch(/^2 frames where the detector flagged/);
     const all = groups.map(describeRefusalGroup);
-    expect(all).toContain('Not available: composite:purple:odd');
+    expect(all).toContain(UNKNOWN_CODE_TEXT);
     expect(all).toContain(
       '3 frames are left out because they have not been downloaded yet. Fetch the rest of the frames above to include them.',
     );

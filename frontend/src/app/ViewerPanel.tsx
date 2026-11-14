@@ -1309,7 +1309,8 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
                       className="flex flex-wrap items-center gap-2 text-sm text-neutral-200"
                     >
                       <ProvenanceBadge tag={l.tag} fixture={objectIsFixture} />
-                      <span>{layerName(l.id)}</span>
+                      {/* data-code keeps the raw id for debugging; users see plain words (Q-477). */}
+                      <span data-code={l.id}>{layerName(l.id)}</span>
                       {l.tier ? (
                         <span className="text-xs text-neutral-400" data-testid="layer-tier">
                           {tierText(l.tier)}
@@ -1351,7 +1352,7 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
                   {defaultsShown.map((m) => (
                     <li key={m.id} className="flex flex-wrap items-center gap-2">
                       <ProvenanceBadge tag="artistic" />
-                      <span>{describeRefusal(m)}</span>
+                      <span data-code={m.id}>{describeRefusal(m)}</span>
                     </li>
                   ))}
                 </ul>
@@ -1362,7 +1363,9 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
               <Row title="Not drawn" count={notDrawn.length}>
                 <ul className="list-disc pl-5 text-sm text-neutral-300" data-testid="missing-list">
                   {notDrawn.map((m) => (
-                    <li key={m.id}>{describeRefusal(m)}</li>
+                    <li key={m.id} data-code={m.id}>
+                      {describeRefusal(m)}
+                    </li>
                   ))}
                 </ul>
               </Row>
