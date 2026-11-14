@@ -6269,3 +6269,419 @@ li[data-state='running'] > .sx-live-mk {
   width: 16px;
   height: 16px;
 }
+
+/* ---- Runs and replay (issue #158; mock-up states 12 and 13). ----
+   The runs button sits right after the RA/Dec readout, the same height, glass like the other
+   floating controls; its list drops below it. The replay draws on #157's scan overlay; its tag sits
+   under the island and its bar above the dock. */
+.sx-topright {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+  justify-content: flex-end;
+}
+.sx-runs {
+  position: relative;
+  display: flex;
+}
+.sx-runs-btn,
+.sx-runs-menu,
+.sx-replay-tag,
+.sx-replay {
+  background: var(--glass-grain), var(--glass-bg);
+  -webkit-backdrop-filter: var(--glass-filter);
+  backdrop-filter: var(--glass-filter);
+  border: 1px solid var(--glass-edge);
+  box-shadow:
+    inset 0 1px 0 var(--glass-hi),
+    var(--glass-lift);
+  text-shadow: var(--glass-text-shadow);
+}
+.sx-runs-btn {
+  width: 52px;
+  min-height: 44px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  color: var(--fg);
+  transition: transform 0.2s var(--sx-ease, ease);
+}
+.sx-runs-btn:hover,
+.sx-runs-btn[data-on] {
+  background: var(--glass-grain), var(--glass-hover);
+}
+.sx-runs-btn[data-on] {
+  background: var(--ac);
+  color: var(--on-ac);
+}
+.sx-runs-btn:active {
+  transform: scale(0.98);
+}
+.sx-runs-btn:focus-visible,
+.sx-runs-open:focus-visible,
+.sx-runs-play:focus-visible,
+.sx-runs-x:focus-visible,
+.sx-replay-pb:focus-visible,
+.sx-replay-tl:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.sx-runs-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 30;
+  width: min(380px, calc(100vw - 32px));
+  max-height: min(70vh, 560px);
+  overflow: auto;
+  padding: 14px 14px 12px;
+  border-radius: 10px;
+  display: grid;
+  gap: 10px;
+  text-align: left;
+  transform-origin: top right;
+}
+.sx-runs-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.sx-runs-head h2 {
+  margin: 0;
+  font-size: 15.5px;
+  font-weight: 600;
+  color: var(--fg);
+}
+.sx-runs-head p,
+.sx-runs-m {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+.sx-runs-x {
+  width: 28px;
+  height: 28px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  color: var(--muted);
+}
+.sx-runs-x:hover {
+  background: var(--glass-veil-hover);
+  color: var(--fg);
+}
+.sx-runs-x svg,
+.sx-runs-play svg,
+.sx-replay-pb svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.sx-runs-play svg,
+.sx-replay-pb svg {
+  fill: currentColor;
+  stroke: none;
+}
+.sx-runs-menu .sx-seg {
+  justify-self: start;
+  background: var(--glass-inner);
+  border-color: var(--glass-inner-edge);
+}
+.sx-runs-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.sx-runs-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-right: 8px;
+  border-radius: 8px;
+  background: var(--glass-inner);
+  border: 1px solid var(--glass-inner-edge);
+}
+.sx-runs-row:hover {
+  background: var(--glass-veil-hover);
+}
+.sx-runs-open {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 12px;
+  row-gap: 2px;
+  padding: 10px;
+  border-radius: 8px;
+  text-align: left;
+  color: var(--fg);
+}
+.sx-runs-kind {
+  grid-row: 1 / 3;
+  align-self: center;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+}
+.sx-runs-t {
+  font-size: 13.5px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.sx-runs-s {
+  font-size: 12.5px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.sx-runs-s [data-tone='accent'] {
+  color: var(--accent);
+}
+.sx-runs-s [data-tone='fail'] {
+  color: var(--fail);
+}
+.sx-runs-play {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  color: var(--fg);
+}
+.sx-runs-play:hover:not(:disabled, [aria-disabled='true']) {
+  background: var(--glass-veil-hover);
+}
+/* D-38: a disabled button is --s3 with --muted text, never a faded colour (as .sx-live's). */
+.sx-runs-play:disabled {
+  cursor: not-allowed;
+  background: var(--s3);
+  border-color: var(--s3);
+  color: var(--muted);
+}
+/* Loading its record: the icon goes --muted (not faded) and the pointer says it is busy. */
+.sx-runs-play[aria-busy='true'] {
+  color: var(--muted);
+  cursor: progress;
+}
+/* Messages: a status dot, a short title and one muted line (no tinted box). */
+.sx-runs-msg {
+  margin: 0;
+  display: grid;
+  grid-template-columns: 6px 1fr;
+  gap: 1px 10px;
+  font-size: 13.5px;
+}
+.sx-runs-msg::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--warn);
+  margin-top: 7px;
+  grid-row: span 2;
+}
+.sx-runs-msg[data-tone='fail']::before {
+  background: var(--fail);
+}
+.sx-runs-msg b {
+  font-weight: 500;
+  color: var(--fg);
+}
+.sx-runs-msg span {
+  color: var(--muted);
+}
+.sx-runs-status {
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+}
+.sx-bezel[data-split] .sx-runs {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* The replay: tag under the island, bar above the dock. */
+.sx-replay-tag {
+  position: absolute;
+  top: 76px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--fg);
+  white-space: nowrap;
+  pointer-events: none;
+}
+.sx-replay-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+.sx-replay {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(16px + 56px + 12px + env(safe-area-inset-bottom, 0px));
+  z-index: 6;
+  width: min(760px, calc(100% - 32px));
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 14px;
+  border-radius: 10px;
+}
+.sx-replay-pb {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background: var(--glass-inner);
+  border: 1px solid var(--glass-inner-edge);
+  display: grid;
+  place-items: center;
+  color: var(--fg);
+}
+.sx-replay-pb:hover:not(:disabled) {
+  background: var(--glass-hover);
+}
+.sx-replay-pb:active:not(:disabled) {
+  transform: scale(0.98);
+}
+.sx-replay-tl {
+  position: relative;
+  flex: 1;
+  min-width: 120px;
+  height: 28px;
+  cursor: pointer;
+  touch-action: none;
+  border-radius: 6px;
+}
+.sx-replay-rail,
+.sx-replay-fill {
+  position: absolute;
+  left: 0;
+  top: 12px;
+  height: 4px;
+  border-radius: 2px;
+}
+.sx-replay-rail {
+  right: 0;
+  background: var(--glass-inner);
+  border: 1px solid var(--line);
+}
+.sx-replay-fill {
+  background: var(--accent);
+}
+.sx-replay-tick {
+  position: absolute;
+  top: 6px;
+  width: 2px;
+  height: 16px;
+  border-radius: 1px;
+  background: var(--p-meas);
+  transform: translateX(-50%);
+}
+.sx-replay-tick::after {
+  /* A wider target to click than the 2 px mark. */
+  content: '';
+  position: absolute;
+  inset: -4px -5px;
+}
+.sx-replay-tick[data-kind='unexplained'] {
+  background: var(--warn);
+}
+.sx-replay-tick[data-kind='skipped'] {
+  background: var(--fail);
+}
+.sx-replay-knob {
+  position: absolute;
+  top: 7px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--fg);
+  transform: translateX(-50%);
+  box-shadow: var(--glass-text-shadow);
+  pointer-events: none;
+}
+.sx-replay-time {
+  flex: none;
+  font-size: 12.5px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.sx-replay-time b {
+  color: var(--fg);
+  font-weight: 500;
+}
+.sx-replay-speed {
+  flex: none;
+  background: var(--glass-inner);
+  border-color: var(--glass-inner-edge);
+}
+.sx-replay-speed button {
+  font-variant-numeric: tabular-nums;
+}
+/* Watch only: the replayed objects do not take clicks. */
+.sx-scan-obj[data-replay] {
+  pointer-events: none;
+}
+/* Phone: the bar wraps (play and time on one line, the timeline under), the controls are 44 px. */
+@media (max-width: 640px), (pointer: coarse) {
+  .sx-replay {
+    flex-wrap: wrap;
+    gap: 8px 12px;
+  }
+  .sx-replay-tl {
+    order: 3;
+    flex-basis: 100%;
+    height: 44px;
+  }
+  .sx-replay-rail,
+  .sx-replay-fill {
+    top: 20px;
+  }
+  .sx-replay-tick {
+    top: 14px;
+  }
+  .sx-replay-knob {
+    top: 15px;
+  }
+  .sx-replay-pb,
+  .sx-runs-play {
+    width: 44px;
+    height: 44px;
+  }
+  .sx-replay-tag {
+    top: 64px;
+  }
+}
+/* Phone width: the readout row sits at the left, so the list spans the screen under it. */
+@media (max-width: 640px) {
+  .sx-runs-menu {
+    position: fixed;
+    top: 64px;
+    left: max(16px, env(safe-area-inset-left, 0px));
+    right: max(16px, env(safe-area-inset-right, 0px));
+    width: auto;
+    z-index: 60;
+  }
+}
