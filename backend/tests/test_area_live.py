@@ -4,7 +4,9 @@ Eros frames (offline; the autouse guard blocks the network)."""
 
 from __future__ import annotations
 
+import contextlib
 import threading
+import time
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -13,14 +15,21 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
+from app.adapters.http import NetworkDisabled, UpstreamError
 from app.api import areas as areas_api
 from app.cache.store import CacheMissOffline, UpstreamUnavailable
 from app.context import Context, make_context
 from app.core.area import clean as area_clean
 from app.core.area import frames as area_frames
-from app.core.area import live
+from app.core.area import live, live_jobs
 from app.core.area.live import Box, LiveAreaError, Plan
-from app.core.area.live_jobs import LiveJobs, Progress, run_live_area
+from app.core.area.live_jobs import (
+    Cancelled,
+    LiveJobs,
+    Progress,
+    cutout_retryable,
+    run_live_area,
+)
 from app.core.card.validate import check
 from app.main import create_app
 from app.timefmt import parse_utc
@@ -528,3 +537,354 @@ def test_a_full_queue_answers_429(client: TestClient, monkeypatch: pytest.Monkey
     monkeypatch.setattr(client.app.state.live_jobs, "submit", full)  # type: ignore[attr-defined]
     r = client.post("/v1/areas/live", json={**BOX, "start": True})
     assert (r.status_code, r.json()["error"]) == (429, "queue_full")
+
+
+# --- issue #169: the cutout second pass and stored areas (Q-482) ---------------------------
+
+
+class _Stop(Exception):
+    """Ends ``find_frames`` early: these tests are about the fetch wrapper only."""
+
+
+def _wrapper_run(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    live_fn: Any,
+    find_body: Any,
+) -> tuple[Any, Plan]:
+    """Run ``run_live_area`` with ``live_fn`` as the cutout fetch and ``find_body(fetch)`` as
+    the frame search; returns (job, plan). ``find_body`` raises to end the run."""
+
+    def fake_live_fetch(ctx: Context, **_: Any) -> Any:
+        return live_fn
+
+    def find(ctx: Context, spec: Any, cfg: Any, *, fetch: Any, **_: Any) -> Any:
+        find_body(fetch)
+        raise _Stop()
+
+    monkeypatch.setattr(area_frames, "live_fetch", fake_live_fetch)
+    monkeypatch.setattr(area_frames, "find_frames", find)
+    plan = _plan()
+    job, progress = _job_progress(plan)
+    with pytest.raises((_Stop, Cancelled, UpstreamUnavailable, CacheMissOffline)):
+        run_live_area(_ctx(tmp_path), plan, progress)
+    return job, plan
+
+
+def _unavailable(text: str = "https://irsa/cutout: HTTP 503") -> UpstreamUnavailable:
+    exc = UpstreamUnavailable(f"irsa_cutout: {text}")
+    exc.__cause__ = UpstreamError(text)
+    return exc
+
+
+def test_a_cutout_that_fails_twice_then_answers_is_kept(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Issue #169 (3): a 503 twice and then 200 no longer fails the square; the step count
+    moves on the success only (never backwards)."""
+    calls: list[str] = []
+    got: list[Any] = []
+
+    def live_fn(row: Any, cut: Any) -> tuple[str, bytes]:
+        calls.append(row)
+        if len(calls) <= 2:
+            raise _unavailable()
+        return "digest", b"body"
+
+    job, plan = _wrapper_run(tmp_path, monkeypatch, live_fn, lambda f: got.append(f("r1", "c")))
+    assert got == [("digest", b"body")] and calls == ["r1"] * 3
+    assert job.steps["frames"].done == 1 and job.steps["frames"].total == plan.n_frames
+
+
+def test_a_stop_during_the_second_pass_wait_ends_the_job_at_once(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(live_jobs, "CUTOUT_SECOND_PASS_S", (30.0,))
+    plan = _plan()
+    job, progress = _job_progress(plan)
+
+    def live_fn(row: Any, cut: Any) -> tuple[str, bytes]:
+        job.cancel.set()  # Stop pressed while the archive answers 503
+        raise _unavailable()
+
+    def find(ctx: Context, spec: Any, cfg: Any, *, fetch: Any, **_: Any) -> Any:
+        fetch("r1", "c")
+        raise AssertionError("not reached")
+
+    monkeypatch.setattr(area_frames, "live_fetch", lambda ctx, **_: live_fn)
+    monkeypatch.setattr(area_frames, "find_frames", find)
+    t0 = time.monotonic()
+    with pytest.raises(Cancelled):
+        run_live_area(_ctx(tmp_path), plan, progress)
+    assert time.monotonic() - t0 < 5.0  # not the 30 s wait
+
+
+def _refused() -> UpstreamUnavailable:
+    exc = UpstreamUnavailable("irsa_cutout: refused")
+    exc.__cause__ = NetworkDisabled("SX_OFFLINE=1")
+    return exc
+
+
+@pytest.mark.parametrize(
+    "make",
+    [
+        lambda: CacheMissOffline("not cached"),
+        lambda: _unavailable("https://irsa/cutout: HTTP 404"),
+        _refused,
+    ],
+)
+def test_a_failure_that_cannot_pass_is_not_retried(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, make: Any
+) -> None:
+    exc = make()
+    calls: list[int] = []
+
+    def live_fn(row: Any, cut: Any) -> tuple[str, bytes]:
+        calls.append(1)
+        raise exc
+
+    _wrapper_run(tmp_path, monkeypatch, live_fn, lambda f: f("r1", "c"))
+    assert calls == [1]
+    assert not cutout_retryable(exc)
+    assert cutout_retryable(_unavailable("https://irsa/cutout: HTTP 429"))
+    assert cutout_retryable(_unavailable("https://irsa/cutout: timeout: ReadTimeout()"))
+
+
+def test_past_the_failure_budget_no_cutout_is_retried(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Q-482: failed cutouts are retried while at most max(2, 25 % of n_frames) failed; past
+    it the archive is taken to be down and nothing is retried any more."""
+    plan = _plan()
+    budget = max(live_jobs.CUTOUT_RETRY_BUDGET_MIN, int(0.25 * plan.n_frames))
+    calls: dict[str, int] = {}
+
+    def live_fn(row: str, cut: Any) -> tuple[str, bytes]:
+        calls[row] = calls.get(row, 0) + 1
+        raise _unavailable()
+
+    def find_body(fetch: Any) -> None:
+        for i in range(budget + 2):
+            with contextlib.suppress(UpstreamUnavailable):
+                fetch(f"r{i}", "c")
+
+    _wrapper_run(tmp_path, monkeypatch, live_fn, find_body)
+    tries = 1 + len(live_jobs.CUTOUT_SECOND_PASS_S)
+    assert [calls[f"r{i}"] for i in range(budget + 2)] == [tries] * budget + [1, 1]
+
+
+def test_a_spent_budget_ends_every_waiting_retry_at_once(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(live_jobs, "CUTOUT_SECOND_PASS_S", (30.0,))
+    plan = _plan()
+    budget = max(live_jobs.CUTOUT_RETRY_BUDGET_MIN, int(0.25 * plan.n_frames))
+    errors: list[BaseException] = []
+
+    def live_fn(row: str, cut: Any) -> tuple[str, bytes]:
+        raise _unavailable()
+
+    def find_body(fetch: Any) -> None:
+        def one(i: int) -> None:
+            try:
+                fetch(f"r{i}", "c")
+            except BaseException as exc:
+                errors.append(exc)
+
+        threads = [threading.Thread(target=one, args=(i,)) for i in range(budget + 1)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join(10)
+
+    t0 = time.monotonic()
+    _wrapper_run(tmp_path, monkeypatch, live_fn, find_body)
+    assert time.monotonic() - t0 < 5.0  # nobody waited the 30 s
+    assert len(errors) == budget + 1
+    assert all(isinstance(e, UpstreamUnavailable) for e in errors)
+
+
+def _stored_client(client: TestClient, missing: tuple[str, ...], spectra: bool) -> Any:
+    """The client's app serving one stored area for ``BOX`` from a fake store."""
+    from tests.test_area_scan import FakeStore, _replies
+
+    app: Any = client.app
+    ctx = app.state.ctx
+    plan = live.plan_from_times(
+        ctx.settings.data_release,
+        live.snap_box(BOX["ra"], BOX["dec"], BOX["width_deg"], BOX["height_deg"]),
+        _three_visits(),
+    )
+    store = FakeStore()
+    store.areas[plan.area_id] = _replies(plan.area_id, unchecked_at=180.0, missing=missing)
+    if spectra:
+        store.areas[plan.area_id]["spectra"] = {"tracks": []}
+    ran: list[str] = []
+    app.state.areas = store
+    app.state.live_jobs = LiveJobs(ctx, lambda c, pl, p: ran.append(pl.area_id), store=store)
+    return plan.area_id, ran
+
+
+def test_a_stored_area_whose_check_failed_answers_done_to_a_plan_and_reruns_on_start(
+    client: TestClient,
+) -> None:
+    """Q-482: ``start=false`` on a stored area answers done (its result is served, R3);
+    ``start=true`` queues the recheck in the worker."""
+    area_id, ran = _stored_client(client, ("skybot:1",), spectra=True)
+    r = client.post("/v1/areas/live", json=BOX)
+    assert r.status_code == 200 and r.json()["state"] == "done"
+    r = client.post("/v1/areas/live", json={**BOX, "start": True, "kind": "discovery"})
+    assert r.status_code == 202 and r.json()["area_id"] == area_id
+    assert client.app.state.live_jobs.wait(10)  # type: ignore[attr-defined]
+    assert ran == [area_id]
+
+
+def test_a_stored_reusable_area_with_spectra_answers_done_on_start(client: TestClient) -> None:
+    area_id, ran = _stored_client(client, (), spectra=True)
+    r = client.post("/v1/areas/live", json={**BOX, "start": True})
+    assert r.status_code == 200 and r.json()["state"] == "done"
+    assert client.app.state.live_jobs.get(area_id) is None  # type: ignore[attr-defined]
+    assert ran == []
+
+
+# --- issue #169 code review: the recheck cooldown, a failed recheck, refills ---------------
+
+
+def test_a_second_start_within_the_cooldown_answers_done_and_makes_no_run(
+    client: TestClient,
+) -> None:
+    """Review #9: through ``POST /v1/areas/live`` (not ``submit``), a stored area whose check
+    failed is rechecked once; the next start within the cooldown answers done at once, with
+    no job and no new run."""
+    area_id, ran = _stored_client(client, ("skybot:1",), spectra=True)
+    r = client.post("/v1/areas/live", json={**BOX, "start": True, "kind": "discovery"})
+    assert r.status_code == 202
+    jobs: Any = client.app.state.live_jobs  # type: ignore[attr-defined]
+    assert jobs.wait(10) and ran == [area_id]
+    n_runs = len(client.get("/v1/runs").json()["runs"])
+    again = client.post("/v1/areas/live", json={**BOX, "start": True, "kind": "discovery"})
+    assert again.status_code == 200 and again.json()["state"] == "done"
+    assert "run_id" not in again.json()
+    assert jobs.wait(10) and ran == [area_id]
+    assert len(client.get("/v1/runs").json()["runs"]) == n_runs
+
+
+def test_a_refill_that_cannot_be_done_is_not_queued_again(client: TestClient) -> None:
+    """Review #4: when the spectra refill cannot be done (here the store has no head in the
+    app's cache), the next start answers done instead of queueing a job and a run each time."""
+    area_id, ran = _stored_client(client, (), spectra=False)
+    r = client.post("/v1/areas/live", json={**BOX, "start": True, "kind": "discovery"})
+    assert r.status_code == 202
+    jobs: Any = client.app.state.live_jobs  # type: ignore[attr-defined]
+    assert jobs.wait(10) and ran == []
+    assert not jobs.needs_spectra(area_id)
+    n_runs = len(client.get("/v1/runs").json()["runs"])
+    again = client.post("/v1/areas/live", json={**BOX, "start": True, "kind": "discovery"})
+    assert again.status_code == 200 and again.json()["state"] == "done"
+    assert len(client.get("/v1/runs").json()["runs"]) == n_runs
+
+
+def _stored_jobs(tmp_path: Path, runner: Any) -> tuple[LiveJobs, Plan, Any]:
+    from tests.test_area_scan import FakeStore, _replies
+
+    plan = _plan()
+    store = FakeStore()
+    store.areas[plan.area_id] = _replies(plan.area_id, unchecked_at=10.0, missing=("skybot:1",))
+    return LiveJobs(_ctx(tmp_path, offline=False), runner, store=store), plan, store
+
+
+def test_a_failed_recheck_keeps_the_stored_result_and_its_cooldown(tmp_path: Path) -> None:
+    """Review #2 and #3: a recheck of a stored area that fails leaves the job and its run
+    done with the stored result (Q-482 (3)), and keeps the cooldown, so a lasting failure is
+    not computed again at every start."""
+    ran: list[str] = []
+
+    def runner(ctx: Context, pl: Plan, prog: Progress) -> None:
+        ran.append(pl.area_id)
+        raise LiveAreaError("area:frames_incomplete", "a cutout failed")
+
+    jobs, plan, _ = _stored_jobs(tmp_path, runner)
+    job = jobs.submit(plan, kind="discovery")
+    assert jobs.wait(10) and ran == [plan.area_id]
+    assert job.state == "done" and job.error is None
+    assert job.run_id is not None
+    run = jobs.runs.get(job.run_id)
+    assert run["state"] == "done" and run["squares"][0]["state"] == "done"
+    assert run["squares"][0]["area_id"] == plan.area_id
+    assert jobs.reusable(plan.area_id)  # the cooldown holds
+
+
+def test_a_stopped_recheck_clears_its_cooldown(tmp_path: Path) -> None:
+    """Review #3: a recheck stopped by ``DELETE`` checked nothing, so the area may be
+    rechecked at once; its stored result is still served."""
+    started, gate = threading.Event(), threading.Event()
+
+    def runner(ctx: Context, pl: Plan, prog: Progress) -> None:
+        started.set()
+        gate.wait(10)
+        prog.check()
+
+    jobs, plan, _ = _stored_jobs(tmp_path, runner)
+    job = jobs.submit(plan, kind="discovery")
+    assert started.wait(10)
+    assert jobs.cancel(plan.area_id)
+    gate.set()
+    assert jobs.wait(10)
+    assert job.state == "failed" and job.error is not None and job.error[0] == "cancelled"
+    assert not jobs.reusable(plan.area_id)
+
+
+def test_a_first_compute_that_stores_codes_starts_the_cooldown(tmp_path: Path) -> None:
+    """Review #1: a first compute that stores an area with a ``skybot:`` code starts the
+    cooldown, so the area is not computed again at once."""
+    from tests.test_area_scan import FakeStore, _replies
+
+    store = FakeStore()
+    ran: list[str] = []
+
+    def runner(ctx: Context, pl: Plan, prog: Progress) -> None:
+        ran.append(pl.area_id)
+        store.areas[pl.area_id] = _replies(pl.area_id, unchecked_at=10.0, missing=("skybot:1",))
+
+    jobs = LiveJobs(_ctx(tmp_path, offline=False), runner, store=store)
+    plan = _plan()
+    jobs.submit(plan)
+    assert jobs.wait(10) and ran == [plan.area_id]
+    assert jobs.reusable(plan.area_id)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "unexpected access_url host: https://evil.example/x",
+        "cutout redirected off the IRSA host: https://evil.example/x",
+        "cutout response is not FITS",
+        "bad FITS from cutout service: truncated FITS header",
+        "https://irsa/cutout: HTTP 403",
+    ],
+)
+def test_the_cutout_adapters_own_refusals_are_not_retried(text: str) -> None:
+    """Review #6: only the http adapter's passing failures get a second pass."""
+    assert not cutout_retryable(_unavailable(text))
+    assert not cutout_retryable(UpstreamError(text))
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "https://irsa/cutout: HTTP 503",
+        "https://irsa/cutout: HTTP 429",
+        "https://irsa/cutout: connection failed: ConnectError('x')",
+        "https://irsa/cutout: transport error: ReadError('reset')",
+        "https://irsa/cutout: timeout: ReadTimeout('')",
+    ],
+)
+def test_the_http_adapters_passing_failures_are_retried(text: str) -> None:
+    assert cutout_retryable(_unavailable(text))
+
+
+def test_an_unknown_failure_is_not_retried() -> None:
+    exc = UpstreamUnavailable("irsa_cutout: boom")
+    exc.__cause__ = ValueError("boom")
+    assert not cutout_retryable(exc)
+    assert not cutout_retryable(OSError("disk full"))

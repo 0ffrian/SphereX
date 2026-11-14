@@ -76,7 +76,11 @@ function mockSquares(region: ScanBox): ScanPlanSquare[] {
 
 /** Square 4 is skipped (no visit pair), as in the mock-up. Invented. */
 const MOCK_SKIP = 4;
-/** `mock-gaps` (#169, as proposed): square 2 fails, square 3 has two unchecked tracks. Invented. */
+/**
+ * `mock-gaps` (#169's fields, landed in PR #172): square 2 fails, square 3 has two unchecked
+ * tracks. Invented. With gaps off the mock answers as a server from before #169 (neither field);
+ * the real server migrates old records, so only tests reach that mode.
+ */
 const GAPS_FAIL = 2;
 const GAPS_UNCHECKED = 3;
 const MOCK_VISITS = ['2026-06-27T03:10:00Z', '2026-06-28T03:10:00Z'];
@@ -237,13 +241,14 @@ export function mockScanApi(
     }
     const events: RunEvent[] = [{ t: 0, type: 'run_started' }];
     const squares: RunSquare[] = [];
-    const totals: RunTotals = {
+    // As an older server answers; #169's two fields are added below when the mock answers as #169.
+    const totals = {
       known: 0,
       found: 0,
       unexplained: 0,
       squares_done: 0,
       squares_skipped: 0,
-    };
+    } as unknown as RunTotals;
     // #169's two fields, only when the mock answers as #169 (an older server sends neither).
     const extra = { unchecked: 0, squares_failed: 0 };
     let acc = 0;
@@ -516,7 +521,12 @@ export function mockResultsOf(rec: RunRecord, gaps = false): RunResults {
     release: rec.release,
     region: rec.region,
     state: rec.state,
-    squares: rec.squares.map((s) => ({ index: s.index, area_id: s.area_id, state: s.state })),
+    squares: rec.squares.map((s) => ({
+      index: s.index,
+      area_id: s.area_id,
+      state: s.state,
+      missing: s.missing ?? [],
+    })),
     known: [...known.values()],
     tracks,
     provenance: { merge: MOCK_PROV, known_positions: MOCK_PROV, track_positions: MOCK_PROV },

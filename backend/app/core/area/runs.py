@@ -13,6 +13,10 @@ Light on purpose (A16.2): plain JSON files and arithmetic, no pipeline module, n
 - **Objects:** read from each finished square's stored replies (``known``, ``tracks``, ``dots``,
   ``summary``), never computed here. ``found`` events and ``/results`` share ``square_objects``
   and ``merge``.
+- **Failures shown (Q-480):** a track the known-object check could not judge (``unchecked``) is
+  counted in ``totals.unchecked`` and listed by ``/results`` with its ``unchecked_by`` codes; each
+  done square carries its ``skybot:`` and ``horizons:`` codes in ``missing``. A record written
+  before Q-480 reads ``unchecked: null`` (not recorded), never 0.
 """
 
 from __future__ import annotations
@@ -42,10 +46,14 @@ LIVE_STATES = ("queued", "running", "paused")
 FINISHED_STATES = ("done", "stopped", "failed")
 DUP_ARCSEC = 30.0
 MERGE_FORMULA = (
-    "known objects merged by designation; found and unexplained tracks merged when they share "
-    "a SkyBoT designation, or when tracks of neighbouring squares have a dot on the same frame "
-    "within 30 arcsec"
+    "known objects merged by designation; found, unexplained and unchecked tracks merged when "
+    "they share a SkyBoT designation, or when tracks of neighbouring squares have a dot on the "
+    "same frame within 30 arcsec; a merged track is found when any member has a match, else "
+    "unexplained when any member was checked, else unchecked"
 )
+# The summary's ``missing`` codes of a failed known-object check (A17.8): a SkyBoT cone of a
+# visit, or a Horizons call for a candidate. A run square carries these only (Q-480).
+CHECK_CODE_PREFIXES = ("skybot:", "horizons:")
 TRACK_POSITIONS_SOURCE = "dot positions of the stored areas (A17.3)"
 KNOWN_POSITIONS_ASSUMPTION = (
     "orbit solutions from SkyBoT (candidates) and JPL Horizons (positions), seen from SPHEREx, "
@@ -83,7 +91,20 @@ def _seconds(a: str, b: str) -> float:
 
 
 def empty_totals() -> dict[str, int]:
-    return {"known": 0, "found": 0, "unexplained": 0, "squares_done": 0, "squares_skipped": 0}
+    return {
+        "known": 0,
+        "found": 0,
+        "unexplained": 0,
+        "unchecked": 0,
+        "squares_done": 0,
+        "squares_skipped": 0,
+        "squares_failed": 0,
+    }
+
+
+def check_codes(missing: Iterable[Any]) -> list[str]:
+    """The ``skybot:`` and ``horizons:`` codes of a ``missing`` list, sorted, no duplicates."""
+    return sorted({str(c) for c in missing if str(c).startswith(CHECK_CODE_PREFIXES)})
 
 
 def write_atomic(path: Path, body: bytes) -> None:
@@ -163,7 +184,7 @@ class RunStore:
                 run = json.loads(path.read_text(encoding="utf-8"))
                 ok = RUN_ID.match(path.stem) is not None and _valid(run, path.stem)
                 if ok:
-                    changed = "provenance" not in run
+                    changed = _migrate_totals(run) or "provenance" not in run
                     run.setdefault("provenance", run_provenance())
                     if run["state"] in LIVE_STATES:
                         self._stop_on_load(run)
@@ -316,14 +337,15 @@ class RunStore:
         error: Mapping[str, str] | None = None,
         event: str | None = None,
         objects: Iterable[Mapping[str, Any]] = (),
-        totals: Mapping[str, int] | None = None,
+        totals: Mapping[str, int | None] | None = None,
+        missing: Sequence[str] | None = None,
         write: bool = True,
     ) -> None:
-        """Set one square's state (and area id or error), append its event and its ``found``
-        events, and replace the totals, in one write. ``write=False`` (a square starting)
-        leaves the file to the next change: a scan rewrites its record once per square, not
-        twice, and a crash loses nothing that matters, as a running square goes back to
-        ``todo`` on load anyway."""
+        """Set one square's state (and area id, error or ``missing`` codes), append its event
+        and its ``found`` events, and replace the totals, in one write. ``write=False`` (a
+        square starting) leaves the file to the next change: a scan rewrites its record once
+        per square, not twice, and a crash loses nothing that matters, as a running square goes
+        back to ``todo`` on load anyway."""
 
         def fn(run: dict[str, Any]) -> None:
             sq = run["squares"][index - 1]
@@ -332,6 +354,8 @@ class RunStore:
                 sq["area_id"] = area_id
             if error is not None:
                 sq["error"] = dict(error)
+            if missing is not None:
+                sq["missing"] = list(missing)
             if event is not None:
                 self._event(run, event, square=index, area_id=area_id or sq.get("area_id"))
             for obj in objects:
@@ -362,6 +386,21 @@ class RunStore:
                 self._runs.values(), key=lambda r: (r["created_at"], r["run_id"]), reverse=True
             )
             return [summary(r) for r in runs]
+
+
+def _migrate_totals(run: dict[str, Any]) -> bool:
+    """Totals of a record written before Q-480 and Q-481: ``unchecked`` was not recorded, so it
+    is ``None`` (never 0, which would be an invented count); ``squares_failed`` is counted from
+    the squares' states. True when the record changed."""
+    totals = run["totals"]
+    changed = False
+    if "unchecked" not in totals:
+        totals["unchecked"] = None
+        changed = True
+    if "squares_failed" not in totals:
+        totals["squares_failed"] = sum(1 for s in run["squares"] if s.get("state") == "failed")
+        changed = True
+    return changed
 
 
 def _valid(run: Any, run_id: str) -> bool:
@@ -457,6 +496,7 @@ class SquareReplies:
     known: Mapping[str, Any] | None
     tracks: Mapping[str, Any] | None
     dots: Mapping[str, Any] | None
+    missing: tuple[str, ...] = ()  # the summary's skybot: and horizons: codes (Q-480)
 
 
 ReadStage = Callable[[str, str], Mapping[str, Any] | None]
@@ -465,9 +505,12 @@ ReadStage = Callable[[str, str], Mapping[str, Any] | None]
 def read_square(index: int, area_id: str, read: ReadStage) -> SquareReplies:
     """One finished square's replies, kept small: the summary's frame times only and the
     dots of its tracks only (an area holds tens of thousands of dots), so a scan can keep
-    every finished square in memory instead of reading them again after each square."""
+    every finished square in memory instead of reading them again after each square. Its
+    ``missing`` keeps the summary's ``skybot:`` and ``horizons:`` codes only (Q-480)."""
     summary, tracks, dots = read(area_id, "summary"), read(area_id, "tracks"), read(area_id, "dots")
+    missing: tuple[str, ...] = ()
     if summary is not None:
+        missing = tuple(check_codes(summary.get("missing", [])))
         summary = {
             "frames": [{"visit": f["visit"], "time": f["time"]} for f in summary.get("frames", [])]
         }
@@ -487,7 +530,8 @@ def read_square(index: int, area_id: str, read: ReadStage) -> SquareReplies:
                 for v in dots.get("visits", [])
             ]
         }
-    return SquareReplies(index, area_id, summary, read(area_id, "known"), tracks, dots)
+    known = read(area_id, "known")
+    return SquareReplies(index, area_id, summary, known, tracks, dots, missing)
 
 
 def _pos(p: Mapping[str, Any]) -> dict[str, Any]:
@@ -528,7 +572,9 @@ def _visit_starts(sq: SquareReplies) -> list[str]:
 def square_objects(sq: SquareReplies) -> list[dict[str, Any]]:
     """The ``found`` event objects of one finished square (Q-471): a track with a SkyBoT match
     is ``known`` (Horizons positions), an ``unexplained`` track carries its measured dots, and
-    a known-list row no track matched is ``predicted`` (the UI hides those by default)."""
+    a known-list row no track matched is ``predicted`` (the UI hides those by default). An
+    ``unchecked`` track has no event (Q-480): the replay is unchanged and its end frame shows
+    the server's totals, which count it."""
     dots = _dot_map(sq)
     known = {str(k["designation"]): k for k in _known_rows(sq)}
     out: list[dict[str, Any]] = []
@@ -628,6 +674,8 @@ class _Cand:
     designation: str | None
     dots: tuple[Mapping[str, Any], ...]
     visits: tuple[str, ...]
+    verdict: str = "unexplained"  # found, unexplained or unchecked
+    unchecked_by: tuple[str, ...] = ()
 
 
 def _same_mover(a: _Cand, b: _Cand) -> bool:
@@ -645,7 +693,11 @@ def merge(
     boxes: Mapping[int, Mapping[str, Any]], squares: Sequence[SquareReplies]
 ) -> dict[str, Any]:
     """Known objects and tracks of the finished squares with the duplicates merged (Q-471);
-    ``boxes`` maps a square index to its box."""
+    ``boxes`` maps a square index to its box. A merged track is ``found`` when any member has a
+    SkyBoT match, else ``unexplained`` when any member was checked and nothing matched, else
+    ``unchecked`` (Q-480). ``unchecked_by`` is the union of the members' codes, on an
+    ``unchecked`` row and on an ``unexplained`` row with an unchecked member. ``missing`` maps
+    each square index to its ``skybot:`` and ``horizons:`` codes."""
     ordered = sorted(squares, key=lambda s: s.index)
 
     cands: list[_Cand] = []
@@ -653,7 +705,8 @@ def merge(
         dots, visits = _dot_map(sq), tuple(_visit_starts(sq))
         for t in _tracks(sq):
             match = t.get("match")
-            if match is None and t.get("verdict") != "unexplained":
+            verdict = str(t.get("verdict"))
+            if match is None and verdict not in ("unexplained", "unchecked"):
                 continue
             des = str(match["designation"]) if match is not None else None
             cands.append(
@@ -664,6 +717,8 @@ def merge(
                     des,
                     tuple(_track_dots(t, dots)),
                     visits,
+                    "found" if match is not None else verdict,
+                    tuple(str(c) for c in t.get("unchecked_by") or ()),
                 )
             )
     u = _Union(len(cands))
@@ -683,19 +738,26 @@ def merge(
         members = groups[root]
         names = sorted({m.designation for m in members if m.designation is not None})
         detected.update(names)
-        tracks.append(
-            {
-                "kind": "found" if names else "unexplained",
-                "designation": names[0] if names else None,
-                "squares": sorted({m.square for m in members}),
-                "tracks": [
-                    {"square": m.square, "area_id": m.area_id, "track_id": m.track_id}
-                    for m in members
-                ],
-                "visits": sorted({v for m in members for v in m.visits}),
-                "positions": _merge_positions(m.dots for m in members),
-            }
-        )
+        if names:
+            kind = "found"
+        elif any(m.verdict == "unexplained" for m in members):
+            kind = "unexplained"
+        else:
+            kind = "unchecked"
+        merged: dict[str, Any] = {
+            "kind": kind,
+            "designation": names[0] if names else None,
+            "squares": sorted({m.square for m in members}),
+            "tracks": [
+                {"square": m.square, "area_id": m.area_id, "track_id": m.track_id} for m in members
+            ],
+            "visits": sorted({v for m in members for v in m.visits}),
+            "positions": _merge_positions(m.dots for m in members),
+        }
+        codes = sorted({c for m in members if m.verdict == "unchecked" for c in m.unchecked_by})
+        if kind != "found" and codes:
+            merged["unchecked_by"] = codes
+        tracks.append(merged)
 
     known_by: dict[str, list[tuple[SquareReplies, Mapping[str, Any]]]] = {}
     for sq in ordered:
@@ -719,7 +781,8 @@ def merge(
                 "positions": _merge_positions(r["positions"] for _, r in rows),
             }
         )
-    return {"known": known, "tracks": tracks}
+    missing = {sq.index: list(sq.missing) for sq in ordered}
+    return {"known": known, "tracks": tracks, "missing": missing}
 
 
 def square_boxes(run: Mapping[str, Any]) -> dict[int, Mapping[str, Any]]:
@@ -730,21 +793,26 @@ def square_counts(squares: Sequence[Mapping[str, Any]]) -> dict[str, int]:
     return {
         "squares_done": sum(1 for s in squares if s["state"] == "done"),
         "squares_skipped": sum(1 for s in squares if s["state"] == "skipped"),
+        "squares_failed": sum(1 for s in squares if s["state"] == "failed"),
     }
 
 
 def totals_of(merged: Mapping[str, Any], squares: Sequence[Mapping[str, Any]]) -> dict[str, int]:
-    """``known`` = merged known objects, ``found`` and ``unexplained`` = merged tracks."""
+    """``known`` = merged known objects; ``found``, ``unexplained`` and ``unchecked`` = merged
+    tracks of that kind (Q-480)."""
     return {
         "known": len(merged["known"]),
         "found": sum(1 for t in merged["tracks"] if t["kind"] == "found"),
         "unexplained": sum(1 for t in merged["tracks"] if t["kind"] == "unexplained"),
+        "unchecked": sum(1 for t in merged["tracks"] if t["kind"] == "unchecked"),
         **square_counts(squares),
     }
 
 
 def results_reply(run: Mapping[str, Any], merged: Mapping[str, Any]) -> dict[str, Any]:
-    """The ``run-results.schema.json`` body."""
+    """The ``run-results.schema.json`` body. A done square's ``missing`` is read from its
+    stored summary by the merge (Q-480); a square not done has none."""
+    missing: Mapping[int, Sequence[str]] = merged.get("missing", {})
     return {
         "run_id": run["run_id"],
         "kind": run["kind"],
@@ -752,7 +820,12 @@ def results_reply(run: Mapping[str, Any], merged: Mapping[str, Any]) -> dict[str
         "region": dict(run["region"]),
         "state": run["state"],
         "squares": [
-            {"index": s["index"], "area_id": s["area_id"], "state": s["state"]}
+            {
+                "index": s["index"],
+                "area_id": s["area_id"],
+                "state": s["state"],
+                "missing": list(missing.get(int(s["index"]), [])) if s["state"] == "done" else [],
+            }
             for s in run["squares"]
         ],
         "known": list(merged["known"]),
@@ -771,6 +844,7 @@ __all__ = [
     "RunStore",
     "Snapshot",
     "SquareReplies",
+    "check_codes",
     "duration_s",
     "merge",
     "new_run_id",

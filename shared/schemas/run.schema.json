@@ -245,20 +245,29 @@
         },
         "error": {
           "$ref": "area-job.schema.json#/definitions/LiveJobError"
+        },
+        "missing": {
+          "type": "array",
+          "items": {
+            "$ref": "area-index.schema.json#/definitions/AreaMissingCode"
+          },
+          "description": "The skybot: and horizons: codes of the square's stored summary: a known-object check that failed (Q-480)."
         }
       }
     },
     "RunTotals": {
       "title": "RunTotals",
-      "description": "known: known objects in the merged known lists; found and unexplained: merged tracks (Q-471).",
+      "description": "known: known objects in the merged known lists; found, unexplained and unchecked: merged tracks (Q-471, Q-480); squares_failed: squares whose computation failed (Q-481).",
       "type": "object",
       "additionalProperties": false,
       "required": [
         "known",
         "found",
         "unexplained",
+        "unchecked",
         "squares_done",
-        "squares_skipped"
+        "squares_skipped",
+        "squares_failed"
       ],
       "properties": {
         "known": {
@@ -273,11 +282,27 @@
           "type": "integer",
           "minimum": 0
         },
+        "unchecked": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Merged tracks the known-object check could not judge (Q-480); null = a run recorded before Q-480, not counted."
+        },
         "squares_done": {
           "type": "integer",
           "minimum": 0
         },
         "squares_skipped": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "squares_failed": {
           "type": "integer",
           "minimum": 0
         }

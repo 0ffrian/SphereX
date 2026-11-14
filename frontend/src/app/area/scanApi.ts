@@ -81,16 +81,16 @@ export type ScanStartAnswer =
 
 export { RunGone };
 
-// ---- #169 (proposed; not in the contract yet): what a run could not check or compute ----------
-// Issue #170 builds against these with the mock (`?scan=mock-gaps`); when #169 lands its schema,
-// `npm run contract:gen` brings the fields into `RunTotals` and `RunTrackRow`, and these readers
-// keep working. A run recorded before #169 has neither field: `unchecked` reads null (not
-// recorded), never 0, so nothing is invented.
+// ---- #169 (landed in PR #172, Q-480 to Q-482): what a run could not check or compute ----------
+// The fields are in the contract (`RunTotals.unchecked`, `squares_failed`, `RunTrackRow` kind
+// `unchecked` and `unchecked_by`). The server migrates older run records on load (`unchecked`
+// null, never 0), so the missing-field fallbacks below are reached only by the mock's
+// older-server mode (`scanMock.ts`, gaps off), kept for tests.
 
-/** The track kinds a results reply may carry: #156's two and #169's proposed `unchecked`. */
-const TRACK_KINDS: readonly string[] = ['found', 'unexplained', 'unchecked'];
-/** A merged track row, with #169's `unchecked` kind (the known-object check did not answer). */
-export type ScanTrackKind = RunTrackRow['kind'] | 'unchecked';
+/** The track kinds a results reply may carry (the generated enum, checked at run time too). */
+const TRACK_KINDS: readonly RunTrackRow['kind'][] = ['found', 'unexplained', 'unchecked'];
+/** A merged track row's kind; `unchecked`: the known-object check did not answer. */
+export type ScanTrackKind = RunTrackRow['kind'];
 export type ScanTrackRow = Omit<RunTrackRow, 'kind'> & {
   kind: ScanTrackKind;
   /** #169: the `skybot:<visit>` and `horizons:<designation>` codes that left it unchecked. */
@@ -240,13 +240,13 @@ export function parseRunResults(body: unknown): RunResults {
     !Array.isArray(body.tracks)
   )
     throw bad('Run results');
-  // `trackRowsOf` widens the rows to #169's proposed kinds without the compiler's help, so the
-  // kinds and `unchecked_by` are checked here: a reply that drifts from them is refused, not read.
+  // The kinds and `unchecked_by` are checked here as well as typed: a reply that drifts from
+  // them is refused, not read.
   for (const t of body.tracks as unknown[])
     if (
       !isObj(t) ||
       !isStr(t.kind) ||
-      !TRACK_KINDS.includes(t.kind) ||
+      !TRACK_KINDS.includes(t.kind as RunTrackRow['kind']) ||
       !Array.isArray(t.tracks) ||
       t.tracks.length === 0 ||
       !Array.isArray(t.positions) ||
