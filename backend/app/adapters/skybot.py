@@ -10,6 +10,7 @@ import math
 from dataclasses import dataclass
 from datetime import datetime
 
+from app.adapters.http import UpstreamError
 from app.cache.keys import CacheKey, norm_dec, norm_float, norm_ra
 from app.cache.store import LiveResponse, Served
 from app.context import Context
@@ -64,7 +65,14 @@ def parse(status: int, body: bytes) -> list[SkybotBody]:
     if status == 204 or not body.strip():
         return []
     doc = json.loads(body)
-    items = doc if isinstance(doc, list) else doc.get("data", [])
+    # A list, or an object carrying ``data``: any other object (an error answered with 200) is
+    # not an answer, so it must not be read (and cached) as "no known objects in this cone".
+    if isinstance(doc, list):
+        items = doc
+    elif isinstance(doc, dict) and isinstance(doc.get("data"), list):
+        items = doc["data"]
+    else:
+        raise ValueError("SkyBoT answer is neither a list nor an object with data")
     out: list[SkybotBody] = []
     for it in items:
         num = it.get("Num")
@@ -102,7 +110,14 @@ def conesearch(
             "-objFilter": "111",
             "-from": "ShiftSpectrum",
         }
-        return ctx.http.get(ctx.settings.skybot_url, params, accept=frozenset({200, 204}))
+        resp = ctx.http.get(ctx.settings.skybot_url, params, accept=frozenset({200, 204}))
+        # Read it before it is cached: an error page answered with 200 would otherwise be kept
+        # for good and fail every later read of this cone (as Horizons' `_fetch` checks).
+        try:
+            parse(resp.status, resp.body)
+        except (ValueError, KeyError, TypeError, AttributeError) as exc:
+            raise UpstreamError(f"SkyBoT answer could not be read: {exc}") from exc
+        return resp
 
     served = ctx.cache.fetch(key, live, refresh=refresh)
     return parse(served.entry.status, served.entry.body), served

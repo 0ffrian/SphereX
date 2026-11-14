@@ -10,7 +10,7 @@ import { regionBox } from './scanGrid';
 import { getScanApi, RunGone, type RunRecord, type RunSummary } from './scanApi';
 import { advance, durationOf, REPLAY_SPEEDS, step, type ReplaySpeed } from './replay';
 import { useScanStore } from './scanStore';
-import { useAreaStore } from '@/app/shell/areaStore';
+import { registerSkyHold, useAreaStore } from '@/app/shell/areaStore';
 import { clampFov } from '@/viewer/sky/skyMath';
 import { flyToView, reducedMotion } from '@/app/sky/areaDraw';
 
@@ -245,6 +245,9 @@ export const useRunsStore = create<RunsState>()((set, get) => {
 export function filteredRuns(runs: readonly RunSummary[], f: RunsFilter): RunSummary[] {
   return f === 'all' ? runs.slice() : runs.filter((r) => r.kind === f);
 }
+
+// A live area that finishes while a replay plays does not open over it (it would end the replay).
+registerSkyHold(() => useRunsStore.getState().replay !== null);
 
 /** Back to a clean state (tests). */
 export function resetRuns(): void {

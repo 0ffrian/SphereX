@@ -138,6 +138,36 @@ describe('scan store', () => {
   });
 });
 
+describe('another run opened over a scan that is still going', () => {
+  it('closing the other run keeps ours: followed again, and still saved for a reload', async () => {
+    await useScanStore.getState().plan('discovery', REGION);
+    await useScanStore.getState().start();
+    await flush();
+    const mine = run().runId;
+    // The Runs list opens another (finished) run in the card, then the card is closed.
+    useScanStore.getState().follow('run-20261113T070000-aaaaaa', 'known', REGION);
+    expect(run().runId).not.toBe(mine);
+    useScanStore.getState().clear();
+    await flush();
+    expect(run().runId).toBe(mine);
+    expect(useScanStore.getState().saved()?.runId).toBe(mine);
+    expect(run().record?.state).toBe('running');
+    // Select again from the other run, then an offer for a region, then closed: ours is kept too.
+    useScanStore.getState().follow('run-20261113T070000-aaaaaa', 'known', REGION);
+    useScanStore.getState().clear();
+    await useScanStore.getState().plan('discovery', REGION);
+    expect(useScanStore.getState().view?.kind).toBe('offer');
+    useScanStore.getState().clear();
+    await flush();
+    expect(run().runId).toBe(mine);
+    expect(useScanStore.getState().saved()?.runId).toBe(mine);
+    // Closing our own (finished or stopped) scan still forgets it.
+    useScanStore.getState().clear();
+    expect(useScanStore.getState().view).toBeNull();
+    expect(useScanStore.getState().saved()).toBeNull();
+  });
+});
+
 describe('start while the user moves on', () => {
   it('a run started after Select again is stopped, not followed (PR #159 review)', async () => {
     const api = mockScanApi({ squareMs: 1000, now, persist: false });

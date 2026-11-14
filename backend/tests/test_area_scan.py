@@ -22,7 +22,7 @@ from app.core.area import clean as area_clean
 from app.core.area import frames as area_frames
 from app.core.area import live, runs, scan
 from app.core.area.live import Box, LiveAreaError, Plan
-from app.core.area.live_jobs import LiveJobs, Progress, RunConflict
+from app.core.area.live_jobs import LiveJobs, Progress, QueueFull, RunConflict
 from app.core.area.store import AreaStore
 from app.core.card.validate import check
 from app.main import create_app
@@ -453,6 +453,36 @@ def test_a_queued_scan_stops_at_once(tmp_path: Path) -> None:
     assert _run(jobs, run_id)["state"] == "stopped"
 
 
+def test_close_stops_the_running_scan_and_everything_waiting(tmp_path: Path) -> None:
+    """Server shutdown (the gap analysis of 14 Nov): the worker ends at its next check, the
+    queued items are dropped, and every run is recorded stopped."""
+    started = threading.Event()
+
+    def runner(ctx: Context, plan: Plan, prog: Progress) -> None:
+        started.set()
+        while True:  # a square that would never end by itself: only a stop ends it
+            prog.check()
+            threading.Event().wait(0.01)
+
+    jobs = _scan_jobs(tmp_path, runner)
+    running = jobs.submit_scan(scan.plan_scan(180.0, 0.0, 2.0, 2.0), "discovery", RELEASE)
+    assert started.wait(5)
+    waiting = jobs.submit_scan(scan.plan_scan(190.0, 0.0, 2.0, 2.0), "known", RELEASE)
+    single = jobs.submit(_plan_of(live.snap_box(10.0, 10.0, 0.5, 0.5)), kind="discovery")
+    assert jobs.close(timeout=10)
+    assert _run(jobs, running)["state"] == "stopped"
+    assert _run(jobs, waiting)["state"] == "stopped"
+    assert single.run_id is not None and _run(jobs, single.run_id)["state"] == "stopped"
+    assert jobs.reply(single)["error"]["code"] == "cancelled"
+    assert jobs.close(timeout=1)  # nothing left: closing again is harmless
+    # A request racing the shutdown queues nothing and does not start the worker again.
+    with pytest.raises(QueueFull):
+        jobs.submit_scan(scan.plan_scan(200.0, 0.0, 2.0, 2.0), "discovery", RELEASE)
+    with pytest.raises(QueueFull):
+        jobs.submit(_plan_of(live.snap_box(12.0, 10.0, 0.5, 0.5)), kind="discovery")
+    assert jobs._thread is None or not jobs._thread.is_alive()
+
+
 def test_a_single_live_job_with_a_kind_is_a_run_of_one_square(tmp_path: Path) -> None:
     store = FakeStore()
 
@@ -637,6 +667,34 @@ def test_the_plan_route_needs_no_network(
     check(body, "scan-plan.schema.json")
     assert (body["cols"], body["rows"], body["kind"]) == (2, 1, "discovery")
     assert [s["area_id"] for s in body["squares"]] == [None, None]
+
+
+def test_server_shutdown_stops_a_scan_that_is_running(tmp_path: Path) -> None:
+    """The lifespan closes the live jobs: the process exits without waiting for the scan, and
+    the run is recorded stopped (not left for the next start to find)."""
+    app = create_app(make_settings(tmp_path / "cache", offline=False, data_release=RELEASE))
+    started = threading.Event()
+
+    def runner(ctx: Context, plan: Plan, prog: Progress) -> None:
+        started.set()
+        while True:  # never ends by itself
+            prog.check()
+            threading.Event().wait(0.01)
+
+    with TestClient(app) as c:
+        app.state.live_jobs = LiveJobs(
+            app.state.ctx,
+            runner,
+            planner=lambda ctx, box: _plan_of(box),
+            store=AreaStore(app.state.ctx, None),
+        )
+        r = c.post("/v1/scans", json={**REGION, "kind": "discovery", "start": True})
+        assert r.status_code == 202
+        run_id = r.json()["run_id"]
+        assert started.wait(5)
+    jobs: LiveJobs = app.state.live_jobs
+    assert jobs.wait(1)  # the worker has ended
+    assert _run(jobs, run_id)["state"] == "stopped"
 
 
 def test_scan_routes_start_pause_resume_stop(client: TestClient) -> None:

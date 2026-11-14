@@ -68,9 +68,26 @@ export interface CombineResult {
   info: CombineInfo;
 }
 
+/**
+ * Track on demand's window (Q-468): `around` ± `days`. The reads of a Track computed for a window
+ * (`/frames`, `/path`, `/job`) name it; without it the backend answers for the base windows.
+ */
+export interface TrackWindow {
+  around: string;
+  days: number;
+}
+/** `?around=…&days=…` for a Track window, or nothing. */
+export function trackQuery(w?: TrackWindow | null): string {
+  return w ? `?${new URLSearchParams({ around: w.around, days: String(w.days) }).toString()}` : '';
+}
+
 export interface ApiClient {
   resolve(q: string, signal?: AbortSignal): Promise<ApiResult<ResolveResponse>>;
-  frames(id: string, signal?: AbortSignal): Promise<ApiResult<FramesResponse>>;
+  frames(
+    id: string,
+    signal?: AbortSignal,
+    window?: TrackWindow | null,
+  ): Promise<ApiResult<FramesResponse>>;
   spectrum(id: string, signal?: AbortSignal): Promise<ApiResult<SpectrumResponse>>;
   /** Sky background index (prototype, not in D-16): the all-sky images that are installed. */
   skyIndex(signal?: AbortSignal): Promise<ApiResult<SkyIndexResponse>>;
@@ -103,7 +120,11 @@ export interface ApiClient {
   /** `GET /v1/areas/{area_id}/known` (P9's Known card). */
   areaKnown(id: string, signal?: AbortSignal): Promise<ApiResult<AreaKnown>>;
   /** `GET /v1/objects/{id}/path` (A19.5, issue #130): the Horizons path seen from SPHEREx. */
-  path(id: string, signal?: AbortSignal): Promise<ApiResult<TrackPath>>;
+  path(
+    id: string,
+    signal?: AbortSignal,
+    window?: TrackWindow | null,
+  ): Promise<ApiResult<TrackPath>>;
 }
 
 export interface ApiClientOptions {
@@ -241,7 +262,8 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
     // object's job with no limit of its own (Q-111 (2), A4.10), so it keeps the long one.
     resolve: (q, signal) =>
       getJson(`/resolve?q=${encodeURIComponent(q)}`, parseResolve, signal, quickTimeoutMs),
-    frames: (id, signal) => getJson(`${objectPath(id)}/frames`, parseFrames, signal),
+    frames: (id, signal, window) =>
+      getJson(`${objectPath(id)}/frames${trackQuery(window)}`, parseFrames, signal),
     spectrum: (id, signal) => getJson(`${objectPath(id)}/spectrum`, parseSpectrum, signal),
     skyIndex: (signal) => getJson('/sky/index.json', parseSkyIndex, signal),
     skyCached: (signal) => getJson('/sky/cached', parseSkyCached, signal),
@@ -255,7 +277,8 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
     areaDots: (id, signal) => getJson(`${areaPath(id)}/dots`, parseAreaDots, signal),
     areaTracks: (id, signal) => getJson(`${areaPath(id)}/tracks`, parseAreaTracks, signal),
     areaKnown: (id, signal) => getJson(`${areaPath(id)}/known`, parseAreaKnown, signal),
-    path: (id, signal) => getJson(`${objectPath(id)}/path`, parseTrackPath, signal),
+    path: (id, signal, window) =>
+      getJson(`${objectPath(id)}/path${trackQuery(window)}`, parseTrackPath, signal),
     getCombine: (id, op, a, b, signal) => {
       const query = new URLSearchParams({ op, a, b }).toString();
       return request(

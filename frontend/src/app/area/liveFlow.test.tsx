@@ -9,6 +9,7 @@ import { useAreaStore, type AreaBox } from '@/app/shell/areaStore';
 import { useShellStore } from '@/app/shell/shellStore';
 import { setSkyApi } from '@/state/store';
 import { LiveAreaCard } from './LiveAreaCard';
+import { resetRuns, useRunsStore } from './runsStore';
 import { httpLiveAreaApi, LiveJobGone, mockLiveAreaApi, mockStatusAt, setLiveAreaApi, type LivePlan } from './liveAreaApi';
 import {
   aboutMinutes,
@@ -151,6 +152,29 @@ describe('computing (state 4) and the hand-off', () => {
     await vi.advanceTimersByTimeAsync(3200);
     expect(useAreaStore.getState().screen).toBe('list');
     expect(useAreaStore.getState().box).toEqual(box);
+  });
+  it('Compute names its tool, so the server records the run for the Runs list (Q-471 (2))', async () => {
+    const kinds: unknown[] = [];
+    const api = mockLiveAreaApi('ok');
+    setLiveAreaApi({ ...api, start: async (b, s, v, kind) => (kinds.push(kind), api.start(b, s, v, kind)) });
+    await draw('discovery');
+    await useLiveJobStore.getState().compute();
+    expect(kinds).toEqual(['discovery']);
+  });
+  it('an area that finishes while a replay plays does not open over it', async () => {
+    setLiveAreaApi(mockLiveAreaApi('ok', { durationMs: 4000 }));
+    await draw('known');
+    await useLiveJobStore.getState().compute();
+    useShellStore.getState().closePanel();
+    useAreaStore.getState().reset();
+    // A replay has the sky to itself (the runs store tells the area store).
+    useRunsStore.setState({ replay: { playing: true } as never });
+    stored = true;
+    await vi.advanceTimersByTimeAsync(4000 + 2 * POLL_MS + 3200);
+    expect(useLiveJobStore.getState().job).toBeNull();
+    expect(useShellStore.getState().tool).toBe('sky');
+    expect(useAreaStore.getState().screen).not.toBe('list');
+    resetRuns();
   });
   it('Stop ends the job and shows the offer again', async () => {
     const api = mockLiveAreaApi('ok');

@@ -199,6 +199,15 @@ let token = 0;
 /** One request per square, and one per Eros card (issue #130): a newer one aborts the older. */
 let knownAbort: AbortController | null = null;
 let trackAbort: AbortController | null = null;
+/**
+ * Something else has the sky to itself (a replay; the runs store registers it, as the hand-off is
+ * registered, so this file does not import that store). A live area that finishes meanwhile is
+ * stored on the server but does not open over it: its card would end the replay.
+ */
+let skyHeld: () => boolean = () => false;
+export function registerSkyHold(fn: (() => boolean) | null): void {
+  skyHeld = fn ?? (() => false);
+}
 function clearTimers(): void {
   knownAbort?.abort();
   knownAbort = null;
@@ -254,7 +263,7 @@ export const useAreaStore = create<AreaState>()((set, get) => {
       // frames and path replace them when the API answers, so a slow backend never leaves "Loading…".
       if (demo) set({ eros: demo, erosFailed: false, trackSource: 'demo', trackPath: false, pathPending: false });
       try {
-        const real = await loadObjectTrack(obj.objectId, ctl.signal);
+        const real = await loadObjectTrack(obj.objectId, ctl.signal, obj.trackWindow);
         if (ctl.signal.aborted) return demo;
         const eros = mergeReal(demo, real.frames, real.path);
         if (eros.hops.length === 0) throw new ApiError('bad_response', 'No frames for this object.');
@@ -361,7 +370,12 @@ export const useAreaStore = create<AreaState>()((set, get) => {
     const s = get();
     const key = obj.designation ?? obj.id;
     const known = s.known
-      ? { ...s.known, objects: s.known.objects.map((o) => ((o.designation ?? o.id) === key ? { ...o, trackAvailable: true } : o)) }
+      ? {
+          ...s.known,
+          objects: s.known.objects.map((o) =>
+            (o.designation ?? o.id) === key ? { ...o, trackAvailable: true, trackWindow: obj.trackWindow } : o,
+          ),
+        }
       : null;
     set({ known });
     if (s.screen === 'track' && useShellStore.getState().tool === 'area') get().openEros(obj);
@@ -384,6 +398,8 @@ export const useAreaStore = create<AreaState>()((set, get) => {
     // another box included): only on the plain sky or while selecting.
     if (ifIdle && shell.tool === 'area' && s.stage === 'set') return;
     if (ifIdle && shell.tool !== 'area' && shell.tool !== 'sky') return;
+    // Nor over a replay (it plays on the plain sky, so the line above lets it through).
+    if (ifIdle && skyHeld()) return;
     clearTimers();
     set({ ...FRESH, flow });
     if (shell.tool !== 'area') shell.setTool('area');

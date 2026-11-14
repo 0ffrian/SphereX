@@ -228,11 +228,18 @@ function RunsList({ titleId, onClose }: { titleId: string; onClose(): void }) {
               </button>
             ))}
           </div>
-          <ul className="sx-runs-rows" data-testid="runs-rows">
-            {shown.map((r) => (
-              <RunRow key={r.run_id} run={r} />
-            ))}
-          </ul>
+          {shown.length === 0 ? (
+            // A filter with nothing under it says so (an empty list read as a list still loading).
+            <p className="sx-runs-m" data-testid="runs-none">
+              No {filter === 'known' ? 'Known objects' : 'Discovery'} runs yet.
+            </p>
+          ) : (
+            <ul className="sx-runs-rows" data-testid="runs-rows">
+              {shown.map((r) => (
+                <RunRow key={r.run_id} run={r} />
+              ))}
+            </ul>
+          )}
           {note && (
             <p className="sx-runs-msg" data-tone="fail" role="status">
               <b>Replay not started</b>
