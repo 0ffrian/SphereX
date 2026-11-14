@@ -302,7 +302,7 @@ sequenceDiagram
       Note over J,R: the pause ends at the next square_started (duration_s)
     end
   end
-  J->>R: run_done
+  J->>R: run_done (state failed when no square is done and one failed, Q-481)
   F->>A: GET /v1/runs/run_id (record, events), /results (merged)
   A->>R: read
   A->>C: read the finished squares

@@ -74,6 +74,20 @@ class RunSquare(BaseModel):
     area_id: RunAreaId
     state: RunSquareState
     error: area_job_schema.LiveJobError | None = None
+    missing: list[area_index_schema.AreaMissingCode] | None = Field(
+        None,
+        description="The skybot: and horizons: codes of the square's stored summary: a known-object check that failed (Q-480).",
+    )
+
+
+type Unchecked = Annotated[
+    int,
+    Field(
+        ...,
+        description="Merged tracks the known-object check could not judge (Q-480); null = a run recorded before Q-480, not counted.",
+        ge=0,
+    ),
+]
 
 
 class RunTotals(BaseModel):
@@ -83,8 +97,13 @@ class RunTotals(BaseModel):
     known: int = Field(..., ge=0)
     found: int = Field(..., ge=0)
     unexplained: int = Field(..., ge=0)
+    unchecked: Unchecked | None = Field(
+        ...,
+        description="Merged tracks the known-object check could not judge (Q-480); null = a run recorded before Q-480, not counted.",
+    )
     squares_done: int = Field(..., ge=0)
     squares_skipped: int = Field(..., ge=0)
+    squares_failed: int = Field(..., ge=0)
 
 
 class RunPosition(BaseModel):

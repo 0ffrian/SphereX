@@ -1542,16 +1542,25 @@ export interface RunSquare {
   area_id: RunAreaId;
   state: RunSquareState;
   error?: LiveJobError;
+  /**
+   * The skybot: and horizons: codes of the square's stored summary: a known-object check that failed (Q-480).
+   */
+  missing?: AreaMissingCode[];
 }
 /**
- * known: known objects in the merged known lists; found and unexplained: merged tracks (Q-471).
+ * known: known objects in the merged known lists; found, unexplained and unchecked: merged tracks (Q-471, Q-480); squares_failed: squares whose computation failed (Q-481).
  */
 export interface RunTotals {
   known: number;
   found: number;
   unexplained: number;
+  /**
+   * Merged tracks the known-object check could not judge (Q-480); null = a run recorded before Q-480, not counted.
+   */
+  unchecked: number | null;
   squares_done: number;
   squares_skipped: number;
+  squares_failed: number;
 }
 export interface RunEvent {
   /**
@@ -1646,6 +1655,10 @@ export interface RunResultSquare {
   index: number;
   area_id: RunAreaId;
   state: RunSquareState;
+  /**
+   * The skybot: and horizons: codes of the square's stored summary: a known-object check that failed (Q-480). Empty for a square not done.
+   */
+  missing: AreaMissingCode[];
 }
 /**
  * A known object, merged by designation.
@@ -1672,10 +1685,10 @@ export interface RunKnownRow {
   positions: RunPosition[];
 }
 /**
- * A found or unexplained track, merged across neighbouring squares.
+ * A found, unexplained or unchecked track, merged across neighbouring squares: found when a member has a SkyBoT match, else unexplained when a member was checked, else unchecked (Q-480).
  */
 export interface RunTrackRow {
-  kind: 'found' | 'unexplained';
+  kind: 'found' | 'unexplained' | 'unchecked';
   designation: string | null;
   /**
    * @minItems 1
@@ -1690,6 +1703,12 @@ export interface RunTrackRow {
    */
   visits: AreaUtcTime[];
   positions: RunPosition[];
+  /**
+   * The members' skybot: and horizons: codes (Q-480): required on an unchecked row, also on an unexplained row with an unchecked member.
+   *
+   * @minItems 1
+   */
+  unchecked_by?: [AreaMissingCode, ...AreaMissingCode[]];
 }
 export interface RunTrackRef {
   square: number;

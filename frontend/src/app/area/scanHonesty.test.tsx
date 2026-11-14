@@ -29,7 +29,14 @@ declare global {
 
 // 5 × 3 squares (#156's split); square 1 is stored, 2 fails, 3 has two unchecked tracks, 4 is skipped.
 const REGION = { ra: 30, dec: 10, width_deg: 9, height_deg: 5.4 };
-const T: RunTotals = { known: 3, found: 2, unexplained: 4, squares_done: 5, squares_skipped: 1 };
+// A record from a server before #169: neither `unchecked` nor `squares_failed` (cast on purpose).
+const T = {
+  known: 3,
+  found: 2,
+  unexplained: 4,
+  squares_done: 5,
+  squares_skipped: 1,
+} as unknown as RunTotals;
 
 /** A finished mock run and its results, with or without #169's fields. */
 async function finished(gaps: boolean): Promise<{ record: RunRecord; results: RunResults }> {

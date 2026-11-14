@@ -159,18 +159,25 @@ def post_live(
     jobs: Annotated[LiveJobs, Depends(get_live_jobs)],
 ) -> Response:
     """The plan of a box (``start=false``), or its job (``start=true``). A box already stored
-    answers ``done``; one already queued or running answers its job, whatever ``start`` is,
-    except a scan's square with ``start=true``: that queues a job of its own behind the square,
-    so stopping the scan never loses this request (PR #160 review, Q-470)."""
+    answers ``done``, unless ``start=true`` and the stored area is not reusable (its
+    known-object check failed) or lacks its ``spectra`` stage (and no refill of it has
+    already failed in this process): then a job is queued, which computes it again or fills
+    the stage in the worker (Q-482; nothing is computed here, A16.2). One already queued or
+    running answers its job, whatever ``start`` is, except a scan's square with
+    ``start=true``: that queues a job of its own behind the square, so stopping the scan never
+    loses this request (PR #160 review, Q-470)."""
     plan = _plan(request, req)
-    if store.entry(plan.area_id, "summary") is not None:
+    stored = store.entry(plan.area_id, "summary") is not None
+    if stored and (
+        not req.start or (jobs.reusable(plan.area_id) and not jobs.needs_spectra(plan.area_id))
+    ):
         return _json(done_reply(plan.area_id), "area-job.schema.json")
     job = jobs.get(plan.area_id)
     if job is not None and job.active and (job.joinable or not req.start):
         return _json(jobs.reply(job), "area-job.schema.json")
     if not req.start:
         return _json(plan.reply(), "area-live-plan.schema.json")
-    if jobs.ctx.settings.offline:
+    if jobs.ctx.settings.offline and not stored:  # a stored area needs no network (Q-482)
         raise ApiError(503, "offline", "Live areas need the network (SX_OFFLINE=1).")
     try:
         job = jobs.submit(plan, kind=req.kind)

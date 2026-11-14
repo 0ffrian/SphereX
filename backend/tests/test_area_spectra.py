@@ -509,3 +509,54 @@ def test_a_faint_arm_with_no_flux_and_no_error_gives_no_limit() -> None:
 
 def test_the_committed_pack_is_up_to_date() -> None:
     assert area_spectra.main(["--root", str(PACK), "--check"]) == 0
+
+
+def test_starting_a_stored_area_again_fills_its_missing_spectra(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Issue #169 (4), Q-482: an area stored in the cache without its ``spectra`` stage serves
+    ``/spectra`` after the same box is started again; the worker fills the stage from the stored
+    replies (never the request, A16.2) and nothing else is recomputed. Offline, as a stored area
+    needs no network."""
+    from dataclasses import replace
+
+    from app.api import areas as areas_api
+    from app.core.area import live
+    from app.core.area.live_jobs import LiveJobs
+
+    cache_dir = tmp_path / "cache"
+    shutil.copytree(PACK, cache_dir)  # the Eros area, stored in the app's own cache
+    _drop_spectra(cache_dir)
+    settings = make_settings(cache_dir, area_pack_dir=tmp_path / "no-pack")
+    box = live.snap_box(180.0, 0.0, 0.5, 0.5)
+    t0 = datetime(2026, 3, 20, tzinfo=UTC)
+    times = [t0 + timedelta(minutes=2 * i) for i in range(4)]
+    times += [t0 + timedelta(hours=2, minutes=2 * i) for i in range(4)]
+    plan = replace(live.plan_from_times(RELEASE, box, times), area_id=EROS)
+    monkeypatch.setattr(areas_api, "plan_area", lambda ctx, b, pair=None: plan)
+    ran: list[str] = []
+    app = create_app(settings)
+    with TestClient(app) as c:
+        store = AreaStore(app.state.ctx, settings.area_pack_dir)
+        app.state.areas = store
+        app.state.live_jobs = LiveJobs(
+            app.state.ctx, lambda ctx, pl, p: ran.append(pl.area_id), store=store
+        )
+        assert c.get(f"/v1/areas/{EROS}/spectra").json()["error"] == "spectra_not_prepared"
+        r = c.post("/v1/areas/live", json={**box.reply(), "start": True, "kind": "discovery"})
+        assert r.status_code == 202, r.text
+        assert app.state.live_jobs.wait(10)
+        got = c.get(f"/v1/areas/{EROS}/spectra")
+        assert got.status_code == 200, got.text
+        assert errors(got.json(), "area-spectra.schema.json") == []
+        assert ran == []  # the pipeline did not run
+        run_id = r.json()["run_id"]
+        assert c.get(f"/v1/runs/{run_id}").json()["state"] == "done"
+        again = c.post("/v1/areas/live", json={**box.reply(), "start": True})
+        assert again.status_code == 200 and again.json()["state"] == "done"  # nothing queued
+    # The same bytes as the committed stage: the check ran on the same stored replies.
+    _, p = _pack_bodies(PACK)
+    key = spectra_key(RELEASE, EROS, p, spectra_settings_sha())
+    filled = ReadThroughCache(cache_dir, offline=True).get(key)
+    committed = ReadThroughCache(PACK, offline=True).get(key)
+    assert filled is not None and committed is not None and filled.body == committed.body

@@ -104,7 +104,15 @@ const RUN: RunRecord = {
   created_at: '2026-11-13T21:09:27Z',
   started_at: '2026-11-13T21:09:27Z',
   finished_at: '2026-11-13T21:41:07Z',
-  totals: { known: 2, found: 1, unexplained: 1, squares_done: 2, squares_skipped: 1 },
+  totals: {
+    known: 2,
+    found: 1,
+    unexplained: 1,
+    unchecked: 0,
+    squares_done: 2,
+    squares_skipped: 1,
+    squares_failed: 0,
+  },
   events: EVENTS,
   provenance: {
     known_positions: { tag: 'model_dependent', source: 'Horizons' },
@@ -150,8 +158,10 @@ describe('recordAt', () => {
       known: 2,
       found: 1,
       unexplained: 0,
+      unchecked: null,
       squares_done: 1,
       squares_skipped: 0,
+      squares_failed: 0,
     });
     // Abramenko, found in squares 1 and 3, counts once (as its circle does).
     expect(recordAt(RUN, 1900).totals).toMatchObject({
