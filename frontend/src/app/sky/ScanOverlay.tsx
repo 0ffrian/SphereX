@@ -18,12 +18,9 @@ import { useRunsStore } from '@/app/area/runsStore';
 import { clock, foundAtOf, recordAt } from '@/app/area/replay';
 import type { SquareState } from '@/app/area/scanApi';
 import { skyToPixels } from './areaDraw';
+import { placeScanLabels, ringBox, type Pt } from './scanLabels';
 
 type Look = SquareState | 'plain';
-interface Pt {
-  x: number;
-  y: number;
-}
 
 /** The squares' screen quads now, for the click test (set by the overlay while it shows). */
 let hits: { quads: { index: number; pts: Pt[] }[]; open(index: number): void } | null = null;
@@ -164,19 +161,15 @@ export function ScanOverlay({ view }: { view: SkyView | null }) {
       if (squareLooks[i] === 'done' && !replaying) quads.push({ index: s.index, pts: q });
     });
     hits = { quads, open: (index) => void openRef.current(index) };
-    // Labels never overlap (as the area layer's placeLabels): found objects first, then
-    // unexplained, then predicted; each tries the right of its ring, then the left, else it is not
-    // drawn (the ring keeps its name as its accessible label).
-    const placed: { x0: number; y0: number; x1: number; y1: number }[] = [];
-    const RANK: Record<ScanObject['kind'], number> = { known: 0, unexplained: 1, predicted: 2 };
-    const ordered = objects.slice().sort((a, b) => RANK[a.kind] - RANK[b.kind]);
+    // Labels never overlap (as the area layer's placeLabels): see scanLabels.ts.
     // Every ring on screen is an obstacle for the other objects' labels.
     const rings = objects.flatMap((o) => {
       const last = o.positions[o.positions.length - 1];
       const e = last ? skyToPixels(last.ra, last.dec) : null;
-      return e ? [{ key: o.key, x0: e.x - 12, y0: e.y - 12, x1: e.x + 12, y1: e.y + 12 }] : [];
+      return e ? [ringBox(o.key, e)] : [];
     });
-    for (const o of ordered) {
+    const toLabel: { label: SVGTextElement; end: Pt; o: ScanObject }[] = [];
+    for (const o of objects) {
       const g = svg.querySelector<SVGGElement>(`[data-obj="${CSS.escape(o.key)}"]`);
       if (!g) continue;
       const p = o.positions.map((q) => skyToPixels(q.ra, q.dec));
@@ -195,33 +188,27 @@ export function ScanOverlay({ view }: { view: SkyView | null }) {
       ring?.setAttribute('cx', end.x.toFixed(1));
       ring?.setAttribute('cy', end.y.toFixed(1));
       const label = g.querySelector('text');
-      if (label) {
-        // Width from the text length (11 px Inter is about 6 px a character).
-        const line = lineOf(o);
-        const w = Math.max(o.title.length, line.length) * 6 + 4;
-        const spots = [
-          { x: end.x + 14, anchor: 'start', x0: end.x + 12, x1: end.x + 14 + w },
-          { x: end.x - 14, anchor: 'end', x0: end.x - 14 - w, x1: end.x - 12 },
-        ];
-        const y0 = end.y - 13;
-        const y1 = end.y + (line ? 14 : 2);
-        const hit = (
-          sp: { x0: number; x1: number },
-          r: { x0: number; y0: number; x1: number; y1: number },
-        ) => sp.x0 < r.x1 && sp.x1 > r.x0 && y0 < r.y1 && y1 > r.y0;
-        const spot = spots.find(
-          (sp) =>
-            !placed.some((r) => hit(sp, r)) && !rings.some((r) => r.key !== o.key && hit(sp, r)),
-        );
-        if (spot) {
-          placed.push({ x0: spot.x0, y0, x1: spot.x1, y1 });
-          label.style.display = '';
-          label.setAttribute('text-anchor', spot.anchor);
-          label.setAttribute('x', spot.x.toFixed(1));
-          label.setAttribute('y', (end.y - 2).toFixed(1));
-          label.querySelectorAll('tspan').forEach((ts) => ts.setAttribute('x', spot.x.toFixed(1)));
-        } else label.style.display = 'none';
-      }
+      if (label) toLabel.push({ label, end, o });
+    }
+    const spots = placeScanLabels(
+      toLabel.map(({ end, o }) => ({
+        key: o.key,
+        kind: o.kind,
+        end,
+        title: o.title,
+        line: lineOf(o),
+      })),
+      rings,
+    );
+    for (const { label, end, o } of toLabel) {
+      const spot = spots.get(o.key);
+      if (spot) {
+        label.style.display = '';
+        label.setAttribute('text-anchor', spot.anchor);
+        label.setAttribute('x', spot.x.toFixed(1));
+        label.setAttribute('y', (end.y - 2).toFixed(1));
+        label.querySelectorAll('tspan').forEach((ts) => ts.setAttribute('x', spot.x.toFixed(1)));
+      } else label.style.display = 'none';
     }
   };
   // The latest closures for the render loop and the click test, then a placement at once.
