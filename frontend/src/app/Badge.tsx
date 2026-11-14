@@ -1,51 +1,22 @@
-// D-02 provenance badge for SPHEREx data shown in the flipbook and spectrum. Synthetic fixture
-// data never wears the Measured badge, even though the fixture reply says `tag: 'measured'`.
+// D-02 provenance badges. Every badge is the D-38 tag (issue #174): 11px uppercase on `--s3`, with
+// a 6px dot in its provenance colour, never a coloured outline. Synthetic fixture data never wears
+// the Measured badge, even though the fixture reply says `tag: 'measured'`.
 import { useState } from 'react';
 import type { Tag } from '@/contract';
 import { badgeForTag } from '@/viewer/honesty';
 
-export function DataBadge({
-  fixture,
-  variant = 'outline',
-}: {
-  fixture: boolean;
-  /** 'tag': the design-language tag (11px uppercase, --s3 fill, coloured dot). */
-  variant?: 'outline' | 'tag';
-}) {
-  if (variant === 'tag') {
-    return (
-      <span
-        className="sx-tagbadge"
-        style={{ ['--dot' as string]: fixture ? 'var(--color-warn)' : 'var(--p-meas)' }}
-        title={
-          fixture
-            ? 'Synthetic fixture data for development, not a SPHEREx measurement'
-            : 'Measured by SPHEREx'
-        }
-        data-testid="badge"
-      >
-        {fixture ? 'Fixture' : 'Measured'}
-      </span>
-    );
-  }
-  if (fixture) {
-    return (
-      <span
-        className="rounded border border-amber-400 px-1.5 py-0.5 text-xs font-medium text-amber-300"
-        title="Synthetic fixture data for development, not a SPHEREx measurement"
-        data-testid="badge"
-      >
-        Fixture
-      </span>
-    );
-  }
+const FIXTURE_TITLE = 'Synthetic fixture data for development, not a SPHEREx measurement';
+const FIXTURE_DOT = 'var(--color-warn)';
+
+export function DataBadge({ fixture }: { fixture: boolean }) {
   return (
     <span
-      className="rounded border border-emerald-400 px-1.5 py-0.5 text-xs font-medium text-emerald-300"
-      title="Measured by SPHEREx"
+      className="sx-tagbadge"
+      style={{ ['--dot' as string]: fixture ? FIXTURE_DOT : 'var(--p-meas)' }}
+      title={fixture ? FIXTURE_TITLE : 'Measured by SPHEREx'}
       data-testid="badge"
     >
-      Measured
+      {fixture ? 'Fixture' : 'Measured'}
     </span>
   );
 }
@@ -54,14 +25,7 @@ export function DataBadge({
  * D-02 Estimated badge for `derived`, `model_dependent` and `inferred_from_analog` values. The
  * tooltip states the formula, assumption or analog.
  */
-export function EstimatedBadge({
-  tooltip,
-  variant = 'outline',
-}: {
-  tooltip: string;
-  /** 'tag': the design-language tag (11px uppercase, --s3 fill, coloured dot). */
-  variant?: 'outline' | 'tag';
-}) {
+export function EstimatedBadge({ tooltip }: { tooltip: string }) {
   // A `title` tooltip opens only on mouse hover, so the badge is a button: a tap or Enter shows
   // the formula as visible text next to it (WCAG 2.1.1, 1.4.13), Escape or a second press hides it.
   const [open, setOpen] = useState(false);
@@ -69,12 +33,8 @@ export function EstimatedBadge({
     <span className="inline-flex flex-wrap items-center gap-1">
       <button
         type="button"
-        className={
-          variant === 'tag'
-            ? 'sx-tagbadge cursor-help focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-300'
-            : 'cursor-help rounded border border-sky-400 px-1.5 py-0.5 text-xs font-medium text-sky-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-300'
-        }
-        style={variant === 'tag' ? { ['--dot' as string]: 'var(--p-phys)' } : undefined}
+        className="sx-tagbadge cursor-help focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+        style={{ ['--dot' as string]: 'var(--p-phys)' }}
         title={tooltip}
         // No aria-expanded: screen readers already hear the formula in the name, and the note
         // it opens is visual only.
@@ -95,11 +55,7 @@ export function EstimatedBadge({
       </button>
       {open && (
         // Already in the button's name, so hidden from screen readers to avoid reading it twice.
-        <span
-          className={variant === 'tag' ? 'text-xs text-muted' : 'text-xs text-sky-200'}
-          aria-hidden="true"
-          data-testid="badge-estimated-note"
-        >
+        <span className="text-xs text-muted" aria-hidden="true" data-testid="badge-estimated-note">
           {tooltip}
         </span>
       )}
@@ -112,6 +68,12 @@ const BADGE_MEANING = {
   Measured: 'Measured: taken straight from observations.',
   Estimated: 'Estimated: worked out from data with a stated method or assumption.',
   Default: 'Default: the artist’s choice, not data.',
+} as const;
+
+const BADGE_DOT = {
+  Measured: 'var(--p-meas)',
+  Estimated: 'var(--p-phys)',
+  Default: 'var(--p-asm)',
 } as const;
 
 /**
@@ -127,21 +89,19 @@ export function ProvenanceBadge({
   tooltip,
   srText = false,
   fixture = false,
-  variant = 'outline',
 }: {
   tag: Tag;
   tooltip?: string;
   srText?: boolean;
   fixture?: boolean;
-  /** 'tag': the design-language tag (11px uppercase, --s3 fill, coloured dot). */
-  variant?: 'outline' | 'tag';
 }) {
   const name = badgeForTag(tag);
   if (fixture && name === 'Measured') {
     return (
       <span
-        className="rounded border border-amber-400 px-1.5 py-0.5 text-xs font-medium text-amber-300"
-        title="Synthetic fixture data for development, not a SPHEREx measurement"
+        className="sx-tagbadge"
+        style={{ ['--dot' as string]: FIXTURE_DOT }}
+        title={FIXTURE_TITLE}
         data-testid="provenance-badge"
         data-tag={tag}
       >
@@ -149,30 +109,10 @@ export function ProvenanceBadge({
       </span>
     );
   }
-  const style =
-    name === 'Measured'
-      ? 'border-emerald-400 text-emerald-300'
-      : name === 'Estimated'
-        ? 'border-sky-400 text-sky-300'
-        : 'border-neutral-400 text-neutral-300';
-  if (variant === 'tag') {
-    const dot = name === 'Measured' ? 'var(--p-meas)' : name === 'Estimated' ? 'var(--p-phys)' : 'var(--p-asm)';
-    return (
-      <span
-        className="sx-tagbadge"
-        style={{ ['--dot' as string]: dot }}
-        title={tooltip ?? BADGE_MEANING[name]}
-        data-testid="provenance-badge"
-        data-tag={tag}
-      >
-        {name}
-        {srText && tooltip && <span className="sr-only">: {tooltip}</span>}
-      </span>
-    );
-  }
   return (
     <span
-      className={`rounded border px-1.5 py-0.5 text-xs font-medium ${style}`}
+      className="sx-tagbadge"
+      style={{ ['--dot' as string]: BADGE_DOT[name] }}
       title={tooltip ?? BADGE_MEANING[name]}
       data-testid="provenance-badge"
       data-tag={tag}

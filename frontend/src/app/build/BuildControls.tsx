@@ -127,7 +127,7 @@ function Control({ c }: { c: BuildControl }) {
   const id = useId();
   const hintId = `${id}-why`;
   const name = c.disabled && c.why ? `${c.label}. ${c.why}` : c.label;
-  const badge = c.tag ? <ProvenanceBadge tag={c.tag} variant="tag" /> : null;
+  const badge = c.tag ? <ProvenanceBadge tag={c.tag} /> : null;
   const hint = c.why ? (
     <span id={hintId} className="sx-ctl-why">
       {c.why}
@@ -327,7 +327,7 @@ export function BuildKeyNumbers({ fixture }: { fixture?: boolean }) {
           ) : (
             <span>{text}</span>
           )}
-          {latest.tag && <ProvenanceBadge tag={latest.tag} fixture={fixture} variant="tag" />}
+          {latest.tag && <ProvenanceBadge tag={latest.tag} fixture={fixture} />}
         </div>
       )}
       {keys.length > 0 && (
@@ -340,7 +340,7 @@ export function BuildKeyNumbers({ fixture }: { fixture?: boolean }) {
               <dt style={{ color: 'var(--muted)' }}>{r.label}</dt>
               <dd className="m-0 flex items-center justify-end gap-2 tabular-nums">
                 {r.value}
-                {r.tag && <ProvenanceBadge tag={r.tag} fixture={fixture} variant="tag" />}
+                {r.tag && <ProvenanceBadge tag={r.tag} fixture={fixture} />}
               </dd>
             </div>
           ))}
@@ -408,7 +408,7 @@ export function BuildSummaryRows({
                 <dt style={{ color: 'var(--muted)' }}>{r.label}</dt>
                 <dd className="m-0 flex items-center justify-end gap-2 text-right tabular-nums">
                   {r.value}
-                  {r.tag && <ProvenanceBadge tag={r.tag} fixture={fixture} variant="tag" />}
+                  {r.tag && <ProvenanceBadge tag={r.tag} fixture={fixture} />}
                 </dd>
               </div>
             ))}

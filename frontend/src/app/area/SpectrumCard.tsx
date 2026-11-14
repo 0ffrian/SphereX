@@ -199,7 +199,6 @@ export function SpectrumSection({ spectrum: t, spectra, measuredOnly, fixture }:
         Spectrum
         <ProvenanceBadge
           tag={tag}
-          variant="tag"
           fixture={fixture}
           // The first word follows the reply's tag, so the tooltip never disagrees with the badge.
           tooltip={

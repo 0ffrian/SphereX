@@ -80,7 +80,7 @@ export function SoundChip() {
     <div className="sx-amb" role="group" aria-label="Sound of this place" data-testid="world-fly-sound">
       <div className="sx-amb-row">
         <span className="sx-amb-title">{CHIP_TEXT.title}</span>
-        <ProvenanceBadge tag="artistic" variant="tag" />
+        <ProvenanceBadge tag="artistic" />
         {action}
         <button
           ref={whatRef}

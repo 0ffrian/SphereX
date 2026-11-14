@@ -619,9 +619,9 @@ function Player({
                   {positionText(resolved)}
                   {resolved.moving && ' · moving object'}
                   {sky.fixture ? (
-                    <DataBadge fixture variant="tag" />
+                    <DataBadge fixture />
                   ) : (
-                    position.tag !== 'measured' && <EstimatedBadge variant="tag" tooltip={position.tooltip} />
+                    position.tag !== 'measured' && <EstimatedBadge tooltip={position.tooltip} />
                   )}
                 </dd>
                 <dt>Release</dt>
@@ -634,7 +634,7 @@ function Player({
                 <dd>
                   <span data-testid="stretch">{response.stretch.kind}</span>
                   {/* A display choice, not data: Estimated. */}
-                  <EstimatedBadge variant="tag" tooltip={stretchFormula(response)} />
+                  <EstimatedBadge tooltip={stretchFormula(response)} />
                 </dd>
                 <dt>Flags</dt>
                 <dd data-testid="frame-flags">{frame.flags.length > 0 ? frame.flags.join(', ') : 'none'}</dd>
