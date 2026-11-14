@@ -6618,13 +6618,19 @@ li[data-state='running'] > .sx-live-mk {
   height: 7px;
 }
 .sx-replay-tick[data-kind='skipped'] {
-  background: var(--fail);
-  /* A diamond. */
+  /* A diamond, drawn by ::before so the click target (::after) stays square and unrotated. */
+  background: transparent;
   top: 10px;
   width: 7px;
   height: 7px;
   border-radius: 0;
-  transform: translateX(-50%) rotate(45deg);
+}
+.sx-replay-tick[data-kind='skipped']::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--fail);
+  transform: rotate(45deg);
 }
 .sx-replay-tick[data-kind='track'] {
   background: var(--fg);
