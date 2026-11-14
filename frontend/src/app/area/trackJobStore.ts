@@ -10,6 +10,11 @@ import { getTrackJobApi, TRACK_DAYS, type TrackJobStatus } from './trackJobApi';
 export const TRACK_POLL_MS = 1000;
 /** Polls in a row that may fail before the job is given up as unreachable. */
 export const TRACK_MAX_MISSED = 30;
+/**
+ * Polls in a row that may answer `idle` (the server has no such job) before the job is given up:
+ * a job that was started and is not there a minute later was lost (the server restarted).
+ */
+export const TRACK_MAX_IDLE = 60;
 
 export interface TrackJobView {
   obj: KnownObject;
@@ -49,16 +54,32 @@ function stopPolling(): void {
 
 export const useTrackJobStore = create<TrackJobState>()((set, get) => {
   let missed = 0;
+  let idle = 0;
   const fail = (code: string, detail = '') => {
     stopPolling();
     const v = get().view;
     if (v) set({ view: { ...v, failed: { code, detail } } });
   };
+  /** Done: the Track view opens on the window the job computed, or says why it cannot. */
+  const finish = (v: TrackJobView, status: TrackJobStatus) => {
+    stopPolling();
+    if (status.track_available === false) {
+      set({ view: { ...v, status } });
+      fail('track:not_available', status.reason ?? '');
+      return;
+    }
+    set({ view: null });
+    onDone?.({
+      ...v.obj,
+      trackAvailable: true,
+      trackWindow: { around: v.around, days: TRACK_DAYS },
+    });
+  };
   const poll = (mine: number) => {
     const v = get().view;
     if (!v || mine !== token || !v.obj.objectId) return;
     getTrackJobApi()
-      .status(v.obj.objectId)
+      .status(v.obj.objectId, { around: v.around, days: TRACK_DAYS })
       .then(
         (status) => {
           if (mine !== token) return;
@@ -66,9 +87,7 @@ export const useTrackJobStore = create<TrackJobState>()((set, get) => {
           if (!cur) return;
           missed = 0;
           if (status.state === 'done') {
-            stopPolling();
-            set({ view: null });
-            onDone?.({ ...cur.obj, trackAvailable: true });
+            finish(cur, status);
             return;
           }
           if (status.state === 'failed') {
@@ -76,7 +95,12 @@ export const useTrackJobStore = create<TrackJobState>()((set, get) => {
             fail('track:failed', status.error ?? '');
             return;
           }
-          // `idle`: the job has not shown up yet (or this server lost it); ask again.
+          // `idle`: the job has not shown up yet; ask again. One that stays away was lost.
+          idle = status.state === 'idle' ? idle + 1 : 0;
+          if (idle >= TRACK_MAX_IDLE) {
+            fail('track:lost');
+            return;
+          }
           set({ view: { ...cur, status } });
           timer = setTimeout(() => poll(mine), TRACK_POLL_MS);
         },
@@ -93,6 +117,7 @@ export const useTrackJobStore = create<TrackJobState>()((set, get) => {
   const begin = async (v: TrackJobView) => {
     stopPolling();
     missed = 0;
+    idle = 0;
     const mine = token;
     set({ view: v, busy: true });
     const id = v.obj.objectId;
@@ -106,9 +131,7 @@ export const useTrackJobStore = create<TrackJobState>()((set, get) => {
     if (answer.kind === 'started') {
       set({ view: { ...v, status: answer.status } });
       if (answer.status.state === 'done') {
-        stopPolling();
-        set({ view: null });
-        onDone?.({ ...v.obj, trackAvailable: true });
+        finish({ ...v, status: answer.status }, answer.status);
         return;
       }
       poll(mine);
@@ -202,6 +225,12 @@ export function trackFailureText(code: string): { title: string; line: string; r
       return {
         title: 'Cannot be tracked',
         line: 'JPL Horizons has no path for this object.',
+        retry: false,
+      };
+    case 'track:not_available':
+      return {
+        title: 'Not enough data to track',
+        line: 'The archive has too little of this object near these visits.',
         retry: false,
       };
     case 'track:unavailable':

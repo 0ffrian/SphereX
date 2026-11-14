@@ -258,7 +258,12 @@ export function areaTrackLabel(
   }
 }
 
-/** One `missing` code in plain words (A17.8 namespaces); an unworded code is shown as it is. */
+const CATALOGUE_NAME: Record<string, string> = { gaia: 'Gaia', wise: 'CatWISE' };
+
+/**
+ * One `missing` code in plain words (A17.8 namespaces). A code with no words of its own gets its
+ * namespace's general line, never the raw code (issue #146): the code stays in `data-code`.
+ */
 export function missingText(code: string): string {
   const colon = code.indexOf(':');
   const ns = colon > 0 ? code.slice(0, colon) : code;
@@ -275,7 +280,21 @@ export function missingText(code: string): string {
         const n = rest.slice('unmatched_dots:'.length);
         return `${n} track ${n === '1' ? 'point is' : 'points are'} not in the dots reply, so some tracks are drawn short.`;
       }
-      return code;
+      if (rest === 'visits') return 'Fewer than two visits cover this area, so there are no tracks.';
+      return 'Part of this area could not be loaded.';
+    case 'cutout':
+      return 'A frame could not be read, so its dots are not shown.';
+    case 'no_footprint':
+      return 'A frame has no outline in the archive, so it was left out.';
+    case 'frames':
+      if (rest.startsWith('cone_maxrec'))
+        return 'The archive returned too many frames for one search, so some may be left out.';
+      return 'A frame search of the archive failed, so some frames may be left out.';
+    case 'stars': {
+      const [cat = '', visit = ''] = rest.split(':');
+      const name = CATALOGUE_NAME[cat];
+      return `The ${name ? `${name} ` : ''}star list${visit ? ` for visit ${visit}` : ''} could not be loaded.`;
+    }
     case 'skybot':
       return `The known-object check (SkyBoT) has no answer for visit ${rest}.`;
     case 'horizons':
@@ -291,8 +310,23 @@ export function missingText(code: string): string {
       if (rest === 'unavailable') return 'The spectrum check could not be loaded, so no colour verdicts are shown.';
       if (rest === 'calibration_default')
         return 'Too few stars to measure the scatter in one visit and detector, so the spectrum check used the default.';
-      return code;
+      return 'Part of the spectrum check could not be loaded.';
     default:
-      return code;
+      return 'One more item could not be loaded.';
   }
+}
+
+/**
+ * The `missing` codes as the lines the cards list: one line per distinct wording, with a count
+ * when several codes say the same (one `cutout:` code per frame would repeat a line per frame).
+ */
+export function missingLines(codes: readonly string[]): { text: string; codes: string[] }[] {
+  const out: { text: string; codes: string[] }[] = [];
+  for (const code of codes) {
+    const text = missingText(code);
+    const line = out.find((l) => l.text === text);
+    if (line) line.codes.push(code);
+    else out.push({ text, codes: [code] });
+  }
+  return out;
 }

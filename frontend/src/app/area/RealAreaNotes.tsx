@@ -6,7 +6,7 @@
 import type { ReactNode } from 'react';
 import type { AreaSummary } from '@/contract';
 import { releaseName } from './liveJobStore';
-import { isLiveArea, missingText, visitStarts } from './realArea';
+import { isLiveArea, missingLines, visitStarts } from './realArea';
 
 export const TEST_DATA_NOTE =
   'Test data: a synthetic fixture area made to test the tool, not SPHEREx measurements.';
@@ -78,9 +78,10 @@ export function RealAreaNotes({
         <details className="fb-muted" data-testid="area-missing">
           <summary>Not shown ({missing.length})</summary>
           <ul>
-            {missing.map((code) => (
-              <li key={code} data-code={code}>
-                {missingText(code)}
+            {missingLines(missing).map((line) => (
+              <li key={line.codes[0]} data-code={line.codes.join(' ')}>
+                {line.text}
+                {line.codes.length > 1 && ` (${line.codes.length})`}
               </li>
             ))}
           </ul>

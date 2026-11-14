@@ -83,11 +83,18 @@ export interface LiveAreaApi {
   /** Coverage check: the plan, without starting anything. */
   /** `visits`: the visit pair picked (the two visit starts, #141's optional pair), else the closest. */
   plan(box: LiveBox, signal?: AbortSignal, visits?: VisitPick): Promise<PlanAnswer>;
-  start(box: LiveBox, signal?: AbortSignal, visits?: VisitPick): Promise<StartAnswer>;
+  /**
+   * `kind`: the tool that asked (Q-471 (2)). The server records the job as a run of one square
+   * only when it is told which tool started it, so the Runs list shows it.
+   */
+  start(box: LiveBox, signal?: AbortSignal, visits?: VisitPick, kind?: LiveKind): Promise<StartAnswer>;
   /** Throws LiveJobGone when the server has no such job, another error when it cannot be read. */
   status(areaId: string, signal?: AbortSignal): Promise<LiveJobStatus>;
   stop(areaId: string): Promise<void>;
 }
+
+/** The tool a live area is computed for: the request's `kind` (Q-471 (2)). */
+export type LiveKind = 'discovery' | 'known';
 
 /** A visit pair, by the two visit starts (ISO UTC), as the request's `visits` (issue #145). */
 export type VisitPick = readonly [string, string];
@@ -176,6 +183,12 @@ export function parseStatusReply(body: unknown): LiveJobStatus {
 
 /** One job poll waits at most this long (engineering value). */
 export const STATUS_TIMEOUT_MS = 10_000;
+/**
+ * The coverage check and Compute: the server asks the archive once before it answers, so this is
+ * longer than a poll. A server that takes the connection and never answers ends as `unavailable`
+ * instead of leaving the card waiting for good.
+ */
+export const REQUEST_TIMEOUT_MS = 60_000;
 
 /** The backend (#141). A route it does not serve, a reply that is not JSON or no backend: `unavailable`. */
 export function httpLiveAreaApi(base = API_BASE, fetchImpl: typeof fetch = (i, init) => globalThis.fetch(i, init)): LiveAreaApi {
@@ -184,12 +197,13 @@ export function httpLiveAreaApi(base = API_BASE, fetchImpl: typeof fetch = (i, i
     if (!type.includes('json')) return null;
     return res.json().catch(() => null);
   };
-  const post = async (box: LiveBox, start: boolean, signal?: AbortSignal, visits?: VisitPick): Promise<unknown> => {
+  const post = async (box: LiveBox, start: boolean, signal?: AbortSignal, visits?: VisitPick, kind?: LiveKind): Promise<unknown> => {
+    const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
     const res = await fetchImpl(`${base}/areas/live`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ ...box, start, ...(visits ? { visits: [...visits] } : {}) }),
-      signal,
+      body: JSON.stringify({ ...box, start, ...(visits ? { visits: [...visits] } : {}), ...(kind ? { kind } : {}) }),
+      signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
     });
     return json(res);
   };
@@ -203,9 +217,9 @@ export function httpLiveAreaApi(base = API_BASE, fetchImpl: typeof fetch = (i, i
         return { kind: 'unavailable' };
       }
     },
-    async start(box, signal, visits) {
+    async start(box, signal, visits, kind) {
       try {
-        return parseStartReply(await post(box, true, signal, visits));
+        return parseStartReply(await post(box, true, signal, visits, kind));
       } catch (e) {
         if (aborted(e)) throw e;
         return { kind: 'unavailable' };
@@ -223,7 +237,10 @@ export function httpLiveAreaApi(base = API_BASE, fetchImpl: typeof fetch = (i, i
       return parseStatusReply(body);
     },
     async stop(areaId) {
-      const res = await fetchImpl(`${base}/areas/live/${encodeURIComponent(areaId)}`, { method: 'DELETE' });
+      const res = await fetchImpl(`${base}/areas/live/${encodeURIComponent(areaId)}`, {
+        method: 'DELETE',
+        signal: AbortSignal.timeout(STATUS_TIMEOUT_MS),
+      });
       // 404: nothing left to stop (it just ended). Anything else that is not 2xx: not stopped.
       if (!res.ok && res.status !== 404) throw new Error(`Stop failed (${res.status}).`);
     },

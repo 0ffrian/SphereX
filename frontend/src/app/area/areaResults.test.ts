@@ -24,6 +24,7 @@ import {
   trackFailureText,
   trackSteps,
   useTrackJobStore,
+  TRACK_MAX_IDLE,
   TRACK_POLL_MS,
 } from './trackJobStore';
 
@@ -182,7 +183,11 @@ describe('Track on demand (Q-468)', () => {
       around: '2026-06-27T05:39:00Z',
       days: 3,
     });
-    expect((await api.status('sbdb-1')).state).toBe('done');
+    // The job is the window's (Q-468): without the window the backend answers for the base job.
+    expect((await api.status('sbdb-1', { around: '2026-06-27T05:39:00Z', days: 3 })).state).toBe(
+      'done',
+    );
+    expect(calls[1]![0]).toBe('/v1/objects/sbdb-1/job?around=2026-06-27T05%3A39%3A00Z&days=3');
     const none = httpTrackJobApi('/v1', async () => reply(405, { detail: 'Method Not Allowed' }));
     expect(await none.start('sbdb-1', 'x')).toEqual({ kind: 'unavailable' });
     const outside = httpTrackJobApi('/v1', async () =>
@@ -233,8 +238,51 @@ describe('Track on demand (Q-468)', () => {
       t = 5000;
       await vi.advanceTimersByTimeAsync(TRACK_POLL_MS + 10);
       expect(useTrackJobStore.getState().view).toBeNull();
-      expect(openEros).toHaveBeenCalledWith({ ...obj, trackAvailable: true });
-      expect(useAreaStore.getState().known?.objects[0]?.trackAvailable).toBe(true);
+      // The Track view reads the window the job computed, not the object's base windows.
+      const window = { around: '2026-06-27T05:39:00Z', days: 3 };
+      expect(openEros).toHaveBeenCalledWith({ ...obj, trackAvailable: true, trackWindow: window });
+      expect(useAreaStore.getState().known?.objects[0]).toMatchObject({
+        trackAvailable: true,
+        trackWindow: window,
+      });
+    });
+    it('polls the job of its window', async () => {
+      const asked: unknown[] = [];
+      const api = mockTrackJobApi('ok', { durationMs: 4000, now: () => 0 });
+      setTrackJobApi({ ...api, status: async (id, w) => (asked.push(w), api.status(id, w)) });
+      useAreaStore.setState({ flow: 'known', screen: 'list', openEros: vi.fn() });
+      useAreaStore.getState().openTrack(obj, '2026-06-27T05:39:00Z', 'spherex_dr1');
+      await vi.advanceTimersByTimeAsync(TRACK_POLL_MS + 10);
+      expect(asked[0]).toEqual({ around: '2026-06-27T05:39:00Z', days: 3 });
+    });
+    it('a job that ends without a Track says so, and nothing opens', async () => {
+      const api = mockTrackJobApi('ok');
+      setTrackJobApi({
+        ...api,
+        status: async (id) => ({
+          id,
+          state: 'done',
+          stage: 'done',
+          track_available: false,
+          reason: 'frames:empty',
+        }),
+      });
+      const openEros = vi.fn();
+      useAreaStore.setState({ flow: 'known', screen: 'list', openEros });
+      useAreaStore.getState().openTrack(obj, '2026-06-27T05:39:00Z', 'spherex_dr1');
+      await vi.advanceTimersByTimeAsync(TRACK_POLL_MS + 10);
+      expect(useTrackJobStore.getState().view?.failed?.code).toBe('track:not_available');
+      expect(trackFailureText('track:not_available').retry).toBe(false);
+      expect(openEros).not.toHaveBeenCalled();
+    });
+    it('a job the server no longer has is given up, not polled for good', async () => {
+      const api = mockTrackJobApi('ok');
+      setTrackJobApi({ ...api, status: async (id) => ({ id, state: 'idle' }) });
+      useAreaStore.setState({ flow: 'known', screen: 'list', openEros: vi.fn() });
+      useAreaStore.getState().openTrack(obj, '2026-06-27T05:39:00Z', 'spherex_dr1');
+      await vi.advanceTimersByTimeAsync(TRACK_MAX_IDLE * TRACK_POLL_MS + 100);
+      expect(useTrackJobStore.getState().view?.failed?.code).toBe('track:lost');
+      expect(trackFailureText('track:lost').retry).toBe(true);
     });
     it('a refusal shows a message, nothing opens', async () => {
       setTrackJobApi(mockTrackJobApi('outside'));

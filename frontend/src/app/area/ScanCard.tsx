@@ -308,7 +308,21 @@ function Scanning({
   record: RunRecord | null;
 }) {
   const busy = useScanStore((s) => s.busy);
-  if (!record) return <p className="sx-live-m">Reading the scan…</p>;
+  if (!record)
+    return (
+      <>
+        <p className="sx-live-m">Reading the scan…</p>
+        {/* A run opened from the list or after a reload while the server does not answer. */}
+        {view.stale && (
+          <Alert
+            tone="warn"
+            title="Lost touch with the scan"
+            line="Trying again."
+            testId="scan-stale"
+          />
+        )}
+      </>
+    );
   const n = record.squares.length;
   const cur = record.squares.find((s) => s.state === 'running');
   const step = view.square?.steps.find((s) => s.state === 'running');
