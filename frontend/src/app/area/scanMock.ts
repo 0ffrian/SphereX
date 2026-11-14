@@ -1,7 +1,10 @@
 // The opt-in mock of the scan and run API (issue #157): INVENTED TEST VALUES, answering only on
 // the dev server with `?scan=mock` (scanApi.getScanApi). Kept apart from the HTTP client so a
 // production build never carries it. `scan_ms=<ms>` sets the time per square, `scan_hold=<square>`
-// freezes the run while that square is analysing (screenshots).
+// freezes the run while that square is analysing (screenshots). `?scan=mock-gaps` answers as #169
+// proposes (issue #170): square 2 fails, square 3 has two tracks the known-object check could not
+// judge, and the totals carry `unchecked` and `squares_failed`. Plain `?scan=mock` answers as a
+// server from before #169 (neither field).
 import { mockStatusAt, type LivePlan } from './liveAreaApi';
 import type {
   FoundObject,
@@ -73,6 +76,9 @@ function mockSquares(region: ScanBox): ScanPlanSquare[] {
 
 /** Square 4 is skipped (no visit pair), as in the mock-up. Invented. */
 const MOCK_SKIP = 4;
+/** `mock-gaps` (#169, as proposed): square 2 fails, square 3 has two unchecked tracks. Invented. */
+const GAPS_FAIL = 2;
+const GAPS_UNCHECKED = 3;
 const MOCK_VISITS = ['2026-06-27T03:10:00Z', '2026-06-28T03:10:00Z'];
 
 /**
@@ -103,6 +109,7 @@ export function mockObjectsOf(region: ScanBox, index: number): FoundObject[] {
     out.push({
       kind: 'known',
       designation: '7051 Sean',
+      track_id: `T${index}a`,
       square: index,
       positions: path(u0, 0.35, 0.22, 0.12),
       positions_tag: model,
@@ -111,6 +118,7 @@ export function mockObjectsOf(region: ScanBox, index: number): FoundObject[] {
     out.push({
       kind: 'known',
       designation: index <= names.length ? names[index - 1]! : `2026 AB${index}`,
+      track_id: `T${index}a`,
       square: index,
       positions: path(0.2, 0.25, 0.15, 0.1),
       positions_tag: model,
@@ -134,9 +142,31 @@ export function mockObjectsOf(region: ScanBox, index: number): FoundObject[] {
   return out;
 }
 
+/**
+ * `mock-gaps` (#169): the two tracks of a square that the known-object check could not judge. They
+ * have no `found` event (#169's proposal), so only the results and the totals carry them. Invented.
+ */
+export function mockUncheckedOf(region: ScanBox, index: number): RunPosition[][] {
+  const g = splitRegion(region);
+  const s = g.squares[index - 1];
+  if (!s) return [];
+  const t = ['2026-06-27T03:10:00Z', '2026-06-28T03:10:00Z'];
+  const two = (u: number, v: number, du: number, dv: number): RunPosition[] =>
+    t.map((time, k) => ({ ...squareCentre(s, u + du * k, v + dv * k), time }));
+  return [two(0.75, 0.2, -0.08, 0.1), two(0.35, 0.85, 0.12, -0.05)];
+}
+
 export function mockScanApi(
-  opts: { squareMs?: number; hold?: number | null; now?: () => number; persist?: boolean } = {},
+  opts: {
+    squareMs?: number;
+    hold?: number | null;
+    now?: () => number;
+    persist?: boolean;
+    /** Answer as #169 proposes: a failed square and unchecked tracks (`?scan=mock-gaps`). */
+    gaps?: boolean;
+  } = {},
 ): ScanApi {
+  const gaps = opts.gaps ?? false;
   const squareMs = opts.squareMs ?? 4000;
   const now = opts.now ?? (() => Date.now());
   const hold = opts.hold ?? null;
@@ -207,15 +237,16 @@ export function mockScanApi(
     }
     const events: RunEvent[] = [{ t: 0, type: 'run_started' }];
     const squares: RunSquare[] = [];
-    const totals: RunTotals = {
+    // As an older server answers; #169's two fields are added below when the mock answers as #169.
+    const totals = {
       known: 0,
       found: 0,
       unexplained: 0,
-      unchecked: 0,
       squares_done: 0,
       squares_skipped: 0,
-      squares_failed: 0,
-    };
+    } as unknown as RunTotals;
+    // #169's two fields, only when the mock answers as #169 (an older server sends neither).
+    const extra = { unchecked: 0, squares_failed: 0 };
     let acc = 0;
     let running: { index: number; areaId: string; f: number } | null = null;
     const known = new Set<string>();
@@ -237,6 +268,17 @@ export function mockScanApi(
         } else squares.push({ ...base, area_id: null, state: 'todo' });
         continue;
       }
+      if (gaps && sq.index === GAPS_FAIL) {
+        events.push({ t: acc / 1000, type: 'square_failed', square: sq.index });
+        squares.push({
+          ...base,
+          area_id: null,
+          state: 'failed',
+          error: { code: 'area:frames_incomplete', detail: 'Some frames could not be downloaded.' },
+        });
+        extra.squares_failed++;
+        continue;
+      }
       if (sq.index === MOCK_SKIP) {
         events.push({ t: acc / 1000, type: 'square_skipped', square: sq.index });
         squares.push({
@@ -256,15 +298,16 @@ export function mockScanApi(
           totals.known++;
           if (o.kind === 'known') totals.found++;
         }
-        if (o.kind === 'unexplained') {
-          totals.found++;
-          totals.unexplained++;
-        }
+        if (o.kind === 'unexplained') totals.unexplained++;
       }
+      if (gaps && sq.index === GAPS_UNCHECKED)
+        extra.unchecked += mockUncheckedOf(r.region, sq.index).length;
       squares.push({ ...base, area_id: areaId, state: 'done' });
       totals.squares_done++;
     }
-    const finished = squares.every((s) => s.state === 'done' || s.state === 'skipped');
+    const finished = squares.every(
+      (s) => s.state === 'done' || s.state === 'skipped' || s.state === 'failed',
+    );
     const state: RunState =
       r.stoppedAt !== null
         ? 'stopped'
@@ -294,7 +337,7 @@ export function mockScanApi(
       started_at: iso(r.t0),
       finished_at:
         state === 'done' ? iso(r.t0 + r.pausedMs + acc) : state === 'stopped' ? iso(tNow) : null,
-      totals,
+      totals: gaps ? ({ ...totals, ...extra } as RunTotals) : totals,
       events: events.sort((a, b) => a.t - b.t),
       provenance: { known_positions: MOCK_PROV, track_positions: MOCK_PROV },
       ...(running && live
@@ -316,6 +359,7 @@ export function mockScanApi(
   };
   const api: ScanApi & { marker: string } = {
     marker: SCAN_MOCK_MARKER,
+    isMock: true,
     async plan(req) {
       return planOf(req);
     },
@@ -361,7 +405,7 @@ export function mockScanApi(
       save();
     },
     async results(id) {
-      return mockResultsOf(recordOf(get(id)));
+      return mockResultsOf(recordOf(get(id)), gaps);
     },
     async list() {
       return [...runs.values()]
@@ -389,8 +433,11 @@ export function summaryOf(rec: RunRecord, nowMs: number): RunSummary {
   };
 }
 
-/** The mock's merged results, in the contract's shape (designations merged, as #156's). Pure. */
-export function mockResultsOf(rec: RunRecord): RunResults {
+/**
+ * The mock's merged results, in the contract's shape (designations merged, as #156's); with
+ * `gaps`, #169's unchecked track rows too. Pure.
+ */
+export function mockResultsOf(rec: RunRecord, gaps = false): RunResults {
   const known = new Map<string, RunKnownRow>();
   const tracks: RunTrackRow[] = [];
   for (const e of rec.events) {
@@ -445,6 +492,25 @@ export function mockResultsOf(rec: RunRecord): RunResults {
       });
     }
   }
+  const unchecked = rec.squares.find((s) => s.index === GAPS_UNCHECKED && s.state === 'done');
+  if (gaps && unchecked)
+    mockUncheckedOf(rec.region, GAPS_UNCHECKED).forEach((positions, i) =>
+      tracks.push({
+        kind: 'unchecked',
+        designation: null,
+        squares: [GAPS_UNCHECKED],
+        tracks: [
+          {
+            square: GAPS_UNCHECKED,
+            area_id: unchecked.area_id ?? 'live-dr1-mock',
+            track_id: `T${GAPS_UNCHECKED}u${i + 1}`,
+          },
+        ],
+        visits: [...MOCK_VISITS],
+        positions,
+        unchecked_by: [`skybot:${i + 1}`],
+      } as unknown as RunTrackRow),
+    );
   return {
     run_id: rec.run_id,
     kind: rec.kind,
@@ -471,6 +537,7 @@ export function scanMockFromEnv(search: string, env: string | undefined): ScanAp
   const ms = Number(q.get('scan_ms'));
   const hold = Number(q.get('scan_hold'));
   return mockScanApi({
+    gaps: v === 'mock-gaps',
     ...(ms > 0 ? { squareMs: ms } : {}),
     hold: hold >= 1 ? Math.floor(hold) : null,
   });

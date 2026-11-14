@@ -152,6 +152,15 @@ describe('another run opened over a scan that is still going', () => {
     expect(run().runId).toBe(mine);
     expect(useScanStore.getState().saved()?.runId).toBe(mine);
     expect(run().record?.state).toBe('running');
+    // Select again from the other run, then an offer for a region, then closed: ours is kept too.
+    useScanStore.getState().follow('run-20261113T070000-aaaaaa', 'known', REGION);
+    useScanStore.getState().clear();
+    await useScanStore.getState().plan('discovery', REGION);
+    expect(useScanStore.getState().view?.kind).toBe('offer');
+    useScanStore.getState().clear();
+    await flush();
+    expect(run().runId).toBe(mine);
+    expect(useScanStore.getState().saved()?.runId).toBe(mine);
     // Closing our own (finished or stopped) scan still forgets it.
     useScanStore.getState().clear();
     expect(useScanStore.getState().view).toBeNull();

@@ -82,7 +82,7 @@
           "items": {
             "$ref": "area-index.schema.json#/definitions/AreaMissingCode"
           },
-          "description": "The skybot: and horizons: codes of the square's stored summary: a known-object check that failed (Q-479). Empty for a square not done."
+          "description": "The skybot: and horizons: codes of the square's stored summary: a known-object check that failed (Q-480). Empty for a square not done."
         }
       }
     },
@@ -178,7 +178,7 @@
     },
     "RunTrackRow": {
       "title": "RunTrackRow",
-      "description": "A found, unexplained or unchecked track, merged across neighbouring squares: found when a member has a SkyBoT match, else unexplained when a member was checked, else unchecked (Q-479).",
+      "description": "A found, unexplained or unchecked track, merged across neighbouring squares: found when a member has a SkyBoT match, else unexplained when a member was checked, else unchecked (Q-480).",
       "type": "object",
       "additionalProperties": false,
       "required": [
@@ -242,7 +242,7 @@
           "items": {
             "$ref": "area-index.schema.json#/definitions/AreaMissingCode"
           },
-          "description": "The members' skybot: and horizons: codes (Q-479): required on an unchecked row, also on an unexplained row with an unchecked member."
+          "description": "The members' skybot: and horizons: codes (Q-480): required on an unchecked row, also on an unexplained row with an unchecked member."
         }
       },
       "if": {

@@ -114,17 +114,36 @@ describe('httpScanApi', () => {
     for (const c of calls) expect(c.init?.signal, c.url).toBeInstanceOf(AbortSignal);
   });
 
-  it('a request that times out says the server is not reachable (plan, Start), and is thrown for a control', async () => {
+  it('a plan that times out says the server is not reachable; a Start that times out may have started', async () => {
     const timeout = () => {
       throw new DOMException('The operation timed out.', 'TimeoutError');
     };
     const { api } = client(timeout);
-    const unreachable = { kind: 'error', code: 'scan:unreachable', detail: '' };
-    expect(await api.plan(REQ)).toEqual(unreachable);
-    expect(await api.start(REQ)).toEqual(unreachable);
+    expect(await api.plan(REQ)).toEqual({ kind: 'error', code: 'scan:unreachable', detail: '' });
     expect(scanFailureText('scan:unreachable').title).toBe('Server not reachable');
+    // The server may have queued the scan before the time limit: never "Nothing was started".
+    const noAnswer = { kind: 'error', code: 'scan:no_answer', detail: '' };
+    expect(await api.start(REQ)).toEqual(noAnswer);
+    expect(scanFailureText('scan:no_answer').line).toMatch(/may have started/);
     await expect(api.pause(id)).rejects.toThrow();
     await expect(api.stop(id)).rejects.toThrow();
+  });
+
+  it('a Start whose reply cannot be read may have started; one that never got through did not', async () => {
+    const garbled = client(() => reply(202, { nope: true }));
+    expect(await garbled.api.start(REQ)).toEqual({
+      kind: 'error',
+      code: 'scan:no_answer',
+      detail: '',
+    });
+    const offline = client(() => {
+      throw new TypeError('Failed to fetch');
+    });
+    expect(await offline.api.start(REQ)).toEqual({
+      kind: 'error',
+      code: 'scan:unreachable',
+      detail: '',
+    });
   });
 
   it('a run the server no longer has is RunGone', async () => {

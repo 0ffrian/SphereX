@@ -7,17 +7,35 @@
 //            carry no possible tracks, Q-472) and rows that
 //            name their square(s) and date, with Track it and Build it; Export ECSV and Scan again.
 // Closing the card while the scan runs does not stop it (the dock button brings the card back).
+// Issue #170 (approved mock-up, 14 Nov): under Measured only (D-21) the card shows tracks only (the
+// number of tracks, rows named "Track" with their visits and dots; no verdict word, rate, known name
+// or Known filter); the Done card carries the provenance of its positions (D-02); tracks the
+// known-object check could not judge (#169) are a fourth total, one status-dot message and a filter;
+// a square starting and the end of the scan are announced to screen readers, nothing else.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { PanelCard } from '@/app/shell/PanelCard';
 import { useAreaStore } from '@/app/shell/areaStore';
 import { useShellStore } from '@/app/shell/shellStore';
+import { ProvenanceBadge } from '@/app/Badge';
 import { Alert, BoxIcon, RouteIcon } from './areaBits';
 import { splitDesignation, type KnownObject } from './areaService';
 import { buildKnown, buildPlaceholder } from './buildFrom';
 import { NO_ID_NOTE } from './KnownList';
 import { releaseName, stepCount } from './liveJobStore';
 import { NO_ORBIT_NOTE } from './RealTrackCard';
-import type { RunKnownRow, RunRecord, RunResults, RunTrackRow, ScanBox, ScanPlan } from './scanApi';
+import { useMeasuredOnly } from './measuredOnly';
+import {
+  scanIsMock,
+  trackRowsOf,
+  tracksOf,
+  uncheckedOf,
+  type RunKnownRow,
+  type RunRecord,
+  type RunResults,
+  type ScanBox,
+  type ScanPlan,
+  type ScanTrackRow,
+} from './scanApi';
 import { scanEcsv } from './scanExport';
 import { aboutTime, gridShape, squareEstimateS, splitCount } from './scanGrid';
 import { objectsFromEvents, rateOf, squaresText } from './scanObjects';
@@ -46,6 +64,17 @@ export function ScanCard() {
   const view = useScanStore((s) => s.view);
   const closePanel = useShellStore((s) => s.closePanel);
   const bodyRef = useRef<HTMLDivElement>(null);
+  const measured = useMeasuredOnly();
+  // The live region speaks when the scan moves on (a square starts, the scan ends), not when the
+  // honesty toggle rewords the same moment.
+  const [said, setSaid] = useState({ key: '', text: '' });
+  const momentKey =
+    view?.kind === 'run' && view.record
+      ? `${view.runId}:${view.record.state}:${view.record.squares.find((s) => s.state === 'running')?.index ?? ''}`
+      : '';
+  // Derived state (React's "adjust state while rendering"): only a new moment changes the text.
+  if (momentKey !== said.key) setSaid({ key: momentKey, text: scanAnnounce(view, measured) });
+  const announced = momentKey === said.key ? said.text : scanAnnounce(view, measured);
   const record = view?.kind === 'run' ? view.record : null;
   const done = record !== null && isFinished(record.state);
   const stateKey = view
@@ -103,6 +132,9 @@ export function ScanCard() {
         data-testid="scan-card"
         data-state={view.kind === 'run' ? (record?.state ?? 'starting') : view.kind}
       >
+        <p className="sr-only" role="status" aria-live="polite" data-testid="scan-announce">
+          {announced}
+        </p>
         {view.kind === 'offer' && <Offer view={view} />}
         {view.kind === 'failed' && <Failed view={view} />}
         {view.kind === 'run' && !done && <Scanning view={view} record={record} />}
@@ -240,32 +272,88 @@ function boxOf(b: ScanBox) {
 }
 
 function Totals({ record }: { record: RunRecord }) {
+  const measured = useMeasuredOnly();
+  const t = record.totals;
+  if (measured)
+    return (
+      <div className="sx-scan-totals" data-testid="scan-totals" data-measured="">
+        <div>
+          <b>{tracksOf(t)}</b>
+          <span>{tracksOf(t) === 1 ? 'track' : 'tracks'}</span>
+        </div>
+      </div>
+    );
+  const unchecked = uncheckedOf(t);
   return (
     <div className="sx-scan-totals" data-testid="scan-totals">
       <div>
-        <b>{record.totals.known}</b>
+        <b>{t.known}</b>
         <span>known objects</span>
       </div>
       <div>
-        <b>{record.totals.found}</b>
-        <span>found by Discovery</span>
+        <b>{t.found}</b>
+        <span>found</span>
       </div>
       <div>
-        <b>{record.totals.unexplained}</b>
+        <b>{t.unexplained}</b>
         <span>unexplained</span>
       </div>
+      {unchecked ? (
+        <div data-tone="warn" data-testid="scan-total-unchecked">
+          <b>{unchecked}</b>
+          <span>not checked</span>
+        </div>
+      ) : null}
     </div>
   );
+}
+
+/** #169: tracks the known-object check could not judge. A fact about the run, so it stays at Measured only. */
+function UncheckedNote({ record }: { record: RunRecord }) {
+  const n = uncheckedOf(record.totals);
+  if (!n) return null;
+  return (
+    <Alert
+      tone="warn"
+      title="Known-object check did not answer"
+      line={`${n} ${n === 1 ? 'track' : 'tracks'} could not be checked against known objects.`}
+      testId="scan-unchecked"
+    />
+  );
+}
+
+/**
+ * What a screen reader hears (#170): the square that starts, then once the end of the scan.
+ * Nothing on a poll that changes nothing. Pure.
+ */
+export function scanAnnounce(v: ScanView | null, measured: boolean): string {
+  if (v?.kind !== 'run' || !v.record) return '';
+  const r = v.record;
+  if (isFinished(r.state)) {
+    const t = r.totals;
+    const u = uncheckedOf(t);
+    const what = measured
+      ? `${tracksOf(t)} ${tracksOf(t) === 1 ? 'track' : 'tracks'}`
+      : [`${t.found} found`, `${t.unexplained} unexplained`, u ? `${u} not checked` : null]
+          .filter(Boolean)
+          .join(', ');
+    if (r.state === 'failed') return 'Scan failed.';
+    return `Scan ${r.state === 'stopped' ? 'stopped' : 'done'}: ${what}.`;
+  }
+  const cur = r.squares.find((s) => s.state === 'running');
+  return cur ? `Square ${cur.index} of ${r.squares.length}.` : '';
 }
 
 /** Predicted-only known objects are hidden on the sky by default; this shows them. */
 function PredictedToggle({ record }: { record: RunRecord }) {
   const on = useScanStore((s) => s.showPredicted);
+  const measured = useMeasuredOnly();
   const n = useMemo(
     () => objectsFromEvents(record.events).filter((o) => o.kind === 'predicted').length,
     [record.events],
   );
-  if (n === 0) return null;
+  // Predicted paths are Horizons positions (model_dependent): not drawn at Measured only.
+  if (n === 0 || measured) return null;
   return (
     <button
       type="button"
@@ -364,6 +452,7 @@ function Scanning({
         <span>{aboutTime(left)} left</span>
       </div>
       <Totals record={record} />
+      <UncheckedNote record={record} />
       <Skipped record={record} />
       {view.stale && (
         <Alert
@@ -434,7 +523,11 @@ function PauseIcon() {
   );
 }
 
-type Filter = 'found' | 'known';
+/**
+ * found: matched and unexplained tracks; unchecked: tracks the known-object check could not judge
+ * (#169); known: every known object; tracks: every track as measured, the only filter at Measured only.
+ */
+export type Filter = 'found' | 'unchecked' | 'known' | 'tracks';
 interface Row {
   key: string;
   num: string;
@@ -442,7 +535,7 @@ interface Row {
   line: string;
   where: string;
   known: RunKnownRow | null;
-  track: RunTrackRow | null;
+  track: ScanTrackRow | null;
 }
 
 /** "squares 2–3 · 27 Jun": the row's squares and the first visit it comes from. */
@@ -465,43 +558,70 @@ function knownRow(k: RunKnownRow, how: string): Row {
   };
 }
 
+/** A track at Measured only (#170): its id, "Track", its visits and dots; no verdict, rate or name. */
+function measuredRow(t: ScanTrackRow): Row {
+  const first = t.tracks[0];
+  const visits = new Set(t.visits).size;
+  const dots = t.positions.length;
+  return {
+    key: `t:${first.area_id}:${first.track_id}`,
+    num: first.track_id,
+    name: 'Track',
+    line: [
+      `${visits} ${visits === 1 ? 'visit' : 'visits'}`,
+      dots > 0 ? `${dots} ${dots === 1 ? 'dot' : 'dots'}` : null,
+    ]
+      .filter(Boolean)
+      .join(' · '),
+    where: whereOf(t.squares, t.visits),
+    known: null,
+    track: t,
+  };
+}
+
 /**
  * The rows of a filter, from the merged results (#156, Q-471). Found: the merged tracks (matched
- * to a known object, or unexplained); Known: every known object, detected or predicted. The
+ * to a known object, or unexplained); Not checked: the tracks #169 marks `unchecked`; Known:
+ * every known object, detected or predicted; Tracks: every track as measured (Measured only). The
  * results carry no "possible" tracks, so there is no Possible filter. Pure, tested by its rows.
  */
 export function scanRows(res: RunResults, f: Filter): Row[] {
   const byName = new Map(res.known.map((k) => [k.designation, k]));
+  const rows = trackRowsOf(res);
   if (f === 'known')
     return res.known.map((k) => knownRow(k, k.detected ? 'detected' : 'predicted'));
-  return res.tracks.map((t) => {
-    const first = t.tracks[0];
-    const key = `t:${first.area_id}:${first.track_id}`;
-    const k = t.designation ? byName.get(t.designation) : undefined;
-    if (k)
-      return { ...knownRow(k, 'detected'), key, where: whereOf(t.squares, t.visits), track: t };
-    // The motion over its merged dots (derived from the measured positions).
-    const r = rateOf(t.positions.slice().sort((a, b) => Date.parse(a.time) - Date.parse(b.time)));
-    return {
-      key,
-      num: first.track_id,
-      name:
-        t.kind === 'unexplained'
-          ? 'Unexplained track'
-          : t.kind === 'unchecked'
-            ? 'Not checked'
-            : (t.designation ?? 'Found track'),
-      line: [
-        r !== null ? `${r.toFixed(2)}°/day` : null,
-        t.kind === 'unexplained' ? 'not in SkyBoT' : null,
-      ]
-        .filter(Boolean)
-        .join(' · '),
-      where: whereOf(t.squares, t.visits),
-      known: null,
-      track: t,
-    };
-  });
+  if (f === 'tracks') return rows.map(measuredRow);
+  return rows
+    .filter((t) => (f === 'unchecked') === (t.kind === 'unchecked'))
+    .map((t) => {
+      const first = t.tracks[0];
+      const key = `t:${first.area_id}:${first.track_id}`;
+      const k = t.designation ? byName.get(t.designation) : undefined;
+      if (k)
+        return { ...knownRow(k, 'detected'), key, where: whereOf(t.squares, t.visits), track: t };
+      // The motion over its merged dots (derived from the measured positions).
+      const r = rateOf(t.positions.slice().sort((a, b) => Date.parse(a.time) - Date.parse(b.time)));
+      return {
+        key,
+        num: first.track_id,
+        name:
+          t.kind === 'unexplained'
+            ? 'Unexplained track'
+            : t.kind === 'unchecked'
+              ? 'Track not checked'
+              : (t.designation ?? 'Found track'),
+        line: [
+          r !== null ? `${r.toFixed(2)}°/day` : null,
+          t.kind === 'unexplained' ? 'not in SkyBoT' : null,
+          t.kind === 'unchecked' ? 'known-object check did not answer' : null,
+        ]
+          .filter(Boolean)
+          .join(' · '),
+        where: whereOf(t.squares, t.visits),
+        known: null,
+        track: t,
+      };
+    });
 }
 
 function asKnownObject(k: RunKnownRow): KnownObject {
@@ -525,7 +645,7 @@ function asKnownObject(k: RunKnownRow): KnownObject {
   };
 }
 
-function ResultRow({ row, release }: { row: Row; release: string }) {
+function ResultRow({ row, release, measured }: { row: Row; release: string; measured: boolean }) {
   const k = row.known;
   const o = k ? asKnownObject(k) : null;
   const around = k ? (middleTime(k.positions.map((p) => p.time)) ?? middleTime(k.visits)) : null;
@@ -537,6 +657,7 @@ function ResultRow({ row, release }: { row: Row; release: string }) {
         : null
     : null;
   const label = [row.num, row.name].filter(Boolean).join(' ');
+  const whyId = `scan-why-${row.key.replace(/[^\w-]/g, '_')}`;
   const build = o
     ? () => buildKnown(o)
     : row.track
@@ -555,21 +676,31 @@ function ResultRow({ row, release }: { row: Row; release: string }) {
       <span className="sx-kr-nm">
         <span>{row.name}</span>
         <small>{row.line}</small>
+        {/* Why Track it is off, in words a touch or screen-reader user also gets (#170). */}
+        {/* A known row says it; a track row already reads "not in SkyBoT", so only a screen reader hears it. */}
+        {!measured && !track && (
+          <small className={o ? 'sx-scan-why' : 'sr-only'} id={whyId} data-testid="scan-track-why">
+            {o ? NO_ID_NOTE : NO_ORBIT_NOTE}
+          </small>
+        )}
       </span>
       <span className="sx-scan-where">{row.where}</span>
       <span className="sx-kr-acts">
-        <button
-          type="button"
-          className="sx-btn-outline sx-btn-sm"
-          disabled={!track}
-          onClick={track ?? undefined}
-          aria-label={`Track it: ${label}`}
-          title={track ? undefined : o ? NO_ID_NOTE : NO_ORBIT_NOTE}
-          data-testid="scan-track"
-        >
-          <RouteIcon />
-          Track it
-        </button>
+        {/* Track it opens the Horizons path (model_dependent): not offered at Measured only. */}
+        {!measured && (
+          <button
+            type="button"
+            className="sx-btn-outline sx-btn-sm"
+            disabled={!track}
+            onClick={track ?? undefined}
+            aria-label={`Track it: ${label}`}
+            aria-describedby={track ? undefined : whyId}
+            data-testid="scan-track"
+          >
+            <RouteIcon />
+            Track it
+          </button>
+        )}
         <button
           type="button"
           className="sx-btn-outline sx-btn-sm"
@@ -582,6 +713,46 @@ function ResultRow({ row, release }: { row: Row; release: string }) {
           Build it
         </button>
       </span>
+    </div>
+  );
+}
+
+const FILTER_NAME: Record<Filter, string> = {
+  found: 'Found',
+  unchecked: 'Not checked',
+  known: 'Known',
+  tracks: 'Tracks',
+};
+
+/**
+ * Where the positions come from (D-02): the tracks' measured dots, and the known objects'
+ * Horizons positions (not shown at Measured only, as the known objects are not). Its source is in
+ * the tag's tooltip.
+ */
+function ScanProvenance({ record, measured }: { record: RunRecord; measured: boolean }) {
+  const p = record.provenance;
+  const tip = (e: { formula?: string; assumption?: string; source?: string }) =>
+    e.source ?? e.formula ?? e.assumption ?? '';
+  return (
+    <div className="sx-scan-provtags" data-testid="scan-prov-tags">
+      <span>
+        <ProvenanceBadge
+          tag={p.track_positions.tag}
+          tooltip={tip(p.track_positions)}
+          variant="tag"
+        />
+        Track positions
+      </span>
+      {!measured && (
+        <span>
+          <ProvenanceBadge
+            tag={p.known_positions.tag}
+            tooltip={tip(p.known_positions)}
+            variant="tag"
+          />
+          Known positions
+        </span>
+      )}
     </div>
   );
 }
@@ -601,19 +772,31 @@ function Done({
   stale: boolean;
 }) {
   const [filter, setFilter] = useState<Filter>('found');
+  const measured = useMeasuredOnly();
+  // The dev-server mock's runs are invented: say so (the production build has no mock).
+  const mock = useMemo(() => scanIsMock(), []);
   const n = record.squares.length;
   const doneN = record.totals.squares_done;
   const release = releaseName(record.release);
   const how =
     record.state === 'done' ? 'Computed live' : record.state === 'stopped' ? 'Stopped' : 'Failed';
   const off = record.squares.filter((s) => s.state === 'skipped' || s.state === 'failed');
-  const counts = results
+  const counts: Record<Filter, number> | null = results
     ? {
         found: scanRows(results, 'found').length,
+        unchecked: scanRows(results, 'unchecked').length,
         known: results.known.length,
+        tracks: trackRowsOf(results).length,
       }
     : null;
-  const rows = results ? scanRows(results, filter) : [];
+  // Measured only shows Tracks alone; Not checked shows only when there are some.
+  const filters: Filter[] = measured
+    ? ['tracks']
+    : (['found', 'unchecked', 'known'] as const).filter(
+        (f) => f !== 'unchecked' || !!counts?.unchecked,
+      );
+  const shownFilter: Filter = filters.includes(filter) ? filter : filters[0]!;
+  const rows = results ? scanRows(results, shownFilter) : [];
   // First and last visit start over every row (the results carry each row's visits, not a frame count).
   const visits = results
     ? [...results.known, ...results.tracks].flatMap((r) => r.visits).sort()
@@ -622,7 +805,7 @@ function Done({
   const download = () => {
     if (!results) return;
     const url = URL.createObjectURL(
-      new Blob([scanEcsv(results, record.region)], { type: 'text/plain' }),
+      new Blob([scanEcsv(results, record.region, measured)], { type: 'text/plain' }),
     );
     const a = document.createElement('a');
     a.href = url;
@@ -635,6 +818,16 @@ function Done({
       <div className="sx-area-prov" data-testid="scan-prov">
         <span>
           <b>{how}</b> · {release} · {doneN} of {n} squares
+          {mock && (
+            <span
+              className="sx-tagbadge"
+              style={{ ['--dot' as string]: 'var(--p-asm)', marginLeft: 8 }}
+              title="Test data: an invented scan from the dev-server mock, not SPHEREx measurements."
+              data-testid="scan-test-data"
+            >
+              Test data
+            </span>
+          )}
         </span>
         {span && (
           <span>
@@ -649,24 +842,26 @@ function Done({
         ))}
       </div>
       <Totals record={record} />
+      <UncheckedNote record={record} />
+      <ScanProvenance record={record} measured={measured} />
       {counts ? (
         <div className="sx-seg" role="group" aria-label="Show" data-testid="scan-filter">
-          {(['found', 'known'] as const).map((f) => (
+          {filters.map((f) => (
             <button
               key={f}
               type="button"
-              aria-pressed={filter === f}
+              aria-pressed={shownFilter === f}
               onClick={() => setFilter(f)}
               data-testid={`scan-filter-${f}`}
             >
-              {f === 'found' ? 'Found' : 'Known'} {counts[f]}
+              {FILTER_NAME[f]} {counts[f]}
             </button>
           ))}
         </div>
       ) : (
         <p className="sx-live-m">
           {stale
-            ? 'The results could not be read. Close and reopen the scan to try again.'
+            ? 'The results could not be read. Open this run again from Runs to try again.'
             : 'Reading the results…'}
         </p>
       )}
@@ -675,7 +870,9 @@ function Done({
           {rows.length === 0 ? (
             <p className="sx-live-m">None in this scan.</p>
           ) : (
-            rows.map((r) => <ResultRow key={r.key} row={r} release={record.release} />)
+            rows.map((r) => (
+              <ResultRow key={r.key} row={r} release={record.release} measured={measured} />
+            ))
           )}
         </div>
       )}
@@ -683,7 +880,7 @@ function Done({
       <Alert
         tone="warn"
         title="Detection rates not measured yet"
-        line="Treat possible tracks as leads."
+        line="How many movers a scan misses is not known."
         testId="scan-rates"
       />
       <div className="sx-live-btns">

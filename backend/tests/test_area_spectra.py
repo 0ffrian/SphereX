@@ -514,7 +514,7 @@ def test_the_committed_pack_is_up_to_date() -> None:
 def test_starting_a_stored_area_again_fills_its_missing_spectra(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Issue #169 (4), Q-481: an area stored in the cache without its ``spectra`` stage serves
+    """Issue #169 (4), Q-482: an area stored in the cache without its ``spectra`` stage serves
     ``/spectra`` after the same box is started again; the worker fills the stage from the stored
     replies (never the request, A16.2) and nothing else is recomputed. Offline, as a stored area
     needs no network."""

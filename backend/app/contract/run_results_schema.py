@@ -47,7 +47,7 @@ class RunResultSquare(BaseModel):
     state: run_schema.RunSquareState
     missing: list[area_index_schema.AreaMissingCode] = Field(
         ...,
-        description="The skybot: and horizons: codes of the square's stored summary: a known-object check that failed (Q-479). Empty for a square not done.",
+        description="The skybot: and horizons: codes of the square's stored summary: a known-object check that failed (Q-480). Empty for a square not done.",
     )
 
 
@@ -86,7 +86,7 @@ class RunTrackRow(BaseModel):
     positions: list[run_schema.RunPosition]
     unchecked_by: list[area_index_schema.AreaMissingCode] | None = Field(
         None,
-        description="The members' skybot: and horizons: codes (Q-479): required on an unchecked row, also on an unexplained row with an unchecked member.",
+        description="The members' skybot: and horizons: codes (Q-480): required on an unchecked row, also on an unexplained row with an unchecked member.",
         min_length=1,
     )
 

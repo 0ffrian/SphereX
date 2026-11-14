@@ -539,7 +539,7 @@ def test_a_full_queue_answers_429(client: TestClient, monkeypatch: pytest.Monkey
     assert (r.status_code, r.json()["error"]) == (429, "queue_full")
 
 
-# --- issue #169: the cutout second pass and stored areas (Q-481) ---------------------------
+# --- issue #169: the cutout second pass and stored areas (Q-482) ---------------------------
 
 
 class _Stop(Exception):
@@ -653,7 +653,7 @@ def test_a_failure_that_cannot_pass_is_not_retried(
 def test_past_the_failure_budget_no_cutout_is_retried(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Q-481: failed cutouts are retried while at most max(2, 25 % of n_frames) failed; past
+    """Q-482: failed cutouts are retried while at most max(2, 25 % of n_frames) failed; past
     it the archive is taken to be down and nothing is retried any more."""
     plan = _plan()
     budget = max(live_jobs.CUTOUT_RETRY_BUDGET_MIN, int(0.25 * plan.n_frames))
@@ -728,7 +728,7 @@ def _stored_client(client: TestClient, missing: tuple[str, ...], spectra: bool) 
 def test_a_stored_area_whose_check_failed_answers_done_to_a_plan_and_reruns_on_start(
     client: TestClient,
 ) -> None:
-    """Q-481: ``start=false`` on a stored area answers done (its result is served, R3);
+    """Q-482: ``start=false`` on a stored area answers done (its result is served, R3);
     ``start=true`` queues the recheck in the worker."""
     area_id, ran = _stored_client(client, ("skybot:1",), spectra=True)
     r = client.post("/v1/areas/live", json=BOX)
@@ -795,7 +795,7 @@ def _stored_jobs(tmp_path: Path, runner: Any) -> tuple[LiveJobs, Plan, Any]:
 
 def test_a_failed_recheck_keeps_the_stored_result_and_its_cooldown(tmp_path: Path) -> None:
     """Review #2 and #3: a recheck of a stored area that fails leaves the job and its run
-    done with the stored result (Q-481 (3)), and keeps the cooldown, so a lasting failure is
+    done with the stored result (Q-482 (3)), and keeps the cooldown, so a lasting failure is
     not computed again at every start."""
     ran: list[str] = []
 

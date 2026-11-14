@@ -251,13 +251,13 @@
           "items": {
             "$ref": "area-index.schema.json#/definitions/AreaMissingCode"
           },
-          "description": "The skybot: and horizons: codes of the square's stored summary: a known-object check that failed (Q-479)."
+          "description": "The skybot: and horizons: codes of the square's stored summary: a known-object check that failed (Q-480)."
         }
       }
     },
     "RunTotals": {
       "title": "RunTotals",
-      "description": "known: known objects in the merged known lists; found, unexplained and unchecked: merged tracks (Q-471, Q-479); squares_failed: squares whose computation failed (Q-480).",
+      "description": "known: known objects in the merged known lists; found, unexplained and unchecked: merged tracks (Q-471, Q-480); squares_failed: squares whose computation failed (Q-481).",
       "type": "object",
       "additionalProperties": false,
       "required": [
@@ -292,7 +292,7 @@
               "type": "null"
             }
           ],
-          "description": "Merged tracks the known-object check could not judge (Q-479); null = a run recorded before Q-479, not counted."
+          "description": "Merged tracks the known-object check could not judge (Q-480); null = a run recorded before Q-480, not counted."
         },
         "squares_done": {
           "type": "integer",

@@ -10,6 +10,7 @@ import {
   spectrumCoverageMessage,
   spectrumEmptyMessage,
   timeLapseText,
+  UNKNOWN_CODE_TEXT,
 } from './messages';
 import { FRAME_REASONS, groupMissing, summarizeSpectrum, WHOLE_RESULT_CODES } from './refusals';
 
@@ -80,15 +81,15 @@ describe('refusal wording', () => {
   });
 
   it('does not read inherited properties as note wording', () => {
-    expect(one(['toString'])).toBe('Not available: toString');
-    expect(one(['constructor'])).toBe('Not available: constructor');
+    expect(one(['toString'])).toBe(UNKNOWN_CODE_TEXT);
+    expect(one(['constructor'])).toBe(UNKNOWN_CODE_TEXT);
   });
 
-  it('shows unknown codes as they are (fallbacks may contain the code)', () => {
-    expect(one(['zzz_new:abc', 'zzz_new:abd'])).toBe('2 frames not used (reason code “zzz_new”).');
-    expect(refusalShortLabel('zzz_new')).toBe('reason code “zzz_new”');
-    expect(one(['spectrum:new_thing'])).toBe('Not available: spectrum:new_thing');
-    expect(one(['cutouts:deferred:x'])).toBe('Not available: cutouts:deferred:x');
+  it('words unknown codes generically, never with the raw code', () => {
+    expect(one(['zzz_new:abc', 'zzz_new:abd'])).toBe('2 frames not used for another reason.');
+    expect(refusalShortLabel('zzz_new')).toBe('other reason');
+    expect(one(['spectrum:new_thing'])).toBe(UNKNOWN_CODE_TEXT);
+    expect(one(['cutouts:deferred:x'])).toBe(UNKNOWN_CODE_TEXT);
   });
 
   it('uses typographic apostrophes', () => {

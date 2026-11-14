@@ -22,7 +22,7 @@ from app.core.area import clean as area_clean
 from app.core.area import frames as area_frames
 from app.core.area import live, runs, scan
 from app.core.area.live import Box, LiveAreaError, Plan
-from app.core.area.live_jobs import LiveJobs, Progress, RunConflict
+from app.core.area.live_jobs import LiveJobs, Progress, QueueFull, RunConflict
 from app.core.area.store import AreaStore
 from app.core.card.validate import check
 from app.main import create_app
@@ -507,6 +507,12 @@ def test_close_stops_the_running_scan_and_everything_waiting(tmp_path: Path) -> 
     assert single.run_id is not None and _run(jobs, single.run_id)["state"] == "stopped"
     assert jobs.reply(single)["error"]["code"] == "cancelled"
     assert jobs.close(timeout=1)  # nothing left: closing again is harmless
+    # A request racing the shutdown queues nothing and does not start the worker again.
+    with pytest.raises(QueueFull):
+        jobs.submit_scan(scan.plan_scan(200.0, 0.0, 2.0, 2.0), "discovery", RELEASE)
+    with pytest.raises(QueueFull):
+        jobs.submit(_plan_of(live.snap_box(12.0, 10.0, 0.5, 0.5)), kind="discovery")
+    assert jobs._thread is None or not jobs._thread.is_alive()
 
 
 def test_a_single_live_job_with_a_kind_is_a_run_of_one_square(tmp_path: Path) -> None:
@@ -528,7 +534,7 @@ def test_a_single_live_job_with_a_kind_is_a_run_of_one_square(tmp_path: Path) ->
             "box": plan.box.reply(),
             "area_id": plan.area_id,
             "state": "done",
-            "missing": [],  # Q-479: its known-object check did not fail
+            "missing": [],  # Q-480: its known-object check did not fail
         }
     ]
     assert run["totals"]["found"] == 1
@@ -1301,11 +1307,11 @@ def test_run_records_never_share_a_provenance_dict(tmp_path: Path) -> None:
     assert pa is not pb and pa["known_positions"] is not runs.RUN_PROVENANCE["known_positions"]
 
 
-# --- runs report failures honestly (issue #169: Q-479, Q-480, Q-481) -------------------------
+# --- runs report failures honestly (issue #169: Q-480, Q-481, Q-482) -------------------------
 
 
 def test_an_unchecked_track_is_counted_listed_and_its_codes_kept(tmp_path: Path) -> None:
-    """Q-479: a SkyBoT cone that failed leaves a track ``unchecked``; the run counts it, lists
+    """Q-480: a SkyBoT cone that failed leaves a track ``unchecked``; the run counts it, lists
     it with its codes, and each square carries the summary's skybot: and horizons: codes."""
     p = scan.plan_scan(180.0, 0.0, 1.5, 1.5)  # one square
     store = FakeStore()
@@ -1326,7 +1332,7 @@ def test_an_unchecked_track_is_counted_listed_and_its_codes_kept(tmp_path: Path)
     assert run["totals"]["unchecked"] == 1 and run["totals"]["found"] == 1
     assert run["totals"]["unexplained"] == 0
     assert run["squares"][0]["missing"] == ["horizons:2024 AB", "skybot:1"]
-    # No found event for the unchecked track: the replay is unchanged (Q-479).
+    # No found event for the unchecked track: the replay is unchanged (Q-480).
     found = [e["object"] for e in run["events"] if e["type"] == "found"]
     assert {o.get("track_id") for o in found} == {"T1"}
     got, merged = jobs.results(run_id)
@@ -1340,7 +1346,7 @@ def test_an_unchecked_track_is_counted_listed_and_its_codes_kept(tmp_path: Path)
 
 
 def test_the_merged_kind_is_found_then_unexplained_then_unchecked() -> None:
-    """Q-479: a merged track is found when any member matched, else unexplained when any
+    """Q-480: a merged track is found when any member matched, else unexplained when any
     member was checked, else unchecked; the unchecked members' codes stay on the row."""
     _, boxes = _row_of_three()
     mover = 180.3
@@ -1370,7 +1376,7 @@ def test_the_merged_kind_is_found_then_unexplained_then_unchecked() -> None:
 
 
 def test_a_scan_whose_every_square_failed_ends_failed(tmp_path: Path) -> None:
-    """Q-480: not stopped, no square done, at least one failed -> failed."""
+    """Q-481: not stopped, no square done, at least one failed -> failed."""
     p = scan.plan_scan(180.0, 0.0, 3.0, 1.0)  # 2 squares
 
     def planner(ctx: Context, box: Box) -> Plan:
@@ -1444,7 +1450,7 @@ def test_a_run_recorded_before_q479_reads_unchecked_null(tmp_path: Path) -> None
 
 
 def test_a_stored_area_whose_check_failed_is_computed_again_once(tmp_path: Path) -> None:
-    """Q-481: a stored area whose summary lists a skybot: code is computed again on the next
+    """Q-482: a stored area whose summary lists a skybot: code is computed again on the next
     start; within the cooldown it is reused, as it is offline."""
     store = FakeStore()
     plan = _plan_of(live.snap_box(10.0, 10.0, 0.5, 0.5))
@@ -1495,7 +1501,7 @@ def test_a_recheck_loses_the_codes_when_skybot_answers(tmp_path: Path) -> None:
 def test_results_are_merged_again_after_an_area_is_stored_again(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Q-481: a recompute stores an area again; every kept merge is dropped, so a run's
+    """Q-482: a recompute stores an area again; every kept merge is dropped, so a run's
     ``/results`` show the area's current result."""
     from app.core.area import live_jobs
 
@@ -1542,7 +1548,7 @@ def _stored_scan(tmp_path: Path, runner: Any, **kw: Any) -> tuple[LiveJobs, Any,
 @pytest.mark.parametrize("where", ["runner", "planner"])
 def test_a_failed_recheck_in_a_scan_keeps_the_stored_result(tmp_path: Path, where: str) -> None:
     """Review #2: a stored square whose recheck fails (or cannot be planned) is done with its
-    stored result, which is still served; the scan is done, not failed (Q-481 (3))."""
+    stored result, which is still served; the scan is done, not failed (Q-482 (3))."""
 
     def boom(*_: Any) -> Any:
         raise LiveAreaError("area:frames_incomplete", "a cutout failed")

@@ -162,7 +162,7 @@ def post_live(
     answers ``done``, unless ``start=true`` and the stored area is not reusable (its
     known-object check failed) or lacks its ``spectra`` stage (and no refill of it has
     already failed in this process): then a job is queued, which computes it again or fills
-    the stage in the worker (Q-481; nothing is computed here, A16.2). One already queued or
+    the stage in the worker (Q-482; nothing is computed here, A16.2). One already queued or
     running answers its job, whatever ``start`` is, except a scan's square with
     ``start=true``: that queues a job of its own behind the square, so stopping the scan never
     loses this request (PR #160 review, Q-470)."""
@@ -177,7 +177,7 @@ def post_live(
         return _json(jobs.reply(job), "area-job.schema.json")
     if not req.start:
         return _json(plan.reply(), "area-live-plan.schema.json")
-    if jobs.ctx.settings.offline and not stored:  # a stored area needs no network (Q-481)
+    if jobs.ctx.settings.offline and not stored:  # a stored area needs no network (Q-482)
         raise ApiError(503, "offline", "Live areas need the network (SX_OFFLINE=1).")
     try:
         job = jobs.submit(plan, kind=req.kind)

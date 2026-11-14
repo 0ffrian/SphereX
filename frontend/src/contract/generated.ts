@@ -1543,19 +1543,19 @@ export interface RunSquare {
   state: RunSquareState;
   error?: LiveJobError;
   /**
-   * The skybot: and horizons: codes of the square's stored summary: a known-object check that failed (Q-479).
+   * The skybot: and horizons: codes of the square's stored summary: a known-object check that failed (Q-480).
    */
   missing?: AreaMissingCode[];
 }
 /**
- * known: known objects in the merged known lists; found, unexplained and unchecked: merged tracks (Q-471, Q-479); squares_failed: squares whose computation failed (Q-480).
+ * known: known objects in the merged known lists; found, unexplained and unchecked: merged tracks (Q-471, Q-480); squares_failed: squares whose computation failed (Q-481).
  */
 export interface RunTotals {
   known: number;
   found: number;
   unexplained: number;
   /**
-   * Merged tracks the known-object check could not judge (Q-479); null = a run recorded before Q-479, not counted.
+   * Merged tracks the known-object check could not judge (Q-480); null = a run recorded before Q-480, not counted.
    */
   unchecked: number | null;
   squares_done: number;
@@ -1656,7 +1656,7 @@ export interface RunResultSquare {
   area_id: RunAreaId;
   state: RunSquareState;
   /**
-   * The skybot: and horizons: codes of the square's stored summary: a known-object check that failed (Q-479). Empty for a square not done.
+   * The skybot: and horizons: codes of the square's stored summary: a known-object check that failed (Q-480). Empty for a square not done.
    */
   missing: AreaMissingCode[];
 }
@@ -1685,7 +1685,7 @@ export interface RunKnownRow {
   positions: RunPosition[];
 }
 /**
- * A found, unexplained or unchecked track, merged across neighbouring squares: found when a member has a SkyBoT match, else unexplained when a member was checked, else unchecked (Q-479).
+ * A found, unexplained or unchecked track, merged across neighbouring squares: found when a member has a SkyBoT match, else unexplained when a member was checked, else unchecked (Q-480).
  */
 export interface RunTrackRow {
   kind: 'found' | 'unexplained' | 'unchecked';
@@ -1704,7 +1704,7 @@ export interface RunTrackRow {
   visits: AreaUtcTime[];
   positions: RunPosition[];
   /**
-   * The members' skybot: and horizons: codes (Q-479): required on an unchecked row, also on an unexplained row with an unchecked member.
+   * The members' skybot: and horizons: codes (Q-480): required on an unchecked row, also on an unexplained row with an unchecked member.
    *
    * @minItems 1
    */

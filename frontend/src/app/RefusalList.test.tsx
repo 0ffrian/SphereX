@@ -2,6 +2,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { RefusalList } from './RefusalList';
+import { UNKNOWN_CODE_TEXT } from './messages';
 import { groupMissing } from './refusals';
 
 declare global {
@@ -57,9 +58,14 @@ describe('RefusalList', () => {
     expect(groups[0]!.querySelector('summary')!.textContent).toBe(
       '3 frames where the detector flagged the object’s centre as saturated or unusable. (show frame IDs)',
     );
-    expect(groups[2]!.querySelector('summary')!.textContent).toContain('reason code “zzz_new”');
+    expect(groups[2]!.querySelector('summary')!.textContent).toContain(
+      'for another reason',
+    );
     const notes = [...host.querySelectorAll('[data-testid="refusal-note"]')];
-    expect(notes.map((n) => n.textContent)).toEqual(['Not available: spectrum:new_thing']);
+    expect(notes.map((n) => n.textContent)).toEqual([UNKNOWN_CODE_TEXT]);
+    // The raw code is not shown, but stays in the DOM for debugging (Q-477).
+    expect(notes[0]!.getAttribute('data-code')).toBeTruthy();
+    expect(notes[0]!.textContent).not.toContain(notes[0]!.getAttribute('data-code')!);
   });
 
   it('labels the list with the lead line', () => {
