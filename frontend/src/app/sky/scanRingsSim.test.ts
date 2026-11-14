@@ -12,7 +12,7 @@ import {
   ringLook,
   seeded,
   stepSim,
-} from './scanRings';
+} from './scanRingsSim';
 
 const run = (seed: number, ms: number, dt = 16) => {
   const sim = newSim(0, seeded(seed));

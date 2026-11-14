@@ -32,7 +32,7 @@ import { clock, foundAtOf, recordAt } from '@/app/area/replay';
 import type { SquareState } from '@/app/area/scanApi';
 import { skyToPixels } from './areaDraw';
 import { placeScanLabels, ringBox, type Pt } from './scanLabels';
-import { ScanRings } from './ScanRings';
+import { ScanRings } from './ScanRings.tsx';
 
 type Look = SquareState | 'plain';
 
