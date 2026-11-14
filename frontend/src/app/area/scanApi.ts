@@ -87,6 +87,8 @@ export { RunGone };
 // keep working. A run recorded before #169 has neither field: `unchecked` reads null (not
 // recorded), never 0, so nothing is invented.
 
+/** The track kinds a results reply may carry: #156's two and #169's proposed `unchecked`. */
+const TRACK_KINDS: readonly string[] = ['found', 'unexplained', 'unchecked'];
 /** A merged track row, with #169's `unchecked` kind (the known-object check did not answer). */
 export type ScanTrackKind = RunTrackRow['kind'] | 'unchecked';
 export type ScanTrackRow = Omit<RunTrackRow, 'kind'> & {
@@ -131,6 +133,8 @@ export interface ScanApi {
   results(runId: string, signal?: AbortSignal): Promise<RunResults>;
   /** Every run, newest first (`GET /v1/runs`). Throws when the list cannot be read. */
   list(signal?: AbortSignal): Promise<RunSummary[]>;
+  /** True only on the dev-server mock (its runs are invented test values; the Test data tag). */
+  readonly isMock?: boolean;
 }
 
 // ---- Reply checks (shape only; #156's schemas replace them) ------------------------------------
@@ -236,6 +240,20 @@ export function parseRunResults(body: unknown): RunResults {
     !Array.isArray(body.tracks)
   )
     throw bad('Run results');
+  // `trackRowsOf` widens the rows to #169's proposed kinds without the compiler's help, so the
+  // kinds and `unchecked_by` are checked here: a reply that drifts from them is refused, not read.
+  for (const t of body.tracks as unknown[])
+    if (
+      !isObj(t) ||
+      !isStr(t.kind) ||
+      !TRACK_KINDS.includes(t.kind) ||
+      !Array.isArray(t.tracks) ||
+      t.tracks.length === 0 ||
+      !Array.isArray(t.positions) ||
+      (t.unchecked_by !== undefined &&
+        !(Array.isArray(t.unchecked_by) && t.unchecked_by.every(isStr)))
+    )
+      throw bad('Run results');
   return body as unknown as RunResults;
 }
 
@@ -358,7 +376,7 @@ export function getScanApi(): ScanApi {
   return api;
 }
 /** True when the scan API in use is the dev-server mock (its runs are invented test values). */
-export const scanIsMock = (): boolean => 'marker' in getScanApi();
+export const scanIsMock = (): boolean => getScanApi().isMock === true;
 /** Tests: put an implementation in place (null: choose again from the URL and env). */
 export function setScanApi(next: ScanApi | null): void {
   api = next;

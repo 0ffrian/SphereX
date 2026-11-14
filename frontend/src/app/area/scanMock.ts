@@ -358,6 +358,7 @@ export function mockScanApi(
   };
   const api: ScanApi & { marker: string } = {
     marker: SCAN_MOCK_MARKER,
+    isMock: true,
     async plan(req) {
       return planOf(req);
     },
