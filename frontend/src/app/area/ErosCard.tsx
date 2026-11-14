@@ -20,6 +20,8 @@ import { drawCutout } from './erosDraw';
 import { useAppStore } from '@/state/store';
 import { effectiveHonesty } from '@/viewer/honesty';
 import { MEASURED_ONLY_NOTE } from './KnownPositionsLayer';
+import type { AreaBack } from './areaBack';
+import { BackArrow } from '@/app/shell/BackArrow';
 import { DETECTORS, detectorIndex, detectorsWithFrames, mjdDay, mjdHM, mjdYear } from './erosModel';
 
 const OVERLAYS: { key: keyof ErosOverlays; label: string }[] = [
@@ -37,7 +39,7 @@ function useMeasuredOnly(): boolean {
   return useAppStore((s) => effectiveHonesty(s.honesty) === 'measured');
 }
 
-function Tabs({ title, back }: { title: string; back?: () => void }) {
+function Tabs({ title, back }: { title: string; back?: AreaBack | null }) {
   const setMinimised = useAreaStore((s) => s.setMinimised);
   const closePanel = useShellStore((s) => s.closePanel);
   return (
@@ -47,12 +49,12 @@ function Tabs({ title, back }: { title: string; back?: () => void }) {
           <button
             type="button"
             className="fb-x"
-            aria-label="Back to the results"
-            title="Back to the results"
-            onClick={back}
+            aria-label={back.label}
+            title={`${back.label} (Esc)`}
+            onClick={back.go}
             data-testid="area-back"
           >
-            <Icon name="back" className="size-4" />
+            <BackArrow />
           </button>
         )}
         <h2 className="fb-name" title={title} data-testid="object-name">
@@ -222,7 +224,15 @@ function CheckGroup({ disabled }: { disabled?: boolean }) {
   );
 }
 
-function Shell({ title, children }: { title: string; children: (close: () => void) => ReactNode }) {
+function Shell({
+  title,
+  back = null,
+  children,
+}: {
+  title: string;
+  back?: AreaBack | null;
+  children: (close: () => void) => ReactNode;
+}) {
   const closePanel = useShellStore((s) => s.closePanel);
   const flow = useAreaStore((s) => s.flow);
   const kind = useAreaStore((s) => s.focus?.kind ?? 'asteroid');
@@ -235,13 +245,14 @@ function Shell({ title, children }: { title: string; children: (close: () => voi
       onClose={closePanel}
       returnFocusTo={flow === 'known' ? '[data-testid="tool-known"]' : '[data-testid="tool-area"]'}
       testId="area-card"
+      back={back}
     >
       {children}
     </PanelCard>
   );
 }
 
-export function ErosCard({ title: given, back }: { title?: string; back?: () => void }) {
+export function ErosCard({ title: given, back }: { title?: string; back?: AreaBack | null }) {
   const focus = useAreaStore((s) => s.focus);
   const real = useAreaStore((s) => s.trackSource === 'real');
   const hasPath = useAreaStore((s) => s.trackPath);
@@ -257,7 +268,7 @@ export function ErosCard({ title: given, back }: { title?: string; back?: () => 
   // The demo cutouts and their photometry are labelled only when some frame actually shows one.
   const anyCutout = eros?.hops.some((h) => !h.no_cutout) ?? false;
   return (
-    <Shell title={title}>
+    <Shell title={title} back={back}>
       {() => (
         <div data-testid="eros-card">
           <div className="fb-view" data-testid="frame-viewer">
@@ -386,10 +397,10 @@ export function MoverDemoCard({
   title: string;
   kind: string;
   frames: number;
-  back: () => void;
+  back: AreaBack | null;
 }) {
   return (
-    <Shell title={title}>
+    <Shell title={title} back={back}>
       {() => (
         <div data-testid="mover-card">
           <div className="fb-view">

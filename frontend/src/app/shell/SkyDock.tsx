@@ -4,6 +4,9 @@
 // a divider, then the search, a button that opens into the search field when it takes focus.
 // Flipbook, Spectrum and the 3D viewer are not dock buttons: the flipbook opens with a search or a
 // click on the sky, and the object panel and the selected object's card hold Spectrum and Build it.
+// Issue #173 (approved mock-up): during a replay the dock becomes the replay's player. The same
+// glass shape widens, the tools fade out and the player fades in; ending the replay runs it back.
+// Choosing a tool ended the replay anyway, so nothing is lost while the tools are away.
 import { useEffect, useLayoutEffect, useRef } from 'react';
 import { SearchBar } from '@/app/search/SearchBar';
 import { OrbitIcon } from '@/components/animate-ui/icons/hugeicons/orbit';
@@ -13,6 +16,8 @@ import { useAreaStore } from './areaStore';
 import { useShellStore } from './shellStore';
 import type { AreaFlow } from '@/app/area/areaService';
 import { reopenScan } from '@/app/sky/areaDraw';
+import { ReplayPlayer } from '@/app/sky/ReplayBar';
+import { useRunsStore } from '@/app/area/runsStore';
 
 const TOOLS: { id: 'known' | 'area'; flow: AreaFlow; label: string; hint: string }[] = [
   {
@@ -37,6 +42,7 @@ export function SkyDock() {
   const tool = useShellStore((s) => s.tool);
   const flow = useAreaStore((s) => s.flow);
   const buildOpen = useShellStore((s) => s.build.open);
+  const replaying = useRunsStore((s) => s.replay !== null);
   const innerRef = useRef<HTMLDivElement>(null);
   const hlRef = useRef<HTMLDivElement>(null);
 
@@ -56,13 +62,19 @@ export function SkyDock() {
   };
   const active = () =>
     innerRef.current?.querySelector<HTMLElement>('[aria-pressed="true"]') ?? null;
-  useLayoutEffect(() => moveHl(active()), [tool, flow, buildOpen]);
+  useLayoutEffect(() => moveHl(active()), [tool, flow, buildOpen, replaying]);
   useEffect(() => {
     const on = () => moveHl(active());
     window.addEventListener('resize', on);
     return () => window.removeEventListener('resize', on);
   }, []);
 
+  if (replaying)
+    return (
+      <div className="sx-fl sx-dock sx-sdock" data-testid="sky-dock" data-replay="">
+        <ReplayPlayer />
+      </div>
+    );
   return (
     <div className="sx-fl sx-dock sx-sdock" data-testid="sky-dock">
       <nav aria-label="Tools" className="sx-sdock-tools">

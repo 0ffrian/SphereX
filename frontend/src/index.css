@@ -4808,6 +4808,10 @@ body {
 
 /* Minimise beside close in a card header (Q-418): only the first button pushes right, so the two
    sit together (4px apart) instead of splitting the free space between them. */
+/* #173: the card's ← sits before the title, pulled toward the edge; the title follows it. */
+.sx-panel-head .sx-panel-back {
+  margin: -6px 0 0 -8px;
+}
 .sx-panel-head .sx-panel-x + .sx-panel-x {
   margin-left: -7px;
 }
@@ -6078,6 +6082,13 @@ li[data-state='running'] > .sx-live-mk {
   stroke-width: 1;
   animation: sx-scan-pulse 1.6s ease-in-out infinite;
 }
+/* #173: the scanning rings on the analysing square (ScanRings.tsx): thin, unfilled, the analysing
+   blue, unlabelled, so they never read as a find (a find's circle is thicker, green or amber). */
+.sx-scan-rings circle {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1;
+}
 @keyframes sx-scan-pulse {
   50% {
     opacity: 0.2;
@@ -6291,7 +6302,7 @@ li[data-state='running'] > .sx-live-mk {
 .sx-runs-btn,
 .sx-runs-menu,
 .sx-replay-tag,
-.sx-replay {
+.sx-replay-back {
   background: var(--glass-grain), var(--glass-bg);
   -webkit-backdrop-filter: var(--glass-filter);
   backdrop-filter: var(--glass-filter);
@@ -6326,7 +6337,8 @@ li[data-state='running'] > .sx-live-mk {
 .sx-runs-play:focus-visible,
 .sx-runs-x:focus-visible,
 .sx-replay-pb:focus-visible,
-.sx-replay-tl:focus-visible {
+.sx-replay-tl:focus-visible,
+.sx-replay-back:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
@@ -6518,7 +6530,7 @@ li[data-state='running'] > .sx-live-mk {
   pointer-events: none;
 }
 
-/* The replay: tag under the island, bar above the dock. */
+/* The replay: tag under the island; the dock becomes the player (#173). */
 .sx-replay-tag {
   position: absolute;
   top: 76px;
@@ -6541,18 +6553,71 @@ li[data-state='running'] > .sx-live-mk {
   border-radius: 50%;
   background: var(--accent);
 }
+/* #173: the dock's glass shape widens into the player; its tools fade out and the player fades in.
+   Width animates from the dock's own size (interpolate-size), so ending the replay runs it back. */
+.sx-sdock {
+  interpolate-size: allow-keywords;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .sx-sdock {
+    transition:
+      left 0.6s var(--sx-spring),
+      width 0.45s var(--sx-spring);
+  }
+  .sx-sdock > * {
+    animation: sx-dock-in 0.3s 0.12s both;
+  }
+}
+@keyframes sx-dock-in {
+  from {
+    opacity: 0;
+  }
+}
+@media (min-width: 641px) {
+  .sx-bezel .sx-sdock.sx-sdock[data-replay] {
+    left: 50%;
+    width: min(760px, calc(100% - 32px));
+  }
+}
+/* The player may wrap (coarse pointers): the glass grows with it. */
+.sx-sdock[data-replay] {
+  height: auto;
+  min-height: 56px;
+}
+.sx-sdock[data-replay] .sx-replay {
+  padding: 8px 7px;
+}
 .sx-replay {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  bottom: calc(16px + 56px + 12px + env(safe-area-inset-bottom, 0px));
-  z-index: 6;
-  width: min(760px, calc(100% - 32px));
+  flex: 1;
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 10px 14px;
+  padding: 0 7px;
+}
+/* In place of the frame player during a replay: a plain ← (#173). */
+.sx-replay-back {
+  width: 48px;
+  height: 48px;
   border-radius: 10px;
+  display: grid;
+  place-items: center;
+  color: var(--fg);
+}
+.sx-replay-back:hover {
+  background: var(--glass-grain), var(--glass-hover);
+}
+.sx-replay-back:active {
+  transform: scale(0.98);
+}
+.sx-replay-back svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 .sx-replay-pb {
   flex: none;

@@ -78,6 +78,22 @@ export function reopenScan(flow: 'known' | 'discovery'): boolean {
   return true;
 }
 
+/**
+ * A click on your patch while its list is folded away (#173, after ← "Back to your patch"): the
+ * list opens again. True when it did.
+ */
+export function patchClickAt(x: number, y: number): boolean {
+  const s = useAreaStore.getState();
+  if (!s.minimised || !s.box || (s.screen !== 'disc' && s.screen !== 'list')) return false;
+  const r = boxToPixels(s.box);
+  if (!r) return false;
+  const inside =
+    x >= Math.min(r.x0, r.x1) && x <= Math.max(r.x0, r.x1) && y >= Math.min(r.y0, r.y1) && y <= Math.max(r.y0, r.y1);
+  if (!inside) return false;
+  s.setMinimised(false);
+  return true;
+}
+
 /** Back to the scan card from an object or square opened in it: the card, and the sky on its region. */
 export function backToScan(): void {
   const v = useScanStore.getState().view;
