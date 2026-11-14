@@ -92,9 +92,12 @@ export function ScanOverlay({ view }: { view: SkyView | null }) {
   );
   const foundAt = useMemo(() => (replayRun ? foundAtOf(replayRun) : null), [replayRun]);
   const replaying = replayView !== null;
-  /** The label's second line as drawn: during a replay, when the object was found. */
+  /**
+   * The label's second line as drawn: during a replay, when the object was found. A circle still
+   * predicted at this point of the replay was not found (yet): it keeps its own line.
+   */
   const lineOf = (o: ScanObject) => {
-    const at = replaying ? foundAt?.get(o.key) : undefined;
+    const at = replaying && o.kind !== 'predicted' ? foundAt?.get(o.key) : undefined;
     return at !== undefined ? `found at ${clock(at)}` : o.line;
   };
   const scan = replayView ?? scanView;
