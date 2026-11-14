@@ -30,7 +30,13 @@ export interface LabelIn {
 /** Where a label is drawn: x and the text anchor (the tspans inherit it), or null when hidden. */
 export type LabelSpot = { x: number; anchor: 'start' | 'end' } | null;
 
-const RANK: Record<ScanObject['kind'], number> = { known: 0, unexplained: 1, predicted: 2 };
+const RANK: Record<ScanObject['kind'], number> = {
+  known: 0,
+  track: 0,
+  unexplained: 1,
+  unchecked: 1,
+  predicted: 2,
+};
 
 /** The ring's box around its centre (rings are at most 11 px in radius, plus a pixel). */
 export function ringBox(key: string, end: Pt): RingBox {

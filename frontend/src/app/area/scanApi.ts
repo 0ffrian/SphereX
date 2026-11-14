@@ -81,6 +81,41 @@ export type ScanStartAnswer =
 
 export { RunGone };
 
+// ---- #169 (proposed; not in the contract yet): what a run could not check or compute ----------
+// Issue #170 builds against these with the mock (`?scan=mock-gaps`); when #169 lands its schema,
+// `npm run contract:gen` brings the fields into `RunTotals` and `RunTrackRow`, and these readers
+// keep working. A run recorded before #169 has neither field: `unchecked` reads null (not
+// recorded), never 0, so nothing is invented.
+
+/** A merged track row, with #169's `unchecked` kind (the known-object check did not answer). */
+export type ScanTrackKind = RunTrackRow['kind'] | 'unchecked';
+export type ScanTrackRow = Omit<RunTrackRow, 'kind'> & {
+  kind: ScanTrackKind;
+  /** #169: the `skybot:<visit>` and `horizons:<designation>` codes that left it unchecked. */
+  unchecked_by?: string[];
+};
+/** The track rows of a run's results, with #169's kinds. */
+export const trackRowsOf = (res: RunResults): ScanTrackRow[] => res.tracks as ScanTrackRow[];
+
+const totalOf = (t: RunTotals, key: string): number | null => {
+  const v = (t as unknown as Record<string, unknown>)[key];
+  return typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : null;
+};
+/** Tracks the known-object check could not judge (#169), or null when the run did not record it. */
+export const uncheckedOf = (t: RunTotals): number | null => totalOf(t, 'unchecked');
+/**
+ * Squares that failed (#169's `squares_failed`); without it, counted from the squares when they
+ * are at hand (a run record), else 0 (a run summary from before #169).
+ */
+export function squaresFailedOf(
+  t: RunTotals,
+  squares?: readonly { state: RunSquareState }[],
+): number {
+  return totalOf(t, 'squares_failed') ?? squares?.filter((s) => s.state === 'failed').length ?? 0;
+}
+/** Every track of a run: found, unexplained and (when recorded) not checked. */
+export const tracksOf = (t: RunTotals): number => t.found + t.unexplained + (uncheckedOf(t) ?? 0);
+
 export interface ScanRequest extends ScanBox {
   kind: ScanKind;
 }

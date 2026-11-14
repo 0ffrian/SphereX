@@ -2,17 +2,20 @@
 // `found` events (#156): one per object, its trajectory and a label. Pure, so it is tested alone.
 //   known       green: a known object found in the frames (a SkyBoT match), its Horizons positions;
 //   unexplained amber: moves across both visits and matches nothing on file, its measured dots;
-//   predicted   blue dashed: a known object predicted there but not found (hidden by default).
+//   predicted   blue dashed: a known object predicted there but not found (hidden by default);
+//   unchecked   amber dotted: a track the known-object check could not judge (#169, from the results);
+//   track       neutral: any track at Measured only (#170), its measured dots, its id and square only.
 // A designation found in several squares is ONE object: its positions are merged in time order, so
 // the trajectory carries across the square border. A Discovery track id belongs to its square
 // (T7 of square 3), so tracks are never merged here; #156's results merge them within 30″.
 import { separationDeg } from '@/viewer/sky/skyMath';
-import type { FoundKind, RunEvent, RunPosition } from './scanApi';
+import type { FoundKind, RunEvent, RunPosition, RunResults } from './scanApi';
+import { trackRowsOf } from './scanApi';
 
 export interface ScanObject {
   /** Stable key: the designation, else `<square>:<track id>`. */
   key: string;
-  kind: FoundKind;
+  kind: FoundKind | 'unchecked' | 'track';
   designation?: string;
   trackId?: string;
   /** The squares it was reported in, ascending. */
@@ -102,6 +105,84 @@ export function objectsFromEvents(events: readonly RunEvent[]): ScanObject[] {
     out.push({ ...full, ...labelOf(full) });
   }
   return out;
+}
+
+const rowKey = (square: number, trackId: string) => `${square}:${trackId}`;
+const byTime = (p: readonly RunPosition[]) => {
+  const seen = new Set<string>();
+  return p
+    .slice()
+    .sort((a, b) => Date.parse(a.time) - Date.parse(b.time))
+    .filter((q) => (seen.has(q.time) ? false : (seen.add(q.time), true)));
+};
+
+/**
+ * Tracks the known-object check could not judge (#169): they have no `found` event, so they come
+ * from the results' rows, with their measured positions. Pure.
+ */
+export function uncheckedObjects(res: RunResults | null): ScanObject[] {
+  if (!res) return [];
+  return trackRowsOf(res)
+    .filter((t) => t.kind === 'unchecked')
+    .map((t) => {
+      const first = t.tracks[0];
+      const positions = byTime(t.positions);
+      return {
+        key: rowKey(first.square, first.track_id),
+        kind: 'unchecked' as const,
+        trackId: first.track_id,
+        squares: [...t.squares].sort((a, b) => a - b),
+        positions,
+        vMag: null,
+        rateDegDay: rateOf(positions),
+        title: `${first.track_id} · not checked`,
+        line: '',
+      };
+    });
+}
+
+/**
+ * Measured only (#170): every track as a neutral ring on its measured dots, named by its id and
+ * square, nothing else. From the results once they are read (every merged track carries its dots);
+ * before that, from the events that carry measured positions (a matched known object's event
+ * carries Horizons positions, so it waits for the results). Pure.
+ */
+export function measuredObjects(events: readonly RunEvent[], res: RunResults | null): ScanObject[] {
+  const asTrack = (key: string, trackId: string, squares: number[], p: readonly RunPosition[]) => {
+    const positions = byTime(p);
+    const s = [...new Set(squares)].sort((a, b) => a - b);
+    return {
+      key,
+      kind: 'track' as const,
+      trackId,
+      squares: s,
+      positions,
+      vMag: null,
+      rateDegDay: null,
+      title: trackId,
+      line: squaresText(s),
+    };
+  };
+  if (res)
+    return trackRowsOf(res)
+      .filter((t) => t.positions.length > 0)
+      .map((t) => {
+        const first = t.tracks[0];
+        return asTrack(
+          rowKey(first.square, first.track_id),
+          first.track_id,
+          t.squares,
+          t.positions,
+        );
+      });
+  const out = new Map<string, ScanObject>();
+  for (const e of events) {
+    const o = e.type === 'found' ? e.object : undefined;
+    if (!o || o.positions_tag !== 'measured' || !o.track_id || o.positions.length === 0) continue;
+    const key = rowKey(o.square, o.track_id);
+    if (!out.has(key)) out.set(key, asTrack(key, o.track_id, [o.square], o.positions));
+  }
+  return [...out.values()];
 }
 
 /** The objects shown: predicted-only ones only when asked (hidden by default). */
