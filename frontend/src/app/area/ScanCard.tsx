@@ -485,7 +485,12 @@ export function scanRows(res: RunResults, f: Filter): Row[] {
     return {
       key,
       num: first.track_id,
-      name: t.kind === 'unexplained' ? 'Unexplained track' : (t.designation ?? 'Found track'),
+      name:
+        t.kind === 'unexplained'
+          ? 'Unexplained track'
+          : t.kind === 'unchecked'
+            ? 'Not checked'
+            : (t.designation ?? 'Found track'),
       line: [
         r !== null ? `${r.toFixed(2)}°/day` : null,
         t.kind === 'unexplained' ? 'not in SkyBoT' : null,
