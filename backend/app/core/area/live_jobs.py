@@ -25,6 +25,7 @@ recorded in ``runs.RunStore`` with its timeline.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import threading
@@ -39,6 +40,7 @@ from app.cache.store import CacheMissOffline, UpstreamUnavailable
 from app.context import Context
 from app.core.area.live import Box, LiveAreaError, Plan, estimate_seconds, plan_area
 from app.core.area.runs import (
+    RunNotFound,
     RunStore,
     Snapshot,
     SquareReplies,
@@ -519,6 +521,23 @@ class LiveJobs:
             while len(self._results) > MAX_RESULTS:
                 del self._results[next(iter(self._results))]
         return run, merged
+
+    def close(self, timeout: float = 15.0) -> bool:
+        """Server shutdown: stop every queued, paused and running item, then wait for the
+        worker. A queued or paused item ends at once and its run is recorded ``stopped``; the
+        running one ends at its next check, which every queued cutout download makes, so the
+        downloads still waiting in its pool end at once. Without this the process could not
+        exit until every queued download had run (minutes when the archive is slow).
+        True when the worker has ended."""
+        with self._lock:
+            runs = [run_id for run_id, item in self._by_run.items() if isinstance(item, ScanJob)]
+            areas = [a for a, job in self._jobs.items() if job.state in ("queued", "running")]
+        for run_id in runs:
+            with contextlib.suppress(RunConflict, RunNotFound):  # it ended in between
+                self.stop(run_id)
+        for area_id in areas:
+            self.cancel(area_id)
+        return self.wait(timeout)
 
     def wait(self, timeout: float | None = None) -> bool:
         """Block until the queue is empty and the worker idle (tests). True when it is."""

@@ -181,3 +181,52 @@ def test_cutout_rejects_redirect_off_host(tmp_path: Path) -> None:
     with pytest.raises(UpstreamUnavailable, match="redirected off the IRSA host"):
         irsa_cutout.fetch_cutout(ctx, row, 10.0, 20.0)
     assert ctx.cache.get(irsa_cutout.key_for(ctx, row, 10.0, 20.0)) is None  # nothing cached
+
+
+# --- an answer that cannot be read is a failed call, never a cache entry (gap analysis, 14 Nov) ---
+
+
+def test_skybot_error_page_is_not_cached_and_the_next_call_asks_again(tmp_path: Path) -> None:
+    from datetime import UTC, datetime
+
+    meta, good = entries("skybot")[0]
+    answers = [
+        httpx.Response(200, content=b"<html><body>Service unavailable</body></html>"),
+        httpx.Response(int(meta["status"]), content=good),
+    ]
+    calls: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(str(request.url))
+        return answers[min(len(calls), len(answers)) - 1]
+
+    ctx = make_context(
+        make_settings(tmp_path, offline=False, http_retries=0),
+        transport=httpx.MockTransport(handler),
+    )
+    when = datetime(2026, 3, 20, tzinfo=UTC)
+    with pytest.raises(UpstreamUnavailable):
+        skybot.conesearch(ctx, 91.1, 13.4, 0.5, when)
+    # Nothing was kept: the same cone asks the service again and reads its real answer.
+    bodies, served = skybot.conesearch(ctx, 91.1, 13.4, 0.5, when)
+    assert len(calls) == 2 and not served.from_cache
+    assert any(b.name == "Eros" for b in bodies)
+    assert skybot.conesearch(ctx, 91.1, 13.4, 0.5, when)[1].from_cache
+
+
+def test_sbdb_error_page_is_not_cached(tmp_path: Path) -> None:
+    calls: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(str(request.url))
+        return httpx.Response(200, content=b"<html>Bad gateway</html>")
+
+    ctx = make_context(
+        make_settings(tmp_path, offline=False, http_retries=0),
+        transport=httpx.MockTransport(handler),
+    )
+    for _ in range(2):
+        with pytest.raises(UpstreamUnavailable):
+            sbdb.query(ctx, "433 Eros")
+    assert len(calls) == 2
+    assert ctx.cache.get(sbdb.sbdb_key("433 Eros")) is None
