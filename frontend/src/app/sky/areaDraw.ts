@@ -8,7 +8,7 @@ import {
   wrapRa,
   type SkyCamera,
 } from '@/viewer/sky/skyMath';
-import { useAreaStore, type AreaBox, type AreaDrag } from '@/app/shell/areaStore';
+import { useAreaStore, type AreaBox, type PixelRect } from '@/app/shell/areaStore';
 import { regionBox, selectionAt, type Selection } from '@/app/area/scanGrid';
 import { isFinished, runningScan, useScanStore, viewRegion } from '@/app/area/scanStore';
 import { getScanApi, RunGone } from '@/app/area/scanApi';
@@ -124,7 +124,7 @@ export function viewNow(): { cam: SkyCamera; width: number; height: number } | n
 }
 
 /** The set area's screen corners now (it follows the view), or null when a corner is behind. */
-export function boxToPixels(box: AreaBox): AreaDrag | null {
+export function boxToPixels(box: AreaBox): PixelRect | null {
   if (!access) return null;
   const cam = access.getView();
   const { width, height } = access.getSize();

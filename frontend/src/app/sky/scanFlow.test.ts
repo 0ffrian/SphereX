@@ -9,6 +9,7 @@ import { mockScanApi } from '@/app/area/scanMock';
 import { resetScans, useScanStore } from '@/app/area/scanStore';
 import {
   backToScan,
+  enterInArea,
   pickRegionAt,
   registerAreaView,
   reopenScan,
@@ -57,6 +58,20 @@ describe('selecting a region', () => {
     expect(cam.fovDeg).toBeCloseTo(6, 1);
     await flush();
     expect(useScanStore.getState().view).toMatchObject({ kind: 'offer', flow: 'discovery' });
+  });
+
+  it('Enter while aiming selects the region in the middle (the preview waits there)', async () => {
+    cam = { ra: 30, dec: 10, fovDeg: 17 };
+    enterInArea();
+    expect(useAreaStore.getState()).toMatchObject({ screen: 'scan', stage: 'set' });
+    expect(cam.ra).toBeCloseTo(30, 3);
+    expect(cam.dec).toBeCloseTo(10, 3);
+    await flush();
+    expect(useScanStore.getState().view).toMatchObject({ kind: 'offer' });
+    // Not aiming any more: Enter does nothing.
+    cam = { ra: 50, dec: 0, fovDeg: 17 };
+    enterInArea();
+    expect(cam.ra).toBe(50);
   });
 
   it('one square: the single-area flow, no scan', () => {

@@ -4633,15 +4633,6 @@ body {
   display: inline-block;
   flex: none;
 }
-.sx-area-size {
-  position: absolute;
-  left: 1px;
-  top: -20px;
-  font: 500 11px ui-monospace, monospace;
-  color: #4ade80;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
 .sx-kn-body {
   gap: 10px;
 }
@@ -5415,7 +5406,29 @@ body {
   top: calc(100% + 6px);
 }
 .sx-area-size {
+  position: absolute;
+  left: 1px;
   top: -18px;
+}
+/* On a phone the hint and the region's label wrap inside the screen (16 px gutters) instead of
+   running off it; the label is centred under the region (which waits in the middle on touch). */
+@media (max-width: 640px) {
+  .sx-aim b {
+    left: 50%;
+    transform: translateX(-50%);
+    width: max-content;
+    max-width: calc(100vw - 32px);
+    white-space: normal;
+    text-align: center;
+  }
+  .sx-area-hint {
+    width: max-content;
+    max-width: calc(100vw - 32px);
+    white-space: normal;
+    text-align: center;
+    justify-content: center;
+    border-radius: 16px;
+  }
 }
 /* The hint sits at the top centre of the sky on a desktop width (mock-up `.hint`). */
 @media (min-width: 641px) {

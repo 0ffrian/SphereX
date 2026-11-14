@@ -40,7 +40,7 @@ export interface AreaBox {
   heightDeg: number;
 }
 /** A rectangle in sky-pane pixels (a set area's corners on screen now). */
-export interface AreaDrag {
+export interface PixelRect {
   x0: number;
   y0: number;
   x1: number;

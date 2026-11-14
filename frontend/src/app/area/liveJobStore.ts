@@ -51,7 +51,7 @@ export interface LiveJobStoreState {
   stop(): Promise<void>;
   /** Try again after a failure: the coverage check again. */
   retry(): Promise<void>;
-  /** The card is gone (closed, Draw again, another flow): the job, if any, keeps running. */
+  /** The card is gone (closed, Choose another region, another flow): the job, if any, keeps running. */
   clearView(): void;
 }
 

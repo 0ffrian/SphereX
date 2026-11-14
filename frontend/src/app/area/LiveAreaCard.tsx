@@ -1,8 +1,8 @@
 // The live area card (issue #144, Q-462; mock-up states 3 to 6), for a box no prepared area holds:
-//   offer      the coverage check's plan: data, visit pair, frames, time; Compute this area or Draw again.
+//   offer      the coverage check's plan: data, visit pair, frames, time; Compute this area or Choose another region.
 //   computing  steps with check marks, a count and a bar on the current step, elapsed and remaining.
 //   waiting    another area is computing; this one starts next.
-//   failure    a status dot, a short title and one muted line; Try again (when it can help) or Draw again.
+//   failure    a status dot, a short title and one muted line; Try again (when it can help) or Choose another region.
 // Closing the card does not stop the job (liveJobStore): the area opens when it is ready.
 import { useEffect, useRef } from 'react';
 import { PanelCard } from '@/app/shell/PanelCard';
@@ -133,7 +133,7 @@ function VisitPicker({ plan, busy }: { plan: LivePlan; busy: boolean }) {
 function DrawAgain() {
   return (
     <button type="button" className="sx-btn-outline" onClick={() => useAreaStore.getState().redraw()} data-testid="live-draw-again">
-      Draw again
+      Choose another region
     </button>
   );
 }

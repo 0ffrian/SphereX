@@ -3,30 +3,33 @@
 // production build never carries it. `scan_ms=<ms>` sets the time per square, `scan_hold=<square>`
 // freezes the run while that square is analysing (screenshots).
 import { mockStatusAt, type LivePlan } from './liveAreaApi';
-import {
-  RunGone,
-  type FoundObject,
-  type RunEvent,
-  type RunKnownRow,
-  type RunPosition,
-  type RunRecord,
-  type RunResults,
-  type RunSquare,
-  type RunState,
-  type RunSummary,
-  type RunTotals,
-  type RunTrackRow,
-  type ScanApi,
-  type ScanBox,
-  type ScanKind,
-  type ScanPlan,
-  type ScanPlanAnswer,
-  type ScanPlanSquare,
-  type ScanRequest,
+import type {
+  FoundObject,
+  RunEvent,
+  RunKnownRow,
+  RunPosition,
+  RunRecord,
+  RunResults,
+  RunSquare,
+  RunState,
+  RunSummary,
+  RunTotals,
+  RunTrackRow,
+  ScanApi,
+  ScanBox,
+  ScanKind,
+  ScanPlan,
+  ScanPlanAnswer,
+  ScanPlanSquare,
+  ScanRequest,
 } from './scanApi';
+import { RunGone } from './scanErrors';
 import { gridShape, SQUARE_ESTIMATE_S, splitRegion, squareCentre } from './scanGrid';
 
 // ---- Mock (opt-in; invented test values) -------------------------------------------------------
+
+/** On every mock API object, so scripts/check-dist.js fails a production build that carries it. */
+export const SCAN_MOCK_MARKER = 'SX_DEV_ONLY_SCAN_MOCK';
 
 interface MockRun {
   id: string;
@@ -309,7 +312,8 @@ export function mockScanApi(
     if (!r) throw new RunGone(id);
     return r;
   };
-  return {
+  const api: ScanApi & { marker: string } = {
+    marker: SCAN_MOCK_MARKER,
     async plan(req) {
       return planOf(req);
     },
@@ -363,6 +367,7 @@ export function mockScanApi(
         .sort((a, b) => b.created_at.localeCompare(a.created_at));
     },
   };
+  return api;
 }
 
 /** A run's list row (`run-list.schema.json` RunSummary), from its record. Pure. */

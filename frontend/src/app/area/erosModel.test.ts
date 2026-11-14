@@ -1,14 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ErosDemo, ErosHop } from './areaService';
-import {
-  detectorIndex,
-  detectorsWithFrames,
-  isoToMjd,
-  mjdDay,
-  mjdHM,
-  mjdYear,
-  trackAt,
-} from './erosModel';
+import { detectorIndex, detectorsWithFrames, isoToMjd, mjdDay, mjdHM, mjdYear, trackAt } from './erosModel';
 
 const hop = (detector: string): ErosHop => ({ detector, mjd_avg: 1 }) as ErosHop;
 const eros = {

@@ -39,6 +39,7 @@ import type {
   ScanPlan as ContractScanPlan,
   ScanSquare,
 } from '@/contract';
+import { RunGone } from './scanErrors';
 import { scanMockFromEnv } from './scanMock';
 
 // ---- Types: #156's contract (`scan-plan`, `run`, `run-results` schemas; generated) ----------
@@ -78,13 +79,7 @@ export type ScanStartAnswer =
   | { kind: 'error'; code: ScanErrorCode; detail: string }
   | { kind: 'unavailable' };
 
-/** The server no longer knows the run (404 `run_not_found`). */
-export class RunGone extends Error {
-  constructor(runId: string) {
-    super(`No run '${runId}'.`);
-    this.name = 'RunGone';
-  }
-}
+export { RunGone };
 
 export interface ScanRequest extends ScanBox {
   kind: ScanKind;
