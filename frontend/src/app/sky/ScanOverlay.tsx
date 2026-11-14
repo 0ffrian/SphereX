@@ -7,12 +7,23 @@
 // button that opens its object in its square's results.
 // Issue #158: during a replay it draws the replayed run as it was at the replay time (replay.ts),
 // watch only: nothing opens, and each label says when the object was found.
+// Issue #170 (approved mock-up): a done square carries a tick and a skipped or failed one a cross
+// and a dashed edge, so colour is not the only sign; a track the known-object check could not judge
+// (#169) is a dotted amber ring; under Measured only (D-21) every track is the same neutral ring on
+// its measured dots, named by its id, and no known name, kind word or predicted path is drawn.
 import { useEffect, useLayoutEffect, useMemo, useRef, type KeyboardEvent } from 'react';
 import type { SkyView } from '@/viewer/sky/SkyView';
 import { useAreaStore } from '@/app/shell/areaStore';
 import { useShellStore } from '@/app/shell/shellStore';
 import { inQuad, regionBox, splitRegion, type GridSquare } from '@/app/area/scanGrid';
-import { objectsFromEvents, visibleObjects, type ScanObject } from '@/app/area/scanObjects';
+import {
+  measuredObjects,
+  objectsFromEvents,
+  uncheckedObjects,
+  visibleObjects,
+  type ScanObject,
+} from '@/app/area/scanObjects';
+import { useMeasuredOnly } from '@/app/area/measuredOnly';
 import { useScanStore, viewRegion, type ScanView } from '@/app/area/scanStore';
 import { useRunsStore } from '@/app/area/runsStore';
 import { clock, foundAtOf, recordAt } from '@/app/area/replay';
@@ -37,7 +48,11 @@ const KIND_TEXT: Record<ScanObject['kind'], string> = {
   known: 'known object found',
   unexplained: 'unexplained mover',
   predicted: 'predicted, not found',
+  unchecked: 'not checked against known objects',
+  track: 'measured track',
 };
+/** The square's number and, once it has ended, a sign that is not only its colour. */
+const SQUARE_SIGN: Partial<Record<Look, string>> = { done: ' ✓', skipped: ' ✕', failed: ' ✕' };
 
 /** The look of each square: plain while offered, else the record's state. */
 function looks(v: ScanView | null, n: number): Look[] {
@@ -105,9 +120,17 @@ export function ScanOverlay({ view }: { view: SkyView | null }) {
   const grid = useMemo(() => (region ? splitRegion(region) : null), [region]);
   const squareLooks = looks(scan, grid?.squares.length ?? 0);
   const events = scan?.kind === 'run' ? scan.record?.events : undefined;
+  const results = scan?.kind === 'run' ? scan.results : null;
+  const measured = useMeasuredOnly();
   const objects = useMemo(
-    () => visibleObjects(objectsFromEvents(events ?? []), showPredicted),
-    [events, showPredicted],
+    () =>
+      measured
+        ? measuredObjects(events ?? [], results)
+        : [
+            ...visibleObjects(objectsFromEvents(events ?? []), showPredicted),
+            ...uncheckedObjects(results),
+          ],
+    [events, results, showPredicted, measured],
   );
   const record = scan?.kind === 'run' ? scan.record : null;
   const flow = scan?.flow ?? 'discovery';
@@ -241,7 +264,7 @@ export function ScanOverlay({ view }: { view: SkyView | null }) {
       data-rows={grid.rows}
     >
       <defs>
-        {(['known', 'unexplained', 'predicted'] as const).map((k) => (
+        {(['known', 'unexplained', 'predicted', 'unchecked', 'track'] as const).map((k) => (
           <marker
             key={k}
             id={`sx-arr-${k}`}
@@ -266,7 +289,10 @@ export function ScanOverlay({ view }: { view: SkyView | null }) {
           >
             <polygon className="sx-scan-cell" />
             {squareLooks[i] === 'running' && <polygon className="sx-scan-pulse" />}
-            <text>{s.index}</text>
+            <text>
+              {s.index}
+              {SQUARE_SIGN[squareLooks[i]!] ?? ''}
+            </text>
           </g>
         ))}
       </g>

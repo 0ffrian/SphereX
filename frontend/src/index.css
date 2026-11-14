@@ -6069,6 +6069,8 @@ li[data-state='running'] > .sx-live-mk {
 :is([data-state='skipped'], [data-state='failed']) > .sx-scan-cell {
   fill: rgba(255, 77, 79, 0.06);
   stroke: rgba(255, 77, 79, 0.6);
+  /* #170: a dashed edge too, so a skipped square is not told from a done one by colour alone. */
+  stroke-dasharray: 6 4;
 }
 .sx-scan-pulse {
   fill: none;
@@ -6112,6 +6114,17 @@ li[data-state='running'] > .sx-live-mk {
 .sx-scan-obj[data-kind='predicted'] {
   --obj: var(--p-phys);
 }
+/* #169/#170: a track the known-object check could not judge: amber, dotted. */
+.sx-scan-obj[data-kind='unchecked'] {
+  --obj: var(--warn);
+}
+.sx-scan-obj[data-kind='unchecked'] circle {
+  stroke-dasharray: 2 2;
+}
+/* #170, Measured only: every track the same neutral ring, no verdict colour. */
+.sx-scan-obj[data-kind='track'] {
+  --obj: var(--fg);
+}
 .sx-scan-obj path {
   fill: none;
   stroke: var(--obj);
@@ -6151,6 +6164,12 @@ li[data-state='running'] > .sx-live-mk {
 .sx-scan-arr-predicted {
   fill: var(--p-phys);
 }
+.sx-scan-arr-unchecked {
+  fill: var(--warn);
+}
+.sx-scan-arr-track {
+  fill: var(--fg);
+}
 .sx-scan-mini {
   display: grid;
   gap: 3px;
@@ -6181,8 +6200,28 @@ li[data-state='running'] > .sx-live-mk {
 }
 .sx-scan-totals {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  /* Three totals, four with Not checked (#170), one at Measured only. */
+  grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
   gap: 8px;
+}
+.sx-scan-totals [data-tone='warn'] b {
+  color: var(--warn);
+}
+/* #170: where the positions come from (D-02), a tag and a label each. */
+.sx-scan-provtags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.sx-scan-provtags > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.sx-scan-why {
+  color: var(--muted);
 }
 .sx-scan-totals div {
   display: grid;
@@ -6414,6 +6453,9 @@ li[data-state='running'] > .sx-live-mk {
 .sx-runs-s [data-tone='fail'] {
   color: var(--fail);
 }
+.sx-runs-s [data-tone='warn'] {
+  color: var(--warn);
+}
 .sx-runs-play {
   flex: none;
   width: 36px;
@@ -6571,9 +6613,21 @@ li[data-state='running'] > .sx-live-mk {
 }
 .sx-replay-tick[data-kind='unexplained'] {
   background: var(--warn);
+  /* #170: shorter than a known object's mark, so the two differ by shape too. */
+  top: 11px;
+  height: 7px;
 }
 .sx-replay-tick[data-kind='skipped'] {
   background: var(--fail);
+  /* A diamond. */
+  top: 10px;
+  width: 7px;
+  height: 7px;
+  border-radius: 0;
+  transform: translateX(-50%) rotate(45deg);
+}
+.sx-replay-tick[data-kind='track'] {
+  background: var(--fg);
 }
 .sx-replay-knob {
   position: absolute;
@@ -6626,6 +6680,12 @@ li[data-state='running'] > .sx-live-mk {
   }
   .sx-replay-tick {
     top: 14px;
+  }
+  .sx-replay-tick[data-kind='unexplained'] {
+    top: 19px;
+  }
+  .sx-replay-tick[data-kind='skipped'] {
+    top: 18px;
   }
   .sx-replay-knob {
     top: 15px;
