@@ -1,7 +1,8 @@
-// A21.10 on the SYNTHETIC fixtures: the sky credit popover takes Escape in the capture phase (one
-// press closes it and nothing else), but never from a text field, and never while it is not drawn:
-// the build pane's split view hides the credit, so opening the pane closes the popover and the
-// pane's first Escape closes the pane. PR #165 review (round 1).
+// A21.10 on the SYNTHETIC fixtures: the sky credit popover takes Escape on `document` in the bubble
+// phase, so a menu or note with focus inside it closes first and alone; one press closes one thing.
+// It never takes Escape from a text field, and never while it is not drawn: the build pane's split
+// view hides the credit, so opening the pane closes the popover and the pane's first Escape closes
+// the pane. PR #165 review (rounds 1 and 2).
 import { expect, test, type Page } from '@playwright/test';
 
 async function skyReady(page: Page): Promise<void> {
@@ -57,9 +58,52 @@ test('Escape in the search field with the popover open: the field keeps it and i
   await input.pressSequentially('Er');
   await expect(input).toHaveAttribute('aria-expanded', 'true');
   await page.keyboard.press('Escape');
-  // As before the capture-phase listener: the list closes and focus stays in the field.
+  // The field keeps its Escape: the list closes and focus stays in the field.
   await expect(input).toHaveAttribute('aria-expanded', 'false');
   await expect(input).toBeFocused();
   await expect(input).toHaveValue('Er');
   await expect(box).toBeVisible();
+});
+
+test('the fps menu opened over the popover: one Escape closes the menu only', async ({ page }) => {
+  await skyReady(page);
+  await page.getByTestId('sky-credit-button').click();
+  const box = page.getByTestId('sky-credit-box');
+  await expect(box).toBeVisible();
+  // Open the menu from the keyboard (a pointer press outside the popover would close it).
+  await page.getByTestId('frame-rate-button').focus();
+  await page.keyboard.press('ArrowDown');
+  const menu = page.getByTestId('frame-rate-menu');
+  await expect(menu).toBeVisible();
+  await expect(box).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('frame-rate-button')).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.getByTestId('frame-rate-button')).toBeFocused();
+  await expect(box).toBeVisible();
+  await expect(page.getByTestId('sky-credit-button')).toHaveAttribute('aria-expanded', 'true');
+  // The next Escape closes the popover, focus back on its button.
+  await page.keyboard.press('Escape');
+  await expect(box).toBeHidden();
+  await expect(page.getByTestId('sky-credit-button')).toBeFocused();
+});
+
+test('the Estimated note inside the popover: one Escape hides the note, the next the popover', async ({
+  page,
+}) => {
+  await skyReady(page);
+  await page.getByTestId('sky-credit-button').click();
+  const box = page.getByTestId('sky-credit-box');
+  await expect(box).toBeVisible();
+  const badge = box.getByTestId('badge-estimated');
+  await badge.focus();
+  await page.keyboard.press('Enter');
+  const note = box.getByTestId('badge-estimated-note');
+  await expect(note).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(note).toHaveCount(0);
+  await expect(box).toBeVisible();
+  await expect(badge).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(box).toBeHidden();
+  await expect(page.getByTestId('sky-credit-button')).toBeFocused();
 });

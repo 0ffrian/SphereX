@@ -32,7 +32,7 @@ export function isShown(el: Element | null | undefined): boolean {
 }
 
 /**
- * Whether a popover that listens for Escape in the capture phase (the sky credit, A21.10) takes
+ * Whether a popover that listens for Escape on `document` (the sky credit, A21.10) takes
  * this press: only Escape, not one already handled, not from a text field (it keeps its own
  * Escape, Q-170 (1)), and only while the popover is drawn (a popover hidden by the split view must
  * not take the build pane's Escape).
