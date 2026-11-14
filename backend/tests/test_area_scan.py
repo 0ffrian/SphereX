@@ -170,9 +170,13 @@ def _replies(
     eros_at: float | None = None,
     mover_at: float | None = None,
     extra_known: str | None = None,
+    unchecked_at: float | None = None,
+    missing: tuple[str, ...] = (),
 ) -> dict[str, dict[str, Any]]:
-    """Hand-made stored replies of one area: 433 Eros found at RA ``eros_at`` and an
-    unexplained mover at ``mover_at`` (both on frame ``f1`` of the shared visit)."""
+    """Hand-made stored replies of one area: 433 Eros found at RA ``eros_at``, an unexplained
+    mover at ``mover_at`` and a mover the known-object check could not judge at
+    ``unchecked_at`` (``unchecked`` by ``skybot:1``; all on frame ``f1`` of the shared visit).
+    ``missing`` is the summary's list."""
     known: list[dict[str, Any]] = []
     tracks: list[dict[str, Any]] = []
     dots: list[dict[str, Any]] = []
@@ -215,10 +219,30 @@ def _replies(
                 "tracklets": [{"dot_ids": [f"{area}:2"]}],
             }
         )
+    if unchecked_at is not None:
+        dots.append(
+            {
+                "dot_id": f"{area}:3",
+                "frame_id": "f1",
+                "time": _iso(0),
+                "ra": unchecked_at,
+                "dec": 0.0,
+            }
+        )
+        tracks.append(
+            {
+                "track_id": "T3",
+                "verdict": "unchecked",
+                "match": None,
+                "unchecked_by": ["skybot:1"],
+                "tracklets": [{"dot_ids": [f"{area}:3"]}],
+            }
+        )
     if extra_known is not None:
         known.append(kn(extra_known, 1.0))
+    frames = [{"visit": 1, "time": _iso(0)}, {"visit": 2, "time": _iso(90)}]
     return {
-        "summary": {"frames": [{"visit": 1, "time": _iso(0)}, {"visit": 2, "time": _iso(90)}]},
+        "summary": {"frames": frames, "missing": list(missing)},
         "known": {"known": known},
         "tracks": {"tracks": tracks},
         "dots": {"visits": [{"visit": 1, "dots": dots}]},
@@ -232,6 +256,12 @@ class FakeStore:
     def entry(self, area_id: str, stage: str) -> Any:
         got = self.areas.get(area_id, {}).get(stage)
         return None if got is None else SimpleNamespace(body=json.dumps(got).encode())
+
+    def spectra_entry(self, area_id: str) -> Any:
+        return self.entry(area_id, "spectra")
+
+    def heads(self, area_id: str) -> list[Any]:
+        return []  # no cache roots: ensure_spectra has nothing to fill
 
 
 # --- the scan job -------------------------------------------------------------------------
@@ -293,8 +323,10 @@ def test_a_scan_runs_done_skipped_failed_and_reused_squares(tmp_path: Path) -> N
         "known": 2,
         "found": 1,
         "unexplained": 1,
+        "unchecked": 0,
         "squares_done": 2,
         "squares_skipped": 1,
+        "squares_failed": 1,
     }
     types = [(e["type"], e.get("square")) for e in run["events"] if e["type"] != "found"]
     assert types == [
@@ -491,7 +523,13 @@ def test_a_single_live_job_with_a_kind_is_a_run_of_one_square(tmp_path: Path) ->
     run = _run(jobs, job.run_id)
     assert (run["kind"], run["state"], run["region"]) == ("known", "done", plan.box.reply())
     assert run["squares"] == [
-        {"index": 1, "box": plan.box.reply(), "area_id": plan.area_id, "state": "done"}
+        {
+            "index": 1,
+            "box": plan.box.reply(),
+            "area_id": plan.area_id,
+            "state": "done",
+            "missing": [],  # Q-479: its known-object check did not fail
+        }
     ]
     assert run["totals"]["found"] == 1
     # Without a kind (the #141 callers), nothing is recorded.
@@ -1261,3 +1299,218 @@ def test_run_records_never_share_a_provenance_dict(tmp_path: Path) -> None:
     pa, pb = store._runs[a]["provenance"], store._runs[b]["provenance"]
     assert pa == pb == runs.RUN_PROVENANCE
     assert pa is not pb and pa["known_positions"] is not runs.RUN_PROVENANCE["known_positions"]
+
+
+# --- runs report failures honestly (issue #169: Q-479, Q-480, Q-481) -------------------------
+
+
+def test_an_unchecked_track_is_counted_listed_and_its_codes_kept(tmp_path: Path) -> None:
+    """Q-479: a SkyBoT cone that failed leaves a track ``unchecked``; the run counts it, lists
+    it with its codes, and each square carries the summary's skybot: and horizons: codes."""
+    p = scan.plan_scan(180.0, 0.0, 1.5, 1.5)  # one square
+    store = FakeStore()
+
+    def runner(ctx: Context, plan: Plan, prog: Progress) -> None:
+        store.areas[plan.area_id] = _replies(
+            plan.area_id,
+            eros_at=180.1,
+            unchecked_at=180.3,
+            missing=("checks:not_run", "horizons:2024 AB", "skybot:1"),
+        )
+
+    jobs = _scan_jobs(tmp_path, runner, store=store)
+    run_id = jobs.submit_scan(p, "discovery", RELEASE)
+    assert jobs.wait(10)
+    run = _run(jobs, run_id)
+    assert run["state"] == "done"
+    assert run["totals"]["unchecked"] == 1 and run["totals"]["found"] == 1
+    assert run["totals"]["unexplained"] == 0
+    assert run["squares"][0]["missing"] == ["horizons:2024 AB", "skybot:1"]
+    # No found event for the unchecked track: the replay is unchanged (Q-479).
+    found = [e["object"] for e in run["events"] if e["type"] == "found"]
+    assert {o.get("track_id") for o in found} == {"T1"}
+    got, merged = jobs.results(run_id)
+    reply = runs.results_reply(got, merged)
+    check(reply, "run-results.schema.json")
+    rows = {t["kind"]: t for t in reply["tracks"]}
+    assert rows["unchecked"]["unchecked_by"] == ["skybot:1"]
+    assert rows["unchecked"]["designation"] is None
+    assert "unchecked_by" not in rows["found"]
+    assert reply["squares"][0]["missing"] == ["horizons:2024 AB", "skybot:1"]
+
+
+def test_the_merged_kind_is_found_then_unexplained_then_unchecked() -> None:
+    """Q-479: a merged track is found when any member matched, else unexplained when any
+    member was checked, else unchecked; the unchecked members' codes stay on the row."""
+    _, boxes = _row_of_three()
+    mover = 180.3
+
+    def merged_of(a: dict[str, Any], b: dict[str, Any]) -> list[dict[str, Any]]:
+        sq = [
+            runs.SquareReplies(2, "live-000000000002", **_stages(a)),
+            runs.SquareReplies(3, "live-000000000003", **_stages(b)),
+        ]
+        tracks: list[dict[str, Any]] = runs.merge(boxes, sq)["tracks"]
+        return tracks
+
+    # unchecked + unchecked (the same mover in squares 2 and 3) -> unchecked
+    both = merged_of(_replies("a2", unchecked_at=mover), _replies("a3", unchecked_at=mover))
+    assert [(t["kind"], t["squares"], t["unchecked_by"]) for t in both] == [
+        ("unchecked", [2, 3], ["skybot:1"])
+    ]
+    # unchecked + unexplained -> unexplained, the failed check still named
+    mixed = merged_of(_replies("a2", unchecked_at=mover), _replies("a3", mover_at=mover))
+    assert [(t["kind"], t.get("unchecked_by")) for t in mixed] == [("unexplained", ["skybot:1"])]
+    # unchecked + found (same frame, 10 arcsec apart) -> found, no codes
+    near = mover + 10 / 3600
+    found = merged_of(_replies("a2", unchecked_at=mover), _replies("a3", eros_at=near))
+    assert [(t["kind"], t["designation"], t.get("unchecked_by")) for t in found] == [
+        ("found", "433 Eros", None)
+    ]
+
+
+def test_a_scan_whose_every_square_failed_ends_failed(tmp_path: Path) -> None:
+    """Q-480: not stopped, no square done, at least one failed -> failed."""
+    p = scan.plan_scan(180.0, 0.0, 3.0, 1.0)  # 2 squares
+
+    def planner(ctx: Context, box: Box) -> Plan:
+        raise RuntimeError("the frame search failed")
+
+    jobs = _scan_jobs(tmp_path, lambda ctx, plan, prog: None, planner=planner)
+    run_id = jobs.submit_scan(p, "discovery", RELEASE)
+    assert jobs.wait(10)
+    run = _run(jobs, run_id)
+    assert run["state"] == "failed"
+    assert [s["state"] for s in run["squares"]] == ["failed", "failed"]
+    assert run["totals"]["squares_failed"] == 2 and run["totals"]["squares_done"] == 0
+    assert run["events"][-1]["type"] == "run_done"
+
+
+def test_a_scan_with_a_square_done_and_one_failed_is_done(tmp_path: Path) -> None:
+    p = scan.plan_scan(180.0, 0.0, 3.0, 1.0)  # 2 squares
+    store = FakeStore()
+
+    def runner(ctx: Context, plan: Plan, prog: Progress) -> None:
+        if plan.box == p.squares[1].box:
+            raise LiveAreaError("area:frames_incomplete", "a cutout failed")
+        store.areas[plan.area_id] = _replies(plan.area_id, mover_at=180.0)
+
+    jobs = _scan_jobs(tmp_path, runner, store=store)
+    run_id = jobs.submit_scan(p, "discovery", RELEASE)
+    assert jobs.wait(10)
+    run = _run(jobs, run_id)
+    assert run["state"] == "done"
+    assert (run["totals"]["squares_done"], run["totals"]["squares_failed"]) == (1, 1)
+
+
+def test_a_scan_whose_every_square_was_skipped_is_done(tmp_path: Path) -> None:
+    p = scan.plan_scan(180.0, 0.0, 3.0, 1.0)  # 2 squares
+
+    def planner(ctx: Context, box: Box) -> Plan:
+        raise LiveAreaError("area:no_visit_pair", "not seen twice")
+
+    jobs = _scan_jobs(tmp_path, lambda ctx, plan, prog: None, planner=planner)
+    run_id = jobs.submit_scan(p, "discovery", RELEASE)
+    assert jobs.wait(10)
+    run = _run(jobs, run_id)
+    assert run["state"] == "done" and run["totals"]["squares_skipped"] == 2
+    assert run["totals"]["squares_failed"] == 0
+
+
+def test_a_run_recorded_before_q479_reads_unchecked_null(tmp_path: Path) -> None:
+    """An old record has no ``unchecked``: it reads null (never an invented 0), its
+    ``squares_failed`` is counted from its squares, and ``/v1/runs`` still passes its schema."""
+    root = tmp_path / "cache" / "runs"
+    store = runs.RunStore(root)
+    box = live.snap_box(180.0, 0.0, 1.0, 1.0)
+    run_id = store.create("discovery", RELEASE, box, [(1, box, None), (2, box, None)])
+    rec = store.get(run_id)
+    rec["state"] = "done"
+    rec["squares"][1]["state"] = "failed"
+    for k in ("unchecked", "squares_failed"):
+        rec["totals"].pop(k)
+    (root / f"{run_id}.json").write_text(json.dumps(rec))
+    app = create_app(make_settings(tmp_path / "cache", data_release=RELEASE))
+    with TestClient(app) as c:
+        listed = c.get("/v1/runs")
+        assert listed.status_code == 200
+        check(listed.json(), "run-list.schema.json")
+        totals = listed.json()["runs"][0]["totals"]
+        assert totals["unchecked"] is None and totals["squares_failed"] == 1
+        got = c.get(f"/v1/runs/{run_id}").json()
+        check(got, "run.schema.json")
+    on_disk = json.loads((root / f"{run_id}.json").read_text())
+    assert on_disk["totals"]["unchecked"] is None  # written back once
+
+
+def test_a_stored_area_whose_check_failed_is_computed_again_once(tmp_path: Path) -> None:
+    """Q-481: a stored area whose summary lists a skybot: code is computed again on the next
+    start; within the cooldown it is reused, as it is offline."""
+    store = FakeStore()
+    plan = _plan_of(live.snap_box(10.0, 10.0, 0.5, 0.5))
+    store.areas[plan.area_id] = _replies(plan.area_id, unchecked_at=10.0, missing=("skybot:1",))
+    ran: list[str] = []
+
+    def runner(ctx: Context, pl: Plan, prog: Progress) -> None:  # SkyBoT fails again
+        ran.append(pl.area_id)
+
+    jobs = LiveJobs(_ctx(tmp_path, offline=False), runner, store=store)
+    assert not jobs.reusable(plan.area_id)
+    jobs.submit(plan, kind="discovery")
+    assert jobs.wait(10)
+    assert ran == [plan.area_id]
+    assert jobs.reusable(plan.area_id)  # rechecked: the cooldown holds
+    jobs.submit(plan, kind="discovery")
+    assert jobs.wait(10)
+    assert ran == [plan.area_id]  # not repeated within the cooldown
+    offline = LiveJobs(_ctx(tmp_path), runner, store=store)
+    assert offline.reusable(plan.area_id)  # offline a recheck could only fail again
+
+
+def test_a_recheck_loses_the_codes_when_skybot_answers(tmp_path: Path) -> None:
+    p = scan.plan_scan(180.0, 0.0, 1.5, 1.5)  # one square
+    store = FakeStore()
+    area_id = _plan_of(p.squares[0].box).area_id
+    store.areas[area_id] = _replies(area_id, unchecked_at=180.3, missing=("skybot:1",))
+    ran: list[int] = []
+
+    def runner(ctx: Context, plan: Plan, prog: Progress) -> None:  # SkyBoT answers this time
+        ran.append(1)
+        store.areas[plan.area_id] = _replies(plan.area_id, mover_at=180.3)
+
+    jobs = LiveJobs(
+        _ctx(tmp_path, offline=False),
+        runner,
+        planner=lambda ctx, box: _plan_of(box),
+        store=store,
+    )
+    run_id = jobs.submit_scan(p, "discovery", RELEASE, stored={1: area_id})
+    assert jobs.wait(10)
+    run = _run(jobs, run_id)
+    assert ran == [1]
+    assert run["squares"][0]["missing"] == []
+    assert (run["totals"]["unchecked"], run["totals"]["unexplained"]) == (0, 1)
+
+
+def test_results_are_merged_again_after_an_area_is_stored_again(tmp_path: Path) -> None:
+    """Q-481: a recompute stores an area again; every kept merge is dropped, so a run's
+    ``/results`` show the area's current result."""
+    store = FakeStore()
+    plan = _plan_of(live.snap_box(10.0, 10.0, 0.5, 0.5))
+    first_pass = [True]
+
+    def runner(ctx: Context, pl: Plan, prog: Progress) -> None:
+        if first_pass[0]:  # SkyBoT fails: stored with the code
+            first_pass[0] = False
+            missing = ("skybot:1",)
+            store.areas[pl.area_id] = _replies(pl.area_id, unchecked_at=10.0, missing=missing)
+        else:  # the recheck: SkyBoT answers
+            store.areas[pl.area_id] = _replies(pl.area_id, mover_at=10.0)
+
+    jobs = LiveJobs(_ctx(tmp_path, offline=False), runner, store=store)
+    first = jobs.submit(plan, kind="discovery")
+    assert jobs.wait(10) and first.run_id is not None
+    assert [t["kind"] for t in jobs.results(first.run_id)[1]["tracks"]] == ["unchecked"]
+    jobs.submit(plan, kind="discovery")  # the recheck (first start was not a recheck)
+    assert jobs.wait(10)
+    assert [t["kind"] for t in jobs.results(first.run_id)[1]["tracks"]] == ["unexplained"]

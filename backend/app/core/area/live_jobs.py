@@ -20,7 +20,14 @@ on the same worker: skipped without a visit pair, done at once when stored, else
 square is marked and the scan goes on. A pause takes effect after the current square and the
 paused scan leaves the worker; resume queues it again at the back; stop is at the next
 check. **Runs (Q-471):** every scan, and every single job submitted with a ``kind``, is
-recorded in ``runs.RunStore`` with its timeline.
+recorded in ``runs.RunStore`` with its timeline. A scan ends ``failed`` when it was not
+stopped, no square is done and at least one failed (Q-480).
+
+**Honest failures (Q-481):** a cutout that fails gets a second pass (``CUTOUT_SECOND_PASS_S``)
+within a failure budget; a stored area is reused only when it is ``reusable`` (its known-object
+check did not fail, or it was rechecked within ``RECHECK_COOLDOWN_S``, or the server is
+offline), else it is computed again; a reused area missing its ``spectra`` stage gets it here,
+in the worker (``ensure_spectra``), never in a request (A16.2).
 """
 
 from __future__ import annotations
@@ -28,14 +35,15 @@ from __future__ import annotations
 import contextlib
 import json
 import logging
+import re
 import threading
 import time
 from collections import deque
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
-from app.adapters.http import UpstreamError
+from app.adapters.http import NetworkDisabled, UpstreamError
 from app.cache.store import CacheMissOffline, UpstreamUnavailable
 from app.context import Context
 from app.core.area.live import Box, LiveAreaError, Plan, estimate_seconds, plan_area
@@ -44,6 +52,7 @@ from app.core.area.runs import (
     RunStore,
     Snapshot,
     SquareReplies,
+    check_codes,
     merge,
     read_square,
     square_boxes,
@@ -74,6 +83,23 @@ MAX_FINISHED = 50
 # Merged results kept per run (``results``), keyed by the squares done, so polling
 # ``/v1/runs/{id}/results`` does not re-read and re-merge every stored square each time.
 MAX_RESULTS = 16
+# The second pass of a failed cutout (Q-481): the waits before each new attempt, after the
+# HTTP policy's own retries (1, 2 and 4 s) gave up. The archive's 503s last longer than those
+# 7 s but pass within a minute (issue #169: a failed cutout answered 200 15.7 s later). An
+# engineering choice, not a physical value; tests set it to zeros.
+CUTOUT_SECOND_PASS_S: tuple[float, ...] = (5.0, 15.0, 30.0)
+# The failure budget of one square (Q-481): failed cutouts are retried only while at most this
+# many have failed (the larger of the two); past it the archive is taken to be down and every
+# waiting retry gives up at once, so the square fails as fast as before.
+CUTOUT_RETRY_BUDGET_MIN = 2
+CUTOUT_RETRY_BUDGET_FRAC = 0.25
+# A stored area whose known-object check failed is computed again at most once per this many
+# seconds per process (Q-481), so a lasting Horizons or SkyBoT failure cannot make every start
+# a full recompute. Same as ``live_failure_ttl_s``.
+RECHECK_COOLDOWN_S = 600.0
+_WAIT_SLICE_S = 0.25  # how often a second-pass wait looks at the give-up flag
+SPECTRA_INPUTS = ("summary", "dots", "tracks")  # the stored stages the spectrum check reads
+_CLIENT_ERROR = re.compile(r"HTTP 4(?!29)[0-9]{2}$")  # the http adapter's last-status text
 
 
 class QueueFull(Exception):
@@ -156,6 +182,11 @@ class Progress:
             j.steps[name].state = "running"
             j.step = name
 
+    def wait(self, seconds: float) -> None:
+        """Sleep up to ``seconds``; a stop ends the wait at once with ``Cancelled``."""
+        if self._job.cancel.wait(max(0.0, seconds)):
+            raise Cancelled()
+
     def count(self, done: int, total: int | None = None) -> None:
         self.check()
         with self._lock:
@@ -185,10 +216,38 @@ def run_live_area(ctx: Context, plan: Plan, progress: Progress) -> None:
     live = area_frames.live_fetch(ctx)
     lock = threading.Lock()
     fetched = [0]
+    failed = [0]  # cutouts that failed at least once (the failure budget, Q-481)
+    budget = max(CUTOUT_RETRY_BUDGET_MIN, int(CUTOUT_RETRY_BUDGET_FRAC * plan.n_frames))
+    give_up = threading.Event()
 
     def fetch(row: Any, cut: Any) -> tuple[str, bytes]:
-        progress.check()
-        got = live(row, cut)
+        # The second pass (Q-481): a failure worth retrying waits CUTOUT_SECOND_PASS_S and asks
+        # again, while the square's failures stay within the budget. The count moves only on
+        # a success, so the step count never goes backwards.
+        waits = iter(CUTOUT_SECOND_PASS_S)
+        first = True
+        while True:
+            progress.check()
+            try:
+                got = live(row, cut)
+                break
+            except (CacheMissOffline, UpstreamUnavailable, UpstreamError, OSError) as exc:
+                if not cutout_retryable(exc) or give_up.is_set():
+                    raise
+                if first:
+                    first = False
+                    with lock:
+                        failed[0] += 1
+                        over = failed[0] > budget
+                    if over:
+                        give_up.set()
+                        raise
+                wait = next(waits, None)
+                if wait is None:
+                    raise
+                _second_pass_wait(progress, wait, give_up)
+                if give_up.is_set():
+                    raise
         with lock:
             fetched[0] += 1
             n = fetched[0]
@@ -228,6 +287,29 @@ def run_live_area(ctx: Context, plan: Plan, progress: Progress) -> None:
         spectrum.store_prepared(ctx.cache, spec.data_release, prepared.params_hash, prepared.bodies)
     except Exception:
         log.exception("live area %s: the spectrum check failed; /spectra is not prepared", spec.id)
+
+
+def cutout_retryable(exc: BaseException) -> bool:
+    """A failed cutout worth a second pass (Q-481): not an offline miss or a refused network
+    (they cannot change), and not a client error (HTTP 4xx other than 429) from the archive.
+    The cache wraps the adapter's error, so its ``__cause__`` is looked at too."""
+    for e in (exc, exc.__cause__):
+        if isinstance(e, (CacheMissOffline, NetworkDisabled)):
+            return False
+        if isinstance(e, UpstreamError) and _CLIENT_ERROR.search(str(e)):
+            return False
+    return True
+
+
+def _second_pass_wait(progress: Progress, seconds: float, give_up: threading.Event) -> None:
+    """Wait ``seconds`` before a second-pass attempt; a stop raises ``Cancelled`` at once and a
+    spent failure budget (``give_up``) ends the wait early."""
+    deadline = time.monotonic() + seconds
+    while not give_up.is_set():
+        left = deadline - time.monotonic()
+        if left <= 0:
+            return
+        progress.wait(min(left, _WAIT_SLICE_S))
 
 
 def _error_of(exc: BaseException) -> tuple[str, str]:
@@ -293,6 +375,10 @@ Planner = Callable[[Context, Box], Plan]
 class _Stage(Protocol):
     def entry(self, area_id: str, stage: str) -> Any: ...
 
+    def spectra_entry(self, area_id: str) -> Any: ...
+
+    def heads(self, area_id: str) -> Sequence[tuple[Any, str, Mapping[str, Any]]]: ...
+
 
 def _default_planner(ctx: Context, box: Box) -> Plan:
     return plan_area(ctx, box)
@@ -328,6 +414,64 @@ class LiveJobs:
         self._running: QueueItem | None = None
         self._results_lock = threading.Lock()
         self._results: dict[str, tuple[tuple[tuple[int, str], ...], dict[str, Any]]] = {}
+        self._rechecked: dict[str, float] = {}  # area id -> monotonic start of its recheck
+
+    # --- stored areas (Q-481) -----------------------------------------------------------
+
+    def reusable(self, area_id: str | None) -> bool:
+        """A stored area that needs no new computation: its summary lists no ``skybot:`` or
+        ``horizons:`` code, or it was rechecked less than ``RECHECK_COOLDOWN_S`` ago, or the
+        server is offline (a recheck would only fail again). Reads the store only."""
+        summary = None if area_id is None else self._read(area_id, "summary")
+        if summary is None:
+            return False
+        if self.ctx.settings.offline or not check_codes(summary.get("missing", [])):
+            return True
+        assert area_id is not None
+        with self._lock:
+            since = self._rechecked.get(area_id)
+        return since is not None and time.monotonic() - since < RECHECK_COOLDOWN_S
+
+    def _mark_recheck(self, area_id: str) -> None:
+        """A stored area is about to be computed again: no other recheck for the cooldown."""
+        if self._stored(area_id):
+            with self._lock:
+                self._rechecked[area_id] = time.monotonic()
+
+    def ensure_spectra(self, area_id: str) -> None:
+        """Fill a stored area's missing ``spectra`` stage (Q-474, Q-481) from its stored
+        ``summary``, ``dots`` and ``tracks``, as ``scripts/area_spectra.py`` does. Worker only:
+        the check never runs in a request (A16.2). Written only into the app's own cache (the
+        committed pack is read only); a failure is logged and never fails the job."""
+        try:
+            if self.store.spectra_entry(area_id) is not None:
+                return
+            from app.core.area import spectrum
+            from app.core.area.config import area_key
+
+            for root, release, head in self.store.heads(area_id):
+                p = str(head["params_hash"])
+                bodies = {s: root.get(area_key(release, area_id, s, p)) for s in SPECTRA_INPUTS}
+                if bodies["summary"] is None:
+                    continue  # not the head the store serves (as ``spectra_entry``)
+                if root is not self.ctx.cache:
+                    log.warning("area %s: no spectra, and its head is not in the cache", area_id)
+                    return
+                if any(b is None for b in bodies.values()):
+                    log.warning("area %s: no spectra, and a stored stage is missing", area_id)
+                    return
+                spectrum.store_prepared(
+                    root, release, p, {s: b.body for s, b in bodies.items() if b is not None}
+                )
+                log.info("area %s: spectra stage filled", area_id)
+                return
+        except Exception:
+            log.exception("area %s: the spectrum check failed; /spectra is not prepared", area_id)
+
+    def _forget_results(self) -> None:
+        """An area was stored (maybe again): every kept merge may be out of date (Q-481)."""
+        with self._results_lock:
+            self._results.clear()
 
     # --- single live areas --------------------------------------------------------------
 
@@ -338,7 +482,8 @@ class LiveJobs:
     def submit(self, plan: Plan, kind: str | None = None) -> Job:
         """Queue a plan; a single job for the area already queued or running (and not
         stopped) is returned as it is. A done job is run again: the caller checks the store
-        first, so a done job reaching here means its stored area is gone. A stopped job that
+        first, so a done job reaching here means its stored area is gone, needs a recheck or
+        lacks its spectra stage (Q-481; the worker decides which). A stopped job that
         is still winding down, or a scan's square computing the area, is replaced here by a
         fresh job queued after it: once the square is stored the fresh job is done at once
         with nothing recomputed, and if the scan is stopped first it computes the area itself.
@@ -620,6 +765,7 @@ class LiveJobs:
             event="square_done",
             objects=square_objects(cache[index]),
             totals=totals_of(merged, record["squares"]),
+            missing=cache[index].missing,
         )
 
     def _square_failed(
@@ -666,9 +812,15 @@ class LiveJobs:
                 write=False,
             )
         try:
-            # Stored meanwhile (by a scan's square, say): done at once, nothing is recomputed.
-            if not self._stored(job.area_id):
+            # Stored meanwhile (by a scan's square, say) and reusable: done at once, nothing is
+            # recomputed but a missing spectra stage. A stored area whose known-object check
+            # failed is computed again; the old result is served until the new one is stored.
+            if self.reusable(job.area_id):
+                self.ensure_spectra(job.area_id)
+            else:
+                self._mark_recheck(job.area_id)
                 self._runner(self.ctx, job.plan, Progress(job, self._lock))
+                self._forget_results()
         except BaseException as exc:
             if not isinstance(exc, (Cancelled, LiveAreaError)):
                 log.exception("live area %s failed", job.area_id)
@@ -692,7 +844,8 @@ class LiveJobs:
             self.runs.square, run_id, sq.index, "running", event="square_started", write=False
         )
         area_id = scan.stored.get(sq.index)
-        if not self._stored(area_id):  # the plan's stored area: no SIA call (Q-470)
+        computed = False
+        if not self.reusable(area_id):  # the plan's stored area: no SIA call (Q-470)
             try:
                 plan = self._planner(self.ctx, sq.box)
             except BaseException as exc:
@@ -701,9 +854,14 @@ class LiveJobs:
                 self._record(self._square_failed, run_id, sq.index, exc)
                 return "next"
             area_id = plan.area_id
-            if not self._stored(area_id) and not self._compute(scan, sq, plan):
-                return "stop" if scan.cancel.is_set() else "next"
+            if not self.reusable(area_id):  # not stored, or its known-object check failed
+                self._mark_recheck(area_id)
+                if not self._compute(scan, sq, plan):
+                    return "stop" if scan.cancel.is_set() else "next"
+                computed = True
         assert area_id is not None
+        if not computed:
+            self.ensure_spectra(area_id)
         self._record(self._square_done, run_id, sq.index, area_id, scan.cache)
         return "next"
 
@@ -742,6 +900,7 @@ class LiveJobs:
         finally:
             with self._lock:
                 scan.current = None
+        self._forget_results()
         self._finish_job(inner, "done")
         return True
 
@@ -781,15 +940,26 @@ class LiveJobs:
                 self._by_run.pop(run_id, None)
             self._record(self.runs.set_state, run_id, "failed", "run_done")
             return
+        # Q-480: a scan that was not stopped ends failed when no square is done and at least
+        # one failed (every square skipped is done: searched, nothing to compute).
+        states = self._square_states(run_id)
         with self._lock:
             stopped = scan.cancel.is_set()
-            scan.state = "stopped" if stopped else "done"
+            failed = not stopped and "done" not in states and "failed" in states
+            scan.state = "stopped" if stopped else "failed" if failed else "done"
             scan.current_square = None
             self._by_run.pop(run_id, None)
         if stopped:
             self._record(self.runs.set_state, run_id, "stopped", "run_stopped")
         else:
-            self._record(self.runs.set_state, run_id, "done", "run_done")
+            self._record(self.runs.set_state, run_id, scan.state, "run_done")
+
+    def _square_states(self, run_id: str) -> list[str]:
+        try:
+            return [str(s["state"]) for s in self.runs.get(run_id)["squares"]]
+        except Exception:  # an unreadable record must not stop the queue
+            log.exception("scan %s: cannot read its squares", run_id)
+            return []
 
     def _prune(self) -> None:
         """Forget the oldest finished jobs beyond ``MAX_FINISHED`` (call with the lock held)."""
@@ -858,7 +1028,9 @@ def done_reply(area_id: str) -> dict[str, Any]:
 
 
 __all__ = [
+    "CUTOUT_SECOND_PASS_S",
     "MAX_WAITING",
+    "RECHECK_COOLDOWN_S",
     "STEPS",
     "Cancelled",
     "Job",
@@ -867,6 +1039,7 @@ __all__ = [
     "QueueFull",
     "RunConflict",
     "ScanJob",
+    "cutout_retryable",
     "done_reply",
     "run_live_area",
 ]
