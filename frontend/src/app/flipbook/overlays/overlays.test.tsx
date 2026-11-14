@@ -426,8 +426,9 @@ describe('overlay components', () => {
     const missing = q('overlay-missing')!.textContent!;
     expect(missing).toContain('WISE source positions are not available for this object');
     expect(missing).toContain('1 frame with no detector footprint on record');
-    // Unknown codes are shown as is.
-    expect(missing).toContain('brand_new');
+    // Unknown codes get generic words, never the raw code.
+    expect(missing).toContain('not used for another reason');
+    expect(missing).not.toContain('brand_new');
   });
 
   it('fixture data wears Fixture badges, never Measured', () => {
