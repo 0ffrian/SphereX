@@ -340,4 +340,41 @@ describe('the spectrum chart', () => {
       expect(Number(bar.getAttribute('y1'))).toBeLessThanOrEqual(axisY + 1e-6);
     expect(host.querySelectorAll('[data-testid="spectrum-errbar"]').length).toBeGreaterThan(0);
   });
+
+  it('#173: possible tracks are hidden until "Show possible (n)" is pressed', async () => {
+    const disc = realDisc();
+    const i = disc.movers.findIndex((m) => m.track);
+    const m0 = disc.movers[i]!;
+    disc.movers[i] = { ...m0, track: { ...m0.track!, verdict: 'possible' } };
+    useAreaStore.setState({ box, disc, screen: 'disc', step: disc.steps.length - 1, running: false });
+    await act(async () => root.render(<DiscoveryCard />));
+    const row = () => host.querySelector(`[data-testid="disc-mover-${m0.id}"]`);
+    expect(row()).toBeNull();
+    const btn = host.querySelector<HTMLButtonElement>('[data-testid="disc-show-possible"]')!;
+    expect(btn.textContent).toBe('Show possible (1)');
+    expect(btn.getAttribute('aria-pressed')).toBe('false');
+    await act(async () => btn.click());
+    expect(row()).not.toBeNull();
+    expect(btn.getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('#173: a single square\'s list has a ← back to your patch, which folds the card away', async () => {
+    useAreaStore.setState({ box, disc: realDisc(), screen: 'disc', step: 4, running: false });
+    await act(async () => root.render(<DiscoveryCard />));
+    const back = host.querySelector<HTMLButtonElement>('[data-testid="area-back"]')!;
+    expect(back.getAttribute('aria-label')).toBe('Back to your patch');
+    await act(async () => back.click());
+    expect(useAreaStore.getState().minimised).toBe(true);
+  });
+
+  it('#173: a track\'s ← goes back to the Discovery list; Escape does the same', async () => {
+    useAreaStore.setState({ box, disc: realDisc(), screen: 'mover', sel: 0, step: 4 });
+    await act(async () => root.render(<MoverCard />));
+    const back = host.querySelector<HTMLButtonElement>('[data-testid="area-back"]')!;
+    expect(back.getAttribute('aria-label')).toBe('Back to the Discovery list');
+    await act(async () => {
+      back.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    });
+    expect(useAreaStore.getState().screen).toBe('disc');
+  });
 });

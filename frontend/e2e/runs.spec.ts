@@ -271,3 +271,40 @@ test('a row opens the run: the scan card shows its combined results', async ({ p
 function pick(o: { kind: string; designation?: string; track_id?: string; square?: number }) {
   return o.designation ?? `${o.square}:${o.track_id}`;
 }
+
+test('#173: in a replay the dock becomes the player, ← replaces the frame player, rings play on the analysing square', async ({
+  page,
+}) => {
+  await open(page);
+  await page.getByTestId('runs-button').click();
+  await page.locator(`[data-run="${DONE.run_id}"]`).getByTestId('runs-play').click();
+  const dock = page.getByTestId('sky-dock');
+  await expect(dock).toHaveAttribute('data-replay', '');
+  await expect(dock.getByTestId('replay-bar')).toBeVisible();
+  await expect(dock.getByTestId('tool-area')).toHaveCount(0);
+  const back = page.getByTestId('replay-back');
+  await expect(back).toHaveAccessibleName('Back: end the replay');
+  await expect(page.locator('.sx-player')).toHaveCount(0);
+  await page.waitForTimeout(1300);
+
+  // Pause, then step to 1 % of the run: square 1 is analysing (it starts at 0.03 s).
+  await page.getByTestId('replay-play').click();
+  const tl = page.getByTestId('replay-timeline');
+  await tl.focus();
+  await page.keyboard.press('Home');
+  await page.keyboard.press('ArrowRight');
+  await expect(page.getByTestId('scan-square-1')).toHaveAttribute('data-state', 'running');
+  const rings = page.getByTestId('scan-rings');
+  await expect(rings).not.toHaveAttribute('data-active', 'true');
+  await page.getByTestId('replay-speed-1').click();
+  await page.getByTestId('replay-play').click();
+  await expect(rings).toHaveAttribute('data-active', 'true');
+  await expect.poll(() => rings.locator('circle:not([display])').count()).toBeGreaterThan(2);
+  await page.screenshot({ path: 'test-results/173-replay-rings.png' });
+
+  await back.click();
+  await expect(page.getByTestId('replay-tag')).toHaveCount(0);
+  await expect(dock).not.toHaveAttribute('data-replay', '');
+  await expect(page.getByTestId('runs-button')).toBeFocused();
+  await expect(page.locator('.sx-player')).toHaveCount(1);
+});

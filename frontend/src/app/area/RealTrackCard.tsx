@@ -7,6 +7,7 @@
 // Build it builds it from its catalogue data. A track no known object explains has no orbit: Track
 // it says so and is off; Build it builds a placeholder from what was measured (buildFrom.ts).
 import { ProvenanceBadge } from '@/app/Badge';
+import { Row, Rows } from '@/app/PanelControls';
 import { PanelCard } from '@/app/shell/PanelCard';
 import { DEMO_OBJECT_ID, useAreaStore } from '@/app/shell/areaStore';
 import { useShellStore } from '@/app/shell/shellStore';
@@ -15,6 +16,7 @@ import { splitDesignation, type KnownObject } from './areaService';
 import { Alert, BoxIcon, RouteIcon } from './areaBits';
 import { buildKnown, buildPlaceholder } from './buildFrom';
 import { areaTrackLabel, matchName } from './realArea';
+import type { AreaBack } from './areaBack';
 import { middleTime } from './trackJobStore';
 import type { AreaSpectra, TrackSpectrum } from './spectraApi';
 import { SpectrumFacts, SpectrumHow, SpectrumSection, SpectrumVerdictLine } from './SpectrumCard';
@@ -78,7 +80,8 @@ export function RealTrackCard({
   summary: Pick<AreaSummary, 'frames'> | null;
   areaId: string;
   release: string;
-  back: () => void;
+  /** The card's ← (#173): back to the list it was opened from. */
+  back: AreaBack | null;
   /**
    * The track's spectrum check (A18.7, issue #162) with the area's reply and a dot lookup; null when
    * the area has none (not run, not loaded, or the demo).
@@ -104,8 +107,10 @@ export function RealTrackCard({
   return (
     <PanelCard
       title={areaTrackLabel(t)}
-      subtitle={VERDICT[t.verdict]}
+      // The verdict line says what it is; without one (no spectrum, or Measured only) a short line does.
+      subtitle={spectrum && !spectrum.measuredOnly ? undefined : VERDICT[t.verdict]}
       onClose={closePanel}
+      back={back}
       onMinimise={() => useAreaStore.getState().setMinimised(true)}
       returnFocusTo='[data-testid="tool-area"]'
       testId="area-card"
@@ -120,6 +125,7 @@ export function RealTrackCard({
             fixture={synthetic}
           />
         )}
+        {/* #173: three facts up top (colour, visits, steadiness); the rest folds away. */}
         <dl className="sx-tr">
           {spectrum && (
             <SpectrumFacts spectrum={spectrum.track} spectra={spectrum.spectra} measuredOnly={spectrum.measuredOnly} />
@@ -128,25 +134,6 @@ export function RealTrackCard({
           <dd>
             {t.visits.join(' and ')} · {nDots} dot{nDots === 1 ? '' : 's'}
           </dd>
-          <dt>Rate</dt>
-          <dd>
-            {t.rate_deg_day !== null ? `${t.rate_deg_day.toFixed(3)}°/day` : 'not given'}
-            {t.pa_deg !== null ? `, ${t.pa_deg.toFixed(0)}° east of north` : ''}
-          </dd>
-          <dt>Known</dt>
-          <dd data-testid="track-known">
-            {t.match
-              ? `${matchName(t.match)}${t.match.median_sep_px !== null ? ` · ${t.match.median_sep_px.toFixed(2)} px from predicted` : ''}`
-              : t.verdict === 'unchecked'
-                ? 'not checked'
-                : 'none on file (SkyBoT)'}
-          </dd>
-          {t.unchecked_by.length > 0 && (
-            <>
-              <dt>Not checked by</dt>
-              <dd>{t.unchecked_by.join(', ')}</dd>
-            </>
-          )}
         </dl>
         <div className="sx-tags">
           <ProvenanceBadge tag={provenance.tracks.tag} tooltip={tip(provenance.tracks)} fixture={synthetic} />
@@ -158,9 +145,7 @@ export function RealTrackCard({
             </span>
           )}
         </div>
-        {!obj && <p className="sx-live-m">{NO_ORBIT_NOTE}</p>}
         {obj && !obj.objectId && <Alert tone="warn" title="No JPL id" line="Its Track cannot be computed here." />}
-        {spectrum && <SpectrumHow spectrum={spectrum.track} spectra={spectrum.spectra} flags={spectrum.flags} />}
         <div className="sx-live-btns">
           <button
             type="button"
@@ -182,10 +167,36 @@ export function RealTrackCard({
             <BoxIcon />
             Build it
           </button>
-          <button type="button" className="sx-btn-outline" onClick={back} data-testid="area-back">
-            Back to the results
-          </button>
         </div>
+        <div className="sx-sp-acc">
+          <Rows>
+            <Row title="Motion and match" testId="track-details">
+              <dl className="sx-tr">
+                <dt>Rate</dt>
+                <dd>
+                  {t.rate_deg_day !== null ? `${t.rate_deg_day.toFixed(3)}°/day` : 'not given'}
+                  {t.pa_deg !== null ? `, ${t.pa_deg.toFixed(0)}° east of north` : ''}
+                </dd>
+                <dt>Known</dt>
+                <dd data-testid="track-known">
+                  {t.match
+                    ? `${matchName(t.match)}${t.match.median_sep_px !== null ? ` · ${t.match.median_sep_px.toFixed(2)} px from predicted` : ''}`
+                    : t.verdict === 'unchecked'
+                      ? 'not checked'
+                      : 'none on file (SkyBoT)'}
+                </dd>
+                {t.unchecked_by.length > 0 && (
+                  <>
+                    <dt>Not checked by</dt>
+                    <dd>{t.unchecked_by.join(', ')}</dd>
+                  </>
+                )}
+              </dl>
+              {!obj && <p className="sx-live-m">{NO_ORBIT_NOTE}</p>}
+            </Row>
+          </Rows>
+        </div>
+        {spectrum && <SpectrumHow spectrum={spectrum.track} spectra={spectrum.spectra} flags={spectrum.flags} />}
       </div>
     </PanelCard>
   );

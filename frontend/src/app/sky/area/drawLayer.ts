@@ -81,6 +81,11 @@ export interface AreaDrawInput {
   layers: { dots: boolean; tracks: boolean };
   measured: boolean;
   selected: string | null;
+  /**
+   * Single-visit possibles are not drawn or labelled until asked (#173: "Show possible (n)"); the
+   * selected one always is.
+   */
+  hidePossible?: boolean;
   outline: AreaOutline | null;
   draft: { square: ScreenSquare; label: string } | null;
   cam: SkyCamera;
@@ -253,11 +258,15 @@ function clearTrack(t: SceneTrack): void {
   t.sy.fill(Number.NaN);
 }
 
+/** A possible track kept off the sky until asked (#173). */
+const hiddenTrack = (t: SceneTrack, i: AreaDrawInput) =>
+  i.hidePossible === true && t.verdict === 'possible' && t.id !== i.selected;
+
 function drawTracks(ctx: AreaCtx, i: AreaDrawInput, stats: AreaDrawStats): void {
   if (!i.scene) return;
   const shown = tracksShown(i.step, i.layers.tracks, i.measured);
   for (const t of i.scene.tracks) {
-    if (!shown) {
+    if (!shown || hiddenTrack(t, i)) {
       clearTrack(t);
       continue;
     }
@@ -266,6 +275,7 @@ function drawTracks(ctx: AreaCtx, i: AreaDrawInput, stats: AreaDrawStats): void 
   if (!shown) return;
   const neutral = i.step < 5;
   for (const t of i.scene.tracks) {
+    if (hiddenTrack(t, i)) continue;
     // Tracklets: a short solid line through the exposures, and a dot per frame.
     ctx.setLineDash(NO_DASH);
     ctx.beginPath();
@@ -325,6 +335,7 @@ function drawLabels(ctx: AreaCtx, i: AreaDrawInput, stats: AreaDrawStats): void 
   ctx.setLineDash(NO_DASH);
   const wanted: LabelWanted[] = [];
   for (const t of i.scene.tracks) {
+    if (hiddenTrack(t, i)) continue;
     const last = lastPoint(t);
     if (last < 0) continue;
     wanted.push({

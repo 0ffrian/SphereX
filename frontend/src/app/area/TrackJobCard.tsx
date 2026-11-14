@@ -1,8 +1,8 @@
 // Track it, computed on demand (issue #145, mock-up state 7): the object's Track job, with its steps,
 // a count and a bar on the frame search, and the elapsed time; the Track view opens when it is done
-// (trackJobStore). There is no Stop: the object job runner (#41) has none, so "Back to the results"
+// (trackJobStore). There is no Stop: the object job runner (#41) has none, so the ← (#173)
 // leaves the job running on the server, and the object is Track-available when it ends.
-import { backToScan } from '@/app/sky/areaDraw';
+import { useAreaBack } from './areaBack';
 import { useEffect, useState } from 'react';
 import { PanelCard } from '@/app/shell/PanelCard';
 import { useAreaStore } from '@/app/shell/areaStore';
@@ -15,7 +15,7 @@ import { trackFailureText, trackSteps, useTrackJobStore } from './trackJobStore'
 export function TrackJobCard() {
   const view = useTrackJobStore((s) => s.view);
   const busy = useTrackJobStore((s) => s.busy);
-  const back = useAreaStore((s) => s.trackBack);
+  const back = useAreaBack();
   const closePanel = useShellStore((s) => s.closePanel);
   // The elapsed clock: the time is read in the effect (a render stays pure), once a second.
   const [now, setNow] = useState(() => view?.t0 ?? 0);
@@ -29,13 +29,6 @@ export function TrackJobCard() {
   }, [running]);
   // The job keeps being followed: when it ends, the row says Track-available (and the Track view
   // opens only if this card is showing again).
-  const goBack = () => {
-    if (back === 'mover') {
-      const s = useAreaStore.getState();
-      s.openMover(s.sel);
-    } else if (back === 'scan') backToScan();
-    else useAreaStore.getState().openList();
-  };
   if (!view) return null;
   const o = view.obj;
   const title = [o.id, o.name].filter(Boolean).join(' ');
@@ -52,6 +45,7 @@ export function TrackJobCard() {
       onMinimise={() => useAreaStore.getState().setMinimised(true)}
       returnFocusTo='[data-testid="tool-known"]'
       testId="area-card"
+      back={back}
     >
       <div
         className="sx-live"
@@ -136,14 +130,6 @@ export function TrackJobCard() {
               Minimise
             </button>
           )}
-          <button
-            type="button"
-            className="sx-btn-outline"
-            onClick={goBack}
-            data-testid="track-back"
-          >
-            Back to the results
-          </button>
         </div>
       </div>
     </PanelCard>

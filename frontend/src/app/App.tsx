@@ -25,6 +25,8 @@ import { SkyZoom } from './shell/SkyZoom';
 import { FrameRate } from './shell/FrameRate';
 import { Transport } from './shell/Transport';
 import { SkyPane } from './sky/SkyPane';
+import { ReplayBack } from './sky/ReplayBar';
+import { useRunsStore } from './area/runsStore';
 import { useHashSync } from './useHashSync';
 import { BuildPane, closeBuildPane } from './build/BuildPane';
 import { SelectedCard } from './build/SelectedCard';
@@ -109,6 +111,7 @@ export function App() {
   // Q-457: a minimised build stays mounted (hidden), and the sky is the view again.
   const buildMini = useShellStore((s) => s.buildMinimised);
   const split = buildOpen && !buildMini;
+  const replaying = useRunsStore((s) => s.replay !== null);
   // Under the phone sheet the sky must not be reachable by Tab or a screen reader.
   const phone = usePhoneWidth();
   const skyHidden = split && phone;
@@ -199,8 +202,15 @@ export function App() {
                 resetKeys={resetKeys}
                 className="absolute top-4 left-4 z-30"
               >
-                <Transport />
-                <FrameRate />
+                {/* Issue #173: during a replay the frame player gives way to a plain ←. */}
+                {replaying ? (
+                  <ReplayBack />
+                ) : (
+                  <>
+                    <Transport />
+                    <FrameRate />
+                  </>
+                )}
               </ErrorBoundary>
             </div>
             {/* Issue #66 (mock-up `.island-wrap`): the island, over everything in the bezel. */}
