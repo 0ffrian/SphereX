@@ -63,6 +63,9 @@ describe('RefusalList', () => {
     );
     const notes = [...host.querySelectorAll('[data-testid="refusal-note"]')];
     expect(notes.map((n) => n.textContent)).toEqual([UNKNOWN_CODE_TEXT]);
+    // The raw code is not shown, but stays in the DOM for debugging (Q-477).
+    expect(notes[0]!.getAttribute('data-code')).toBeTruthy();
+    expect(notes[0]!.textContent).not.toContain(notes[0]!.getAttribute('data-code')!);
   });
 
   it('labels the list with the lead line', () => {

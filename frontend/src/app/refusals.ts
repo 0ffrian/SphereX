@@ -204,7 +204,7 @@ export interface RefusalGroup {
   kind: 'frames' | 'note';
   /** Frame groups: the reason (`saturated`). Notes: the whole code (`frames:truncated`). */
   reason: string;
-  /** False for a reason or code this page has no wording for; it is then shown as is. */
+  /** False for a reason or code this page has no wording for; it is then shown in generic plain words, the raw code kept in `data-code` (Q-477). */
   known: boolean;
   /** Frames in the group; `n` for `cutouts:deferred:<n>`; 1 for other notes. */
   count: number;

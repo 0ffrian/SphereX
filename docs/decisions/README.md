@@ -290,7 +290,7 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | Q-194 | Track path sound details | Proposed | [haptics-sound](haptics-sound.md) |
 | Q-195 | GET /v1/health beyond D-16 | Proposed | [contract](contract.md) |
 | Q-196 | UI wording for every missing code | Proposed | [contract](contract.md) |
-| Q-477 | Missing code with no wording: generic plain text, not the raw code (conflicts with Q-196, A11) | Proposed | [contract](contract.md) |
+| Q-477 | Missing code with no wording: generic plain text, not the raw code (amends Q-196, A11) | Accepted | [contract](contract.md) |
 | Q-197 | MVP object in warm start and pre-fetch | Proposed | [scope-process](scope-process.md) |
 | Q-198 | Interim event serving until #15 | Proposed | [platform-hosting](platform-hosting.md) |
 | Q-199 | Blind test owner and object | Proposed | [scope-process](scope-process.md) |
