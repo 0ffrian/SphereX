@@ -5,7 +5,7 @@
 //
 // Synthetic stand-ins, not the real backend's output: every stamp is the same 15 x 15 image
 // (a centred Gaussian), and `export.ecsv` is a header-only stub; the real writer is P7 (A17.7).
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { AreaDots, AreaError } from '../src/contract';
@@ -28,9 +28,9 @@ export const FIXTURE_AREA_DIRS: Readonly<Record<string, string>> = {
 
 export const AREA_STAMP_SIZE = 15;
 
-/** `/v1/areas`, `/v1/areas/{id}` and its sub-routes; `m[3]` is the stamp's dot id. */
+/** `/v1/areas`, `/v1/areas/{id}` and its sub-routes (spectra: #162); `m[3]` is the stamp's dot id. */
 const AREA_PATH =
-  /^\/v1\/areas(?:\/([^/]+)(?:\/(known|dots|tracks|checks|export\.ecsv|stamps\/([^/]+)\.png))?)?$/;
+  /^\/v1\/areas(?:\/([^/]+)(?:\/(known|dots|tracks|checks|spectra|export\.ecsv|stamps\/([^/]+)\.png))?)?$/;
 
 export interface AreaAnswer {
   status: number;
@@ -112,5 +112,11 @@ export function areaReply(pathname: string): AreaAnswer | null {
     };
   }
   if (m[3] !== undefined) return stamp(dir, m[3]);
+  // The spectrum check (A17.13, #161): only the main fixture area has one; the other answers as an
+  // area stored without it.
+  if (what === 'spectra' && !existsSync(join(dir, 'spectra.json'))) {
+    const body = { error: 'spectra_not_prepared', detail: 'Synthetic fixture: no spectrum check stored for this area.' };
+    return { status: 404, contentType: 'application/json', body: JSON.stringify(body) };
+  }
   return jsonFile(dir, `${what}.json`);
 }
