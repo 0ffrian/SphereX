@@ -29,6 +29,7 @@ import type { SkyCachedObject, SkySurvey } from '@/app/api/types';
 import { isApiError } from '@/app/api/errors';
 import { formatCoords } from '@/app/format';
 import { Icon } from '@/app/shell/icons';
+import { popoverTakesEscape } from '@/app/shell/shortcuts';
 import { getSkyApi, useAppStore } from '@/state/store';
 import { prefersReducedMotion, type RendererBackend } from '@/viewer/ViewerApp';
 import { SkyView } from '@/viewer/sky/SkyView';
@@ -168,13 +169,22 @@ export function SkyPane({ children }: { children?: ReactNode }) {
   const creditBtnRef = useRef<HTMLButtonElement>(null);
   const creditId = useId();
   const [creditOpen, setCreditOpen] = useState(false);
+  // The split view (the build pane) hides the credit (index.css), so it closes the popover too: a
+  // hidden popover must not keep its Escape listener (A21.10).
+  useEffect(
+    () =>
+      useShellStore.subscribe((s) => {
+        if (s.build.open && !s.buildMinimised) setCreditOpen(false);
+      }),
+    [],
+  );
   // Escape or a press outside the popover and its button closes it. Escape is taken in the capture
   // phase, before the window listeners added earlier (the replay's): one press closes the popover
-  // only (A21.10).
+  // only (A21.10). A text field keeps its Escape, and a popover that is not drawn takes none.
   useEffect(() => {
     if (!creditOpen) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape' || e.defaultPrevented) return;
+      if (!popoverTakesEscape(e, creditRef.current)) return;
       e.preventDefault();
       setCreditOpen(false);
       creditBtnRef.current?.focus();

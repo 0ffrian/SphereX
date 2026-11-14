@@ -120,7 +120,7 @@ test('play replays a recorded run on the sky: squares, circles and ticks at thei
   await page.locator(`[data-run="${DONE.run_id}"]`).getByTestId('runs-play').click();
   await expect(page.getByTestId('runs-menu')).toBeHidden();
   const tag = page.getByTestId('replay-tag');
-  await expect(tag).toHaveText(/^Replay · Discovery · 13 Nov \d\d:\d\d$/);
+  await expect(tag).toHaveText(/^Replay · Discovery · 13 Nov \d\d:\d\d UTC$/);
   const overlay = page.getByTestId('scan-overlay');
   await expect(overlay).toHaveAttribute('data-replay', 'true');
   await expect(page.getByTestId('replay-speed-60')).toHaveAttribute('aria-pressed', 'true');
@@ -169,6 +169,54 @@ test('play replays a recorded run on the sky: squares, circles and ticks at thei
   await page.keyboard.press('Escape');
   await expect(tag).toBeHidden();
   await expect(overlay).toBeHidden();
+  await expect(page.getByTestId('runs-button')).toBeFocused();
+});
+
+test('Escape with the sky credit popover open over a replay closes the popover only', async ({
+  page,
+}) => {
+  await open(page);
+  await page.getByTestId('runs-button').click();
+  await page.locator(`[data-run="${DONE.run_id}"]`).getByTestId('runs-play').click();
+  const tag = page.getByTestId('replay-tag');
+  await expect(tag).toBeVisible();
+  await page.getByTestId('sky-credit-button').click();
+  const box = page.getByTestId('sky-credit-box');
+  await expect(box).toBeVisible();
+  // One Escape: the popover closes, focus goes back to its button, the replay goes on.
+  await page.keyboard.press('Escape');
+  await expect(box).toBeHidden();
+  await expect(page.getByTestId('sky-credit-button')).toBeFocused();
+  await expect(tag).toBeVisible();
+  // The next Escape ends the replay.
+  await page.keyboard.press('Escape');
+  await expect(tag).toBeHidden();
+  await expect(page.getByTestId('runs-button')).toBeFocused();
+});
+
+test('Escape with the credit popover open over the runs list closes the popover only', async ({
+  page,
+}) => {
+  await open(page);
+  await page.getByTestId('sky-credit-button').click();
+  await expect(page.getByTestId('sky-credit-box')).toBeVisible();
+  // Open the list from the keyboard (a pointer press outside the popover would close it).
+  await page.getByTestId('runs-button').focus();
+  await page.keyboard.press('Enter');
+  const menu = page.getByTestId('runs-menu');
+  await expect(menu).toBeVisible();
+  await expect(page.getByTestId('sky-credit-box')).toBeVisible();
+  // Focus in the list (its own Escape handler is on the list).
+  await page.getByTestId('runs-filter-all').focus();
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('sky-credit-box')).toBeHidden();
+  // The list is still open (its exit animation would keep it visible for a moment: ask the button).
+  await expect(page.getByTestId('runs-button')).toHaveAttribute('aria-expanded', 'true');
+  await expect(menu).toBeVisible();
+  // The next Escape closes the list, focus back on the runs button.
+  await page.getByTestId('runs-filter-all').focus();
+  await page.keyboard.press('Escape');
+  await expect(menu).toBeHidden();
   await expect(page.getByTestId('runs-button')).toBeFocused();
 });
 
