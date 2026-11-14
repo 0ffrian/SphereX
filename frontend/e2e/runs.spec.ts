@@ -114,6 +114,12 @@ test('the runs button lists every run, newest first, with a filter and states in
   await page.keyboard.press('Escape');
   await expect(menu).toBeHidden();
   await expect(button).toBeFocused();
+  // From the runs button itself, Escape closes the open list too.
+  await button.click();
+  await expect(menu).toBeVisible();
+  await button.focus();
+  await page.keyboard.press('Escape');
+  await expect(menu).toBeHidden();
 });
 
 test('play replays a recorded run on the sky: squares, circles and ticks at their times', async ({

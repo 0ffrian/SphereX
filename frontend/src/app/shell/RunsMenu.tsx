@@ -109,7 +109,8 @@ export function RunsMenu() {
   };
 
   return (
-    <div className="sx-runs" data-testid="runs">
+    // Escape closes the list from anywhere in it, the runs button included (Q-473 (2)).
+    <div className="sx-runs" data-testid="runs" onKeyDown={open ? onMenuKey : undefined}>
       <button
         ref={btnRef}
         type="button"
@@ -139,7 +140,6 @@ export function RunsMenu() {
             aria-modal="false"
             aria-labelledby={titleId}
             className="sx-runs-menu"
-            onKeyDown={onMenuKey}
             initial={reduced ? false : { opacity: 0, y: -6, scale: 0.96, filter: 'blur(4px)' }}
             animate={{ opacity: 1, y: 0, scale: 1, filter: 'blur(0px)' }}
             exit={
