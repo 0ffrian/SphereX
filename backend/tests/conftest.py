@@ -76,7 +76,7 @@ def block_network(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.fixture(autouse=True)
 def no_second_pass_waits(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The cutout second pass (Q-481) waits 5, 15 and 30 s before its attempts; tests never
+    """The cutout second pass (Q-482) waits 5, 15 and 30 s before its attempts; tests never
     wait (a test that needs the waits sets them itself)."""
     from app.core.area import live_jobs
 

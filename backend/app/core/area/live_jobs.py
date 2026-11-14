@@ -21,9 +21,9 @@ square is marked and the scan goes on. A pause takes effect after the current sq
 paused scan leaves the worker; resume queues it again at the back; stop is at the next
 check. **Runs (Q-471):** every scan, and every single job submitted with a ``kind``, is
 recorded in ``runs.RunStore`` with its timeline. A scan ends ``failed`` when it was not
-stopped, no square is done and at least one failed (Q-480).
+stopped, no square is done and at least one failed (Q-481).
 
-**Honest failures (Q-481):** a cutout that fails gets a second pass (``CUTOUT_SECOND_PASS_S``)
+**Honest failures (Q-482):** a cutout that fails gets a second pass (``CUTOUT_SECOND_PASS_S``)
 within a failure budget; a stored area is reused only when it is ``reusable`` (its known-object
 check did not fail, or it was rechecked within ``RECHECK_COOLDOWN_S``, or the server is
 offline), else it is computed again; a reused area missing its ``spectra`` stage gets it here,
@@ -83,18 +83,18 @@ MAX_FINISHED = 50
 # Merged results kept per run (``results``), keyed by the squares done, so polling
 # ``/v1/runs/{id}/results`` does not re-read and re-merge every stored square each time.
 MAX_RESULTS = 16
-# The second pass of a failed cutout (Q-481): the waits before each new attempt, after the
+# The second pass of a failed cutout (Q-482): the waits before each new attempt, after the
 # HTTP policy's own retries (1, 2 and 4 s) gave up. The archive's 503s last longer than those
 # 7 s but pass within a minute (issue #169: a failed cutout answered 200 15.7 s later). An
 # engineering choice, not a physical value; tests set it to zeros.
 CUTOUT_SECOND_PASS_S: tuple[float, ...] = (5.0, 15.0, 30.0)
-# The failure budget of one square (Q-481): failed cutouts are retried only while at most this
+# The failure budget of one square (Q-482): failed cutouts are retried only while at most this
 # many have failed (the larger of the two); past it the archive is taken to be down and every
 # waiting retry gives up at once, so the square fails as fast as before.
 CUTOUT_RETRY_BUDGET_MIN = 2
 CUTOUT_RETRY_BUDGET_FRAC = 0.25
 # A stored area whose known-object check failed is computed again at most once per this many
-# seconds per process (Q-481), so a lasting Horizons or SkyBoT failure cannot make every start
+# seconds per process (Q-482), so a lasting Horizons or SkyBoT failure cannot make every start
 # a full recompute. Same as ``live_failure_ttl_s``.
 RECHECK_COOLDOWN_S = 600.0
 _WAIT_SLICE_S = 0.25  # how often a second-pass wait looks at the give-up flag
@@ -222,12 +222,12 @@ def run_live_area(ctx: Context, plan: Plan, progress: Progress) -> None:
     live = area_frames.live_fetch(ctx)
     lock = threading.Lock()
     fetched = [0]
-    failed = [0]  # cutouts that failed at least once (the failure budget, Q-481)
+    failed = [0]  # cutouts that failed at least once (the failure budget, Q-482)
     budget = max(CUTOUT_RETRY_BUDGET_MIN, int(CUTOUT_RETRY_BUDGET_FRAC * plan.n_frames))
     give_up = threading.Event()
 
     def fetch(row: Any, cut: Any) -> tuple[str, bytes]:
-        # The second pass (Q-481): a failure worth retrying waits CUTOUT_SECOND_PASS_S and asks
+        # The second pass (Q-482): a failure worth retrying waits CUTOUT_SECOND_PASS_S and asks
         # again, while the square's failures stay within the budget. The count moves only on
         # a success, so the step count never goes backwards.
         waits = iter(CUTOUT_SECOND_PASS_S)
@@ -296,7 +296,7 @@ def run_live_area(ctx: Context, plan: Plan, progress: Progress) -> None:
 
 
 def cutout_retryable(exc: BaseException) -> bool:
-    """A failed cutout worth a second pass (Q-481): only an archive error the http adapter
+    """A failed cutout worth a second pass (Q-482): only an archive error the http adapter
     reports as passing (HTTP 429 or 5xx, a failed connection, a timeout, a transport error).
     Not an offline miss or a refused network, not a client error (HTTP 4xx other than 429),
     and not the cutout adapter's own refusals (a foreign host, a redirect off IRSA, a body
@@ -422,13 +422,14 @@ class LiveJobs:
         self._queue: deque[QueueItem] = deque()
         self._thread: threading.Thread | None = None
         self._running: QueueItem | None = None
+        self._closed = False  # set by ``close()``: nothing new is queued during shutdown
         self._results_lock = threading.Lock()
         self._results: dict[str, tuple[tuple[tuple[int, str], ...], dict[str, Any]]] = {}
         self._results_gen = 0  # moves on every store, so a merge read before it is not kept
         self._rechecked: dict[str, float] = {}  # area id -> monotonic time of its last compute
         self._no_refill: set[str] = set()  # areas whose spectra refill could not be done
 
-    # --- stored areas (Q-481) -----------------------------------------------------------
+    # --- stored areas (Q-482) -----------------------------------------------------------
 
     def reusable(self, area_id: str | None) -> bool:
         """A stored area that needs no new computation: its summary lists no ``skybot:`` or
@@ -445,7 +446,7 @@ class LiveJobs:
         return since is not None and time.monotonic() - since < RECHECK_COOLDOWN_S
 
     def _mark_recheck(self, area_id: str) -> None:
-        """Start the cooldown of ``area_id`` (Q-481). Called when a compute starts and again
+        """Start the cooldown of ``area_id`` (Q-482). Called when a compute starts and again
         when it stores the area, so neither a recheck nor a first compute that stored a
         ``skybot:`` or ``horizons:`` code is followed by another compute within
         ``RECHECK_COOLDOWN_S`` (a job for the same box queued behind a scan's square is then
@@ -474,14 +475,14 @@ class LiveJobs:
         """The stored area lacks its ``spectra`` stage and a refill may still fill it: false
         once a refill was tried in this process and could not be done (served from the pack, a
         stage missing, the check failing), so ``start=true`` does not queue a job every time
-        only for it to fail again (Q-481 (2)). Reads the store and memory only."""
+        only for it to fail again (Q-482 (2)). Reads the store and memory only."""
         with self._lock:
             if area_id in self._no_refill:
                 return False
         return self.store.spectra_entry(area_id) is None
 
     def ensure_spectra(self, area_id: str) -> None:
-        """Fill a stored area's missing ``spectra`` stage (Q-474, Q-481) from its stored
+        """Fill a stored area's missing ``spectra`` stage (Q-474, Q-482) from its stored
         ``summary``, ``dots`` and ``tracks``, as ``scripts/area_spectra.py`` does. Worker only:
         the check never runs in a request (A16.2). Written only into the app's own cache (the
         committed pack is read only); a failure is logged and never fails the job, and the
@@ -520,7 +521,7 @@ class LiveJobs:
             return
 
     def _forget_results(self) -> None:
-        """An area was stored (maybe again): every kept merge may be out of date (Q-481). The
+        """An area was stored (maybe again): every kept merge may be out of date (Q-482). The
         generation moves, so a merge read from the store before this is not kept after it."""
         with self._results_lock:
             self._results_gen += 1
@@ -536,7 +537,7 @@ class LiveJobs:
         """Queue a plan; a single job for the area already queued or running (and not
         stopped) is returned as it is. A done job is run again: the caller checks the store
         first, so a done job reaching here means its stored area is gone, needs a recheck or
-        lacks its spectra stage (Q-481; the worker decides which). A stopped job that
+        lacks its spectra stage (Q-482; the worker decides which). A stopped job that
         is still winding down, or a scan's square computing the area, is replaced here by a
         fresh job queued after it: once the square is stored the fresh job is done at once
         with nothing recomputed, and if the scan is stopped first it computes the area itself.
@@ -546,7 +547,7 @@ class LiveJobs:
             job = self._jobs.get(plan.area_id)
             if job is not None and job.joinable:
                 return job
-            if len(self._queue) >= MAX_WAITING:
+            if self._closed or len(self._queue) >= MAX_WAITING:
                 raise QueueFull()
             self._prune()
             job = Job(plan)
@@ -590,7 +591,7 @@ class LiveJobs:
         stored = dict(stored or {})
         post: list[Snapshot] = []
         with self._lock:
-            if len(self._queue) >= MAX_WAITING:
+            if self._closed or len(self._queue) >= MAX_WAITING:
                 raise QueueFull()
             run_id = self.runs.create(
                 kind,
@@ -631,7 +632,7 @@ class LiveJobs:
                 return
             if not isinstance(item, ScanJob) or item.state != "paused":
                 raise RunConflict("run_not_paused", "Only a paused scan can be resumed.")
-            if len(self._queue) >= MAX_WAITING:
+            if self._closed or len(self._queue) >= MAX_WAITING:
                 raise QueueFull()
             item.state = "queued"
             self._queue.append(item)
@@ -729,8 +730,10 @@ class LiveJobs:
         running one ends at its next check, which every queued cutout download makes, so the
         downloads still waiting in its pool end at once. Without this the process could not
         exit until every queued download had run (minutes when the archive is slow).
-        True when the worker has ended."""
+        True when the worker has ended. Afterwards nothing new is queued (``QueueFull``): a
+        request racing the shutdown must not start the worker again."""
         with self._lock:
+            self._closed = True
             runs = [run_id for run_id, item in self._by_run.items() if isinstance(item, ScanJob)]
             areas = [a for a, job in self._jobs.items() if job.state in ("queued", "running")]
         for run_id in runs:
@@ -871,7 +874,7 @@ class LiveJobs:
             # Stored meanwhile (by a scan's square, say) and reusable: done at once, nothing is
             # recomputed but a missing spectra stage. A stored area whose known-object check
             # failed is computed again; the old result is served until the new one is stored,
-            # and stays the job's result when the recheck fails (Q-481 (3)).
+            # and stays the job's result when the recheck fails (Q-482 (3)).
             if self.reusable(job.area_id):
                 self.ensure_spectra(job.area_id)
             else:
@@ -919,7 +922,7 @@ class LiveJobs:
         if area_id is not None and self.reusable(area_id):  # stored: no SIA call (Q-470)
             return self._reused(scan, sq, area_id)
         # A stored area that is not reusable is rechecked; its stored result stays the
-        # square's result when the recheck cannot be planned or fails (Q-481 (3)).
+        # square's result when the recheck cannot be planned or fails (Q-482 (3)).
         old = area_id if self._stored(area_id) else None
         try:
             plan = self._planner(self.ctx, sq.box)
@@ -952,7 +955,7 @@ class LiveJobs:
         """Run the pipeline for one square: the area id the square is done with, or None once
         the square is recorded failed (or back to ``todo`` when the scan was stopped). ``old``
         is a stored area this computes again: when the recheck fails, or only its job is
-        stopped, the square is done with ``old``, as it is still served (Q-481 (3)). The
+        stopped, the square is done with ``old``, as it is still served (Q-482 (3)). The
         square's job is listed under its area id while it runs (unless another job for that
         area is active), so ``GET /v1/areas/live/{id}`` shows it; a request for the same box
         does not join it but queues its own job behind it (``submit``)."""
@@ -1043,7 +1046,7 @@ class LiveJobs:
                 self._by_run.pop(run_id, None)
             self._record(self.runs.set_state, run_id, "failed", "run_done")
             return
-        # Q-480: a scan that was not stopped ends failed when no square is done and at least
+        # Q-481: a scan that was not stopped ends failed when no square is done and at least
         # one failed. A scan whose squares were all skipped (no visit pair, so nothing to
         # search) ends done, as nothing failed; skipped and failed squares, none done: failed.
         states = self._square_states(run_id)

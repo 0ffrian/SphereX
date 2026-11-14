@@ -276,12 +276,15 @@ export const useScanStore = create<ScanState>()((set, get) => {
     clear() {
       stopPolling();
       token++;
-      // Another run was opened from the Runs list over the scan this browser started: closing
-      // that one must not forget ours. Ours is followed again (its card stays closed), so its dock
-      // button brings it back, no second scan starts beside it, and a reload still restores it.
+      // Anything other than the scan this browser started was in the card (another run opened
+      // from the Runs list, or an offer or refusal made after Select again over it): closing it
+      // must not forget ours. Ours is followed again (its card stays closed), so its dock button
+      // brings it back, no second scan starts beside it, and a reload still restores it. Only
+      // closing our own scan, or clearing with nothing in the card (a saved run the server lost),
+      // forgets it.
       const v = get().view;
       const kept = get().saved();
-      if (v?.kind === 'run' && kept && kept.runId !== v.runId) {
+      if (kept && v && !(v.kind === 'run' && v.runId === kept.runId)) {
         get().follow(kept.runId, kept.flow, kept.region);
         return;
       }
@@ -323,6 +326,11 @@ export function scanFailureText(code: string): { title: string; line: string } {
       return {
         title: 'Server not reachable',
         line: 'Nothing was started. Select again in a minute.',
+      };
+    case 'scan:no_answer':
+      return {
+        title: 'No answer from the server',
+        line: 'The scan may have started. Check Runs before you start it again.',
       };
     case 'scan:unavailable':
       return {

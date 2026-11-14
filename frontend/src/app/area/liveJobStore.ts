@@ -326,8 +326,13 @@ export function stepCount(s: { id: string; state: string; done?: number; total?:
   return unit ? `${s.total} ${unit}` : String(s.total);
 }
 
-/** The island pill while the live card is minimised: "Discovery · Step 2 of 6 · Download frames". */
+/**
+ * The island pill while the live card is minimised: "Discovery · Step 2 of 6 · Download frames",
+ * "Known objects · Ready to compute" for the offer, "Discovery · Could not compute" for a failure (#153).
+ */
 export function liveMiniTitle(s: Pick<LiveJobStoreState, 'view' | 'job'>, flowLabel: string): string {
+  if (s.view?.kind === 'offer') return `${flowLabel} · Ready to compute`;
+  if (s.view?.kind === 'failed') return `${flowLabel} · Could not compute`;
   if (s.view?.kind !== 'job') return flowLabel;
   const st = s.job?.status;
   if (!st || st.state === 'queued') return `${flowLabel} · Waiting`;

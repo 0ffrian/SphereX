@@ -76,8 +76,8 @@ def create_app(
         # Live areas and scans first: stopped, so their queued downloads end at once and the
         # process can exit (a run still going is recorded `stopped`, its finished squares kept).
         live_jobs = getattr(app.state, "live_jobs", None)
-        if live_jobs is not None:
-            live_jobs.close()
+        if live_jobs is not None and not live_jobs.close():
+            log.warning("live area worker still busy after the shutdown wait; exiting anyway")
         app.state.overlays.close()  # stop the catalogue fetch pool (issue #12)
         # Issue #41: no new jobs, queued downloads, measurements and bakes dropped.
         app.state.pipeline.close()

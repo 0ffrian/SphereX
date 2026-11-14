@@ -13,10 +13,10 @@ Light on purpose (A16.2): plain JSON files and arithmetic, no pipeline module, n
 - **Objects:** read from each finished square's stored replies (``known``, ``tracks``, ``dots``,
   ``summary``), never computed here. ``found`` events and ``/results`` share ``square_objects``
   and ``merge``.
-- **Failures shown (Q-479):** a track the known-object check could not judge (``unchecked``) is
+- **Failures shown (Q-480):** a track the known-object check could not judge (``unchecked``) is
   counted in ``totals.unchecked`` and listed by ``/results`` with its ``unchecked_by`` codes; each
   done square carries its ``skybot:`` and ``horizons:`` codes in ``missing``. A record written
-  before Q-479 reads ``unchecked: null`` (not recorded), never 0.
+  before Q-480 reads ``unchecked: null`` (not recorded), never 0.
 """
 
 from __future__ import annotations
@@ -52,7 +52,7 @@ MERGE_FORMULA = (
     "unexplained when any member was checked, else unchecked"
 )
 # The summary's ``missing`` codes of a failed known-object check (A17.8): a SkyBoT cone of a
-# visit, or a Horizons call for a candidate. A run square carries these only (Q-479).
+# visit, or a Horizons call for a candidate. A run square carries these only (Q-480).
 CHECK_CODE_PREFIXES = ("skybot:", "horizons:")
 TRACK_POSITIONS_SOURCE = "dot positions of the stored areas (A17.3)"
 KNOWN_POSITIONS_ASSUMPTION = (
@@ -389,7 +389,7 @@ class RunStore:
 
 
 def _migrate_totals(run: dict[str, Any]) -> bool:
-    """Totals of a record written before Q-479 and Q-480: ``unchecked`` was not recorded, so it
+    """Totals of a record written before Q-480 and Q-481: ``unchecked`` was not recorded, so it
     is ``None`` (never 0, which would be an invented count); ``squares_failed`` is counted from
     the squares' states. True when the record changed."""
     totals = run["totals"]
@@ -496,7 +496,7 @@ class SquareReplies:
     known: Mapping[str, Any] | None
     tracks: Mapping[str, Any] | None
     dots: Mapping[str, Any] | None
-    missing: tuple[str, ...] = ()  # the summary's skybot: and horizons: codes (Q-479)
+    missing: tuple[str, ...] = ()  # the summary's skybot: and horizons: codes (Q-480)
 
 
 ReadStage = Callable[[str, str], Mapping[str, Any] | None]
@@ -506,7 +506,7 @@ def read_square(index: int, area_id: str, read: ReadStage) -> SquareReplies:
     """One finished square's replies, kept small: the summary's frame times only and the
     dots of its tracks only (an area holds tens of thousands of dots), so a scan can keep
     every finished square in memory instead of reading them again after each square. Its
-    ``missing`` keeps the summary's ``skybot:`` and ``horizons:`` codes only (Q-479)."""
+    ``missing`` keeps the summary's ``skybot:`` and ``horizons:`` codes only (Q-480)."""
     summary, tracks, dots = read(area_id, "summary"), read(area_id, "tracks"), read(area_id, "dots")
     missing: tuple[str, ...] = ()
     if summary is not None:
@@ -573,7 +573,7 @@ def square_objects(sq: SquareReplies) -> list[dict[str, Any]]:
     """The ``found`` event objects of one finished square (Q-471): a track with a SkyBoT match
     is ``known`` (Horizons positions), an ``unexplained`` track carries its measured dots, and
     a known-list row no track matched is ``predicted`` (the UI hides those by default). An
-    ``unchecked`` track has no event (Q-479): the replay is unchanged and its end frame shows
+    ``unchecked`` track has no event (Q-480): the replay is unchanged and its end frame shows
     the server's totals, which count it."""
     dots = _dot_map(sq)
     known = {str(k["designation"]): k for k in _known_rows(sq)}
@@ -695,7 +695,7 @@ def merge(
     """Known objects and tracks of the finished squares with the duplicates merged (Q-471);
     ``boxes`` maps a square index to its box. A merged track is ``found`` when any member has a
     SkyBoT match, else ``unexplained`` when any member was checked and nothing matched, else
-    ``unchecked`` (Q-479). ``unchecked_by`` is the union of the members' codes, on an
+    ``unchecked`` (Q-480). ``unchecked_by`` is the union of the members' codes, on an
     ``unchecked`` row and on an ``unexplained`` row with an unchecked member. ``missing`` maps
     each square index to its ``skybot:`` and ``horizons:`` codes."""
     ordered = sorted(squares, key=lambda s: s.index)
@@ -799,7 +799,7 @@ def square_counts(squares: Sequence[Mapping[str, Any]]) -> dict[str, int]:
 
 def totals_of(merged: Mapping[str, Any], squares: Sequence[Mapping[str, Any]]) -> dict[str, int]:
     """``known`` = merged known objects; ``found``, ``unexplained`` and ``unchecked`` = merged
-    tracks of that kind (Q-479)."""
+    tracks of that kind (Q-480)."""
     return {
         "known": len(merged["known"]),
         "found": sum(1 for t in merged["tracks"] if t["kind"] == "found"),
@@ -811,7 +811,7 @@ def totals_of(merged: Mapping[str, Any], squares: Sequence[Mapping[str, Any]]) -
 
 def results_reply(run: Mapping[str, Any], merged: Mapping[str, Any]) -> dict[str, Any]:
     """The ``run-results.schema.json`` body. A done square's ``missing`` is read from its
-    stored summary by the merge (Q-479); a square not done has none."""
+    stored summary by the merge (Q-480); a square not done has none."""
     missing: Mapping[int, Sequence[str]] = merged.get("missing", {})
     return {
         "run_id": run["run_id"],

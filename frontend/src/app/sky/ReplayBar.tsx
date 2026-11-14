@@ -7,11 +7,15 @@
 // Keyboard on the timeline: arrows step 1 % of the run, Page Up and Page Down jump to the previous
 // or next tick, Home and End to the start and the end. Screen readers hear the position from the
 // slider's value text when they move it; nothing is announced while it plays (it would never stop).
+// Issue #170: the marks differ by shape as well as colour (a tall mark for a known object found, a
+// short one for an unexplained track, a diamond for a skipped or failed square); under Measured only
+// every find is the same neutral mark named by its track.
 import { useEffect, useMemo, useRef, type KeyboardEvent, type PointerEvent } from 'react';
 import { isEditableTarget } from '@/app/shell/shortcuts';
 import { useShellStore } from '@/app/shell/shellStore';
 import { clock, REPLAY_SPEEDS, squareAt, ticksOf, whenText } from '@/app/area/replay';
 import { useRunsStore } from '@/app/area/runsStore';
+import { useMeasuredOnly } from '@/app/area/measuredOnly';
 
 const TOOL = { discovery: 'Discovery', known: 'Known objects' } as const;
 
@@ -22,7 +26,8 @@ export function ReplayBar() {
   const railRef = useRef<HTMLDivElement>(null);
   const active = replay !== null;
   const run = replay?.run ?? null;
-  const ticks = useMemo(() => (run ? ticksOf(run) : []), [run]);
+  const measured = useMeasuredOnly();
+  const ticks = useMemo(() => (run ? ticksOf(run, measured) : []), [run, measured]);
 
   // Another tool ends the replay (the replay keeps the sky to itself).
   useEffect(() => {

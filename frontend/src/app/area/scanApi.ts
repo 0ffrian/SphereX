@@ -81,6 +81,43 @@ export type ScanStartAnswer =
 
 export { RunGone };
 
+// ---- #169 (proposed; not in the contract yet): what a run could not check or compute ----------
+// Issue #170 builds against these with the mock (`?scan=mock-gaps`); when #169 lands its schema,
+// `npm run contract:gen` brings the fields into `RunTotals` and `RunTrackRow`, and these readers
+// keep working. A run recorded before #169 has neither field: `unchecked` reads null (not
+// recorded), never 0, so nothing is invented.
+
+/** The track kinds a results reply may carry: #156's two and #169's proposed `unchecked`. */
+const TRACK_KINDS: readonly string[] = ['found', 'unexplained', 'unchecked'];
+/** A merged track row, with #169's `unchecked` kind (the known-object check did not answer). */
+export type ScanTrackKind = RunTrackRow['kind'] | 'unchecked';
+export type ScanTrackRow = Omit<RunTrackRow, 'kind'> & {
+  kind: ScanTrackKind;
+  /** #169: the `skybot:<visit>` and `horizons:<designation>` codes that left it unchecked. */
+  unchecked_by?: string[];
+};
+/** The track rows of a run's results, with #169's kinds. */
+export const trackRowsOf = (res: RunResults): ScanTrackRow[] => res.tracks as ScanTrackRow[];
+
+const totalOf = (t: RunTotals, key: string): number | null => {
+  const v = (t as unknown as Record<string, unknown>)[key];
+  return typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : null;
+};
+/** Tracks the known-object check could not judge (#169), or null when the run did not record it. */
+export const uncheckedOf = (t: RunTotals): number | null => totalOf(t, 'unchecked');
+/**
+ * Squares that failed (#169's `squares_failed`); without it, counted from the squares when they
+ * are at hand (a run record), else 0 (a run summary from before #169).
+ */
+export function squaresFailedOf(
+  t: RunTotals,
+  squares?: readonly { state: RunSquareState }[],
+): number {
+  return totalOf(t, 'squares_failed') ?? squares?.filter((s) => s.state === 'failed').length ?? 0;
+}
+/** Every track of a run: found, unexplained and (when recorded) not checked. */
+export const tracksOf = (t: RunTotals): number => t.found + t.unexplained + (uncheckedOf(t) ?? 0);
+
 export interface ScanRequest extends ScanBox {
   kind: ScanKind;
 }
@@ -96,6 +133,8 @@ export interface ScanApi {
   results(runId: string, signal?: AbortSignal): Promise<RunResults>;
   /** Every run, newest first (`GET /v1/runs`). Throws when the list cannot be read. */
   list(signal?: AbortSignal): Promise<RunSummary[]>;
+  /** True only on the dev-server mock (its runs are invented test values; the Test data tag). */
+  readonly isMock?: boolean;
 }
 
 // ---- Reply checks (shape only; #156's schemas replace them) ------------------------------------
@@ -201,6 +240,20 @@ export function parseRunResults(body: unknown): RunResults {
     !Array.isArray(body.tracks)
   )
     throw bad('Run results');
+  // `trackRowsOf` widens the rows to #169's proposed kinds without the compiler's help, so the
+  // kinds and `unchecked_by` are checked here: a reply that drifts from them is refused, not read.
+  for (const t of body.tracks as unknown[])
+    if (
+      !isObj(t) ||
+      !isStr(t.kind) ||
+      !TRACK_KINDS.includes(t.kind) ||
+      !Array.isArray(t.tracks) ||
+      t.tracks.length === 0 ||
+      !Array.isArray(t.positions) ||
+      (t.unchecked_by !== undefined &&
+        !(Array.isArray(t.unchecked_by) && t.unchecked_by.every(isStr)))
+    )
+      throw bad('Run results');
   return body as unknown as RunResults;
 }
 
@@ -254,8 +307,10 @@ export function httpScanApi(
       }
     },
     async start(req, signal) {
+      let answered = false;
       try {
         const res = await post(req, true, signal);
+        answered = true;
         const body = await json(res);
         if (isObj(body) && isStr(body.error) && isScanError(body.error))
           return { kind: 'error', code: body.error, detail: isStr(body.detail) ? body.detail : '' };
@@ -263,9 +318,12 @@ export function httpScanApi(
         return { kind: 'started', run: parseRunRecord(body) };
       } catch (e) {
         if (aborted(e)) throw e;
-        // No answer at all (no network, or the time limit): the server is not reachable, which is
-        // not the same as a server with no scan routes.
-        return { kind: 'error', code: 'scan:unreachable', detail: '' };
+        // The time limit, or a reply that could not be read: the server may have queued the scan,
+        // so the card must not say nothing started (Select again would start a second one).
+        // Only a request that never got through (no network) is `scan:unreachable`.
+        const timedOut = e instanceof DOMException && e.name === 'TimeoutError';
+        const code = answered || timedOut ? 'scan:no_answer' : 'scan:unreachable';
+        return { kind: 'error', code, detail: '' };
       }
     },
     async run(id, signal) {
@@ -317,6 +375,8 @@ export function getScanApi(): ScanApi {
   }
   return api;
 }
+/** True when the scan API in use is the dev-server mock (its runs are invented test values). */
+export const scanIsMock = (): boolean => getScanApi().isMock === true;
 /** Tests: put an implementation in place (null: choose again from the URL and env). */
 export function setScanApi(next: ScanApi | null): void {
   api = next;

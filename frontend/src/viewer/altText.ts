@@ -25,7 +25,7 @@ export const TYPE_NAME: Readonly<Record<ObjectType, string>> = {
   star_mira: 'Mira variable star',
   star_ttauri: 'T Tauri star',
   star: 'star',
-  candidate: 'unidentified moving source',
+  candidate: 'object whose type is not decided',
   planet_rocky: 'rocky planet',
   planet_water: 'water planet',
   gas_giant: 'gas giant',
