@@ -79,8 +79,11 @@ export function recordAt(run: RunRecord, t: number): RunRecord {
           known: known.size,
           found: found.size,
           unexplained: unexplained.size,
+          // No event carries an unchecked track (Q-479): not counted before the end frame.
+          unchecked: null,
           squares_done: squares.filter((s) => s.state === 'done').length,
           squares_skipped: squares.filter((s) => s.state === 'skipped').length,
+          squares_failed: squares.filter((s) => s.state === 'failed').length,
         },
   };
 }

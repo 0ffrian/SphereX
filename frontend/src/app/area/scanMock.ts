@@ -211,8 +211,10 @@ export function mockScanApi(
       known: 0,
       found: 0,
       unexplained: 0,
+      unchecked: 0,
       squares_done: 0,
       squares_skipped: 0,
+      squares_failed: 0,
     };
     let acc = 0;
     let running: { index: number; areaId: string; f: number } | null = null;
@@ -449,7 +451,12 @@ export function mockResultsOf(rec: RunRecord): RunResults {
     release: rec.release,
     region: rec.region,
     state: rec.state,
-    squares: rec.squares.map((s) => ({ index: s.index, area_id: s.area_id, state: s.state })),
+    squares: rec.squares.map((s) => ({
+      index: s.index,
+      area_id: s.area_id,
+      state: s.state,
+      missing: s.missing ?? [],
+    })),
     known: [...known.values()],
     tracks,
     provenance: { merge: MOCK_PROV, known_positions: MOCK_PROV, track_positions: MOCK_PROV },
