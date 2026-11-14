@@ -739,7 +739,6 @@ function ScanProvenance({ record, measured }: { record: RunRecord; measured: boo
         <ProvenanceBadge
           tag={p.track_positions.tag}
           tooltip={tip(p.track_positions)}
-          variant="tag"
         />
         Track positions
       </span>
@@ -748,7 +747,6 @@ function ScanProvenance({ record, measured }: { record: RunRecord; measured: boo
           <ProvenanceBadge
             tag={p.known_positions.tag}
             tooltip={tip(p.known_positions)}
-            variant="tag"
           />
           Known positions
         </span>

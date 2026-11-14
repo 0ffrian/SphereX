@@ -121,7 +121,6 @@ export function KnownPositionsLayer({ view }: { view: View | null }) {
             tag="model_dependent"
             tooltip="Estimated: JPL Horizons positions seen from SPHEREx at each frame time, a prediction rather than a measurement."
             srText
-            variant="tag"
           />
         </span>
       ) : (

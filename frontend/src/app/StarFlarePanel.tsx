@@ -68,7 +68,7 @@ export function StarFlarePanel({
         ) : (
           <span>{text ?? 'None yet. A flare starts at a spot group on a seeded schedule.'}</span>
         )}
-        <ProvenanceBadge tag="inferred_from_analog" fixture={fixture} variant="tag" />
+        <ProvenanceBadge tag="inferred_from_analog" fixture={fixture} />
       </div>
       <Rows>
         <Row title="About this flare">

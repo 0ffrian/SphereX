@@ -162,7 +162,7 @@ export function FlipbookSpectrum({ name }: { name: string }) {
         )}
         {/* D-02 badge for the measured points (Fixture on dev data) and the Q-23 caveat. */}
         <div className="fb-meta" data-testid="spectrum-provenance">
-          {sky.fixture ? <DataBadge fixture variant="tag" /> : <ProvenanceBadge tag="measured" variant="tag" />}
+          {sky.fixture ? <DataBadge fixture /> : <ProvenanceBadge tag="measured" />}
           <span data-testid="spectrum-caveat">Not absolute photometry: no aperture correction yet.</span>
         </div>
         {/* R13.12, A8 (Q-446): hear it as a sweep or as a 12-note chord. */}

@@ -1090,13 +1090,13 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
 
             {plan.star?.physics && !engineStar && (
               <dl
-                className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm"
+                className="grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-1 text-sm"
                 data-testid="star-readouts"
               >
                 {starReadouts(plan.star.physics).map((r) => (
                   <div key={r.label} className="contents">
                     <dt className="text-neutral-300">{r.label}</dt>
-                    <dd className="text-neutral-100">
+                    <dd className="flex items-center justify-end gap-2 whitespace-nowrap text-neutral-100 tabular-nums">
                       {r.value} {r.tag && <ProvenanceBadge tag={r.tag} fixture={objectIsFixture} />}
                     </dd>
                   </div>
@@ -1106,13 +1106,16 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
 
             {planetMeasured.length > 0 && (
               <dl
-                className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm"
+                className="grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-1 text-sm"
                 data-testid="planet-measured"
               >
                 {planetMeasured.map((m) => (
                   <div key={m.field} className="contents">
                     <dt className="text-neutral-300">{m.label}</dt>
-                    <dd className="text-neutral-100" title={m.source}>
+                    <dd
+                      className="flex items-center justify-end gap-2 whitespace-nowrap text-neutral-100 tabular-nums"
+                      title={m.source}
+                    >
                       {m.value} <ProvenanceBadge tag={m.tag} fixture={objectIsFixture} />
                     </dd>
                   </div>
