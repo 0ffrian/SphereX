@@ -49,6 +49,10 @@ describe('reply check', () => {
     expect(bad((o) => ((o.tracks[0]!.points[0] as { used: unknown }).used = 1))).toThrow(/used/);
     expect(bad((o) => ((o.tracks[0]!.points[0] as { visit: unknown }).visit = null))).toThrow(/visit/);
     expect(() => parseAreaSpectra(null)).toThrow();
+    // The Spectrum section's badge reads provenance.points and provenance.colour: never guessed.
+    expect(bad((o) => delete (o.provenance as Partial<AreaSpectra['provenance']>).colour)).toThrow(/provenance\.colour/);
+    expect(bad((o) => ((o.provenance.colour as { tag: string }).tag = 'artistic'))).toThrow(/provenance\.colour\.tag/);
+    expect(bad((o) => ((o.provenance.points as { tag: string }).tag = 'artistic'))).toThrow(/provenance\.points\.tag/);
   });
 
   it('knows every verdict of A17.13', () => {
@@ -59,6 +63,11 @@ describe('reply check', () => {
 describe('the HTTP client', () => {
   it('ok; 404 spectra_not_prepared is not run; everything else unavailable', async () => {
     expect((await httpSpectraApi('/v1', fetchOf(() => reply(EROS))).areaSpectra('eros-2026-03')).kind).toBe('ok');
+    const artistic = { ...EROS, provenance: { ...EROS.provenance, colour: { ...EROS.provenance.colour, tag: 'artistic' } } };
+    expect(await httpSpectraApi('/v1', fetchOf(() => reply(artistic))).areaSpectra('eros-2026-03')).toEqual({ kind: 'unavailable' });
+    const noColour = structuredClone(EROS);
+    delete (noColour.provenance as Partial<AreaSpectra['provenance']>).colour;
+    expect(await httpSpectraApi('/v1', fetchOf(() => reply(noColour))).areaSpectra('eros-2026-03')).toEqual({ kind: 'unavailable' });
     const notRun = reply({ error: 'spectra_not_prepared', detail: 'x' }, 404);
     expect(await httpSpectraApi('/v1', fetchOf(() => notRun)).areaSpectra('a')).toEqual({ kind: 'not_run' });
     expect(await httpSpectraApi('/v1', fetchOf(() => reply({ error: 'area_not_found' }, 404))).areaSpectra('a')).toEqual({ kind: 'unavailable' });
