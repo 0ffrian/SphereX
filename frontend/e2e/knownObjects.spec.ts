@@ -120,9 +120,9 @@ test('a square elsewhere is refused with area:not_prepared', async ({ page }) =>
   const refused = page.getByTestId('area-refused');
   await expect(refused).toBeVisible({ timeout: 15_000 });
   await expect(refused).toHaveAttribute('data-code', 'area:not_prepared');
-  // Held UI issue 6: a title, one line that says what to do, and Draw again.
+  // Held UI issue 6: a title, one line that says what to do, and Choose another region.
   await expect(refused).toContainText('No data for this area here');
-  await expect(refused).toContainText('Draw again');
+  await expect(refused).toContainText('Choose a region');
   await expect(page.getByTestId('area-redraw')).toBeVisible();
   await expect(page.getByTestId('known-row')).toHaveCount(0);
 });

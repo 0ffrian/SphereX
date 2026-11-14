@@ -5,15 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useShellStore } from '@/app/shell/shellStore';
 import { useAreaStore } from '@/app/shell/areaStore';
 import { foundText, runLine } from '@/app/shell/RunsMenu';
-import {
-  getScanApi,
-  httpScanApi,
-  mockScanApi,
-  parseRunList,
-  setScanApi,
-  summaryOf,
-  type RunSummary,
-} from './scanApi';
+import { getScanApi, httpScanApi, parseRunList, setScanApi, type RunSummary } from './scanApi';
+import { mockScanApi, summaryOf } from './scanMock';
 import { filteredRuns, resetRuns, RUNS_POLL_MS, setRunsClock, useRunsStore } from './runsStore';
 import { resetScans, useScanStore } from './scanStore';
 

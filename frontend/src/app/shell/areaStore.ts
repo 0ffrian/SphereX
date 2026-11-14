@@ -39,14 +39,12 @@ export interface AreaBox {
   widthDeg: number;
   heightDeg: number;
 }
-/** The rectangle being dragged, in sky-pane pixels. */
-export interface AreaDrag {
+/** A rectangle in sky-pane pixels (a set area's corners on screen now). */
+export interface PixelRect {
   x0: number;
   y0: number;
   x1: number;
   y1: number;
-  /** A side is held at the 2° limit (issue #144): the readout says "2° max". */
-  held?: boolean;
 }
 /**
  * Where the flow is: the drawing card, the island searching, the list, an Eros card, the steps, or
@@ -105,14 +103,13 @@ export interface AreaState {
   /** Which dock tool started this (the dock highlight follows it). */
   flow: AreaFlow;
   /**
-   * aiming: the pointer is the next view's rectangle, a click zooms there (issue #144);
-   * drawing: in that view, waiting for a drag; set: an area exists.
+   * aiming: the pointer is the region to select, a click selects it (issue #157, Q-472);
+   * set: an area or a scan's region exists.
    */
-  stage: 'aiming' | 'drawing' | 'set';
+  stage: 'aiming' | 'set';
   box: AreaBox | null;
   /** The last area, kept for "Keep the last area" after redrawing or reopening. */
   last: AreaBox | null;
-  drag: AreaDrag | null;
   screen: AreaScreen;
   say: AreaSay | null;
   /** The card is shrunk to the island's pill. */
@@ -147,11 +144,8 @@ export interface AreaState {
   ov: ErosOverlays;
   /** Bumped when the sky should fly to fit the whole area (and on a refit). */
   fitSeq: number;
-  /** Dock: start a flow (also from another flow): drawing mode, nothing searched yet. */
+  /** Dock: start a flow (also from another flow): selecting, nothing searched yet. */
   startFlow(flow: AreaFlow): void;
-  setDrag(drag: AreaDrag | null): void;
-  /** Aim: the patch is picked (the sky zooms to it); the drag now draws. */
-  pickPatch(): void;
   /** The area is set: Known starts the island's search, Discovery opens its steps. */
   setBox(box: AreaBox): void;
   redraw(): void;
@@ -220,7 +214,6 @@ function clearTimers(): void {
 const FRESH = {
   stage: 'aiming' as const,
   box: null,
-  drag: null,
   screen: 'draw' as const,
   say: null,
   minimised: false,
@@ -388,8 +381,8 @@ export const useAreaStore = create<AreaState>()((set, get) => {
     const shell = useShellStore.getState();
     const s = get();
     // Never over another area the user is busy with (any card of a set box, the live card of
-    // another box included, or a box being dragged): only on the plain sky or while aiming.
-    if (ifIdle && shell.tool === 'area' && (s.stage === 'set' || s.drag !== null)) return;
+    // another box included): only on the plain sky or while selecting.
+    if (ifIdle && shell.tool === 'area' && s.stage === 'set') return;
     if (ifIdle && shell.tool !== 'area' && shell.tool !== 'sky') return;
     clearTimers();
     set({ ...FRESH, flow });
@@ -453,10 +446,6 @@ export const useAreaStore = create<AreaState>()((set, get) => {
       useLiveJobStore.getState().clearView();
       useTrackJobStore.getState().clear();
       set({ ...FRESH, flow });
-    },
-    setDrag: (drag) => set({ drag }),
-    pickPatch: () => {
-      if (get().stage === 'aiming') set({ stage: 'drawing', drag: null });
     },
     setBox: (box) => {
       if (get().flow === 'known') runKnown(box);

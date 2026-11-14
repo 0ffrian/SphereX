@@ -4633,15 +4633,6 @@ body {
   display: inline-block;
   flex: none;
 }
-.sx-area-size {
-  position: absolute;
-  left: 1px;
-  top: -20px;
-  font: 500 11px ui-monospace, monospace;
-  color: #4ade80;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
 .sx-kn-body {
   gap: 10px;
 }
@@ -5370,18 +5361,11 @@ body {
 }
 
 /* ---- Live areas (issue #144, Q-462; the live-areas mock-up, states 1 to 6) ----
-   Aim: the pointer is the next view's rectangle (the canvas hides its own); draw: a + pointer, the
-   box stops at 2° a side with a readout over it. The live card: offer, computing, waiting, failure.
+   The pointer is the selection rectangle (the canvas hides its own; issue #157). The live card:
+   offer, computing, waiting, failure.
    Messages are a status dot, a short title and one muted line: no coloured border, no tint. */
 .sx-sky-pane canvas[data-area-mode='aim'] {
   cursor: none;
-}
-.sx-sky-pane canvas[data-area-mode='draw'] {
-  /* An 18 px + in --fg (#e6e9eb) with a dark edge, as the mock-up's; the system crosshair otherwise. */
-  cursor:
-    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='19' height='19'><path d='M9.5 0v19M0 9.5h19' stroke='%23000' stroke-opacity='.75' stroke-width='4'/><path d='M9.5 0v19M0 9.5h19' stroke='%23e6e9eb' stroke-width='2'/></svg>")
-      9 9,
-    crosshair;
 }
 .sx-aim {
   position: absolute;
@@ -5422,48 +5406,29 @@ body {
   top: calc(100% + 6px);
 }
 .sx-area-size {
+  position: absolute;
+  left: 1px;
   top: -18px;
 }
-.sx-area-size[data-held] {
-  color: var(--fg);
-}
-/* The + on the corner being dragged. */
-.sx-area-plus {
-  position: absolute;
-  width: 18px;
-  height: 18px;
-  pointer-events: none;
-}
-.sx-area-plus[data-corner^='b'] {
-  bottom: -9px;
-}
-.sx-area-plus[data-corner^='t'] {
-  top: -9px;
-}
-.sx-area-plus[data-corner$='r'] {
-  right: -9px;
-}
-.sx-area-plus[data-corner$='l'] {
-  left: -9px;
-}
-.sx-area-plus::before,
-.sx-area-plus::after {
-  content: '';
-  position: absolute;
-  background: var(--fg);
-  box-shadow: 0 0 2px rgba(0, 0, 0, 0.8);
-}
-.sx-area-plus::before {
-  left: 8px;
-  top: 0;
-  width: 2px;
-  height: 18px;
-}
-.sx-area-plus::after {
-  top: 8px;
-  left: 0;
-  width: 18px;
-  height: 2px;
+/* On a phone the hint and the region's label wrap inside the screen (16 px gutters) instead of
+   running off it; the label is centred under the region (which waits in the middle on touch). */
+@media (max-width: 640px) {
+  .sx-aim b {
+    left: 50%;
+    transform: translateX(-50%);
+    width: max-content;
+    max-width: calc(100vw - 32px);
+    white-space: normal;
+    text-align: center;
+  }
+  .sx-area-hint {
+    width: max-content;
+    max-width: calc(100vw - 32px);
+    white-space: normal;
+    text-align: center;
+    justify-content: center;
+    border-radius: 16px;
+  }
 }
 /* The hint sits at the top centre of the sky on a desktop width (mock-up `.hint`). */
 @media (min-width: 641px) {

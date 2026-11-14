@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { boxFromPixels, boxToPixels, centreRect, fitCamera, rectOf, registerAreaView } from './areaDraw';
+import { regionBox } from '@/app/area/scanGrid';
+import { boxToPixels, fitCamera, registerAreaView } from './areaDraw';
 import type { SkyCamera } from '@/viewer/sky/skyMath';
 
 let cam: SkyCamera = { ra: 100, dec: 10, fovDeg: 4 };
@@ -10,43 +11,37 @@ const access = {
     cam = c;
   },
 };
+// A region's box, as a selection gives it (issue #157).
+const BOX = regionBox({ ra: 100, dec: 10, width_deg: 3, height_deg: 1.5 });
 
 afterEach(() => registerAreaView(null));
 
 describe('areaDraw', () => {
-  it('rectOf keeps the corners as given', () => {
-    expect(rectOf(1, 2, 3, 4)).toEqual({ x0: 1, y0: 2, x1: 3, y1: 4 });
+  it('without a view there is no box on screen or fit', () => {
+    expect(boxToPixels(BOX)).toBeNull();
+    expect(fitCamera(BOX, { l: 0, t: 0, r: 500, b: 300 })).toBeNull();
   });
-  it('without a view there is no box, centre or fit', () => {
-    expect(centreRect()).toBeNull();
-    expect(boxFromPixels({ x0: 0, y0: 0, x1: 10, y1: 10 })).toBeNull();
-    expect(fitCamera({ a: { ra: 1, dec: 1 }, b: { ra: 2, dec: 0 }, widthDeg: 1, heightDeg: 1 }, { l: 0, t: 0, r: 500, b: 300 })).toBeNull();
-  });
-  it('centreRect is a wide box around the view centre', () => {
+  it('a box centred on the view maps to pixels around the screen centre', () => {
     cam = { ra: 100, dec: 10, fovDeg: 4 };
     registerAreaView(access);
-    const b = centreRect()!;
-    expect(b.widthDeg).toBeGreaterThan(b.heightDeg);
-    expect((b.a.ra + b.b.ra) / 2).toBeCloseTo(100, 1);
-    expect((b.a.dec + b.b.dec) / 2).toBeCloseTo(10, 1);
-  });
-  it('a box maps to pixels and back to the same corners', () => {
-    cam = { ra: 100, dec: 10, fovDeg: 4 };
-    registerAreaView(access);
-    const b = boxFromPixels({ x0: 300, y0: 200, x1: 700, y1: 400 })!;
-    const px = boxToPixels(b)!;
-    expect(px.x0).toBeCloseTo(300, 3);
-    expect(px.y1).toBeCloseTo(400, 3);
+    const px = boxToPixels(BOX)!;
+    expect((px.x0 + px.x1) / 2).toBeCloseTo(500, 0);
+    expect((px.y0 + px.y1) / 2).toBeCloseTo(300, 0);
+    // East is on the left: the top-left corner is left of and above the bottom-right one.
+    expect(px.x0).toBeLessThan(px.x1);
+    expect(px.y0).toBeLessThan(px.y1);
   });
   it('fitCamera puts the whole box inside the safe rectangle', () => {
     cam = { ra: 100, dec: 10, fovDeg: 4 };
     registerAreaView(access);
-    const b = boxFromPixels({ x0: 100, y0: 100, x1: 900, y1: 500 })!;
     const safe = { l: 20, t: 60, r: 600, b: 500 };
-    const fit = fitCamera(b, safe)!;
+    const fit = fitCamera(BOX, safe)!;
     cam = fit;
-    const px = boxToPixels(b)!;
-    for (const [x, y] of [[px.x0, px.y0], [px.x1, px.y1]] as const) {
+    const px = boxToPixels(BOX)!;
+    for (const [x, y] of [
+      [px.x0, px.y0],
+      [px.x1, px.y1],
+    ] as const) {
       expect(x).toBeGreaterThan(safe.l - 2);
       expect(x).toBeLessThan(safe.r + 2);
       expect(y).toBeGreaterThan(safe.t - 2);

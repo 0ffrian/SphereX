@@ -178,13 +178,13 @@ describe('KnownList rows (A18.5, Q-466)', () => {
     expect(notes.textContent).toContain('SkyBoT) has no answer for visit 2');
     expect(notes.textContent).toContain('No predicted path for 433 Eros');
   });
-  it('a refusal replaces the list with a title, one line and Draw again (held UI issue 6)', async () => {
+  it('a refusal replaces the list with a title, one line and Choose another region (held UI issue 6)', async () => {
     useAreaStore.setState({ known: null, refusal: { code: 'area:not_prepared', message: 'No prepared data for this area yet.' } });
     await act(async () => root.render(<KnownList />));
     const r = host.querySelector('[data-testid="area-refused"]')!;
     expect(r.getAttribute('data-code')).toBe('area:not_prepared');
     expect(r.querySelector('b')?.textContent).toBe('No data for this area here');
-    expect(r.querySelector('span')?.textContent).toContain('Draw again');
+    expect(r.querySelector('span')?.textContent).toContain('Choose a region');
     expect(host.querySelector('[data-testid="area-redraw"]')).not.toBeNull();
     expect(host.querySelector('[data-testid="known-list"]')).toBeNull();
   });
