@@ -7,9 +7,11 @@ import { useEffect, useRef, type MutableRefObject } from 'react';
 import { newSim, quadPoint, ringLook, stepSim } from './scanRings';
 import type { Pt } from './scanLabels';
 
-const prefersStill = () =>
-  typeof window !== 'undefined' &&
-  (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false);
+/** Reduced motion, read live: a change while the rings play stops or starts them. */
+const stillQuery = () =>
+  typeof window !== 'undefined'
+    ? (window.matchMedia?.('(prefers-reduced-motion: reduce)') ?? null)
+    : null;
 
 export function ScanRings({
   quad,
@@ -24,7 +26,8 @@ export function ScanRings({
 
   useEffect(() => {
     const g = gRef.current;
-    if (!active || !g || prefersStill() || typeof requestAnimationFrame !== 'function') return;
+    if (!active || !g || typeof requestAnimationFrame !== 'function') return;
+    const still = stillQuery();
     const sim = newSim(performance.now());
     let raf = 0;
     const frame = (now: number) => {
@@ -37,7 +40,7 @@ export function ScanRings({
       for (let i = 0; i < circles.length; i++) {
         const c = circles[i] as SVGCircleElement;
         const r = sim.rings[i];
-        if (!r || !q) {
+        if (!r || !q || still?.matches) {
           c.setAttribute('display', 'none');
           continue;
         }

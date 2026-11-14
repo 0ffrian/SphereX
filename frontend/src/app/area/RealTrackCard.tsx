@@ -109,6 +109,7 @@ export function RealTrackCard({
       title={areaTrackLabel(t)}
       // The verdict line says what it is; without one (no spectrum, or Measured only) a short line does.
       subtitle={spectrum && !spectrum.measuredOnly ? undefined : VERDICT[t.verdict]}
+      wrapSubtitle
       onClose={closePanel}
       back={back}
       onMinimise={() => useAreaStore.getState().setMinimised(true)}

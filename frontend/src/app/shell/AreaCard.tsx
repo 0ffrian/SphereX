@@ -6,6 +6,8 @@
 // The results are a DEMO (app/area/areaService.ts, Q-205 pending) and are tagged as such.
 import { useEffect, useLayoutEffect } from 'react';
 import { areaBackOf, useAreaBack } from '@/app/area/areaBack';
+import { useRunsStore } from '@/app/area/runsStore';
+import { isEditableTarget } from './shortcuts';
 import { boxInBezel, useIslandStore } from '@/app/island/islandStore';
 import { DiscoveryCard, MoverCard } from '@/app/area/DiscoveryCard';
 import { ErosCard } from '@/app/area/ErosCard';
@@ -109,7 +111,9 @@ export function AreaCard() {
   // focus is inside it).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape' || e.defaultPrevented) return;
+      if (e.key !== 'Escape' || e.defaultPrevented || isEditableTarget(e.target)) return;
+      // A replay owns Escape (ReplayBar ends it).
+      if (useRunsStore.getState().replay) return;
       e.preventDefault();
       const s = useAreaStore.getState();
       const b = s.minimised ? null : areaBackOf(s);

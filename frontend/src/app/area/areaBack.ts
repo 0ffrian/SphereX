@@ -22,7 +22,18 @@ type Where = Pick<
 const toList = (s: Where): AreaBack | null =>
   s.fromScan
     ? { label: 'Back to the scan', go: backToScan }
-    : { label: 'Back to your patch', go: () => useAreaStore.getState().backToPatch() };
+    : {
+        label: 'Back to your patch',
+        go: () => {
+          useAreaStore.getState().backToPatch();
+          // Focus goes to the island's pill, which names the folded card ("Discovery, minimised").
+          requestAnimationFrame(() =>
+            document
+              .querySelector<HTMLElement>('[data-testid="island-mini"]')
+              ?.focus({ preventScroll: true }),
+          );
+        },
+      };
 
 /** The ← of the card on screen now, or null when it is the first card of its branch. Pure but `go`. */
 export function areaBackOf(s: Where): AreaBack | null {

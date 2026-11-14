@@ -97,7 +97,7 @@ export function DiscoveryCard() {
   const showPossible = useAreaStore((s) => s.showPossible);
   const all = disc?.movers ?? [];
   const nPossible = all.filter(isPossible).length;
-  const movers = showPossible ? all : all.filter((m) => !isPossible(m));
+  const shownMovers = showPossible ? all : all.filter((m) => !isPossible(m));
   const active: MoverFilter = showVerdicts ? filter : 'all';
   // Indexes stay those of disc.movers (openMover takes them).
   const shown = all
@@ -111,7 +111,7 @@ export function DiscoveryCard() {
         : step >= total - 1
           ? real && !real.tracks
             ? 'The tracks could not be loaded'
-            : `${movers.length} movers found${nPossible > 0 && !showPossible ? `, ${nPossible} possible hidden` : ''}`
+            : `${shownMovers.length} movers found${nPossible > 0 && !showPossible ? `, ${nPossible} possible hidden` : ''}`
           : '';
   return (
     <PanelCard
@@ -191,14 +191,14 @@ export function DiscoveryCard() {
           })}
         </div>
       )}
-      {step >= 3 && showVerdicts && movers.length > 0 && (
+      {step >= 3 && showVerdicts && shownMovers.length > 0 && (
         <ToggleGroup<MoverFilter>
           label="Show"
           hideLabel
           options={[
-            { value: 'all', label: `All ${movers.length}`, testId: 'disc-filter-all' },
-            { value: 'rock', label: `Rock-like ${movers.filter((m) => keep(m, 'rock')).length}`, testId: 'disc-filter-rock' },
-            { value: 'known', label: `Known ${movers.filter((m) => keep(m, 'known')).length}`, testId: 'disc-filter-known' },
+            { value: 'all', label: `All ${shownMovers.length}`, testId: 'disc-filter-all' },
+            { value: 'rock', label: `Rock-like ${shownMovers.filter((m) => keep(m, 'rock')).length}`, testId: 'disc-filter-rock' },
+            { value: 'known', label: `Known ${shownMovers.filter((m) => keep(m, 'known')).length}`, testId: 'disc-filter-known' },
           ]}
           value={active}
           onChange={setFilter}
@@ -240,17 +240,16 @@ export function DiscoveryCard() {
         // Until the completeness and false-alarm checks (D4 to D7) exist (plan answer 4).
         <Alert tone="warn" title="Detection rates not measured yet" line="Treat possible tracks as leads." testId="disc-rates" />
       )}
-      {(done || refusal) && (
+      {(done || refusal || nPossible > 0) && (
         <div className="sx-live-btns">
-          {done && nPossible > 0 && (
+          {nPossible > 0 && (
             <button
               type="button"
               className="sx-btn-outline"
-              aria-pressed={showPossible}
               onClick={() => useAreaStore.getState().setShowPossible(!showPossible)}
               data-testid="disc-show-possible"
             >
-              {`Show possible (${nPossible.toLocaleString('en-GB')})`}
+              {`${showPossible ? 'Hide' : 'Show'} possible (${nPossible.toLocaleString('en-GB')})`}
             </button>
           )}
           {done && real && (
@@ -263,14 +262,16 @@ export function DiscoveryCard() {
               Export ECSV
             </a>
           )}
-          <button
-            type="button"
-            className="sx-btn-outline"
-            data-testid="area-redraw"
-            onClick={() => useAreaStore.getState().redraw()}
-          >
-            Choose another region
-          </button>
+          {(done || refusal) && (
+            <button
+              type="button"
+              className="sx-btn-outline"
+              data-testid="area-redraw"
+              onClick={() => useAreaStore.getState().redraw()}
+            >
+              Choose another region
+            </button>
+          )}
         </div>
       )}
       </div>
