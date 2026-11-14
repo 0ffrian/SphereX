@@ -6213,12 +6213,16 @@ li[data-state='running'] > .sx-live-mk {
 .sx-runs-play:hover:not(:disabled, [aria-disabled='true']) {
   background: var(--glass-veil-hover);
 }
+/* D-38: a disabled button is --s3 with --muted text, never a faded colour (as .sx-live's). */
 .sx-runs-play:disabled {
-  opacity: 0.4;
   cursor: not-allowed;
+  background: var(--s3);
+  border-color: var(--s3);
+  color: var(--muted);
 }
+/* Loading its record: the icon goes --muted (not faded) and the pointer says it is busy. */
 .sx-runs-play[aria-busy='true'] {
-  opacity: 0.6;
+  color: var(--muted);
   cursor: progress;
 }
 /* Messages: a status dot, a short title and one muted line (no tinted box). */
@@ -6299,8 +6303,8 @@ li[data-state='running'] > .sx-live-mk {
   width: 40px;
   height: 40px;
   border-radius: 8px;
-  background: var(--s3);
-  border: 1px solid var(--line);
+  background: var(--glass-inner);
+  border: 1px solid var(--glass-inner-edge);
   display: grid;
   place-items: center;
   color: var(--fg);
