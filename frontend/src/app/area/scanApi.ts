@@ -6,6 +6,7 @@
 //          (no network calls on the backend; visit pairs are resolved square by square by the job)
 //   POST   same body with start: true -> 202 RunRecord
 //          errors: 422 scan:too_large | area:bad_box, 429 queue_full, 503 offline
+//   GET    /v1/runs -> RunList (every run, newest first; the runs menu of #158)
 //   GET    /v1/runs/{run_id} -> RunRecord (404 run_not_found)
 //   POST   /v1/runs/{run_id}/pause, /resume -> RunRecord (409 run_not_pausable | run_not_paused |
 //          run_finished; 429 queue_full on resume)
@@ -32,6 +33,7 @@ import type {
   RunSquare,
   RunSquareState,
   RunState,
+  RunSummary,
   RunTotals,
   RunTrackRow,
   ScanPlan as ContractScanPlan,
@@ -60,6 +62,7 @@ export type {
   RunResults,
   RunSquare,
   RunState,
+  RunSummary,
   RunTotals,
   RunTrackRow,
 };
@@ -96,6 +99,8 @@ export interface ScanApi {
   resume(runId: string): Promise<RunRecord>;
   stop(runId: string): Promise<void>;
   results(runId: string, signal?: AbortSignal): Promise<RunResults>;
+  /** Every run, newest first (`GET /v1/runs`). Throws when the list cannot be read. */
+  list(signal?: AbortSignal): Promise<RunSummary[]>;
 }
 
 // ---- Reply checks (shape only; #156's schemas replace them) ------------------------------------
@@ -168,6 +173,29 @@ export function parseRunRecord(body: unknown): RunRecord {
   for (const e of body.events as unknown[])
     if (!isObj(e) || !isNum(e.t) || !isStr(e.type)) throw bad('Run');
   return body as unknown as RunRecord;
+}
+
+const RUN_KINDS: readonly string[] = ['discovery', 'known'];
+
+export function parseRunList(body: unknown): RunSummary[] {
+  if (!isObj(body) || !Array.isArray(body.runs)) throw bad('Run list');
+  for (const r of body.runs as unknown[])
+    if (
+      !isObj(r) ||
+      !isStr(r.run_id) ||
+      !isStr(r.kind) ||
+      !RUN_KINDS.includes(r.kind) ||
+      !isBox(r.region) ||
+      !isStr(r.state) ||
+      !RUN_STATES.includes(r.state) ||
+      !isStr(r.created_at) ||
+      !(isNum(r.duration_s) || r.duration_s === null) ||
+      !isObj(r.totals) ||
+      !isNum(r.squares_done) ||
+      !isNum(r.squares_total)
+    )
+      throw bad('Run list');
+  return body.runs as RunSummary[];
 }
 
 export function parseRunResults(body: unknown): RunResults {
@@ -256,6 +284,11 @@ export function httpScanApi(
       const body = await json(res);
       if (res.status === 404) throw new RunGone(id);
       return parseRunResults(body);
+    },
+    async list(signal) {
+      const res = await fetchImpl(`${base}/runs`, { signal: timed(signal) });
+      if (!res.ok) throw new Error(`Runs request failed (${res.status}).`);
+      return parseRunList(await json(res));
     },
   };
 }

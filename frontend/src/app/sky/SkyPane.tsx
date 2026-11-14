@@ -29,6 +29,7 @@ import type { SkyCachedObject, SkySurvey } from '@/app/api/types';
 import { isApiError } from '@/app/api/errors';
 import { formatCoords } from '@/app/format';
 import { Icon } from '@/app/shell/icons';
+import { popoverTakesEscape } from '@/app/shell/shortcuts';
 import { getSkyApi, useAppStore } from '@/state/store';
 import { prefersReducedMotion, type RendererBackend } from '@/viewer/ViewerApp';
 import { SkyView } from '@/viewer/sky/SkyView';
@@ -68,6 +69,7 @@ import { KnownPositionsLayer } from '@/app/area/KnownPositionsLayer';
 import { enterInArea, pickRegionAt, registerAreaView, restoreSavedScan } from './areaDraw';
 import { ScanOverlay, scanClickAt } from './ScanOverlay';
 import { AimOverlay } from './AimOverlay';
+import { ReplayBar } from './ReplayBar';
 import { useCachedMarkers } from './useCachedMarkers';
 import { useTargetMarkers, type TargetMarker } from './useTargetMarkers';
 
@@ -167,11 +169,25 @@ export function SkyPane({ children }: { children?: ReactNode }) {
   const creditBtnRef = useRef<HTMLButtonElement>(null);
   const creditId = useId();
   const [creditOpen, setCreditOpen] = useState(false);
-  // Escape or a press outside the popover and its button closes it.
+  // The split view (the build pane) hides the credit (index.css), so it closes the popover too: a
+  // hidden popover must not keep its Escape listener (A21.10).
+  useEffect(
+    () =>
+      useShellStore.subscribe((s) => {
+        if (s.build.open && !s.buildMinimised) setCreditOpen(false);
+      }),
+    [],
+  );
+  // Escape or a press outside the popover and its button closes it. Escape is taken on `document` in
+  // the bubble phase: after the focus-scoped React handlers (a menu or popover with focus inside it
+  // closes first and stops the press), before every window listener (the replay's), so one press
+  // closes one thing (A21.10). A text field keeps its Escape, and a popover that is not drawn takes
+  // none.
   useEffect(() => {
     if (!creditOpen) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape' || e.defaultPrevented) return;
+      if (!popoverTakesEscape(e, creditRef.current)) return;
+      e.preventDefault();
       setCreditOpen(false);
       creditBtnRef.current?.focus();
     };
@@ -180,10 +196,10 @@ export function SkyPane({ children }: { children?: ReactNode }) {
       if (creditRef.current?.contains(t) || creditBtnRef.current?.contains(t)) return;
       setCreditOpen(false);
     };
-    window.addEventListener('keydown', onKey);
+    document.addEventListener('keydown', onKey);
     window.addEventListener('pointerdown', onDown, true);
     return () => {
-      window.removeEventListener('keydown', onKey);
+      document.removeEventListener('keydown', onKey);
       window.removeEventListener('pointerdown', onDown, true);
     };
   }, [creditOpen]);
@@ -788,6 +804,7 @@ export function SkyPane({ children }: { children?: ReactNode }) {
       <AreaOverlay view={view} />
       <AimOverlay view={view} />
       <ScanOverlay view={view} />
+      <ReplayBar />
       <AreaTrackLayer view={view} />
       <KnownPositionsLayer view={view} />
       {/* Panels sit right after the canvas in the tab order. */}
