@@ -4,6 +4,7 @@
 import { useEffect, useId, useRef, type KeyboardEvent, type ReactNode, type Ref } from 'react';
 import { useIslandStore } from '@/app/island/islandStore';
 import { Icon, type IconName } from './icons';
+import { BackArrow } from './BackArrow';
 
 /** Hands the element to a function or object ref (kept out of the component: a ref's owner is the caller). */
 function assignRef(ref: Ref<HTMLElement> | undefined, el: HTMLElement | null) {
@@ -24,6 +25,8 @@ export function PanelCard({
   pending = false,
   bare = false,
   testId,
+  back,
+  wrapSubtitle = false,
   children,
 }: {
   title: string;
@@ -47,6 +50,13 @@ export function PanelCard({
    */
   bare?: boolean;
   testId: string;
+  /**
+   * A ← before the title that steps back one level (issue #173); Escape inside the card does the
+   * same, and × still closes everything.
+   */
+  back?: { label: string; go(): void } | null;
+  /** The subtitle wraps to two lines instead of being cut (a sentence, not a name). */
+  wrapSubtitle?: boolean;
   children: ReactNode | ((close: () => void) => ReactNode);
 }) {
   // The area cards (Known objects, Discovery) are travelled to by the island like the object panel:
@@ -83,7 +93,8 @@ export function PanelCard({
   const onKeyDown = (e: KeyboardEvent<HTMLElement>) => {
     if (e.key !== 'Escape' || e.defaultPrevented) return;
     e.preventDefault();
-    close();
+    if (back) back.go();
+    else close();
   };
   return (
     <section
@@ -104,6 +115,18 @@ export function PanelCard({
     >
       {!bare && (
       <header className="sx-panel-head">
+        {back && (
+          <button
+            type="button"
+            className="sx-panel-x sx-panel-back"
+            aria-label={back.label}
+            title={`${back.label} (Esc)`}
+            onClick={back.go}
+            data-testid="area-back"
+          >
+            <BackArrow />
+          </button>
+        )}
         {icon && (
           <span
             className="grid size-9 flex-none place-items-center rounded-xl bg-sx-muted text-sx-green"
@@ -118,7 +141,10 @@ export function PanelCard({
           </h2>
           {subtitle && (
             // A long name is cut with an ellipsis; the tooltip has it in full.
-            <p className="truncate" title={typeof subtitle === 'string' ? subtitle : undefined}>
+            <p
+              className={wrapSubtitle ? 'line-clamp-2' : 'truncate'}
+              title={typeof subtitle === 'string' ? subtitle : undefined}
+            >
               {subtitle}
             </p>
           )}

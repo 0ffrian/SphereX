@@ -13,6 +13,7 @@ import { DemoTag } from './DemoTag';
 import { ErosCard, MoverDemoCard } from './ErosCard';
 import { RealAreaNotes } from './RealAreaNotes';
 import { RealTrackCard } from './RealTrackCard';
+import { useAreaBack } from './areaBack';
 import { Alert, AreaAlert } from './areaBits';
 import { API_BASE } from '@/app/api/config';
 import { visitNumbers } from '@/app/sky/area/blink';
@@ -21,7 +22,7 @@ import { SpectrumRowWord } from './SpectrumCard';
 import { flagsFrom } from './spectrumWords';
 import { ToggleGroup } from '@/app/PanelControls';
 import { useAppStore } from '@/state/store';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { RealDiscovery } from './realArea';
 
 /** The result chip of a mover row: the stored verdict for a prepared area, the demo's kind else. */
@@ -41,6 +42,8 @@ function MoverChip({ m, step }: { m: DiscoveryMover; step: number }) {
 }
 
 type MoverFilter = 'all' | 'rock' | 'known';
+/** A single-visit or ambiguous possible: hidden on the sky and in the list until asked (#173). */
+export const isPossible = (m: DiscoveryMover) => m.track?.verdict === 'possible';
 /** The results filter (mock-up state A): all, the Rock-like spectrum verdicts, or the known objects. */
 const keep = (m: DiscoveryMover, f: MoverFilter) =>
   f === 'all' || (f === 'rock' ? m.spectrum?.verdict === 'rock' : m.known !== null);
@@ -67,7 +70,18 @@ export function DiscoveryCard() {
   const box = useAreaStore((s) => s.box);
   const refusal = useAreaStore((s) => s.refusal);
   const closePanel = useShellStore((s) => s.closePanel);
+  const back = useAreaBack();
   const visit = useAreaStore((s) => s.visit);
+  // Back from a track (#173): the list opens on the row it came from.
+  const cameFrom = useAreaStore((s) => (s.sel >= 0 ? (s.disc?.movers[s.sel]?.id ?? null) : null));
+  useEffect(() => {
+    if (!cameFrom) return;
+    const row = document.querySelector<HTMLElement>(`[data-testid="disc-mover-${CSS.escape(cameFrom)}"]`);
+    row?.scrollIntoView({ block: 'nearest' });
+    row?.focus({ preventScroll: true });
+    // Only on arrival.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const real = disc?.real ?? null;
   const visits = real ? visitNumbers(real.summary, real.dots) : [];
   // The spectrum check (A18.7, issue #162): the row verdicts show once its step is done, and never
@@ -80,9 +94,15 @@ export function DiscoveryCard() {
   const done = total > 0 && !running && step >= total - 1;
   const spectrumAt = steps.findIndex((s) => s.label === SPECTRUM_STEP);
   const showVerdicts = !measuredOnly && spectrumAt >= 0 && step >= spectrumAt;
-  const movers = disc?.movers ?? [];
+  const showPossible = useAreaStore((s) => s.showPossible);
+  const all = disc?.movers ?? [];
+  const nPossible = all.filter(isPossible).length;
+  const shownMovers = showPossible ? all : all.filter((m) => !isPossible(m));
   const active: MoverFilter = showVerdicts ? filter : 'all';
-  const shown = movers.map((m, i) => ({ m, i })).filter(({ m }) => keep(m, active));
+  // Indexes stay those of disc.movers (openMover takes them).
+  const shown = all
+    .map((m, i) => ({ m, i }))
+    .filter(({ m }) => (showPossible || !isPossible(m)) && keep(m, active));
   const announce =
     total === 0
       ? ''
@@ -91,7 +111,7 @@ export function DiscoveryCard() {
         : step >= total - 1
           ? real && !real.tracks
             ? 'The tracks could not be loaded'
-            : `${disc?.movers.length ?? 0} movers found`
+            : `${shownMovers.length} movers found${nPossible > 0 && !showPossible ? `, ${nPossible} possible hidden` : ''}`
           : '';
   return (
     <PanelCard
@@ -101,6 +121,7 @@ export function DiscoveryCard() {
       onMinimise={() => useAreaStore.getState().setMinimised(true)}
       returnFocusTo='[data-testid="tool-area"]'
       testId="area-card"
+      back={back}
     >
       <div className="sx-live sx-results" data-testid="disc-card">
       {refusal ? (
@@ -170,14 +191,14 @@ export function DiscoveryCard() {
           })}
         </div>
       )}
-      {step >= 3 && showVerdicts && movers.length > 0 && (
+      {step >= 3 && showVerdicts && shownMovers.length > 0 && (
         <ToggleGroup<MoverFilter>
           label="Show"
           hideLabel
           options={[
-            { value: 'all', label: `All ${movers.length}`, testId: 'disc-filter-all' },
-            { value: 'rock', label: `Rock-like ${movers.filter((m) => keep(m, 'rock')).length}`, testId: 'disc-filter-rock' },
-            { value: 'known', label: `Known ${movers.filter((m) => keep(m, 'known')).length}`, testId: 'disc-filter-known' },
+            { value: 'all', label: `All ${shownMovers.length}`, testId: 'disc-filter-all' },
+            { value: 'rock', label: `Rock-like ${shownMovers.filter((m) => keep(m, 'rock')).length}`, testId: 'disc-filter-rock' },
+            { value: 'known', label: `Known ${shownMovers.filter((m) => keep(m, 'known')).length}`, testId: 'disc-filter-known' },
           ]}
           value={active}
           onChange={setFilter}
@@ -219,8 +240,18 @@ export function DiscoveryCard() {
         // Until the completeness and false-alarm checks (D4 to D7) exist (plan answer 4).
         <Alert tone="warn" title="Detection rates not measured yet" line="Treat possible tracks as leads." testId="disc-rates" />
       )}
-      {(done || refusal) && (
+      {(done || refusal || nPossible > 0) && (
         <div className="sx-live-btns">
+          {nPossible > 0 && (
+            <button
+              type="button"
+              className="sx-btn-outline"
+              onClick={() => useAreaStore.getState().setShowPossible(!showPossible)}
+              data-testid="disc-show-possible"
+            >
+              {`${showPossible ? 'Hide' : 'Show'} possible (${nPossible.toLocaleString('en-GB')})`}
+            </button>
+          )}
           {done && real && (
             <a
               className="sx-btn-outline"
@@ -231,14 +262,16 @@ export function DiscoveryCard() {
               Export ECSV
             </a>
           )}
-          <button
-            type="button"
-            className="sx-btn-outline"
-            data-testid="area-redraw"
-            onClick={() => useAreaStore.getState().redraw()}
-          >
-            Choose another region
-          </button>
+          {(done || refusal) && (
+            <button
+              type="button"
+              className="sx-btn-outline"
+              data-testid="area-redraw"
+              onClick={() => useAreaStore.getState().redraw()}
+            >
+              Choose another region
+            </button>
+          )}
         </div>
       )}
       </div>
@@ -250,7 +283,7 @@ export function DiscoveryCard() {
 export function MoverCard() {
   const sel = useAreaStore((s) => s.sel);
   const disc = useAreaStore((s) => s.disc);
-  const openDisc = useAreaStore((s) => s.openDisc);
+  const back = useAreaBack();
   const measuredOnly = useAppStore((s) => s.honesty === 'measured');
   const flags = useDotFlags(disc?.real ?? null);
   const m = disc?.movers[sel];
@@ -266,18 +299,18 @@ export function MoverCard() {
         summary={disc.real.summary}
         areaId={disc.real.entry.area_id}
         release={disc.real.summary.data_release}
-        back={openDisc}
+        back={back}
       />
     );
   }
   const title = m.known ? `${m.id} · ${m.known}` : m.id;
-  if (m.kind === 'known') return <ErosCard title={title} back={openDisc} />;
+  if (m.kind === 'known') return <ErosCard title={title} back={back} />;
   return (
     <MoverDemoCard
       title={title}
       kind={m.visits < 2 ? 'Seen once' : 'Unexplained'}
       frames={m.visits < 2 ? 4 : 8}
-      back={openDisc}
+      back={back}
     />
   );
 }

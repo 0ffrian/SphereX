@@ -73,6 +73,7 @@ export function AreaTrackLayer({ view }: { view: SkyView | null }) {
           layers: { dots: !!real.dots, tracks: !!real.tracks },
           measured: effectiveHonesty(useAppStore.getState().honesty) === 'measured',
           selected: s.screen === 'mover' ? (s.disc?.movers[s.sel]?.id ?? null) : null,
+          hidePossible: !s.showPossible,
           outline: null,
           draft: null,
           cam: view.getView(),

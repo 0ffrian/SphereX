@@ -10,24 +10,31 @@
 // Issue #170: the marks differ by shape as well as colour (a tall mark for a known object found, a
 // short one for an unexplained track, a diamond for a skipped or failed square); under Measured only
 // every find is the same neutral mark named by its track.
+// Issue #173 (approved mock-up): the bar is no longer a separate strip above the dock: the dock
+// becomes the player (SkyDock renders ReplayPlayer in its glass shape), and the flipbook's frame
+// player at the top left gives way to a plain ← (ReplayBack) that ends the replay, as Escape does.
 import { useEffect, useMemo, useRef, type KeyboardEvent, type PointerEvent } from 'react';
 import { isEditableTarget } from '@/app/shell/shortcuts';
 import { useShellStore } from '@/app/shell/shellStore';
 import { clock, REPLAY_SPEEDS, squareAt, ticksOf, whenText } from '@/app/area/replay';
 import { useRunsStore } from '@/app/area/runsStore';
 import { useMeasuredOnly } from '@/app/area/measuredOnly';
+import { BackArrow } from '@/app/shell/BackArrow';
 
 const TOOL = { discovery: 'Discovery', known: 'Known objects' } as const;
 
+/** Ends the replay and gives focus back to the runs button it was started from. */
+export function endReplayToRuns() {
+  useRunsStore.getState().endReplay();
+  document.querySelector<HTMLElement>('[data-testid="runs-button"]')?.focus();
+}
+
+/** The replay's tag at the top, and its keys: Escape or another tool ends it. */
 export function ReplayBar() {
   const replay = useRunsStore((s) => s.replay);
   const tool = useShellStore((s) => s.tool);
-  const playRef = useRef<HTMLButtonElement>(null);
-  const railRef = useRef<HTMLDivElement>(null);
   const active = replay !== null;
   const run = replay?.run ?? null;
-  const measured = useMeasuredOnly();
-  const ticks = useMemo(() => (run ? ticksOf(run, measured) : []), [run, measured]);
 
   // Another tool ends the replay (the replay keeps the sky to itself).
   useEffect(() => {
@@ -40,12 +47,46 @@ export function ReplayBar() {
     const onKey = (e: globalThis.KeyboardEvent) => {
       if (e.key !== 'Escape' || e.defaultPrevented || isEditableTarget(e.target)) return;
       e.preventDefault();
-      useRunsStore.getState().endReplay();
-      document.querySelector<HTMLElement>('[data-testid="runs-button"]')?.focus();
+      endReplayToRuns();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [active]);
+
+  if (!replay || !run) return null;
+  return (
+    <div className="sx-replay-tag" role="status" data-testid="replay-tag">
+      <span className="sx-replay-dot" aria-hidden="true" />
+      Replay · {TOOL[run.kind]} · {whenText(run.started_at ?? run.created_at)}
+    </div>
+  );
+}
+
+/** In place of the flipbook's frame player during a replay: a plain ← that ends it. */
+export function ReplayBack() {
+  return (
+    <button
+      type="button"
+      className="sx-replay-back"
+      aria-label="Back: end the replay"
+      title="End the replay (Esc)"
+      onClick={endReplayToRuns}
+      data-testid="replay-back"
+    >
+      <BackArrow className="" />
+    </button>
+  );
+}
+
+/** The player the dock becomes during a replay: play, the timeline, the time and the speeds. */
+export function ReplayPlayer() {
+  const replay = useRunsStore((s) => s.replay);
+  const playRef = useRef<HTMLButtonElement>(null);
+  const railRef = useRef<HTMLDivElement>(null);
+  const active = replay !== null;
+  const run = replay?.run ?? null;
+  const measured = useMeasuredOnly();
+  const ticks = useMemo(() => (run ? ticksOf(run, measured) : []), [run, measured]);
   // The replay starts with focus on its play button.
   useEffect(() => {
     if (active) playRef.current?.focus({ preventScroll: true });
@@ -96,10 +137,6 @@ export function ReplayBar() {
 
   return (
     <>
-      <div className="sx-replay-tag" role="status" data-testid="replay-tag">
-        <span className="sx-replay-dot" aria-hidden="true" />
-        Replay · {TOOL[run.kind]} · {whenText(run.started_at ?? run.created_at)}
-      </div>
       <div className="sx-replay" role="group" aria-label="Replay" data-testid="replay-bar">
         <button
           ref={playRef}

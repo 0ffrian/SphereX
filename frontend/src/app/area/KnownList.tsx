@@ -6,7 +6,8 @@
 // Track it and Build it (Q-469). The provenance lines say how and when the area was computed, its
 // visits and frames, and when SkyBoT last answered. Else DEMO DATA: the one object, only for an area
 // over the prepared Eros area, under the Demo tag.
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useAreaBack } from './areaBack';
 import { PanelCard } from '@/app/shell/PanelCard';
 import { DEMO_OBJECT_ID, useAreaStore } from '@/app/shell/areaStore';
 import { useShellStore } from '@/app/shell/shellStore';
@@ -131,6 +132,18 @@ export function KnownList() {
   const known = useAreaStore((s) => s.known);
   const refusal = useAreaStore((s) => s.refusal);
   const closePanel = useShellStore((s) => s.closePanel);
+  const back = useAreaBack();
+  // Back from an object's Track (#173): the list opens on the row it came from.
+  const cameFrom = useAreaStore((s) => s.focus);
+  useEffect(() => {
+    if (!cameFrom) return;
+    const key = CSS.escape(cameFrom.designation ?? cameFrom.id);
+    const row = document.querySelector<HTMLElement>(`[data-testid="known-row"][data-object="${key}"]`);
+    row?.scrollIntoView({ block: 'nearest' });
+    row?.querySelector<HTMLElement>('button')?.focus({ preventScroll: true });
+    // Only on arrival.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [filter, setFilter] = useState<KnownFilter>('all');
   const [all, setAll] = useState(false);
   const real = known?.real ?? null;
@@ -148,6 +161,7 @@ export function KnownList() {
       title="Known objects"
       subtitle="In this area"
       onClose={closePanel}
+      back={back}
       onMinimise={() => useAreaStore.getState().setMinimised(true)}
       returnFocusTo='[data-testid="tool-known"]'
       testId="area-card"
