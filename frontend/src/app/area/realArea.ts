@@ -312,7 +312,8 @@ export function missingText(code: string): string {
         return 'Too few stars to measure the scatter in one visit and detector, so the spectrum check used the default.';
       return 'Part of the spectrum check could not be loaded.';
     default:
-      return 'One more item could not be loaded.';
+      // As the objects' generic line (Q-477, messages.ts UNKNOWN_CODE_TEXT), for an area.
+      return 'Some data for this area is not available.';
   }
 }
 

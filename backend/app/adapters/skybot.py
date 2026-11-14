@@ -65,7 +65,14 @@ def parse(status: int, body: bytes) -> list[SkybotBody]:
     if status == 204 or not body.strip():
         return []
     doc = json.loads(body)
-    items = doc if isinstance(doc, list) else doc.get("data", [])
+    # A list, or an object carrying ``data``: any other object (an error answered with 200) is
+    # not an answer, so it must not be read (and cached) as "no known objects in this cone".
+    if isinstance(doc, list):
+        items = doc
+    elif isinstance(doc, dict) and isinstance(doc.get("data"), list):
+        items = doc["data"]
+    else:
+        raise ValueError("SkyBoT answer is neither a list nor an object with data")
     out: list[SkybotBody] = []
     for it in items:
         num = it.get("Num")
