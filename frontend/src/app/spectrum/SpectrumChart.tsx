@@ -5,6 +5,7 @@
 // slots 1 (blue) and 2 (orange).
 import { useState } from 'react';
 import type { SpectrumPoint } from '@/app/api/types';
+import { flagReasonsText } from '@/app/messages';
 import { formatFlux, formatNumber, formatWavelength } from '@/app/format';
 import { extentWithErrors, linearScale, niceTicks, paddedExtent } from './scale';
 
@@ -232,7 +233,7 @@ export function pointText(p: SpectrumPoint, unit: string): string {
   const flag = !p.flagged
     ? ''
     : p.flag_reasons && p.flag_reasons.length > 0
-      ? `, flagged (${p.flag_reasons.join(', ')})`
+      ? `, flagged (${flagReasonsText(p.flag_reasons)})`
       : ', flagged';
   return `${formatWavelength(p.wavelength_um)}: ${formatFlux(p.flux, p.error, unit)}${flag}`;
 }

@@ -32,7 +32,13 @@ export function RefusalList({
               <FrameGroup group={g} lead={lead} />
             </li>
           ) : (
-            <li key={g.key} className="list-none py-1" data-testid="refusal-note">
+            // data-code keeps the raw code for debugging; users see plain words (Q-477).
+            <li
+              key={g.key}
+              className="list-none py-1"
+              data-testid="refusal-note"
+              data-code={g.reason}
+            >
               {describeRefusalGroup(g)}
             </li>
           ),
