@@ -51,7 +51,7 @@ Names (island, object panel, object card, ObjectCard, split pane, build pane, fe
 
 No number keys ([Q-121](../decisions/shell-surfaces.md) item 1). A new tool takes keys only on its own focused element (for example A18's square as a labelled `role="group"` with its own keydown and `preventDefault`), never on the sky canvas.
 
-**Escape as built** (no single owner). The press bubbles from the focused element: React handlers run first (at the root container, innermost focused surface first), then `document` listeners, then `window` listeners; listeners on the same target run in the order they were added; each handler skips an event that is already `defaultPrevented`. Focus-scoped handlers that also call `stopPropagation` (`FrameRate` menu, `ConfidencePopover`, the Estimated `Badge` note, `ChordPlayer` while its chord plays, `RunsMenu`) end the press there, so no `document` or `window` listener sees it.
+**Escape as built** (no single owner). The press bubbles from the focused element: React handlers run first (at the root container, innermost focused surface first), then `document` listeners, then `window` listeners; listeners on the same target run in the order they were added; the `document` and `window` listeners (and `RunsMenu`) skip an event that is already `defaultPrevented`, while the innermost focused React handlers do not need to, since nothing has run before them. Focus-scoped handlers that also call `stopPropagation` (`FrameRate` menu, `ConfidencePopover`, the Estimated `Badge` note, `ChordPlayer` while its chord plays, `RunsMenu`) end the press there, so no `document` or `window` listener sees it.
 
 | Handler | Scope | Active when | Skips text fields | Effect | preventDefault |
 |---|---|---|---|---|---|
