@@ -8,7 +8,7 @@ A value the backend cannot compute is never guessed: the reply leaves it out (or
 
 **Format.** A code is `<reason>`, `<namespace>:<reason>` or `<reason>:<frame_id>`. A frame code names one frame; the others describe the whole reply. Order follows the stages, so a reply lists Stage 1's codes before its own.
 
-**UI.** `frontend/src/app/refusals.ts` groups codes by reason (frame codes counted, whole-reply codes as notes) and `frontend/src/app/messages.ts` holds the plain-English line for each known code. A code with no wording is shown as is, never hidden (A11). `backendReasons.test.ts` checks that `FRAME_REASONS` matches the backend's Stage 1 and Stage 2 reasons. **Proposed (Q-196):** extend that test to every code in this table, so a new backend code without wording fails CI.
+**UI.** `frontend/src/app/refusals.ts` groups codes by reason (frame codes counted, whole-reply codes as notes) and `frontend/src/app/messages.ts` holds the plain-English line for each known code. A code with no wording is still listed, never hidden, but in generic plain words, not as the raw code ("Some data for this object is not available."; frames: "N frames not used for a reason this page has no wording for."). Codes that are not layers (`catalogue`, `exoplanet_archive`, `star_catalogue`, `spectrum`, `measuring:*`, `type:exoplanet_*`, `composite:flags_unmasked`, `extended_source`, `flag_reasons`) have their own wording (issue #146, #84). This differs from the line Q-196 states; see Q-477. `backendReasons.test.ts` checks that `FRAME_REASONS` matches the backend's Stage 1 and Stage 2 reasons. **Proposed (Q-196):** extend that test to every code in this table, so a new backend code without wording fails CI.
 
 #### Stage 1 (`/frames`, A4.1)
 

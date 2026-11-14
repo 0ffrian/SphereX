@@ -10,7 +10,7 @@
 //   counted        `cutouts:deferred:<n>` and the moving-object path search's
 //                  `frames:<cone_cap|cone_maxrec|sparse_path|cone_failed|search_deferred|
 //                  outside_window>:<n>` (COUNTED_CODES)
-// Anything else is kept and shown as is, never dropped.
+// Anything else is kept, never dropped; messages.ts words it generically (no raw code on screen).
 import type { Frame, SpectrumPoint } from '@/app/api/types';
 
 /** Every per-frame refusal reason of Stage 1 (/frames) and Stage 2 (/spectrum). */
@@ -47,6 +47,14 @@ export type OverlayFrameReason = (typeof OVERLAY_FRAME_REASONS)[number];
  */
 export const MOVING_FRAME_REASONS = ['no_footprint', 'ephemeris'] as const;
 export type MovingFrameReason = (typeof MOVING_FRAME_REASONS)[number];
+
+/**
+ * Per-frame codes that are not Stage 1 or 2 reasons: `extended_source:<frame_id>` (a comet's coma
+ * fills the aperture, A19.8, A19.10) and the composite's `composite:flags_unmasked:<frame_id>`
+ * (read as `flags_unmasked:<frame_id>`, groupCompositeMissing).
+ */
+export const OTHER_FRAME_REASONS = ['extended_source', 'flags_unmasked'] as const;
+export type OtherFrameReason = (typeof OTHER_FRAME_REASONS)[number];
 
 /**
  * Counted whole-result codes, `<prefix>:<n>`. `cutouts:deferred` counts frames still to download;
@@ -90,6 +98,8 @@ export const WHOLE_RESULT_CODES = [
   'frames:ephemeris',
   'frames:moving_window',
   'spectrum:saturated',
+  // A19.8: the coma fills the aperture in every frame.
+  'spectrum:extended_source',
   'overlay:gaia',
   'overlay:wise',
   // The cone is still being fetched (backend overlay_wait_s); a later request will have it.
@@ -137,6 +147,7 @@ const KNOWN_REASONS: ReadonlySet<string> = new Set([
   ...FRAME_REASONS,
   ...OVERLAY_FRAME_REASONS,
   ...MOVING_FRAME_REASONS,
+  ...OTHER_FRAME_REASONS,
 ]);
 const KNOWN_WHOLE: ReadonlySet<string> = new Set(WHOLE_RESULT_CODES);
 
@@ -163,6 +174,7 @@ export const COMPOSITE_CHANNEL_REASONS = [
 const COMPOSITE_CODE_RE = new RegExp(
   `^composite:(?:(?:${COMPOSITE_WHOLE_REASONS.join('|')})|(?:blue|green|red):(?:${COMPOSITE_CHANNEL_REASONS.join('|')}))$`,
 );
+const COMPOSITE_UNMASKED_RE = /^composite:flags_unmasked:(.+)$/;
 const COMPOSITE_SKIPPED_RE = /^composite:(?:blue|green|red):skipped:([a-z][a-z0-9_]*):(.+)$/;
 
 export type ParsedMissing =
@@ -322,6 +334,8 @@ export function summarizeSpectrum(
 export function groupCompositeMissing(codes: readonly string[]): RefusalGroup[] {
   return groupMissing(
     codes.map((c) => {
+      const u = COMPOSITE_UNMASKED_RE.exec(c);
+      if (u) return `flags_unmasked:${u[1]}`;
       const m = COMPOSITE_SKIPPED_RE.exec(c);
       return m ? `${m[1]}:${m[2]}` : c;
     }),

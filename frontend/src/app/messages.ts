@@ -13,6 +13,7 @@ import {
   type CountedCode,
   type FrameReason,
   type MovingFrameReason,
+  type OtherFrameReason,
   type OverlayFrameReason,
   type RefusalGroup,
   type SpectrumOutcome,
@@ -80,7 +81,10 @@ function pluralPoints(n: number): string {
 
 /** Each frame reason: the list line (after the count) and a short label for the ID list. */
 const FRAME_TEXT: Readonly<
-  Record<FrameReason | OverlayFrameReason | MovingFrameReason, { line: string; short: string }>
+  Record<
+    FrameReason | OverlayFrameReason | MovingFrameReason | OtherFrameReason,
+    { line: string; short: string }
+  >
 > = {
   no_footprint: {
     line: 'with no outline on the sky on record, so they can’t be checked for this moving object.',
@@ -142,7 +146,19 @@ const FRAME_TEXT: Readonly<
     line: 'whose image is blank or flat and can’t be shown.',
     short: 'blank image',
   },
+  extended_source: {
+    line: 'where the object is a diffuse cloud that fills the measuring circle, so this tool can’t measure it as a point.',
+    short: 'diffuse, fills the circle',
+  },
+  flags_unmasked: {
+    line: 'whose bad-pixel map was not available, so faulty pixels may remain in the colour image.',
+    short: 'bad pixels not removed',
+  },
 };
+
+/** Said when a code has no wording here. Never the code itself: a judge sees plain words only. */
+export const UNKNOWN_CODE_TEXT = 'Some data for this object is not available.';
+const UNKNOWN_FRAMES_TEXT = 'for another reason.';
 
 /** "1 search", "12 searches" */
 function pluralSearches(n: number): string {
@@ -179,6 +195,8 @@ const NOTE_TEXT: Readonly<Record<string, string>> = {
   'frames:truncated': 'The archive sent a shortened list, so some frames may be missing.',
   'frames:ephemeris':
     'The predicted path of this object could not be loaded for all or part of the search, so some or all of its frames are missing. Try again later.',
+  'spectrum:extended_source':
+    'The object is a diffuse cloud that fills the measuring circle in every frame, so this tool can’t measure a spectrum from it.',
   'frames:moving_window':
     'The search period set up for this object is too short, so its frames were not searched.',
   'spectrum:saturated':
@@ -247,13 +265,13 @@ function frameText(reason: string): { line: string; short: string } | undefined 
     : undefined;
 }
 
-/** One line per group. Unknown codes are shown as is, never hidden. */
+/** One line per group. A code with no wording gets a generic line, never the raw code. */
 export function describeRefusalGroup(g: RefusalGroup): string {
   if (g.kind === 'frames') {
     const text = frameText(g.reason);
     return text
       ? `${pluralFrames(g.count)} ${text.line}`
-      : `${pluralFrames(g.count)} not used (reason code “${g.reason}”).`;
+      : `${pluralFrames(g.count)} not used ${UNKNOWN_FRAMES_TEXT}`;
   }
   if (g.known && g.reason.startsWith('cutouts:deferred:')) {
     return g.count === 1
@@ -265,7 +283,7 @@ export function describeRefusalGroup(g: RefusalGroup): string {
     return COUNTED_TEXT[counted.prefix](counted.count);
   }
   if (Object.hasOwn(NOTE_TEXT, g.reason)) return NOTE_TEXT[g.reason]!;
-  return compositeChannelText(g.reason) ?? `Not available: ${g.reason}`;
+  return compositeChannelText(g.reason) ?? UNKNOWN_CODE_TEXT;
 }
 
 // ---- Colour composite -------------------------------------------------------------------------
@@ -310,7 +328,7 @@ export function compositeAnnouncement(c: CompositeResponse): string {
 
 /** Short label for a frame group's ID list, e.g. "saturated". */
 export function refusalShortLabel(reason: string): string {
-  return frameText(reason)?.short ?? `reason code “${reason}”`;
+  return frameText(reason)?.short ?? 'other reason';
 }
 
 const NOT_CHECKED = ' More frames have not been checked yet.';
@@ -524,7 +542,85 @@ export function layerName(id: string): string {
     const key = id.slice(MOTION_PREFIX.length);
     return `${MOTION_NAME[key] ?? key.replace(/_/g, ' ')} (motion)`;
   }
-  return LAYER_NAME[id] ?? `Layer “${id.replace(/_/g, ' ')}”`;
+  return LAYER_NAME[id] ?? 'This layer';
+}
+
+// ---- Card and render-parameter codes that are not layers (A4.12) -------------------------------
+
+/**
+ * `missing` codes of the card and the render parameters that name a gap in the data, not a layer
+ * (backend/app/core/card/catalogue.py, card/service.py, classify/rules.py). Wording follows the
+ * meanings in docs/architecture/refusals.md A4.12.
+ */
+const NON_LAYER_TEXT: Readonly<Record<string, string>> = {
+  catalogue: 'No catalogue answered for this object, so facts from it are missing.',
+  exoplanet_archive:
+    'The NASA Exoplanet Archive gave no entry for this planet, so its type is not decided.',
+  star_catalogue: 'Some star facts could not be fetched from the catalogues, so they are left out.',
+  spectrum:
+    'There is no measured SPHEREx spectrum for this object, so what needs one is not drawn.',
+  'measuring:spectrum':
+    'The SPHEREx spectrum is still being measured. This fills in when it is ready.',
+  'measuring:frames': 'More SPHEREx frames are still being measured, so this is a partial answer.',
+  'type:exoplanet_thresholds':
+    'The size limits used to sort planets are switched off, so this planet’s type is not decided.',
+  'type:exoplanet_radius':
+    'The archive gives no usable radius for this planet, so its type is not decided.',
+  'type:exoplanet_mass':
+    'The archive gives no measured mass for this planet, so its type is not decided.',
+  'type:exoplanet_mass_range':
+    'The planet’s mass is outside the range the size-and-mass models cover, so its type is not decided.',
+  'type:exoplanet_water_model_range':
+    'The planet’s temperature is missing or outside the range the water-world models cover, so its type is not decided.',
+  'type:exoplanet_envelope':
+    'The planet is larger than a rocky or water world of its mass would be, so its type is not decided.',
+};
+const MEASURING_LAYER_RE = /^measuring:([a-z0-9_]+)$/;
+const NON_LAYER_PREFIXES = ['type:', 'measuring:', 'composite:', 'overlay:', 'frames:', 'path:'];
+
+/**
+ * Words for a `missing` code that is not a viewer layer, or `null` for a layer id. Never the raw
+ * code: a `type:*`, `measuring:*` or other `prefix:code` with no line gets the generic one.
+ */
+export function nonLayerMissingText(id: string): string | null {
+  if (Object.hasOwn(NON_LAYER_TEXT, id)) return NON_LAYER_TEXT[id]!;
+  const m = MEASURING_LAYER_RE.exec(id);
+  if (m)
+    return `${layerName(m[1]!)}: still being measured. This fills in when the spectrum is ready.`;
+  if (NON_LAYER_PREFIXES.some((p) => id.startsWith(p))) return UNKNOWN_CODE_TEXT;
+  return null;
+}
+
+// ---- Spectrum point flags (`flag_reasons`) ------------------------------------------------------
+
+/**
+ * Why a measured point is flagged (backend/app/core/measure: the FITS FLAGS names in REJECT_FLAGS,
+ * NONFINITE, NONPOSITIVE_VARIANCE, `<name>_core`, `no_proper_motion`). Short lower-case phrases;
+ * the flag names are the pipeline's own, so wording stays at what the name says.
+ */
+const FLAG_TEXT: Readonly<Record<string, string>> = {
+  outlier_core: 'the object’s centre looked unusual (kept, as expected for a moving object)',
+  no_proper_motion:
+    'the object’s drift across the sky is unknown, so its catalogue position was used',
+  NONFINITE: 'some pixels had no value',
+  NONPOSITIVE_VARIANCE: 'some pixels had no usable uncertainty',
+  TRANSIENT: 'some pixels showed a brief flash',
+  OVERFLOW: 'some pixels were saturated',
+  NONFUNC: 'some pixels were not working',
+  MISSING_DATA: 'some pixels had missing data',
+  HOT: 'some pixels were unusually bright',
+  COLD: 'some pixels were unusually dark',
+  NONLINEAR: 'some pixels responded unevenly to light',
+  PERSIST: 'some pixels held a faint trace of an earlier bright source',
+  OUTLIER: 'some pixels looked unusual',
+};
+const FLAG_GENERIC = 'some pixels carried a quality flag';
+
+/** One plain phrase for a point's flag reasons, never a raw flag name. */
+export function flagReasonsText(reasons: readonly string[]): string {
+  const seen = new Set<string>();
+  for (const r of reasons) seen.add(Object.hasOwn(FLAG_TEXT, r) ? FLAG_TEXT[r]! : FLAG_GENERIC);
+  return [...seen].join('; ');
 }
 
 const FIELD_NAME: Readonly<Record<string, string>> = {
@@ -556,6 +652,11 @@ function fieldList(fields: readonly string[]): string {
 
 /** One short line for a layer or view mode that is not drawn, with what would change it. */
 export function describeRefusal(item: MissingItem): string {
+  // A gap in the card's data (catalogue, spectrum, planet type, …), not a layer: its own words.
+  if (item.reason === 'backend') {
+    const plain = nonLayerMissingText(item.id);
+    if (plain !== null) return plain;
+  }
   const name = layerName(item.id);
   // Not drawn from data, but a display default is shown instead (the panel adds a Default chip).
   if (item.defaultShown) return `${name}: shown as a default. ${item.defaultShown}`;
