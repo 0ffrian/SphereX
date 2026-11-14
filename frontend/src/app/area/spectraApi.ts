@@ -84,6 +84,9 @@ const bool = (o: Obj, k: string, p: string): void => {
   if (typeof o[k] !== 'boolean') throw new BadSpectra(`${p}.${k}`, 'expected true or false');
 };
 
+/** The tags an area reply may carry (`AreaTag`). */
+const AREA_TAGS = ['measured', 'derived', 'model_dependent'] as const;
+
 /** Checks a `/spectra` reply; throws on the first field the UI reads that does not match. */
 export function parseAreaSpectra(raw: unknown): AreaSpectra {
   const p = 'spectra';
@@ -94,7 +97,9 @@ export function parseAreaSpectra(raw: unknown): AreaSpectra {
   arr(o, 'missing', p).forEach((m, i) => {
     if (typeof m !== 'string') throw new BadSpectra(`${p}.missing[${i}]`, 'expected a string');
   });
-  obj(o.provenance, `${p}.provenance`);
+  const pv = obj(o.provenance, `${p}.provenance`);
+  // The Spectrum section's tag reads these two entries (SpectrumCard.tsx).
+  for (const k of ['points', 'colour']) oneOf(obj(pv[k], `${p}.provenance.${k}`), 'tag', `${p}.provenance.${k}`, AREA_TAGS);
   const m = obj(o.method, `${p}.method`);
   str(m, 'spectrum_version', `${p}.method`);
   obj(m.settings, `${p}.method.settings`);
