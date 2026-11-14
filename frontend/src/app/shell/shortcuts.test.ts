@@ -1,6 +1,6 @@
 // "/" focuses the search field, except while typing in a field or with a modifier held.
 import { describe, expect, it } from 'vitest';
-import { isEditableTarget, isSearchShortcut } from './shortcuts';
+import { isEditableTarget, isSearchShortcut, isShown, popoverTakesEscape } from './shortcuts';
 
 const base = {
   key: '/',
@@ -46,5 +46,49 @@ describe('isEditableTarget', () => {
     expect(isEditableTarget(make('<button>Play</button>'))).toBe(false);
     expect(isEditableTarget(make('<canvas></canvas>'))).toBe(false);
     expect(isEditableTarget(null)).toBe(false);
+  });
+});
+
+describe('popoverTakesEscape (the sky credit popover, A21.10)', () => {
+  const shown = (visible: boolean) => {
+    const el = document.createElement('div');
+    (el as unknown as { checkVisibility: () => boolean }).checkVisibility = () => visible;
+    return el;
+  };
+  const press = (
+    over: Partial<{ key: string; defaultPrevented: boolean; target: EventTarget | null }> = {},
+  ) => ({
+    key: 'Escape',
+    defaultPrevented: false,
+    target: document.body as EventTarget | null,
+    ...over,
+  });
+  it('takes Escape while the popover is drawn', () => {
+    expect(popoverTakesEscape(press(), shown(true))).toBe(true);
+  });
+  it('not other keys, and not a press already handled', () => {
+    expect(popoverTakesEscape(press({ key: 'Enter' }), shown(true))).toBe(false);
+    expect(popoverTakesEscape(press({ defaultPrevented: true }), shown(true))).toBe(false);
+  });
+  it('not from a text field: the search keeps its Escape (Q-170 (1))', () => {
+    const input = document.createElement('input');
+    document.body.appendChild(input);
+    expect(popoverTakesEscape(press({ target: input }), shown(true))).toBe(false);
+    input.remove();
+  });
+  it('not while the popover is hidden (the split view hides it), or gone', () => {
+    expect(popoverTakesEscape(press(), shown(false))).toBe(false);
+    expect(popoverTakesEscape(press(), null)).toBe(false);
+  });
+});
+
+describe('isShown', () => {
+  it('uses checkVisibility where the browser has it, else the element has boxes', () => {
+    const el = document.createElement('div');
+    // jsdom has no layout: no boxes, so not shown.
+    expect(isShown(el)).toBe(false);
+    (el as unknown as { checkVisibility: () => boolean }).checkVisibility = () => true;
+    expect(isShown(el)).toBe(true);
+    expect(isShown(null)).toBe(false);
   });
 });

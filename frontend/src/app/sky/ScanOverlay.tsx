@@ -5,21 +5,22 @@
 // coordinates and re-projected on each render, so it stays pinned when the sky moves.
 // A click on a done square opens that square's results (SkyPane asks scanClickAt); a circle is a
 // button that opens its object in its square's results.
-import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
+// Issue #158: during a replay it draws the replayed run as it was at the replay time (replay.ts),
+// watch only: nothing opens, and each label says when the object was found.
+import { useEffect, useLayoutEffect, useMemo, useRef, type KeyboardEvent } from 'react';
 import type { SkyView } from '@/viewer/sky/SkyView';
 import { useAreaStore } from '@/app/shell/areaStore';
 import { useShellStore } from '@/app/shell/shellStore';
 import { inQuad, regionBox, splitRegion, type GridSquare } from '@/app/area/scanGrid';
 import { objectsFromEvents, visibleObjects, type ScanObject } from '@/app/area/scanObjects';
 import { useScanStore, viewRegion, type ScanView } from '@/app/area/scanStore';
+import { useRunsStore } from '@/app/area/runsStore';
+import { clock, foundAtOf, recordAt } from '@/app/area/replay';
 import type { SquareState } from '@/app/area/scanApi';
 import { skyToPixels } from './areaDraw';
+import { placeScanLabels, ringBox, type Pt } from './scanLabels';
 
 type Look = SquareState | 'plain';
-interface Pt {
-  x: number;
-  y: number;
-}
 
 /** The squares' screen quads now, for the click test (set by the overlay while it shows). */
 let hits: { quads: { index: number; pts: Pt[] }[]; open(index: number): void } | null = null;
@@ -64,10 +65,41 @@ const pts = (p: Pt[]) => p.map((q) => `${q.x.toFixed(1)},${q.y.toFixed(1)}`).joi
 export function ScanOverlay({ view }: { view: SkyView | null }) {
   const areaTool = useShellStore((s) => s.tool === 'area');
   const onScan = useAreaStore((s) => s.screen === 'scan');
-  const scan = useScanStore((s) => s.view);
+  const scanView = useScanStore((s) => s.view);
   const showPredicted = useScanStore((s) => s.showPredicted);
+  const replayRun = useRunsStore((s) => s.replay?.run ?? null);
+  const replayT = useRunsStore((s) => s.replay?.t ?? 0);
+  // A replay (#158) draws its run as it was at the replay time, in place of the scan of the tool.
+  const replayView = useMemo<ScanView | null>(
+    () =>
+      replayRun
+        ? {
+            kind: 'run',
+            flow: replayRun.kind,
+            runId: replayRun.run_id,
+            region: replayRun.region,
+            record: recordAt(replayRun, replayT),
+            square: null,
+            results: null,
+            stale: false,
+            stopping: false,
+          }
+        : null,
+    [replayRun, replayT],
+  );
+  const foundAt = useMemo(() => (replayRun ? foundAtOf(replayRun) : null), [replayRun]);
+  const replaying = replayView !== null;
+  /**
+   * The label's second line as drawn: during a replay, when the object was found. A circle still
+   * predicted at this point of the replay was not found (yet): it keeps its own line.
+   */
+  const lineOf = (o: ScanObject) => {
+    const at = replaying && o.kind !== 'predicted' ? foundAt?.get(o.key) : undefined;
+    return at !== undefined ? `found at ${clock(at)}` : o.line;
+  };
+  const scan = replayView ?? scanView;
   const region = viewRegion(scan);
-  const shown = areaTool && onScan && region !== null;
+  const shown = region !== null && (replaying || (areaTool && onScan));
   const svgRef = useRef<SVGSVGElement>(null);
 
   const grid = useMemo(() => (region ? splitRegion(region) : null), [region]);
@@ -85,7 +117,7 @@ export function ScanOverlay({ view }: { view: SkyView | null }) {
     focus: Parameters<ReturnType<typeof useAreaStore.getState>['openSquare']>[2] = null,
   ) => {
     const sq = record?.squares.find((s) => s.index === index);
-    if (!sq || sq.state !== 'done') return false;
+    if (replaying || !sq || sq.state !== 'done') return false;
     useAreaStore.getState().openSquare(regionBox(sq.box), flow, focus);
     return true;
   };
@@ -126,9 +158,17 @@ export function ScanOverlay({ view }: { view: SkyView | null }) {
         t.setAttribute('x', (q[0]!.x + 7).toFixed(1));
         t.setAttribute('y', (q[0]!.y + 17).toFixed(1));
       }
-      if (squareLooks[i] === 'done') quads.push({ index: s.index, pts: q });
+      if (squareLooks[i] === 'done' && !replaying) quads.push({ index: s.index, pts: q });
     });
     hits = { quads, open: (index) => void openRef.current(index) };
+    // Labels never overlap (as the area layer's placeLabels): see scanLabels.ts.
+    // Every ring on screen is an obstacle for the other objects' labels.
+    const rings = objects.flatMap((o) => {
+      const last = o.positions[o.positions.length - 1];
+      const e = last ? skyToPixels(last.ra, last.dec) : null;
+      return e ? [ringBox(o.key, e)] : [];
+    });
+    const toLabel: { label: SVGTextElement; end: Pt; o: ScanObject }[] = [];
     for (const o of objects) {
       const g = svg.querySelector<SVGGElement>(`[data-obj="${CSS.escape(o.key)}"]`);
       if (!g) continue;
@@ -148,13 +188,27 @@ export function ScanOverlay({ view }: { view: SkyView | null }) {
       ring?.setAttribute('cx', end.x.toFixed(1));
       ring?.setAttribute('cy', end.y.toFixed(1));
       const label = g.querySelector('text');
-      if (label) {
-        label.setAttribute('x', (end.x + 14).toFixed(1));
+      if (label) toLabel.push({ label, end, o });
+    }
+    const spots = placeScanLabels(
+      toLabel.map(({ end, o }) => ({
+        key: o.key,
+        kind: o.kind,
+        end,
+        title: o.title,
+        line: lineOf(o),
+      })),
+      rings,
+    );
+    for (const { label, end, o } of toLabel) {
+      const spot = spots.get(o.key);
+      if (spot) {
+        label.style.display = '';
+        label.setAttribute('text-anchor', spot.anchor);
+        label.setAttribute('x', spot.x.toFixed(1));
         label.setAttribute('y', (end.y - 2).toFixed(1));
-        label
-          .querySelectorAll('tspan')
-          .forEach((ts) => ts.setAttribute('x', (end.x + 14).toFixed(1)));
-      }
+        label.querySelectorAll('tspan').forEach((ts) => ts.setAttribute('x', spot.x.toFixed(1)));
+      } else label.style.display = 'none';
     }
   };
   // The latest closures for the render loop and the click test, then a placement at once.
@@ -182,6 +236,7 @@ export function ScanOverlay({ view }: { view: SkyView | null }) {
       ref={svgRef}
       className="sx-scan"
       data-testid="scan-overlay"
+      data-replay={replaying || undefined}
       data-cols={grid.cols}
       data-rows={grid.rows}
     >
@@ -215,35 +270,42 @@ export function ScanOverlay({ view }: { view: SkyView | null }) {
           </g>
         ))}
       </g>
-      {objects.map((o) => (
-        <g
-          key={o.key}
-          data-obj={o.key}
-          data-kind={o.kind}
-          className="sx-scan-obj"
-          data-testid="scan-object"
-          role="button"
-          tabIndex={0}
-          aria-label={`${o.title}, ${KIND_TEXT[o.kind]}${o.squares.length > 1 ? `, ${o.line}` : ''}. Open it`}
-          onClick={() => openObject(o)}
-          onKeyDown={(e) => {
-            if (e.key !== 'Enter' && e.key !== ' ') return;
-            e.preventDefault();
-            openObject(o);
-          }}
-        >
-          <path markerEnd={`url(#sx-arr-${o.kind})`} />
-          <circle r={o.kind === 'predicted' ? 9 : 11} />
-          <text>
-            <tspan>{o.title}</tspan>
-            {o.line && (
-              <tspan dy="13" className="sx-scan-sub">
-                {o.line}
-              </tspan>
-            )}
-          </text>
-        </g>
-      ))}
+      {objects.map((o) => {
+        const line = lineOf(o);
+        return (
+          <g
+            key={o.key}
+            data-obj={o.key}
+            data-kind={o.kind}
+            className="sx-scan-obj"
+            data-testid="scan-object"
+            {...(replaying
+              ? { 'aria-hidden': true, 'data-replay': true }
+              : {
+                  role: 'button',
+                  tabIndex: 0,
+                  'aria-label': `${o.title}, ${KIND_TEXT[o.kind]}${o.squares.length > 1 ? `, ${o.line}` : ''}. Open it`,
+                  onClick: () => openObject(o),
+                  onKeyDown: (e: KeyboardEvent<SVGGElement>) => {
+                    if (e.key !== 'Enter' && e.key !== ' ') return;
+                    e.preventDefault();
+                    openObject(o);
+                  },
+                })}
+          >
+            <path markerEnd={`url(#sx-arr-${o.kind})`} />
+            <circle r={o.kind === 'predicted' ? 9 : 11} />
+            <text>
+              <tspan>{o.title}</tspan>
+              {line && (
+                <tspan dy="13" className="sx-scan-sub">
+                  {line}
+                </tspan>
+              )}
+            </text>
+          </g>
+        );
+      })}
     </svg>
   );
 }

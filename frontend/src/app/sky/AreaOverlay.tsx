@@ -9,6 +9,7 @@ import { boxToPixels } from './areaDraw';
 
 export function AreaOverlay({ view }: { view: SkyView | null }) {
   const ref = useRef<HTMLDivElement>(null);
+  // A scan draws its own grid and frame (ScanOverlay): no single-area outline under it.
   const box = useAreaStore((s) => (s.screen === 'scan' ? null : s.box));
 
   useEffect(() => {

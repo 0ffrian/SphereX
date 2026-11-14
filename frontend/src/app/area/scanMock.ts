@@ -13,6 +13,7 @@ import {
   type RunResults,
   type RunSquare,
   type RunState,
+  type RunSummary,
   type RunTotals,
   type RunTrackRow,
   type ScanApi,
@@ -356,6 +357,28 @@ export function mockScanApi(
     async results(id) {
       return mockResultsOf(recordOf(get(id)));
     },
+    async list() {
+      return [...runs.values()]
+        .map((r) => summaryOf(recordOf(r), now()))
+        .sort((a, b) => b.created_at.localeCompare(a.created_at));
+    },
+  };
+}
+
+/** A run's list row (`run-list.schema.json` RunSummary), from its record. Pure. */
+export function summaryOf(rec: RunRecord, nowMs: number): RunSummary {
+  const start = rec.started_at ? Date.parse(rec.started_at) : null;
+  const end = rec.finished_at ? Date.parse(rec.finished_at) : nowMs;
+  return {
+    run_id: rec.run_id,
+    kind: rec.kind,
+    region: rec.region,
+    state: rec.state,
+    created_at: rec.created_at,
+    duration_s: start === null ? null : Math.max(0, Math.round((end - start) / 1000)),
+    totals: rec.totals,
+    squares_done: rec.squares.filter((s) => s.state === 'done').length,
+    squares_total: rec.squares.length,
   };
 }
 
