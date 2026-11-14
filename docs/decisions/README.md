@@ -38,7 +38,7 @@ The log is split by topic so a task loads only what it needs. **Load this index 
 | [moving-frames.md](moving-frames.md) | frames for moving objects: the path cone search, its tags and refusals, MOST | 0 D, 4 Q, 8 KB |
 | [exoplanets.md](exoplanets.md) | the exoplanet card fields (mass, orbit, host star), radius from the archive, tidal locking, mass in the physics layer, and the two demo exoplanet fixtures | 0 D, 5 Q, 15 KB |
 | [exoplanet-looks.md](exoplanet-looks.md) | the climate scenarios and locked-planet temperature map, starlight colour, scenario looks and presets, and the exoplanet mould steps | 0 D, 5 Q, 15 KB |
-| [catalogue-values.md](catalogue-values.md) | name resolution for the demo exoplanets, star Teff, radius and Mira periods, the literature registry, binary brown dwarf components, the issue #68 backend fixes and the slope unit, Gaia MSC (Q-220), Procyon's radius (Q-336), the issue #93 literature rows, SOHO/SWAN reference and cache keys (Q-364 to Q-366) | 0 D, 11 Q, 19 KB |
+| [catalogue-values.md](catalogue-values.md) | name resolution for the demo exoplanets, star Teff, radius and Mira periods, the literature registry, binary brown dwarf components, the issue #68 backend fixes and the slope unit, Gaia MSC (Q-220), Procyon's radius (Q-336), the issue #93 literature rows, SOHO/SWAN reference (withdrawn) and cache keys (Q-364 to Q-366) | 0 D, 11 Q, 19 KB |
 | [demo-pack.md](demo-pack.md) | the demo search list and aliases, the 67P and Bennu shape products, the WRL reader, and the pre-built demo pack, with the catalogue-gap rule (Q-369) | 0 D, 7 Q, 21 KB (over the target) |
 | [sound-ambience.md](sound-ambience.md) | the haptics cut and the move to `frontend/src/sound/` (D-39), pitch polarity (Q-430), the flyover soundscape, weather, buses and stage audibility, the spectrum chord and the weather overlay (Q-431 to Q-449), the tone stream as built and the grouped exposure tick (Q-458), the Track path sound as built (Q-459) | 1 D, 22 Q, 25.5 KB (over the target) |
 
@@ -115,7 +115,7 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | Q-14 | Contract source of truth | Answered: D-17, D-18 | [contract](contract.md) |
 | Q-15 | Does A15 replace Zenbook demo screen | Open (answered by Q-132, see note) | [platform-hosting](platform-hosting.md) |
 | Q-16 | Munazir confirms D-17 | Answered: Munazir is Moon (`MintHerbs`); D-17… | [scope-process](scope-process.md) |
-| Q-17 | Comet field pulse tag | Open | [haptics-design](haptics-design.md) |
+| Q-17 | Comet field pulse tag | Superseded by D-39 | [haptics-design](haptics-design.md) |
 | Q-18 | View-mode rgb type | Answered: D-23 corrected to `TV<[number, numb… | [contract](contract.md) |
 | Q-19 | Where R8.8 frontend types live | Open | [haptics-design](haptics-design.md) |
 | Q-20 | Cutout cache strips PSF HDU | Open (implemented as proposed) | [data-sources](data-sources.md) |
@@ -165,7 +165,7 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | Q-65 | Mira pulsation tier split | Open (R5.7 uses the split) | [rendering-bodies](rendering-bodies.md) |
 | Q-66 | Viewer motion and quality levels | Open (implemented as described); three.js cap opt-in, Q-383, Q-386 | [rendering-motion](rendering-motion.md) |
 | Q-67 | Tone mapping (clipHighlights) | Open (implemented as described); premise questioned by Q-387 | [rendering-motion](rendering-motion.md) |
-| Q-68 | Field-worker interface at 4 Hz | Open | [haptics-design](haptics-design.md) |
+| Q-68 | Field-worker interface at 4 Hz | Superseded by D-39 | [haptics-design](haptics-design.md) |
 | Q-69 | Golden frames on SwiftShader | Open | [rendering-motion](rendering-motion.md) |
 | Q-70 | Spectrum pitch follows wavelength | Open (implemented as described); amended by Q-430 (long wavelength = low pitch) | [haptics-sound](haptics-sound.md) |
 | Q-71 | Engine-owned pulse trains | Open (implemented as described); amended by D-39 (audio trains only) | [haptics-built](haptics-built.md) |
@@ -286,7 +286,7 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | Q-190 | Sustained-tone timbre by tag; body level | Proposed (timbre part stays live for sound, D-39) | [haptics-sound](haptics-sound.md) |
 | Q-191 | Body tone on bodies without height | Deferred (D-39) | [haptics-sound](haptics-sound.md) |
 | Q-192 | Height ticks after the event | Deferred (D-39) | [haptics-sound](haptics-sound.md) |
-| Q-193 | Desktop Feel mode in the build pane | Proposed | [shell-proposals](shell-proposals.md) |
+| Q-193 | Desktop Feel mode in the build pane | Deferred (D-39) | [shell-proposals](shell-proposals.md) |
 | Q-194 | Track path sound details | Proposed | [haptics-sound](haptics-sound.md) |
 | Q-195 | GET /v1/health beyond D-16 | Proposed | [contract](contract.md) |
 | Q-196 | UI wording for every missing code | Proposed | [contract](contract.md) |
@@ -377,7 +377,7 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | Q-330 | World engine and `cardToWorld` review fixes: clouds, CO₂ liquid, lava worlds, preset tolerance, Titan, albedo | Open (built; Moon to confirm); items 2 and 7 amended by Q-355, Q-359 | [rendering-engines-review](rendering-engines-review.md) |
 | Q-331 | Gas giant review fixes: Saturn's rings, measured winds and flattening, Great Red Spot, cyclones | Open (built; Moon to confirm) | [rendering-engines-review](rendering-engines-review.md) |
 | Q-332 | Gas giant flattening: backend `f_J (P_J/P)^2` against the viewer's measured value or `0.7 q` | Open | [rendering-kinds](rendering-kinds.md) |
-| Q-333 | 3I/ATLAS: SOHO/SWAN water point, water break-up, tail reference grain, perihelion | Open (built; Moon to confirm); reference follow-up Q-365 | [rendering-kinds](rendering-kinds.md) |
+| Q-333 | 3I/ATLAS: SOHO/SWAN water point, water break-up, tail reference grain, perihelion | Open (built; Moon to confirm); reference follow-up Q-365 withdrawn | [rendering-kinds](rendering-kinds.md) |
 | Q-334 | Rock engine review fixes: Bennu density, seed hash, preset badges, mesh readouts, lighting tag | Open (built; Moon to confirm); item 2 amended by Q-353 | [rendering-engines-review](rendering-engines-review.md) |
 | Q-335 | Verbatim with reviewed `@deviation` fixes; extractors; parity harness not in the repo | Open (built; parity harness to commit); amended by Q-354 | [rendering-engines-review](rendering-engines-review.md) |
 | Q-336 | Procyon A: interferometric radius 2.048 R☉ and the α CMi aliases | Open (built; Kevin to confirm) | [catalogue-values](catalogue-values.md) |
@@ -409,7 +409,7 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | Q-362 | Confidence: conversion tags, no proper motion for stars, giant colour model_dependent | Decided (Atish, 11 Nov 2026) | [physics-fixes](physics-fixes.md#q-355-to-q-362-phase-3-physics-issue-93) |
 | Q-363 | New optional card fields: eccentricity, insolation, luminosities, FLAME mass, flare rate, phase curves | Decided (Atish, 11 Nov 2026); amended by Q-374 to Q-376, Q-379 | [contract](contract.md) |
 | Q-364 | Literature rows: star rotation periods, TRAPPIST-1 flare rate, phase-curve values | Decided (Atish); Kevin to confirm the readings; amended by Q-377 | [catalogue-values](catalogue-values.md) |
-| Q-365 | 3I/ATLAS SOHO/SWAN point: published reference and date | Open | [catalogue-values](catalogue-values.md) |
+| Q-365 | 3I/ATLAS SOHO/SWAN point: published reference and date | Withdrawn | [catalogue-values](catalogue-values.md) |
 | Q-366 | #93 cache keys, `ASSET_VERSION` 12 and the A15 re-warm | Decided (Atish, 11 Nov 2026); amended by Q-376, Q-378 | [catalogue-values](catalogue-values.md) |
 | Q-367 | Engines kill switch `?engines=0`, kept in `localStorage['sx.engines']` | Open (built); Atish to confirm | [rendering-engines-tuning](rendering-engines-tuning.md#q-367-and-q-368-regression-and-operations-fixes-issue-93) |
 | Q-368 | Chrome's GPU cache drops KHR-linked programs; the ANGLEPerContextBlobCache flag and the demo warm-up | Proposed (Atish to confirm on the A15) | [rendering-engines-tuning](rendering-engines-tuning.md#q-367-and-q-368-regression-and-operations-fixes-issue-93) |
