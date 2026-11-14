@@ -29,7 +29,7 @@ export function ReplayBar() {
     if (active && tool !== 'sky') useRunsStore.getState().endReplay();
   }, [active, tool]);
   // Escape ends it, from anywhere that does not use Escape itself; a text field keeps it (as
-  // BuildPane and SelectedCard). The sky credit popover takes Escape first (capture), A21.10.
+  // BuildPane and SelectedCard). The sky credit popover (on `document`) takes Escape first, A21.10.
   useEffect(() => {
     if (!active) return;
     const onKey = (e: globalThis.KeyboardEvent) => {

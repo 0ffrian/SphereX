@@ -101,7 +101,7 @@ export function RunsMenu() {
     if (refocus) btnRef.current?.focus();
   };
   const onMenuKey = (e: KeyboardEvent<HTMLDivElement>) => {
-    // An Escape already taken (the sky credit popover's, in the capture phase) closes only that.
+    // An Escape already taken by a handler inside the list closes only that (A21.10).
     if (e.key !== 'Escape' || e.defaultPrevented) return;
     e.preventDefault();
     e.stopPropagation();

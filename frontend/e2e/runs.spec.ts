@@ -194,30 +194,32 @@ test('Escape with the sky credit popover open over a replay closes the popover o
   await expect(page.getByTestId('runs-button')).toBeFocused();
 });
 
-test('Escape with the credit popover open over the runs list closes the popover only', async ({
+test('Escape with the credit popover open over the runs list closes the list first, then the popover', async ({
   page,
 }) => {
   await open(page);
   await page.getByTestId('sky-credit-button').click();
-  await expect(page.getByTestId('sky-credit-box')).toBeVisible();
+  const box = page.getByTestId('sky-credit-box');
+  await expect(box).toBeVisible();
   // Open the list from the keyboard (a pointer press outside the popover would close it).
   await page.getByTestId('runs-button').focus();
   await page.keyboard.press('Enter');
   const menu = page.getByTestId('runs-menu');
   await expect(menu).toBeVisible();
-  await expect(page.getByTestId('sky-credit-box')).toBeVisible();
-  // Focus in the list (its own Escape handler is on the list).
+  await expect(box).toBeVisible();
+  // Focus in the list: the focused list closes first (A21.10), and only the list.
   await page.getByTestId('runs-filter-all').focus();
   await page.keyboard.press('Escape');
-  await expect(page.getByTestId('sky-credit-box')).toBeHidden();
-  // The list is still open (its exit animation would keep it visible for a moment: ask the button).
-  await expect(page.getByTestId('runs-button')).toHaveAttribute('aria-expanded', 'true');
-  await expect(menu).toBeVisible();
-  // The next Escape closes the list, focus back on the runs button.
-  await page.getByTestId('runs-filter-all').focus();
-  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('runs-button')).toHaveAttribute('aria-expanded', 'false');
   await expect(menu).toBeHidden();
   await expect(page.getByTestId('runs-button')).toBeFocused();
+  await expect(box).toBeVisible();
+  await expect(page.getByTestId('sky-credit-button')).toHaveAttribute('aria-expanded', 'true');
+  // The next Escape closes the popover, focus back on its button.
+  await page.keyboard.press('Escape');
+  await expect(box).toBeHidden();
+  await expect(page.getByTestId('sky-credit-button')).toBeFocused();
+  await expect(page.getByTestId('runs-button')).toHaveAttribute('aria-expanded', 'false');
 });
 
 test('a failed square is a red tick on the timeline', async ({ page }) => {

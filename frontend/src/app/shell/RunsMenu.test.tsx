@@ -1,5 +1,5 @@
 // The runs list's Escape (A21.10): it closes the list and gives focus back to the button, unless
-// the press was already taken, as the sky credit popover takes it in the capture phase. One Escape
+// the press was already taken, as by a handler inside the list (a menu, a popover). One Escape
 // closes one thing.
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';

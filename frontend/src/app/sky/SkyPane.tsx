@@ -178,9 +178,11 @@ export function SkyPane({ children }: { children?: ReactNode }) {
       }),
     [],
   );
-  // Escape or a press outside the popover and its button closes it. Escape is taken in the capture
-  // phase, before the window listeners added earlier (the replay's): one press closes the popover
-  // only (A21.10). A text field keeps its Escape, and a popover that is not drawn takes none.
+  // Escape or a press outside the popover and its button closes it. Escape is taken on `document` in
+  // the bubble phase: after the focus-scoped React handlers (a menu or popover with focus inside it
+  // closes first and stops the press), before every window listener (the replay's), so one press
+  // closes one thing (A21.10). A text field keeps its Escape, and a popover that is not drawn takes
+  // none.
   useEffect(() => {
     if (!creditOpen) return;
     const onKey = (e: KeyboardEvent) => {
@@ -194,10 +196,10 @@ export function SkyPane({ children }: { children?: ReactNode }) {
       if (creditRef.current?.contains(t) || creditBtnRef.current?.contains(t)) return;
       setCreditOpen(false);
     };
-    window.addEventListener('keydown', onKey, true);
+    document.addEventListener('keydown', onKey);
     window.addEventListener('pointerdown', onDown, true);
     return () => {
-      window.removeEventListener('keydown', onKey, true);
+      document.removeEventListener('keydown', onKey);
       window.removeEventListener('pointerdown', onDown, true);
     };
   }, [creditOpen]);
