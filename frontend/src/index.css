@@ -2622,6 +2622,14 @@ body {
   border-radius: 4px;
   padding: 2px 6px;
 }
+/* #174: the Estimated tag is a button (it opens its formula); with a mouse it is the same size as the
+   span tags beside it. A touch screen keeps the 44 px target from the Details button rule. */
+@media (pointer: fine) {
+  button.sx-tagbadge {
+    min-height: 0;
+    min-width: 0;
+  }
+}
 .sx-tagbadge::before {
   content: '';
   width: 6px;
