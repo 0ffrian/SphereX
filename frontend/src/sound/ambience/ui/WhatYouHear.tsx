@@ -81,7 +81,7 @@ export function WhatYouHear({ id, onClose }: { id: string; onClose: () => void }
           <ul className="sx-amb-list">
             {weather.map((r, i) => (
               <li key={i}>
-                <ProvenanceBadge tag={r.tag} variant="tag" srText />
+                <ProvenanceBadge tag={r.tag} srText />
                 <span>{r.text}</span>
               </li>
             ))}
@@ -95,7 +95,7 @@ export function WhatYouHear({ id, onClose }: { id: string; onClose: () => void }
           <ul className="sx-amb-list">
             {ui.airFacts.map((f) => (
               <li key={f.label}>
-                <ProvenanceBadge tag="derived" variant="tag" srText />
+                <ProvenanceBadge tag="derived" srText />
                 <span>
                   {f.label}: <span className="sx-amb-num">{f.text}</span>
                 </span>
@@ -111,7 +111,7 @@ export function WhatYouHear({ id, onClose }: { id: string; onClose: () => void }
           <ul className="sx-amb-list">
             {ui.inputs.map((x) => (
               <li key={`${x.label}-${x.source}`}>
-                <ProvenanceBadge tag={x.tag} variant="tag" srText />
+                <ProvenanceBadge tag={x.tag} srText />
                 <span>
                   {x.label}{' '}
                   <span className="sx-amb-num">

@@ -955,13 +955,12 @@ export function SkyPane({ children }: { children?: ReactNode }) {
             <p className="sx-credit-line pointer-events-auto">
               <span className="sx-credit-title">{survey.title}</span>
               {survey.tag === 'derived' ? (
-                <EstimatedBadge tooltip={survey.formula ?? ''} variant="tag" />
+                <EstimatedBadge tooltip={survey.formula ?? ''} />
               ) : (
                 <ProvenanceBadge
                   tag={survey.tag}
                   tooltip={survey.formula ?? survey.assumption ?? undefined}
                   srText
-                  variant="tag"
                 />
               )}
               {fixtureSky && (
