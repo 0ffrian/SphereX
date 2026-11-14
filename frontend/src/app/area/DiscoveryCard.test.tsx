@@ -245,6 +245,75 @@ describe('the spectrum check', () => {
     expect(chart.querySelectorAll('[data-testid="spectrum-point"]')).toHaveLength(14);
   });
 
+  it('Measured only hides the row words, the Rock-like filter and the verdict counts in the step list (D-21)', async () => {
+    useAppStore.setState({ honesty: 'measured' });
+    const disc = spectrumDisc();
+    const at = disc.steps.length - 1;
+    useAreaStore.setState({ box, disc, screen: 'disc', step: at, running: false });
+    await act(async () => root.render(<DiscoveryCard />));
+    expect(host.querySelectorAll('[data-testid="spectrum-word"]')).toHaveLength(0);
+    expect(host.querySelector('[data-testid="disc-filter"]')).toBeNull();
+    expect(host.querySelector('[data-testid="disc-filter-rock"]')).toBeNull();
+    const steps = host.querySelector('[data-testid="disc-steps"]')!;
+    const last = steps.querySelectorAll('li')[at]!;
+    expect(last.textContent).toContain('Check the spectrum');
+    const n = disc.real!.spectra!.tracks.length;
+    expect(last.querySelector('small')?.textContent).toBe(`${n} track${n === 1 ? '' : 's'} checked`);
+    expect(steps.textContent).not.toMatch(/rock-like|very red|one colour/i);
+    expect(host.querySelectorAll('[data-testid^="disc-mover-"]')).toHaveLength(disc.movers.length);
+    // Back to the default: the words, the filter and the counts return.
+    await act(async () => useAppStore.setState({ honesty: 'derived' }));
+    expect(host.querySelectorAll('[data-testid="spectrum-word"]')).toHaveLength(disc.movers.length);
+    expect(host.querySelector('[data-testid="disc-filter-rock"]')).not.toBeNull();
+    expect(last.querySelector('small')?.textContent).toMatch(/rock-like/);
+  });
+
+  it('a Rock-like filter chosen before Measured only does not stay applied under it', async () => {
+    const disc = spectrumDisc(['T8']);
+    useAreaStore.setState({ box, disc, screen: 'disc', step: disc.steps.length - 1, running: false });
+    await act(async () => root.render(<DiscoveryCard />));
+    await act(async () => host.querySelector<HTMLElement>('[data-testid="disc-filter-rock"]')!.click());
+    expect(host.querySelectorAll('[data-testid^="disc-mover-"]')).toHaveLength(0);
+    await act(async () => useAppStore.setState({ honesty: 'measured' }));
+    expect(host.querySelectorAll('[data-testid^="disc-mover-"]')).toHaveLength(disc.movers.length);
+    expect(host.querySelector('[data-testid="disc-filter-none"]')).toBeNull();
+  });
+
+  it('Measured only hides the Steady row (a change between exposures is derived, Q-379) and tags the chart from the reply', async () => {
+    useAppStore.setState({ honesty: 'measured' });
+    const disc = spectrumDisc();
+    useAreaStore.setState({ box, disc, screen: 'mover', sel: 0, step: 5 });
+    await act(async () => root.render(<MoverCard />));
+    expect(host.querySelector('[data-testid="spectrum-steady"]')).toBeNull();
+    expect(host.querySelector('[data-testid="spectrum-colour"]')).not.toBeNull();
+    // The reply's provenance.points tag (measured); a synthetic area reads "Fixture", never "Measured".
+    const badge = host.querySelector('[data-testid="spectrum-section"] [data-testid="provenance-badge"]')!;
+    expect(badge.getAttribute('data-tag')).toBe(disc.real!.spectra!.provenance.points.tag);
+    expect(badge.textContent).toBe('Fixture');
+  });
+
+  it('the Spectrum tag follows the reply\'s provenance.colour', async () => {
+    const disc = spectrumDisc();
+    const sp = disc.real!.spectra!;
+    disc.real = { ...disc.real!, spectra: { ...sp, provenance: { ...sp.provenance, colour: { ...sp.provenance.colour, tag: 'derived' } } } };
+    useAreaStore.setState({ box, disc, screen: 'mover', sel: 0, step: 5 });
+    await act(async () => root.render(<MoverCard />));
+    expect(host.querySelector('[data-testid="spectrum-section"] [data-testid="provenance-badge"]')?.getAttribute('data-tag')).toBe('derived');
+  });
+
+  it('Points used counts only the points that entered a pair or a step', async () => {
+    const disc = spectrumDisc(['T2']);
+    const t = disc.movers[0]!.spectrum!;
+    const used = t.points.filter((p) => p.used).length;
+    expect(used).toBeLessThan(t.points.length);
+    useAreaStore.setState({ box, disc, screen: 'mover', sel: 0, step: 5 });
+    await act(async () => root.render(<MoverCard />));
+    const row = host.querySelector('[data-testid="spectrum-points"] button')!;
+    expect(row.textContent).toMatch(new RegExp(`Points used\\s*${used}\\b`));
+    // The list still names every point, with why a point was not used.
+    expect(host.querySelectorAll('[data-testid="spectrum-points-list"] li')).toHaveLength(t.points.length);
+  });
+
   it('One colour: no chart, the Steady row only', async () => {
     const disc = spectrumDisc(['T5']);
     const i = disc.movers.findIndex((m) => m.spectrum?.verdict === 'one_colour');

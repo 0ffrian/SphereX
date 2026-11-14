@@ -69,12 +69,12 @@ export function verdictLine(t: TrackSpectrum, matched: boolean): string {
   switch (t.verdict) {
     case 'rock':
       return [rangeLine(t), heatGlowLine(t), matched ? null : 'A lead worth following.'].filter(Boolean).join(' ');
+    // These lines say what the light fits, never what the body is: a track that matched no known
+    // object is never called an asteroid (A16.5, A17.13).
     case 'very_red':
-      return 'Only a warm, dark near-Earth asteroid fits. Its distance is not known.';
+      return 'Only a warm, dark rock close to the Sun would fit. Its distance is not known.';
     case 'too_red':
-      return t.r_au !== null
-        ? `Even with heat glow at ${r2(t.r_au)} AU. Probably not an asteroid.`
-        : 'Even with heat glow. Probably not an asteroid.';
+      return t.r_au !== null ? `Even with heat glow at ${r2(t.r_au)} AU from the Sun.` : 'Even with heat glow.';
     case 'too_blue':
       return 'Probably a star, a blend or an artefact.';
     case 'flickers': {

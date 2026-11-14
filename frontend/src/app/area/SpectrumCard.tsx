@@ -5,7 +5,8 @@
 // "Points used". The verdict is an extra line: it never changes the track's own verdict, chip or order.
 //
 // Measured only (D-21): the chart shows the points' raw brightness alone; the verdict, the range, the
-// heat-glow band and the Distance row are hidden (they are model_dependent).
+// heat-glow band and the Distance row are hidden (they are model_dependent), and so is the Steady row
+// (a step's change is a ratio of fluxes, derived: Q-379).
 import { ProvenanceBadge } from '@/app/Badge';
 import { FormulaMath } from '@/app/FormulaMath';
 import { Row, Rows } from '@/app/PanelControls';
@@ -195,7 +196,7 @@ export function SpectrumSection({ spectrum: t, spectra, measuredOnly, fixture }:
       <h3 id={`sp-h-${t.track_id}`}>
         Spectrum
         <ProvenanceBadge
-          tag={measuredOnly ? 'measured' : 'model_dependent'}
+          tag={measuredOnly ? spectra.provenance.points.tag : spectra.provenance.colour.tag}
           variant="tag"
           fixture={fixture}
           tooltip={
@@ -214,7 +215,7 @@ export function SpectrumSection({ spectrum: t, spectra, measuredOnly, fixture }:
 /** The rows under the chart, as `<dt>`/`<dd>` pairs for the card's facts list. */
 export function SpectrumFacts({ spectrum: t, spectra, measuredOnly }: Pick<SpectrumBlockProps, 'spectrum' | 'spectra' | 'measuredOnly'>) {
   const colour = colourText(t);
-  const steady = steadyText(t);
+  const steady = measuredOnly ? null : steadyText(t);
   const distance = measuredOnly ? null : distanceText(t);
   const showColour = t.verdict !== 'one_colour' && colour !== null;
   return (
@@ -287,11 +288,10 @@ export function SpectrumHow({ spectrum: t, spectra, flags }: Pick<SpectrumBlockP
           </li>
         </ol>
         <p className="sx-sp-src">
-          Sources: Pravec and Harris 2000 (spin limit); Harris 1998 (heat glow model, NEATM); Ivezić et al. 2022 (SPHEREx
-          asteroid spectra).
+          Sources: Pravec and Harris 2000 (spin limit); Harris 1998 (heat glow model, NEATM).
         </p>
       </Row>
-      <Row title="Points used" count={t.points.length} testId="spectrum-points">
+      <Row title="Points used" count={t.points.filter((p) => p.used).length} testId="spectrum-points">
         <ul className="sx-sp-points" data-testid="spectrum-points-list">
           {rows.map(({ p, f }) => (
             <li key={p.dot_id} data-used={p.used || undefined}>
@@ -301,7 +301,13 @@ export function SpectrumHow({ spectrum: t, spectra, flags }: Pick<SpectrumBlockP
               <span>
                 {Math.round(p.flux_uJy)} ± {Math.round(p.flux_err)} µJy · SNR {p.snr.toFixed(1)}
                 {f.length > 0 ? ` · ${f.join(', ')}` : ''}
-                {p.used ? '' : !p.point ? ` · not used: below SNR ${typeof snrMin === 'number' ? snrMin : 'the minimum'}` : ' · not used: no pair or step'}
+                {p.used
+                  ? p.point
+                    ? ''
+                    : ' · used as a limit only'
+                  : !p.point
+                    ? ` · not used: below SNR ${typeof snrMin === 'number' ? snrMin : 'the minimum'}`
+                    : ' · not used: no pair or step'}
               </span>
             </li>
           ))}

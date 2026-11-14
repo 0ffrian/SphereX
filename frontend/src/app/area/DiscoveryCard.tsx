@@ -70,14 +70,16 @@ export function DiscoveryCard() {
   const visit = useAreaStore((s) => s.visit);
   const real = disc?.real ?? null;
   const visits = real ? visitNumbers(real.summary, real.dots) : [];
-  // The spectrum check (A18.7, issue #162): the row verdicts show once its step is done.
+  // The spectrum check (A18.7, issue #162): the row verdicts show once its step is done, and never
+  // under Measured only, where the verdict (model_dependent) is hidden as on the Result card (D-21).
+  const measuredOnly = useAppStore((s) => s.honesty === 'measured');
   const [filter, setFilter] = useState<MoverFilter>('all');
   const steps = disc?.steps ?? [];
   const total = steps.length;
   const nowStep = running ? step + 1 : -1;
   const done = total > 0 && !running && step >= total - 1;
   const spectrumAt = steps.findIndex((s) => s.label === SPECTRUM_STEP);
-  const showVerdicts = spectrumAt >= 0 && step >= spectrumAt;
+  const showVerdicts = !measuredOnly && spectrumAt >= 0 && step >= spectrumAt;
   const movers = disc?.movers ?? [];
   const active: MoverFilter = showVerdicts ? filter : 'all';
   const shown = movers.map((m, i) => ({ m, i })).filter(({ m }) => keep(m, active));
@@ -142,7 +144,7 @@ export function DiscoveryCard() {
                 )}
               </i>
               <span>{s.label}</span>
-              <small>{on ? s.result : ''}</small>
+              <small>{on ? (measuredOnly && s.measuredResult !== undefined ? s.measuredResult : s.result) : ''}</small>
             </li>
           );
         })}

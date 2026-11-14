@@ -140,6 +140,11 @@ export interface DiscoveryStep {
   label: string;
   /** What the step reports once done (dummy numbers, labelled "(demo)"). */
   result: string;
+  /**
+   * The result under Measured only (D-21), when `result` carries a model_dependent verdict: the
+   * spectrum check's "3 rock-like, ..." becomes "9 tracks checked". Absent: `result` shows as it is.
+   */
+  measuredResult?: string;
 }
 export interface DiscoveryResult {
   /** True for the made-up demo answer; false for a prepared area's stored replies. */
@@ -487,9 +492,20 @@ export function realSteps(r: RealDiscovery): DiscoveryStep[] {
     { label: 'Check known objects (SkyBoT)', result: checked },
     // A17.13: only when the area has a stored spectrum check (else "Spectrum check not run" is
     // listed under Not shown).
-    ...(r.spectra ? [{ label: SPECTRUM_STEP, result: verdictCounts(r.spectra.tracks) }] : []),
+    ...(r.spectra
+      ? [
+          {
+            label: SPECTRUM_STEP,
+            result: verdictCounts(r.spectra.tracks),
+            measuredResult: tracksChecked(r.spectra.tracks.length),
+          },
+        ]
+      : []),
   ];
 }
+
+/** The spectrum step's neutral result under Measured only (the verdicts are model_dependent, D-21). */
+const tracksChecked = (n: number) => `${n} track${n === 1 ? '' : 's'} checked`;
 
 /** The step of the spectrum check (A18.7); the row verdicts show once it is done. */
 export const SPECTRUM_STEP = 'Check the spectrum';

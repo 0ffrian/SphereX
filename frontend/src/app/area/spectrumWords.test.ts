@@ -59,9 +59,9 @@ describe('verdict words (every enum value)', () => {
   });
 
   it('the card line per verdict', () => {
-    expect(verdictLine(track('T8'), false)).toBe('Only a warm, dark near-Earth asteroid fits. Its distance is not known.');
+    expect(verdictLine(track('T8'), false)).toBe('Only a warm, dark rock close to the Sun would fit. Its distance is not known.');
     expect(verdictLine(bare({ verdict: 'too_red', r_au: 2.95, r_source: 'parallax' }), false)).toBe(
-      'Even with heat glow at 2.95 AU. Probably not an asteroid.',
+      'Even with heat glow at 2.95 AU from the Sun.',
     );
     expect(verdictLine(bare({ verdict: 'too_blue' }), false)).toBe('Probably a star, a blend or an artefact.');
     expect(verdictLine(bare({ verdict: 'flickers', steps: [step(1, 0.05), step(1, 0.7, false)] }), false)).toBe(
@@ -69,6 +69,16 @@ describe('verdict words (every enum value)', () => {
     );
     expect(verdictLine(bare({ verdict: 'too_faint' }), false)).toBe('Its colour is uncertain by more than a third.');
     expect(verdictLine(track('T5'), false)).toBe('Seen by one detector, so its colour cannot be compared.');
+  });
+
+  it('never calls an unmatched track an asteroid (A16.5): the lines describe the light, not the body', () => {
+    for (const verdict of Object.keys(VERDICT_WORDS) as (keyof typeof VERDICT_WORDS)[]) {
+      const line = verdictLine(bare({ verdict, r_au: 1.2, r_source: 'parallax' }), false);
+      expect(line, verdict).not.toMatch(/asteroid|near-Earth|discovery|\bnew\b/i);
+      expect(VERDICT_WORDS[verdict].title, verdict).not.toMatch(/asteroid/i);
+      expect(VERDICT_WORDS[verdict].word, verdict).not.toMatch(/asteroid/i);
+    }
+    expect(verdictLine(track('T8'), false)).not.toMatch(/asteroid/i);
   });
 });
 
