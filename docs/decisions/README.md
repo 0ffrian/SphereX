@@ -491,5 +491,5 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | Q-472 | Scan UI: select a region, gridded screen, square-by-square scan, objects circled with trajectories, combined results | Decided (as built, #157) | [moving-objects](moving-objects.md) |
 | Q-474 | Spectrum check: architecture and contract (replaces the cut D6 smoothness score) | Proposed | [moving-objects](moving-objects.md) |
 | Q-475 | Spectrum check: physics and starting values | Proposed | [moving-objects](moving-objects.md) |
-| Q-476 | Spectrum check UI as built: choices where A18.7 and the mock-up are silent or differ | Proposed | [moving-objects](moving-objects.md) |
+| Q-476 | Spectrum check UI as built: choices where A18.7 and the mock-up are silent or differ; (6) Measured only hides the verdict in the list too, settled by D-21 | Proposed ((6) settled by D-21, 14 Nov 2026) | [moving-objects](moving-objects.md) |
 | B-01 to B-04 | Post-event backlog | Backlog | [scope-process](scope-process.md#post-event-backlog) |
