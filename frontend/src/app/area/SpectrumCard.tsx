@@ -8,6 +8,7 @@
 // heat-glow band and the Distance row are hidden (they are model_dependent), and so is the Steady row
 // (a step's change is a ratio of fluxes, derived: Q-379).
 import { ProvenanceBadge } from '@/app/Badge';
+import { badgeForTag } from '@/viewer/honesty';
 import { FormulaMath } from '@/app/FormulaMath';
 import { Row, Rows } from '@/app/PanelControls';
 import type { AreaSpectra, TrackSpectrum } from './spectraApi';
@@ -191,18 +192,20 @@ export function SpectrumSection({ spectrum: t, spectra, measuredOnly, fixture }:
   if (t.verdict === 'one_colour') return null;
   const model = chartModel(t, reflectedRange(spectra.method), measuredOnly);
   if (model.points.length === 0 && model.limits.length === 0) return null;
+  const tag = measuredOnly ? spectra.provenance.points.tag : spectra.provenance.colour.tag;
   return (
     <section className="sx-sp-sec" aria-labelledby={`sp-h-${t.track_id}`} data-testid="spectrum-section">
       <h3 id={`sp-h-${t.track_id}`}>
         Spectrum
         <ProvenanceBadge
-          tag={measuredOnly ? spectra.provenance.points.tag : spectra.provenance.colour.tag}
+          tag={tag}
           variant="tag"
           fixture={fixture}
+          // The first word follows the reply's tag, so the tooltip never disagrees with the badge.
           tooltip={
             measuredOnly
-              ? 'Measured: each dot’s brightness as SPHEREx recorded it.'
-              : 'Estimated: brightness divided by the Sun’s, compared with the range where rocks fall (A17.13). The points themselves are measured.'
+              ? `${badgeForTag(tag)}: each dot’s brightness as SPHEREx recorded it.`
+              : `${badgeForTag(tag)}: brightness divided by the Sun’s, compared with the range where rocks fall (A17.13). The points themselves are measured.`
           }
         />
       </h3>
