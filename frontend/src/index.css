@@ -6161,7 +6161,7 @@ li[data-state='running'] > .sx-live-mk {
   border: 1px solid var(--glass-inner-edge);
 }
 .sx-runs-row:hover {
-  border-color: var(--line);
+  background: var(--glass-veil-hover);
 }
 .sx-runs-open {
   flex: 1;
@@ -6178,13 +6178,11 @@ li[data-state='running'] > .sx-live-mk {
 .sx-runs-kind {
   grid-row: 1 / 3;
   align-self: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 8px;
-  background: var(--s3);
+  width: 20px;
+  height: 20px;
   display: grid;
   place-items: center;
-  color: var(--fg);
+  color: var(--muted);
 }
 .sx-runs-t {
   font-size: 13.5px;
@@ -6212,7 +6210,7 @@ li[data-state='running'] > .sx-live-mk {
   border: 1px solid var(--line);
   color: var(--fg);
 }
-.sx-runs-play:hover:not(:disabled) {
+.sx-runs-play:hover:not(:disabled, [aria-disabled='true']) {
   background: var(--glass-veil-hover);
 }
 .sx-runs-play:disabled {
@@ -6256,7 +6254,7 @@ li[data-state='running'] > .sx-live-mk {
   justify-items: start;
 }
 .sx-bezel[data-split] .sx-runs {
-  opacity: 0;
+  visibility: hidden;
   pointer-events: none;
 }
 
@@ -6367,7 +6365,7 @@ li[data-state='running'] > .sx-live-mk {
   border-radius: 50%;
   background: var(--fg);
   transform: translateX(-50%);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+  box-shadow: var(--glass-text-shadow);
   pointer-events: none;
 }
 .sx-replay-time {

@@ -8,7 +8,7 @@ import { create } from 'zustand';
 import { useShellStore } from '@/app/shell/shellStore';
 import { regionBox } from './scanGrid';
 import { getScanApi, RunGone, type RunRecord, type RunSummary } from './scanApi';
-import { advance, durationOf, REPLAY_SPEEDS, type ReplaySpeed } from './replay';
+import { advance, durationOf, REPLAY_SPEEDS, step, type ReplaySpeed } from './replay';
 import { useScanStore } from './scanStore';
 import { useAreaStore } from '@/app/shell/areaStore';
 import { clampFov } from '@/viewer/sky/skyMath';
@@ -28,7 +28,7 @@ export interface Replay {
   end: number;
   speed: ReplaySpeed;
   playing: boolean;
-  /** Reduced motion: the clock moves in whole seconds of wall time (no animation). */
+  /** Reduced motion: the clock moves one step a second, by steps counted (no animation). */
   stepped: boolean;
 }
 
@@ -83,7 +83,9 @@ export const useRunsStore = create<RunsState>()((set, get) => {
   const tick = () => {
     const r = get().replay;
     if (!r || !r.playing) return stopTick();
-    const t = advance(anchor.t, nowMs() - anchor.wall, r.speed, r.end, r.stepped);
+    const t = r.stepped
+      ? step(r.t, r.speed, r.end)
+      : advance(anchor.t, nowMs() - anchor.wall, r.speed, r.end);
     const done = t >= r.end;
     set({ replay: { ...r, t, playing: !done } });
     if (done) stopTick();
@@ -99,9 +101,18 @@ export const useRunsStore = create<RunsState>()((set, get) => {
     const r = get().replay;
     if (r) anchor = { t: r.t, wall: nowMs() };
   };
-  /** Where the clock is now (not the last tick's position): no progress is lost on a change. */
+  /**
+   * Where the clock is now (not the last tick's position): no progress is lost on a change. Under
+   * reduced motion it is the step shown.
+   */
   const liveT = (r: Replay) =>
-    r.playing ? advance(anchor.t, nowMs() - anchor.wall, r.speed, r.end, r.stepped) : r.t;
+    r.playing && !r.stepped ? advance(anchor.t, nowMs() - anchor.wall, r.speed, r.end) : r.t;
+  /** After a seek or a speed change: re-anchor; under reduced motion the next step is a full second away. */
+  const restart = () => {
+    const r = get().replay;
+    if (r?.stepped && r.playing) startTick();
+    else reanchor();
+  };
   const isGoing = (runs: readonly RunSummary[]) =>
     runs.some((r) => r.state === 'running' || r.state === 'queued' || r.state === 'paused');
   const pollAgain = () => {
@@ -215,13 +226,13 @@ export const useRunsStore = create<RunsState>()((set, get) => {
       const r = get().replay;
       if (!r) return;
       set({ replay: { ...r, t: Math.min(r.end, Math.max(0, t)) } });
-      reanchor();
+      restart();
     },
     setSpeed(speed) {
       const r = get().replay;
       if (!r || !REPLAY_SPEEDS.includes(speed)) return;
       set({ replay: { ...r, t: liveT(r), speed } });
-      reanchor();
+      restart();
     },
     endReplay() {
       stopTick();

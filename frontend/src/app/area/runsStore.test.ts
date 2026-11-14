@@ -217,15 +217,26 @@ describe('replay', () => {
     useRunsStore.getState().play();
     expect(useRunsStore.getState().replay!.t).toBe(0);
   });
-  it('steps once a second under reduced motion', async () => {
-    await replayOf(true);
+  it('steps once a second under reduced motion, one step per tick whatever the jitter', async () => {
+    const r = await replayOf(true);
+    expect(r.end).toBeGreaterThan(1.5);
     useRunsStore.getState().setSpeed(1);
-    wall += 900;
-    await vi.advanceTimersByTimeAsync(1000);
-    expect(useRunsStore.getState().replay!.t).toBe(0);
-    wall += 200;
+    // The wall clock jitters (999 ms, then 2001 ms): each tick is still exactly one step.
+    wall += 999;
     await vi.advanceTimersByTimeAsync(1000);
     expect(useRunsStore.getState().replay!.t).toBe(1);
+    wall += 1002;
+    await vi.advanceTimersByTimeAsync(999);
+    expect(useRunsStore.getState().replay!.t).toBe(1);
+    // A seek starts a full second before the next step; pause keeps the step shown.
+    useRunsStore.getState().seek(0.25);
+    await vi.advanceTimersByTimeAsync(999);
+    expect(useRunsStore.getState().replay!.t).toBe(0.25);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(useRunsStore.getState().replay!.t).toBe(1.25);
+    wall += 700;
+    useRunsStore.getState().pause();
+    expect(useRunsStore.getState().replay!.t).toBe(1.25);
   });
   it('ends from the runs button, and from endReplay', async () => {
     await replayOf();
@@ -257,7 +268,7 @@ describe('list rows', () => {
     expect(runLine(base)).toEqual({
       before: null,
       state: null,
-      line: '13 Nov 07:28 · 15 squares · 9 found, 2 unexplained · 3 h 52 min',
+      line: '13 Nov 07:28 UTC · 15 squares · 9 found, 2 unexplained · 3 h 52 min',
     });
   });
   it('a Known objects run counts known and detected', () => {
@@ -285,7 +296,7 @@ describe('list rows', () => {
       squares_total: 2,
     });
     expect(r).toEqual({
-      before: '13 Nov 06:58',
+      before: '13 Nov 06:58 UTC',
       state: { word: 'Stopped', tone: 'fail' },
       line: 'after 1 of 2 squares',
     });
