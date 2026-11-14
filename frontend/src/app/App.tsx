@@ -17,6 +17,7 @@ import { FixtureBanner } from './FixtureBanner';
 import { LiveAnnouncer } from './LiveAnnouncer';
 import { Panels } from './shell/Panels';
 import { Readout } from './shell/Readout';
+import { RunsMenu } from './shell/RunsMenu';
 import { useShellStore } from './shell/shellStore';
 import { isEditableTarget, isSearchShortcut } from './shell/shortcuts';
 import { SkyDock } from './shell/SkyDock';
@@ -129,7 +130,11 @@ export function App() {
                 resetKeys={resetKeys}
                 className="absolute top-4 right-4 z-50"
               >
-                <Readout />
+                {/* Issue #158: the runs button right after the readout, the same height (mock-up state 12). */}
+                <div className="sx-topright">
+                  <Readout />
+                  <RunsMenu />
+                </div>
               </ErrorBoundary>
             </header>
             <main className="sx-view" aria-label="Sky view" data-split={split || undefined}>

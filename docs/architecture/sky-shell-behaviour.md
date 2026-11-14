@@ -51,7 +51,7 @@ Names (island, object panel, object card, ObjectCard, split pane, build pane, fe
 
 No number keys ([Q-121](../decisions/shell-surfaces.md) item 1). A new tool takes keys only on its own focused element (for example A18's square as a labelled `role="group"` with its own keydown and `preventDefault`), never on the sky canvas.
 
-**Escape as built** (no single owner). React handlers run at the root container, before window listeners; window listeners run in the order they were added; each handler skips an event that is already `defaultPrevented`.
+**Escape as built** (no single owner). The press bubbles from the focused element: React handlers run first (at the root container, innermost focused surface first), then `document` listeners, then `window` listeners; listeners on the same target run in the order they were added; the `document` and `window` listeners (and `RunsMenu`) skip an event that is already `defaultPrevented`, while the innermost focused React handlers do not need to, since nothing has run before them. Focus-scoped handlers that also call `stopPropagation` (`FrameRate` menu, `ConfidencePopover`, the Estimated `Badge` note, `ChordPlayer` while its chord plays, `RunsMenu`) end the press there, so no `document` or `window` listener sees it.
 
 | Handler | Scope | Active when | Skips text fields | Effect | preventDefault |
 |---|---|---|---|---|---|
@@ -59,6 +59,9 @@ No number keys ([Q-121](../decisions/shell-surfaces.md) item 1). A new tool take
 | `BuildPane` onKeyDown and window listener | inside the pane, or anywhere | pane open | onKeyDown no, window yes | `closeBuildPane()` | yes |
 | `SelectedCard` window listener | anywhere | object card shown | yes | `deselectObject()` | yes |
 | `Island` window listener | anywhere | thinking and `tool !== 'sky'` | **no** | `closePanel()` | **no** |
+| `RunsMenu` onKeyDown | focus inside the runs list | list open, press not `defaultPrevented` | no | `closeMenu()`, focus the runs button; also `stopPropagation`, so with the credit popover open the first Escape closes the list and the next the popover | yes |
+| `ReplayBar` window listener | anywhere | a replay shown | yes | `endReplay()`, focus the runs button | yes |
+| `SkyPane` credit popover, `document` listener (bubble phase) | anywhere | credit popover open and drawn (`checkVisibility`); the split view hides the credit and closes the popover | yes | close the popover, focus its button. Runs after the focus-scoped React handlers (a menu, note or list with focus inside it, even inside the popover, closes first and alone) and before every `window` listener (`ReplayBar`, `BuildPane`, `SelectedCard`, `AreaCard`, `Island`), which then skip the press. Skips text fields, presses already handled and a hidden popover (`shortcuts.ts` `popoverTakesEscape`); its order against `WhatYouHear`'s `document` listener follows mount order, and each closes only itself | yes |
 
 Known effects: with the pane opened from the rail and a search thinking under it, Escape can first set the tool to `sky` (island) and then close the pane, so focus goes to the marker instead of the rail button; Escape in the search field while thinking leaves the panel tool.
 
