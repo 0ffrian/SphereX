@@ -160,16 +160,16 @@ def post_live(
 ) -> Response:
     """The plan of a box (``start=false``), or its job (``start=true``). A box already stored
     answers ``done``, unless ``start=true`` and the stored area is not reusable (its
-    known-object check failed) or lacks its ``spectra`` stage: then a job is queued, which
-    computes it again or fills the stage in the worker (Q-481; nothing is computed here,
-    A16.2). One already queued or running answers its job, whatever ``start`` is, except a
-    scan's square with ``start=true``: that queues a job of its own behind the square, so
-    stopping the scan never loses this request (PR #160 review, Q-470)."""
+    known-object check failed) or lacks its ``spectra`` stage (and no refill of it has
+    already failed in this process): then a job is queued, which computes it again or fills
+    the stage in the worker (Q-481; nothing is computed here, A16.2). One already queued or
+    running answers its job, whatever ``start`` is, except a scan's square with
+    ``start=true``: that queues a job of its own behind the square, so stopping the scan never
+    loses this request (PR #160 review, Q-470)."""
     plan = _plan(request, req)
     stored = store.entry(plan.area_id, "summary") is not None
     if stored and (
-        not req.start
-        or (jobs.reusable(plan.area_id) and store.spectra_entry(plan.area_id) is not None)
+        not req.start or (jobs.reusable(plan.area_id) and not jobs.needs_spectra(plan.area_id))
     ):
         return _json(done_reply(plan.area_id), "area-job.schema.json")
     job = jobs.get(plan.area_id)

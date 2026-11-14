@@ -1492,9 +1492,13 @@ def test_a_recheck_loses_the_codes_when_skybot_answers(tmp_path: Path) -> None:
     assert (run["totals"]["unchecked"], run["totals"]["unexplained"]) == (0, 1)
 
 
-def test_results_are_merged_again_after_an_area_is_stored_again(tmp_path: Path) -> None:
+def test_results_are_merged_again_after_an_area_is_stored_again(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Q-481: a recompute stores an area again; every kept merge is dropped, so a run's
     ``/results`` show the area's current result."""
+    from app.core.area import live_jobs
+
     store = FakeStore()
     plan = _plan_of(live.snap_box(10.0, 10.0, 0.5, 0.5))
     first_pass = [True]
@@ -1511,6 +1515,118 @@ def test_results_are_merged_again_after_an_area_is_stored_again(tmp_path: Path) 
     first = jobs.submit(plan, kind="discovery")
     assert jobs.wait(10) and first.run_id is not None
     assert [t["kind"] for t in jobs.results(first.run_id)[1]["tracks"]] == ["unchecked"]
-    jobs.submit(plan, kind="discovery")  # the recheck (first start was not a recheck)
+    monkeypatch.setattr(live_jobs, "RECHECK_COOLDOWN_S", 0.0)  # the cooldown has passed
+    jobs.submit(plan, kind="discovery")  # the recheck
     assert jobs.wait(10)
     assert [t["kind"] for t in jobs.results(first.run_id)[1]["tracks"]] == ["unexplained"]
+
+
+# --- issue #169 code review: a recheck in a scan ---------------------------------------------
+
+
+def _stored_scan(tmp_path: Path, runner: Any, **kw: Any) -> tuple[LiveJobs, Any, str, FakeStore]:
+    """One square whose area is stored with a ``skybot:`` code (so it is rechecked)."""
+    p = scan.plan_scan(180.0, 0.0, 1.5, 1.5)  # one square
+    store = FakeStore()
+    area_id = _plan_of(p.squares[0].box).area_id
+    store.areas[area_id] = _replies(area_id, unchecked_at=180.3, missing=("skybot:1",))
+    jobs = LiveJobs(
+        _ctx(tmp_path, offline=False),
+        runner,
+        planner=kw.get("planner") or (lambda ctx, box: _plan_of(box)),
+        store=store,
+    )
+    return jobs, p, area_id, store
+
+
+@pytest.mark.parametrize("where", ["runner", "planner"])
+def test_a_failed_recheck_in_a_scan_keeps_the_stored_result(tmp_path: Path, where: str) -> None:
+    """Review #2: a stored square whose recheck fails (or cannot be planned) is done with its
+    stored result, which is still served; the scan is done, not failed (Q-481 (3))."""
+
+    def boom(*_: Any) -> Any:
+        raise LiveAreaError("area:frames_incomplete", "a cutout failed")
+
+    runner = boom if where == "runner" else (lambda ctx, plan, prog: None)
+    planner = boom if where == "planner" else None
+    jobs, p, area_id, _ = _stored_scan(tmp_path, runner, planner=planner)
+    run_id = jobs.submit_scan(p, "discovery", RELEASE, stored={1: area_id})
+    assert jobs.wait(10)
+    run = _run(jobs, run_id)
+    assert run["state"] == "done"
+    sq = run["squares"][0]
+    assert (sq["state"], sq["area_id"], sq.get("error")) == ("done", area_id, None)
+    assert sq["missing"] == ["skybot:1"]  # the stored result still says its check failed
+    assert run["totals"]["unchecked"] == 1
+
+
+def test_a_scan_stopped_during_a_recheck_puts_the_square_back_to_todo(tmp_path: Path) -> None:
+    """Review #2: Stop still stops the scan; the square did not finish in this run, so it is
+    ``todo`` like any square not reached (its stored result is still served by the area
+    routes), and the stopped recheck leaves no cooldown."""
+    started, gate = threading.Event(), threading.Event()
+
+    def runner(ctx: Context, plan: Plan, prog: Progress) -> None:
+        started.set()
+        gate.wait(10)
+        prog.check()
+
+    jobs, p, area_id, _ = _stored_scan(tmp_path, runner)
+    run_id = jobs.submit_scan(p, "discovery", RELEASE, stored={1: area_id})
+    assert started.wait(10)
+    jobs.stop(run_id)
+    gate.set()
+    assert jobs.wait(10)
+    run = _run(jobs, run_id)
+    assert run["state"] == "stopped" and run["squares"][0]["state"] == "todo"
+    assert not jobs.reusable(area_id)
+
+
+def test_a_job_behind_a_square_that_stored_a_failed_check_is_not_computed_again(
+    tmp_path: Path,
+) -> None:
+    """Review #1: a square's first compute stores its area with a ``skybot:`` code; a job for
+    the same box queued behind it (PR #160 rule) is done at once, as ``submit`` says, since the
+    first compute started the cooldown."""
+    p = scan.plan_scan(180.0, 0.0, 1.5, 1.5)  # one square
+    plan = _plan_of(p.squares[0].box)
+    store = FakeStore()
+    ran: list[str] = []
+
+    def runner(ctx: Context, pl: Plan, prog: Progress) -> None:
+        ran.append(pl.area_id)
+        store.areas[pl.area_id] = _replies(pl.area_id, unchecked_at=180.3, missing=("skybot:1",))
+
+    jobs = LiveJobs(
+        _ctx(tmp_path, offline=False), runner, planner=lambda c, b: _plan_of(b), store=store
+    )
+    run_id = jobs.submit_scan(p, "discovery", RELEASE)
+    job = jobs.submit(plan, kind="discovery")
+    assert jobs.wait(10)
+    assert ran == [plan.area_id]
+    assert job.state == "done"
+    assert _run(jobs, run_id)["state"] == "done"
+
+
+def test_a_merge_read_before_an_area_is_stored_again_is_not_kept(tmp_path: Path) -> None:
+    """Review #5: a merge read from the store while a job stores an area again is answered but
+    not kept, so the next read merges the area's current result."""
+    store = FakeStore()
+    plan = _plan_of(live.snap_box(10.0, 10.0, 0.5, 0.5))
+    store.areas[plan.area_id] = _replies(plan.area_id, unchecked_at=10.0)
+    jobs = LiveJobs(_ctx(tmp_path), lambda ctx, pl, prog: None, store=store)
+    job = jobs.submit(plan, kind="discovery")
+    assert jobs.wait(10) and job.run_id is not None
+    real_entry = store.entry
+
+    def entry(area_id: str, stage: str) -> Any:
+        got = real_entry(area_id, stage)
+        if stage == "tracks":  # the worker stores the area again while this read goes on
+            store.areas[plan.area_id] = _replies(plan.area_id, mover_at=10.0)
+            jobs._forget_results()
+        return got
+
+    store.entry = entry  # type: ignore[method-assign]
+    assert [t["kind"] for t in jobs.results(job.run_id)[1]["tracks"]] == ["unchecked"]
+    store.entry = real_entry  # type: ignore[method-assign]
+    assert [t["kind"] for t in jobs.results(job.run_id)[1]["tracks"]] == ["unexplained"]
