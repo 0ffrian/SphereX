@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 
+from app.adapters.http import UpstreamError
 from app.cache.keys import CacheKey, norm_name
 from app.cache.store import LiveResponse, Served
 from app.context import Context
@@ -54,11 +55,18 @@ def parse(body: bytes) -> SbdbAnswer:
 def query(ctx: Context, name: str, *, refresh: bool = False) -> tuple[SbdbAnswer, Served]:
     def live() -> LiveResponse:
         # 300 = several matches, 404 = not found on some API versions; both are real answers.
-        return ctx.http.get(
+        resp = ctx.http.get(
             ctx.settings.sbdb_url,
             {"sstr": norm_name(name), "phys-par": "1"},
             accept=frozenset({200, 300, 404}),
         )
+        # Read it before it is cached: an answer that is not SBDB's JSON is a failed call, not
+        # an entry kept for good.
+        try:
+            parse(resp.body)
+        except (ValueError, KeyError, TypeError, AttributeError) as exc:
+            raise UpstreamError(f"SBDB answer could not be read: {exc}") from exc
+        return resp
 
     served = ctx.cache.fetch(sbdb_key(name), live, refresh=refresh)
     return parse(served.entry.body), served
