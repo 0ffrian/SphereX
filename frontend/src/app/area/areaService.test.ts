@@ -30,11 +30,20 @@ const erosJson = JSON.parse(
 ) as ErosDemo;
 
 /** A stub API: only the two area routes; `calls` records the paths and signals. */
-function stubApi(over: Partial<ApiClient> = {}): { api: ApiClient; signals: (AbortSignal | undefined)[] } {
+function stubApi(over: Partial<ApiClient> = {}): {
+  api: ApiClient;
+  signals: (AbortSignal | undefined)[];
+} {
   const signals: (AbortSignal | undefined)[] = [];
   const api = {
-    areaIndex: async (signal?: AbortSignal) => (signals.push(signal), { data: INDEX, fixture: 'synthetic' as const }),
-    areaKnown: async (_id: string, signal?: AbortSignal) => (signals.push(signal), { data: KNOWN, fixture: 'synthetic' as const }),
+    areaIndex: async (signal?: AbortSignal) => (
+      signals.push(signal),
+      { data: INDEX, fixture: 'synthetic' as const }
+    ),
+    areaKnown: async (_id: string, signal?: AbortSignal) => (
+      signals.push(signal),
+      { data: KNOWN, fixture: 'synthetic' as const }
+    ),
     ...over,
   } as unknown as ApiClient;
   return { api, signals };
@@ -56,7 +65,10 @@ const box = (ra: number, dec: number, w = 0.6, h = 0.4): AreaBox => ({
 });
 
 beforeEach(() => {
-  vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => structuredClone(DEMO) })));
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => ({ ok: true, json: async () => structuredClone(DEMO) })),
+  );
 });
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -91,7 +103,7 @@ describe('Known objects on /v1/areas (issue #130)', () => {
     expect(splitDesignation('C/2026 A1', null)).toEqual({ id: 'C/2026 A1', name: '' });
     expect(splitDesignation('Synthetic fixture A1', null).id).toBe('Synthetic fixture A1');
   });
-  it('maps a /known row: counts, Track it vs Open, positions; the SkyBoT date is the area\'s', () => {
+  it("maps a /known row: counts, Track it vs Open, positions; the SkyBoT date is the area's", () => {
     const [a, b] = KNOWN.known.map((k) => knownRow(k));
     expect(a!.frames).toBe(KNOWN.known[0]!.n_frames);
     expect(a!.visits).toBe(KNOWN.known[0]!.n_visits);
@@ -100,7 +112,13 @@ describe('Known objects on /v1/areas (issue #130)', () => {
     expect(a!.positions!.length).toBe(KNOWN.known[0]!.positions.length);
     expect(b!.trackAvailable).toBe(false);
     expect(b!.objectId).toBeNull();
-    expect(latestSkybot(KNOWN)).toBe(KNOWN.skybot.map((s) => s.fetched_at).filter(Boolean).sort().at(-1));
+    expect(latestSkybot(KNOWN)).toBe(
+      KNOWN.skybot
+        .map((s) => s.fetched_at)
+        .filter(Boolean)
+        .sort()
+        .at(-1),
+    );
     expect(latestSkybot({ skybot: [{ visit: 1, fetched_at: null }] })).toBeNull();
   });
   it('knownObjectsIn: area from the index, then /known; passes the abort signal', async () => {
@@ -152,7 +170,9 @@ describe('Known objects on /v1/areas (issue #130)', () => {
     const r = await knownObjectsIn(box(91.118, 13.453));
     expect(r.demo).toBe(true);
     expect(r.objects.map((o) => o.id)).toEqual(['433']);
-    await expect(knownObjectsIn(box(200, -30))).rejects.toMatchObject({ code: 'area:not_prepared' });
+    await expect(knownObjectsIn(box(200, -30))).rejects.toMatchObject({
+      code: 'area:not_prepared',
+    });
   });
   it('an aborted request is not turned into the demo answer', async () => {
     setSkyApi(
@@ -187,7 +207,11 @@ describe('Eros card on real frames and path (issue #130)', () => {
     }).frames;
   it('projects the sky onto the demo image within a pixel of the demo track', () => {
     for (const p of erosJson.track) {
-      const px = skyToPx(erosJson, (p as unknown as { ra: number }).ra, (p as unknown as { dec: number }).dec)!;
+      const px = skyToPx(
+        erosJson,
+        (p as unknown as { ra: number }).ra,
+        (p as unknown as { dec: number }).dec,
+      )!;
       expect(Math.abs(px[0] - p.px[0])).toBeLessThan(1);
       expect(Math.abs(px[1] - p.px[1])).toBeLessThan(1);
     }
@@ -197,15 +221,19 @@ describe('Eros card on real frames and path (issue #130)', () => {
     const ids = [...demoIds, '2026W12_2A_0158_5_D1', '2026W12_2A_0158_5_D4'];
     const merged = mergeReal(erosJson, frames(ids), null);
     expect(merged.hops).toHaveLength(18);
-    expect(merged.hops.filter((h) => h.no_cutout).map((h) => h.frame_id).sort()).toEqual([
-      '2026W12_2A_0158_5_D1',
-      '2026W12_2A_0158_5_D4',
-    ]);
+    expect(
+      merged.hops
+        .filter((h) => h.no_cutout)
+        .map((h) => h.frame_id)
+        .sort(),
+    ).toEqual(['2026W12_2A_0158_5_D1', '2026W12_2A_0158_5_D4']);
     const extra = merged.hops.find((h) => h.frame_id === '2026W12_2A_0158_5_D4')!;
     expect(extra.detector).toBe('D4');
     expect(Number.isNaN(extra.flux)).toBe(true);
     // A frame the demo has keeps its demo cutout.
-    expect(merged.hops.find((h) => h.frame_id === demoIds[0])!.png).toBe(erosJson.hops.find((h) => h.frame_id === demoIds[0])!.png);
+    expect(merged.hops.find((h) => h.frame_id === demoIds[0])!.png).toBe(
+      erosJson.hops.find((h) => h.frame_id === demoIds[0])!.png,
+    );
   });
   it('the sky path is the real Horizons path, projected', () => {
     const path = parseTrackPath(shared('track/eros-2026-03/path.json'));
@@ -220,13 +248,18 @@ describe('Eros card on real frames and path (issue #130)', () => {
       ...path,
       windows: [
         { start: path.points[0]!.time, end: mid },
-        { start: path.points[Math.floor(path.points.length / 2) + 1]!.time, end: path.points.at(-1)!.time },
+        {
+          start: path.points[Math.floor(path.points.length / 2) + 1]!.time,
+          end: path.points.at(-1)!.time,
+        },
       ],
     };
     const merged = mergeReal(erosJson, frames(['2026W12_2A_0158_1_D1']), split);
     const gaps = merged.track.flatMap((p, i) => (p.gap ? [i] : []));
     expect(gaps).toEqual([Math.floor(path.points.length / 2) + 1]);
-    expect(mergeReal(erosJson, frames(['2026W12_2A_0158_1_D1']), path).track.some((p) => p.gap)).toBe(false);
+    expect(
+      mergeReal(erosJson, frames(['2026W12_2A_0158_1_D1']), path).track.some((p) => p.gap),
+    ).toBe(false);
   });
   it('without the demo file (null) the real frames still list', () => {
     const merged = mergeReal(null, frames(['2026W12_2A_0158_1_D1']), null);
@@ -244,7 +277,10 @@ describe('area service', () => {
   });
   it('Discovery refuses elsewhere with area:not_prepared', async () => {
     const far = box(200, -30);
-    await expect(discoverIn(far)).rejects.toMatchObject({ code: 'area:not_prepared', message: 'No prepared data for this area yet.' });
+    await expect(discoverIn(far)).rejects.toMatchObject({
+      code: 'area:not_prepared',
+      message: 'No prepared data for this area yet.',
+    });
     setSkyApi(stubApi().api);
     await expect(areaSearch(far, 'known')).rejects.toMatchObject({ code: 'area:not_prepared' });
   });

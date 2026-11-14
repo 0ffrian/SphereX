@@ -4,7 +4,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAreaStore } from '@/app/shell/areaStore';
 import { useShellStore } from '@/app/shell/shellStore';
-import { mockScanApi, setScanApi } from '@/app/area/scanApi';
+import { setScanApi } from '@/app/area/scanApi';
+import { mockScanApi } from '@/app/area/scanMock';
 import { resetScans, useScanStore } from '@/app/area/scanStore';
 import {
   backToScan,

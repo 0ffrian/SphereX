@@ -29,14 +29,24 @@ const PLAN = {
 const BOX = { ra: 30, dec: 10, width_deg: 1, height_deg: 0.6 };
 
 const reply = (body: unknown, status = 200, type = 'application/json') =>
-  new Response(typeof body === 'string' ? body : JSON.stringify(body), { status, headers: { 'content-type': type } });
+  new Response(typeof body === 'string' ? body : JSON.stringify(body), {
+    status,
+    headers: { 'content-type': type },
+  });
 
 describe('reply checks', () => {
   it('a plan, a stored area and each error code', () => {
     expect(parsePlanReply(PLAN)).toEqual({ kind: 'plan', plan: PLAN });
-    expect(parsePlanReply({ area_id: 'x', state: 'done' })).toEqual({ kind: 'stored', areaId: 'x' });
+    expect(parsePlanReply({ area_id: 'x', state: 'done' })).toEqual({
+      kind: 'stored',
+      areaId: 'x',
+    });
     for (const code of ['area:no_visit_pair', 'upstream_unavailable', 'offline'])
-      expect(parsePlanReply({ error: code, detail: 'd' })).toEqual({ kind: 'error', code, detail: 'd' });
+      expect(parsePlanReply({ error: code, detail: 'd' })).toEqual({
+        kind: 'error',
+        code,
+        detail: 'd',
+      });
   });
   it('anything else is "unavailable", never a made-up plan', () => {
     expect(parsePlanReply(null)).toEqual({ kind: 'unavailable' });
@@ -45,40 +55,102 @@ describe('reply checks', () => {
     expect(parsePlanReply({ ...PLAN, visits: [PLAN.visits[0]] })).toEqual({ kind: 'unavailable' });
   });
   it('#147: an area already being computed, another area: refusal, and a null eta', () => {
-    expect(parsePlanReply({ area_id: 'a', state: 'running', steps: [], elapsed_s: 3, eta_s: null })).toEqual({ kind: 'running', areaId: 'a', state: 'running' });
-    expect(parsePlanReply({ error: 'area:too_large', detail: 'x' })).toEqual({ kind: 'error', code: 'area:too_large', detail: 'x' });
-    expect(parseStatusReply({ area_id: 'a', state: 'done', step: null, steps: [], elapsed_s: 9, eta_s: null }).eta_s).toBeNull();
+    expect(
+      parsePlanReply({ area_id: 'a', state: 'running', steps: [], elapsed_s: 3, eta_s: null }),
+    ).toEqual({ kind: 'running', areaId: 'a', state: 'running' });
+    expect(parsePlanReply({ error: 'area:too_large', detail: 'x' })).toEqual({
+      kind: 'error',
+      code: 'area:too_large',
+      detail: 'x',
+    });
+    expect(
+      parseStatusReply({
+        area_id: 'a',
+        state: 'done',
+        step: null,
+        steps: [],
+        elapsed_s: 9,
+        eta_s: null,
+      }).eta_s,
+    ).toBeNull();
   });
   it('start: 429 queue_full is an error the card can name, not "unavailable"', () => {
-    expect(parseStartReply({ error: 'queue_full', detail: 'x' })).toEqual({ kind: 'error', code: 'queue_full', detail: 'x' });
+    expect(parseStartReply({ error: 'queue_full', detail: 'x' })).toEqual({
+      kind: 'error',
+      code: 'queue_full',
+      detail: 'x',
+    });
   });
   it('status: an unknown step id breaks the contract', () => {
-    expect(() => parseStatusReply({ area_id: 'a', state: 'running', step: null, steps: [{ id: 'pair', label: 'x', state: 'done' }], elapsed_s: 0, eta_s: 1 })).toThrow();
+    expect(() =>
+      parseStatusReply({
+        area_id: 'a',
+        state: 'running',
+        step: null,
+        steps: [{ id: 'pair', label: 'x', state: 'done' }],
+        elapsed_s: 0,
+        eta_s: 1,
+      }),
+    ).toThrow();
   });
   it('start: queued or running', () => {
-    expect(parseStartReply({ area_id: 'a', state: 'queued' })).toEqual({ kind: 'started', areaId: 'a', state: 'queued' });
-    expect(parseStartReply({ area_id: 'a', state: 'running' })).toEqual({ kind: 'started', areaId: 'a', state: 'running' });
-    expect(parseStartReply({ area_id: 'a', state: 'done' })).toEqual({ kind: 'stored', areaId: 'a' });
+    expect(parseStartReply({ area_id: 'a', state: 'queued' })).toEqual({
+      kind: 'started',
+      areaId: 'a',
+      state: 'queued',
+    });
+    expect(parseStartReply({ area_id: 'a', state: 'running' })).toEqual({
+      kind: 'started',
+      areaId: 'a',
+      state: 'running',
+    });
+    expect(parseStartReply({ area_id: 'a', state: 'done' })).toEqual({
+      kind: 'stored',
+      areaId: 'a',
+    });
   });
   it('status: steps, times, queue position and error', () => {
     const s = parseStatusReply({
-      area_id: 'a', state: 'failed', step: 'frames',
+      area_id: 'a',
+      state: 'failed',
+      step: 'frames',
       steps: [{ id: 'visits', label: 'Find a pair of visits', state: 'done', done: 2, total: 2 }],
-      elapsed_s: 12, eta_s: 0, queue_position: 2, error: { code: 'upstream_unavailable', detail: 'IRSA' },
+      elapsed_s: 12,
+      eta_s: 0,
+      queue_position: 2,
+      error: { code: 'upstream_unavailable', detail: 'IRSA' },
     });
-    expect(s.steps[0]).toEqual({ id: 'visits', label: 'Find a pair of visits', state: 'done', done: 2, total: 2 });
+    expect(s.steps[0]).toEqual({
+      id: 'visits',
+      label: 'Find a pair of visits',
+      state: 'done',
+      done: 2,
+      total: 2,
+    });
     expect(s.queue_position).toBe(2);
     expect(s.error).toEqual({ code: 'upstream_unavailable', detail: 'IRSA' });
-    expect(() => parseStatusReply({ area_id: 'a', state: 'weird', steps: [], elapsed_s: 0, eta_s: 0 })).toThrow();
+    expect(() =>
+      parseStatusReply({ area_id: 'a', state: 'weird', steps: [], elapsed_s: 0, eta_s: 0 }),
+    ).toThrow();
   });
-  it('the request box never asks for more than 2° a side (a hair over is the backend\'s area:too_large)', () => {
-    const b = liveBoxOf({ a: { ra: 10, dec: 1 }, b: { ra: 12, dec: -1 }, widthDeg: 2.0004, heightDeg: 1.99 });
+  it("the request box never asks for more than 2° a side (a hair over is the backend's area:too_large)", () => {
+    const b = liveBoxOf({
+      a: { ra: 10, dec: 1 },
+      b: { ra: 12, dec: -1 },
+      widthDeg: 2.0004,
+      heightDeg: 1.99,
+    });
     expect(b.width_deg).toBe(2);
     expect(b.height_deg).toBe(1.99);
   });
   it('the request box: centre and sides of the drawn corners, across RA 0', () => {
-    expect(liveBoxOf({ a: { ra: 359.5, dec: 11 }, b: { ra: 0.5, dec: 10 }, widthDeg: 1, heightDeg: 1 })).toEqual({
-      ra: 0, dec: 10.5, width_deg: 1, height_deg: 1,
+    expect(
+      liveBoxOf({ a: { ra: 359.5, dec: 11 }, b: { ra: 0.5, dec: 10 }, widthDeg: 1, heightDeg: 1 }),
+    ).toEqual({
+      ra: 0,
+      dec: 10.5,
+      width_deg: 1,
+      height_deg: 1,
     });
   });
 });
@@ -93,12 +165,17 @@ describe('HTTP client', () => {
     expect(init.method).toBe('POST');
     expect(JSON.parse(init.body as string)).toEqual({ ...BOX, start: false });
     await api.start(BOX);
-    expect(JSON.parse((fetchImpl.mock.calls[1] as unknown as [string, RequestInit])[1].body as string).start).toBe(true);
+    expect(
+      JSON.parse((fetchImpl.mock.calls[1] as unknown as [string, RequestInit])[1].body as string)
+        .start,
+    ).toBe(true);
   });
   it('a route the backend does not serve, an HTML page or no backend: unavailable', async () => {
-    const notFound = httpLiveAreaApi('/v1', (async () => reply({ error: 'not_found', detail: 'Not Found' }, 404)) as unknown as typeof fetch);
+    const notFound = httpLiveAreaApi('/v1', (async () =>
+      reply({ error: 'not_found', detail: 'Not Found' }, 404)) as unknown as typeof fetch);
     expect(await notFound.plan(BOX)).toEqual({ kind: 'unavailable' });
-    const html = httpLiveAreaApi('/v1', (async () => reply('<!doctype html>', 200, 'text/html')) as unknown as typeof fetch);
+    const html = httpLiveAreaApi('/v1', (async () =>
+      reply('<!doctype html>', 200, 'text/html')) as unknown as typeof fetch);
     expect(await html.plan(BOX)).toEqual({ kind: 'unavailable' });
     const down = httpLiveAreaApi('/v1', (async () => {
       throw new TypeError('Failed to fetch');
@@ -106,11 +183,16 @@ describe('HTTP client', () => {
     expect(await down.plan(BOX)).toEqual({ kind: 'unavailable' });
   });
   it('a job the server no longer knows (404 job_not_found) is LiveJobGone', async () => {
-    const api = httpLiveAreaApi('/v1', (async () => reply({ error: 'job_not_found', detail: 'x' }, 404)) as unknown as typeof fetch);
+    const api = httpLiveAreaApi('/v1', (async () =>
+      reply({ error: 'job_not_found', detail: 'x' }, 404)) as unknown as typeof fetch);
     await expect(api.status('a')).rejects.toBeInstanceOf(LiveJobGone);
   });
   it('Stop: 204 and 404 (already ended) are fine; a 500 is not stopped', async () => {
-    const at = (status: number) => httpLiveAreaApi('/v1', (async () => new Response(null, { status })) as unknown as typeof fetch);
+    const at = (status: number) =>
+      httpLiveAreaApi(
+        '/v1',
+        (async () => new Response(null, { status })) as unknown as typeof fetch,
+      );
     await expect(at(204).stop('a')).resolves.toBeUndefined();
     await expect(at(404).stop('a')).resolves.toBeUndefined();
     await expect(at(500).stop('a')).rejects.toThrow('Stop failed (500).');
@@ -119,14 +201,30 @@ describe('HTTP client', () => {
     let sig: AbortSignal | undefined;
     const api = httpLiveAreaApi('/v1', (async (_u: string, init?: RequestInit) => {
       sig = init?.signal ?? undefined;
-      return reply({ area_id: 'a', state: 'running', step: null, steps: [], elapsed_s: 1, eta_s: 9 });
+      return reply({
+        area_id: 'a',
+        state: 'running',
+        step: null,
+        steps: [],
+        elapsed_s: 1,
+        eta_s: 9,
+      });
     }) as unknown as typeof fetch);
     await api.status('a');
     expect(sig).toBeInstanceOf(AbortSignal);
   });
   it('reads a job and stops it with DELETE', async () => {
     const fetchImpl = vi.fn(async (_u: string, init?: RequestInit) =>
-      init?.method === 'DELETE' ? new Response(null, { status: 204 }) : reply({ area_id: 'a b', state: 'running', step: null, steps: [], elapsed_s: 1, eta_s: 9 }),
+      init?.method === 'DELETE'
+        ? new Response(null, { status: 204 })
+        : reply({
+            area_id: 'a b',
+            state: 'running',
+            step: null,
+            steps: [],
+            elapsed_s: 1,
+            eta_s: 9,
+          }),
     );
     const api = httpLiveAreaApi('/v1', fetchImpl as unknown as typeof fetch);
     expect((await api.status('a b')).state).toBe('running');
@@ -140,7 +238,14 @@ describe('mock', () => {
   const plan = PLAN as LivePlan;
   it('steps run in order with counts; elapsed and remaining add up to the estimate', () => {
     const s = mockStatusAt('a', 0.3, plan);
-    expect(s.steps.map((x) => x.state)).toEqual(['done', 'running', 'todo', 'todo', 'todo', 'todo']);
+    expect(s.steps.map((x) => x.state)).toEqual([
+      'done',
+      'running',
+      'todo',
+      'todo',
+      'todo',
+      'todo',
+    ]);
     expect(s.step).toBe('frames');
     expect(s.steps[1]).toMatchObject({ done: 7, total: 14 });
     expect(s.elapsed_s + (s.eta_s ?? 0)).toBe(540);
@@ -152,10 +257,19 @@ describe('mock', () => {
     expect(mockFromEnv('?live=mock', undefined)).not.toBeNull();
     expect(mockFromEnv('', 'mock')).not.toBeNull();
   });
-  it('scenarios answer the contract\'s errors', async () => {
-    expect(await mockLiveAreaApi('no_pair').plan(BOX)).toMatchObject({ kind: 'error', code: 'area:no_visit_pair' });
-    expect(await mockLiveAreaApi('unreachable').plan(BOX)).toMatchObject({ kind: 'error', code: 'upstream_unavailable' });
-    expect(await mockLiveAreaApi('offline').plan(BOX)).toMatchObject({ kind: 'error', code: 'offline' });
+  it("scenarios answer the contract's errors", async () => {
+    expect(await mockLiveAreaApi('no_pair').plan(BOX)).toMatchObject({
+      kind: 'error',
+      code: 'area:no_visit_pair',
+    });
+    expect(await mockLiveAreaApi('unreachable').plan(BOX)).toMatchObject({
+      kind: 'error',
+      code: 'upstream_unavailable',
+    });
+    expect(await mockLiveAreaApi('offline').plan(BOX)).toMatchObject({
+      kind: 'error',
+      code: 'offline',
+    });
     expect(await mockLiveAreaApi('stored').plan(BOX)).toMatchObject({ kind: 'stored' });
   });
   it('a queued job waits, then runs to done', async () => {

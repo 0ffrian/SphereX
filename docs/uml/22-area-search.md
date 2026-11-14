@@ -1,6 +1,6 @@
 # 22 Area search: components and sequences
 
-Area search of [A16](../architecture/moving-objects/area-search.md) (agreed plan, Q-146): a square drawn on the sky, then **Known objects** (hand-off to Track, [A19](../architecture/moving-objects/track.md) and [A20](../architecture/moving-objects/track-ui.md)) or **Discovery** (dots, glitches, stars and fixed dots removed, joined across visits with a parallax-aware test, checked against known objects). Three diagrams: components, the offline precompute, and the sky interaction. Drawn 9 Nov 2026 from A16 to A18 (backend [A17](../architecture/moving-objects/area-backend.md), sky UI [A18](../architecture/moving-objects/area-ui.md), shell [A21](../architecture/sky-shell.md)). **Built:** the backend from frames to the API (issues #97 and #108: `frames.py`, `dots.py`, `clean.py`, `join.py`, `match.py`, `service.py`, `api/areas.py`, `core/export/ecsv.py`) and the committed Eros pack. The frontend reads `/v1/areas` from the sky dock (issue #96, Q-406): a prepared area that holds the drawn box answers first, and the Q-414 demo only where none does. Known objects' rows carry their Horizons positions and **Track it** reads the object's `/frames` and `/path` for the Eros card (issue #130, Q-455). **Live areas (issue #141, Q-462, Q-463):** a box drawn anywhere is planned by `core/area/live.py` and computed by a background job in `core/area/live_jobs.py` (the same pipeline, stored as `derived.area`), on SPHEREx DR1; see the live area job sequence. **Scans and runs (issue #156, Q-470, Q-471):** a region scanned square by square on the same worker, every run recorded with a replay timeline; see the scan and run sequence. The frontend's aim, draw and live card (issue #144) and the results with Track it and Build it (issue #145) are the last two diagrams. Not built: the gated extras D4, D5 and D7 (cut); D6 is replaced by the spectrum check (`core/area/spectrum.py`, Q-474), computed when an area is stored and served from its own `spectra` stage (built: issue #161; its UI: issue #162, Q-476). Items marked "proposed" wait on a decision (Q-178 to Q-187 in the spec).
+Area search of [A16](../architecture/moving-objects/area-search.md) (agreed plan, Q-146): a square drawn on the sky, then **Known objects** (hand-off to Track, [A19](../architecture/moving-objects/track.md) and [A20](../architecture/moving-objects/track-ui.md)) or **Discovery** (dots, glitches, stars and fixed dots removed, joined across visits with a parallax-aware test, checked against known objects). Three diagrams: components, the offline precompute, and the sky interaction. Drawn 9 Nov 2026 from A16 to A18 (backend [A17](../architecture/moving-objects/area-backend.md), sky UI [A18](../architecture/moving-objects/area-ui.md), shell [A21](../architecture/sky-shell.md)). **Built:** the backend from frames to the API (issues #97 and #108: `frames.py`, `dots.py`, `clean.py`, `join.py`, `match.py`, `service.py`, `api/areas.py`, `core/export/ecsv.py`) and the committed Eros pack. The frontend reads `/v1/areas` from the sky dock (issue #96, Q-406): a prepared area that holds the drawn box answers first, and the Q-414 demo only where none does. Known objects' rows carry their Horizons positions and **Track it** reads the object's `/frames` and `/path` for the Eros card (issue #130, Q-455). **Live areas (issue #141, Q-462, Q-463):** a box drawn anywhere is planned by `core/area/live.py` and computed by a background job in `core/area/live_jobs.py` (the same pipeline, stored as `derived.area`), on SPHEREx DR1; see the live area job sequence. **Scans and runs (issue #156, Q-470, Q-471):** a region scanned square by square on the same worker, every run recorded with a replay timeline; see the scan and run sequence. The frontend's aim, draw and live card (issue #144), the results with Track it and Build it (issue #145) and the scan UI (issue #157, Q-472) are the last three diagrams. Not built: the gated extras D4, D5 and D7 (cut); D6 is replaced by the spectrum check (`core/area/spectrum.py`, Q-474), computed when an area is stored and served from its own `spectra` stage (built: issue #161; its UI: issue #162, Q-476). Items marked "proposed" wait on a decision (Q-178 to Q-187 in the spec).
 
 ## Components
 
@@ -315,6 +315,8 @@ sequenceDiagram
 
 ## Aim, draw and the live card (issue #144)
 
+> **Changed by issue #157 ([Q-472](../decisions/moving-objects.md)):** the aim and draw steps below are replaced by selecting a region (see the last diagram). A region of one square goes to `Set` directly; `Drawing` is no longer entered.
+
 The frontend side of a live area, as built ([A18.1](../architecture/moving-objects/area-ui.md#a181-tool-and-drawing), Q-462): `areaStore` stages `aiming`, `drawing` and `set`, then the live card of `liveJobStore` for a box no prepared area holds. The job API is `app/area/liveAreaApi.ts` on the schemas of the sequence above. Closing the card leaves the job running (it is followed until done, failed or stopped); a done job opens in the existing Known and Discovery views.
 
 ```mermaid
@@ -393,3 +395,34 @@ sequenceDiagram
     B-->>U: plain sphere, placeholder_shape (artistic), size not drawn
   end
 ```
+
+## Select a region and scan (issue #157)
+
+The scan UI as built ([A18.1](../architecture/moving-objects/area-ui.md#a181-tool-and-drawing), [Q-472](../decisions/moving-objects.md)). The pointer is the region (`AimOverlay`, `scanGrid.selectionAt`); a click flies north up to it. One square is the single-area flow above; more squares open the scan card (`ScanCard`, `scanStore`) on the scan and run routes of #156 (`scanApi.ts`, generated `ScanPlan`, `Run`, `RunResults`). `ScanOverlay` draws the grid in #156's split (`scanGrid.gridShape`), the squares' states and the circled objects from `found` events, pinned to the sky. The run id is kept in localStorage, so a reload follows the run again.
+
+```mermaid
+stateDiagram-v2
+  [*] --> Selecting: dock, Known objects or Discovery
+  Selecting --> Selecting: drag turns the sky, zoom resizes the region (12 deg or 36 squares max)
+  Selecting --> Single: click, tap or Enter on a region of one square
+  Selecting --> Planning: click, tap or Enter on more squares (fly north up)
+  Selecting --> [*]: Escape
+  Single --> [*]: the single-area flow (Set, above)
+  Planning --> Offer: POST /v1/scans start=false (plan)
+  Planning --> Failed: scan:too_large, area:bad_box, or no scan routes
+  Offer --> Running: Start scan (start=true, 202; run id saved)
+  Offer --> Selecting: Select again
+  Running --> Running: poll GET /v1/runs/{id} (squares, progress, found events)
+  Running --> Paused: Pause (after the current square)
+  Paused --> Running: Resume
+  Running --> Stopping: Stop (DELETE; the square stops at its next check)
+  Stopping --> Done: run stopped
+  Running --> Done: run done or failed
+  Done --> Done: GET /v1/runs/{id}/results (Found / Known rows)
+  Done --> Square: a done square or a circle opens its stored results
+  Square --> Done: Back or the dock button
+  Done --> Selecting: Scan again
+  Failed --> Selecting: Select again
+  Done --> [*]
+```
+

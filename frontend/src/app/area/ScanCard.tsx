@@ -3,7 +3,8 @@
 //   scanning a mini grid of the squares' states, "Square 7 of 15 · <step and count>", time left,
 //            running totals, skipped squares as status-dot messages; Pause or Resume (icons) and Stop
 //            (the header's − and × minimise and close, so the card has no Minimise button);
-//   done     where the data came from, the totals, a Found / Known / Possible filter and rows that
+//   done     where the data came from, the totals, a Found / Known filter (no Possible: the results
+//            carry no possible tracks, Q-472) and rows that
 //            name their square(s) and date, with Track it and Build it; Export ECSV and Scan again.
 // Closing the card while the scan runs does not stop it (the dock button brings the card back).
 import { useEffect, useMemo, useRef, useState } from 'react';
