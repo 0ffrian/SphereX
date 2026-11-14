@@ -185,29 +185,28 @@ export function lengthText(s: number): string {
   return rest ? `${h} h ${rest} min` : `${h} h`;
 }
 
+/** Where the replay is after `wallMs` of playing from `fromT` at `speed`, stopped at the end. */
+export function advance(fromT: number, wallMs: number, speed: ReplaySpeed, end: number): number {
+  return Math.min(end, fromT + (wallMs / 1000) * speed);
+}
+
 /**
- * Where the replay is after `wallMs` of playing from `fromT` at `speed`, stopped at the end.
- * Under reduced motion the clock moves in whole steps of one second of wall time (no animation).
+ * Reduced motion: one step a second, each step one second of the run times the speed. The
+ * position moves by whole steps counted, not by wall time, so timer jitter (a tick at 999 ms, the
+ * next at 2001 ms) never skips or doubles a step.
  */
-export function advance(
-  fromT: number,
-  wallMs: number,
-  speed: ReplaySpeed,
-  end: number,
-  stepped: boolean,
-): number {
-  const wall = stepped ? Math.floor(wallMs / 1000) * 1000 : wallMs;
-  return Math.min(end, fromT + (wall / 1000) * speed);
+export function step(fromT: number, speed: ReplaySpeed, end: number): number {
+  return Math.min(end, fromT + speed);
 }
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-/** "13 Nov 07:28" in UTC, as the mock-up writes it (the app's times are UTC). */
+/** "13 Nov 07:28 UTC": the mock-up's form, saying it is UTC (on stage UTC+4 would read it as local). */
 export function whenText(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '';
   const hh = String(d.getUTCHours()).padStart(2, '0');
   const mm = String(d.getUTCMinutes()).padStart(2, '0');
-  return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${hh}:${mm}`;
+  return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${hh}:${mm} UTC`;
 }
 
 const signed = (v: number) => `${v < 0 ? '−' : '+'}${Math.abs(Math.round(v))}°`;

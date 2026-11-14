@@ -11,6 +11,7 @@ import {
   recordAt,
   regionText,
   squareAt,
+  step,
   ticksOf,
   whenText,
 } from './replay';
@@ -244,13 +245,14 @@ describe('timeline', () => {
 
 describe('clock', () => {
   it('advances by wall time times the speed, and stops at the end', () => {
-    expect(advance(0, 1000, 60, 1900, false)).toBe(60);
-    expect(advance(100, 2500, 10, 1900, false)).toBe(125);
-    expect(advance(1890, 1000, 600, 1900, false)).toBe(1900);
+    expect(advance(0, 1000, 60, 1900)).toBe(60);
+    expect(advance(100, 2500, 10, 1900)).toBe(125);
+    expect(advance(1890, 1000, 600, 1900)).toBe(1900);
   });
-  it('moves in whole seconds of wall time under reduced motion', () => {
-    expect(advance(0, 999, 60, 1900, true)).toBe(0);
-    expect(advance(0, 1500, 60, 1900, true)).toBe(60);
+  it('moves one step of the speed at a time under reduced motion', () => {
+    expect(step(0, 60, 1900)).toBe(60);
+    expect(step(60, 60, 1900)).toBe(120);
+    expect(step(1890, 600, 1900)).toBe(1900);
   });
   it('writes times as the mock-up does', () => {
     expect(clock(0)).toBe('0:00');
@@ -260,7 +262,7 @@ describe('clock', () => {
     expect(lengthText(540)).toBe('9 min');
     expect(lengthText(13930)).toBe('3 h 52 min');
     expect(lengthText(7200)).toBe('2 h');
-    expect(whenText('2026-11-13T07:28:44Z')).toBe('13 Nov 07:28');
+    expect(whenText('2026-11-13T07:28:44Z')).toBe('13 Nov 07:28 UTC');
     expect(regionText({ ra: 207.9, dec: -11.45, width_deg: 9.6, height_deg: 6 })).toBe(
       '9.6° × 6.0° near RA 208°, Dec −11°',
     );

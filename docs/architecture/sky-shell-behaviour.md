@@ -59,6 +59,9 @@ No number keys ([Q-121](../decisions/shell-surfaces.md) item 1). A new tool take
 | `BuildPane` onKeyDown and window listener | inside the pane, or anywhere | pane open | onKeyDown no, window yes | `closeBuildPane()` | yes |
 | `SelectedCard` window listener | anywhere | object card shown | yes | `deselectObject()` | yes |
 | `Island` window listener | anywhere | thinking and `tool !== 'sky'` | **no** | `closePanel()` | **no** |
+| `RunsMenu` onKeyDown | focus inside the runs list | list open | no | `closeMenu()`, focus the runs button; also `stopPropagation` | yes |
+| `ReplayBar` window listener | anywhere | a replay shown | yes | `endReplay()`, focus the runs button | yes |
+| `SkyPane` credit popover, window listener in the **capture** phase | anywhere | credit popover open | no | close the popover, focus its button; runs before every other handler, so one press closes only the popover | yes |
 
 Known effects: with the pane opened from the rail and a search thinking under it, Escape can first set the tool to `sky` (island) and then close the pane, so focus goes to the marker instead of the rail button; Escape in the search field while thinking leaves the panel tool.
 

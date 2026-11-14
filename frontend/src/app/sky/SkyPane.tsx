@@ -168,11 +168,14 @@ export function SkyPane({ children }: { children?: ReactNode }) {
   const creditBtnRef = useRef<HTMLButtonElement>(null);
   const creditId = useId();
   const [creditOpen, setCreditOpen] = useState(false);
-  // Escape or a press outside the popover and its button closes it.
+  // Escape or a press outside the popover and its button closes it. Escape is taken in the capture
+  // phase, before the window listeners added earlier (the replay's): one press closes the popover
+  // only (A21.10).
   useEffect(() => {
     if (!creditOpen) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape' || e.defaultPrevented) return;
+      e.preventDefault();
       setCreditOpen(false);
       creditBtnRef.current?.focus();
     };
@@ -181,10 +184,10 @@ export function SkyPane({ children }: { children?: ReactNode }) {
       if (creditRef.current?.contains(t) || creditBtnRef.current?.contains(t)) return;
       setCreditOpen(false);
     };
-    window.addEventListener('keydown', onKey);
+    window.addEventListener('keydown', onKey, true);
     window.addEventListener('pointerdown', onDown, true);
     return () => {
-      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('keydown', onKey, true);
       window.removeEventListener('pointerdown', onDown, true);
     };
   }, [creditOpen]);

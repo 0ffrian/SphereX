@@ -1,6 +1,6 @@
 // The replay of a run on the sky (issue #158; mock-up state 13). The squares and circles are
 // #157's ScanOverlay, fed the run as it was at the replay time (replay.ts). This draws the tag at
-// the top ("Replay · Discovery · 13 Nov 07:28") and the bar above the dock: play or pause, the
+// the top ("Replay · Discovery · 13 Nov 07:28 UTC") and the bar above the dock: play or pause, the
 // timeline (a slider; ticks mark finds, green known and amber unexplained, and skipped squares in
 // red; click a tick or the rail to jump, drag the knob), the time and the square count, and the
 // speeds 1×, 10×, 60×, 600×. Escape, the runs button or another tool ends the replay.
@@ -8,6 +8,7 @@
 // or next tick, Home and End to the start and the end. Screen readers hear the position from the
 // slider's value text when they move it; nothing is announced while it plays (it would never stop).
 import { useEffect, useMemo, useRef, type KeyboardEvent, type PointerEvent } from 'react';
+import { isEditableTarget } from '@/app/shell/shortcuts';
 import { useShellStore } from '@/app/shell/shellStore';
 import { clock, REPLAY_SPEEDS, squareAt, ticksOf, whenText } from '@/app/area/replay';
 import { useRunsStore } from '@/app/area/runsStore';
@@ -27,11 +28,12 @@ export function ReplayBar() {
   useEffect(() => {
     if (active && tool !== 'sky') useRunsStore.getState().endReplay();
   }, [active, tool]);
-  // Escape ends it, from anywhere that does not use Escape itself.
+  // Escape ends it, from anywhere that does not use Escape itself; a text field keeps it (as
+  // BuildPane and SelectedCard). The sky credit popover takes Escape first (capture), A21.10.
   useEffect(() => {
     if (!active) return;
     const onKey = (e: globalThis.KeyboardEvent) => {
-      if (e.key !== 'Escape' || e.defaultPrevented) return;
+      if (e.key !== 'Escape' || e.defaultPrevented || isEditableTarget(e.target)) return;
       e.preventDefault();
       useRunsStore.getState().endReplay();
       document.querySelector<HTMLElement>('[data-testid="runs-button"]')?.focus();

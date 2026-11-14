@@ -297,11 +297,14 @@ function RunRow({ run }: { run: RunSummary }) {
         className="sx-runs-play"
         aria-label={`Replay ${what}`}
         title={started ? 'Replay' : 'Not started yet'}
-        disabled={!started || loading}
+        disabled={!started}
+        // While its record loads the button stays enabled, so it keeps focus; a press does nothing.
+        aria-disabled={loading || undefined}
         aria-busy={loading || undefined}
-        onClick={() =>
-          void useRunsStore.getState().startReplay(run.run_id, { stepped: prefersStill() })
-        }
+        onClick={() => {
+          if (loading) return;
+          void useRunsStore.getState().startReplay(run.run_id, { stepped: prefersStill() });
+        }}
         data-testid="runs-play"
       >
         <svg viewBox="0 0 24 24" aria-hidden="true">
