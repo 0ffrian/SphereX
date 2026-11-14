@@ -1,10 +1,10 @@
-// Draws the scanning rings (scanRings.ts) on the square being analysed, live or in a replay (issue
+// Draws the scanning rings (scanRingsSim.ts) on the square being analysed, live or in a replay (issue
 // #173). One animation frame loop moves the model and sets the circles directly (no React render per
 // frame). The square's screen quad comes from ScanOverlay's placement, so the rings stay pinned to
 // the sky. Nothing plays under reduced motion: the blue square says "analysing" on its own.
 // Decoration only: hidden from screen readers (the scan card's live region says the square).
 import { useEffect, useRef, type MutableRefObject } from 'react';
-import { newSim, quadPoint, ringLook, stepSim } from './scanRings';
+import { newSim, quadPoint, ringLook, stepSim } from './scanRingsSim';
 import type { Pt } from './scanLabels';
 
 /** Reduced motion, read live: a change while the rings play stops or starts them. */
