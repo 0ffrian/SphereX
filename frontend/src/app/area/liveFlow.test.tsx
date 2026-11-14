@@ -297,6 +297,23 @@ describe('waiting (state 5)', () => {
   });
 });
 
+describe('the minimised pill names the offer and a failure (#153)', () => {
+  const box = { a: { ra: 10, dec: 5 }, b: { ra: 11, dec: 6 }, widthDeg: 1, heightDeg: 1 };
+  it('the offer says Ready to compute', async () => {
+    setLiveAreaApi(mockLiveAreaApi('ok'));
+    await draw('known');
+    expect(useLiveJobStore.getState().view?.kind).toBe('offer');
+    expect(liveMiniTitle(useLiveJobStore.getState(), 'Known objects')).toBe('Known objects · Ready to compute');
+  });
+  it('a failure says Could not compute', () => {
+    const view = { kind: 'failed' as const, box, flow: 'discovery' as const, code: 'offline', detail: '' };
+    expect(liveMiniTitle({ view, job: null }, 'Discovery')).toBe('Discovery · Could not compute');
+  });
+  it('no card is just the flow', () => {
+    expect(liveMiniTitle({ view: null, job: null }, 'Discovery')).toBe('Discovery');
+  });
+});
+
 describe('failures (state 6)', () => {
   it.each([
     ['no_pair', 'area:no_visit_pair', false],
