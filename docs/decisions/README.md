@@ -496,7 +496,7 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | Q-476 | Spectrum check UI as built: choices where A18.7 and the mock-up are silent or differ; (6) Measured only hides the verdict in the list too, settled by D-21 | Proposed ((6) settled by D-21, 14 Nov 2026) | [moving-objects](moving-objects.md) |
 | Q-478 | Discovery gap analysis (14 Nov 2026): nine fixes on `fix/discovery-gaps`; open gaps (a) to (h), among them issue #143 and a real asteroid missed by the pair test | Proposed (14 Nov 2026) | [moving-objects](moving-objects.md) |
 | Q-479 | Scan and replay honesty as built (issue #170): Measured only hides known names too; the sky from `/results`; #169's fields read before #169 lands (null, never 0); flags before the length | Proposed (14 Nov 2026) | [moving-objects](moving-objects.md) |
-| Q-480 | Runs count and list unchecked tracks (`unchecked`, null on older records; `unchecked_by`; `missing` per square; no found event) | Proposed (issue #169) | [moving-objects](moving-objects.md) |
-| Q-481 | A scan whose every square failed ends `failed`; `squares_failed` in the totals | Proposed (issue #169) | [moving-objects](moving-objects.md) |
-| Q-482 | Cutout second pass with a failure budget; spectra refilled in the worker; a stored area whose known-object check failed is rechecked (cooldown) | Proposed (issue #169) | [moving-objects](moving-objects.md) |
+| Q-480 | Runs count and list unchecked tracks (`unchecked`, null on older records; `unchecked_by`; `missing` per square; no found event) | Proposed (14 Nov 2026, issue #169) | [moving-objects](moving-objects.md) |
+| Q-481 | A scan whose every square failed ends `failed`; `squares_failed` in the totals | Proposed (14 Nov 2026, issue #169) | [moving-objects](moving-objects.md) |
+| Q-482 | Cutout second pass with a failure budget; spectra refilled in the worker; a stored area whose known-object check failed is rechecked (cooldown) | Proposed (14 Nov 2026, issue #169) | [moving-objects](moving-objects.md) |
 | B-01 to B-04 | Post-event backlog | Backlog | [scope-process](scope-process.md#post-event-backlog) |
