@@ -321,7 +321,6 @@ export function ErosCard({ title: given, back }: { title?: string; back?: () => 
                       tag="model_dependent"
                       tooltip="Estimated: the path is a JPL Horizons prediction seen from SPHEREx, not a measurement."
                       srText
-                      variant="tag"
                     />
                     {' Path from Horizons'}
                   </>
@@ -353,7 +352,6 @@ export function ErosCard({ title: given, back }: { title?: string; back?: () => 
                         'Approximate photometry from the demo extraction; not a calibrated SPHEREx flux.'
                       }
                       srText
-                      variant="tag"
                     />
                   )}
                 </span>

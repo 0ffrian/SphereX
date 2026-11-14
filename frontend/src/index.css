@@ -2325,18 +2325,20 @@ body {
 }
 
 /* Issue #71 stream U: the buttons in the Details panel are the mock-up's small size (the Tailwind
-   button class is 44 px high). Unlayered so it beats the utilities; a touch screen keeps 44 px. */
-.sx-bp-details button {
+   button class is 44 px high). Unlayered so it beats the utilities; a touch screen keeps 44 px.
+   Issue #174: `:where()` keeps it at element weight, so the D-38 component classes (rows that open,
+   segmented items, the Hear it row, tags) keep their own sizes instead of being shrunk by it. */
+:where(.sx-bp-details) button {
   min-height: 32px;
   min-width: 32px;
   padding: 0 10px;
   font-size: 12.5px;
 }
-.sx-bp-details [role='group'] {
+:where(.sx-bp-details) [role='group'] {
   gap: 6px;
 }
 @media (pointer: coarse) {
-  .sx-bp-details button {
+  :where(.sx-bp-details) button {
     min-height: 44px;
     min-width: 44px;
   }
@@ -2450,7 +2452,9 @@ body {
   position: relative;
   display: grid;
   grid-auto-flow: column;
-  grid-auto-columns: minmax(0, 1fr);
+  /* Issue #174: each item at least its label's width (no "Measured / only" wrap), and the items
+     share the rest of the track. */
+  grid-auto-columns: minmax(max-content, 1fr);
   gap: 2px;
   padding: 3px;
   border-radius: 8px;
@@ -5639,7 +5643,10 @@ li[data-state='running'] > .sx-live-mk {
   color: var(--fg);
   font-weight: 500;
 }
-.sx-seg {
+/* The compact, content-width segmented control on the glass (the replay speed). Issue #174: scoped,
+   so it no longer overrides the panels' equal-width D-38 control (`.sx-seg` above), whose items
+   share the track and whose selected fill is the sliding thumb. */
+.sx-replay-speed {
   display: inline-flex;
   flex-wrap: wrap;
   justify-self: start;
@@ -5649,7 +5656,7 @@ li[data-state='running'] > .sx-live-mk {
   border: 1px solid var(--line);
   border-radius: 8px;
 }
-.sx-seg button {
+.sx-replay-speed button {
   padding: 4px 10px;
   border: 0;
   border-radius: 6px;
@@ -5660,14 +5667,14 @@ li[data-state='running'] > .sx-live-mk {
   font-variant-numeric: tabular-nums;
   cursor: pointer;
 }
-.sx-seg button:hover {
+.sx-replay-speed button:hover {
   color: var(--fg);
 }
-.sx-seg button[aria-pressed='true'] {
+.sx-replay-speed button[aria-pressed='true'] {
   background: var(--ac);
   color: var(--on-ac);
 }
-.sx-seg button:focus-visible {
+.sx-replay-speed button:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
