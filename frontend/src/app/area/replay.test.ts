@@ -1,5 +1,6 @@
 // Replay of a recorded run (issue #158): the run as it was at time t, the timeline marks, the
 // labels' "found at" times, the clock text and the deterministic clock.
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   advance,
@@ -203,7 +204,41 @@ describe('timeline', () => {
     const at = foundAtOf(RUN);
     expect(at.get('9532 Abramenko')).toBe(600);
     expect(at.get('3:T7')).toBe(1900);
-    for (const o of objectsFromEvents(RUN.events)) expect(at.has(o.key)).toBe(true);
+    for (const o of objectsFromEvents(RUN.events))
+      expect(at.has(o.key)).toBe(o.kind !== 'predicted');
+  });
+  it('gives a predicted-only object no "found at" time', () => {
+    expect(foundAtOf(RUN).has('2020 AB1')).toBe(false);
+    // The recorded DR1 run: its 197 predicted-only circles were never found.
+    const dr1 = JSON.parse(
+      readFileSync(`${process.cwd()}/e2e/fixtures/runs/run-dr1.json`, 'utf8'),
+    ) as RunRecord;
+    const at = foundAtOf(dr1);
+    const objs = objectsFromEvents(dr1.events);
+    const predicted = objs.filter((o) => o.kind === 'predicted');
+    expect(predicted).toHaveLength(197);
+    for (const o of predicted) expect(at.has(o.key)).toBe(false);
+    for (const o of objs.filter((x) => x.kind !== 'predicted')) expect(at.has(o.key)).toBe(true);
+    // Found in square 1, predicted again in square 2: found at its detection.
+    expect(at.get('8925 Boattini')).toBe(1841.644);
+  });
+  it('finds an object predicted first and detected later at its detection, as its tick', () => {
+    const later: RunEvent = {
+      t: 1900,
+      type: 'found',
+      square: 3,
+      area_id: 'live-bbbbbbbbbbbb',
+      object: {
+        kind: 'known',
+        positions_tag: 'model_dependent',
+        designation: '2020 AB1',
+        square: 3,
+        positions: [pos(207.3, '2025-06-27T13:00:00Z')],
+      },
+    };
+    const run = { ...RUN, events: [...EVENTS.slice(0, -1), later, EVENTS[EVENTS.length - 1]!] };
+    expect(foundAtOf(run).get('2020 AB1')).toBe(1900);
+    expect(ticksOf(run).find((k) => k.label === '2020 AB1 found')?.t).toBe(1900);
   });
 });
 

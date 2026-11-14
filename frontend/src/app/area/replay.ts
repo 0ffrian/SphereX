@@ -147,12 +147,16 @@ export function objectKey(o: { designation?: string; square: number; track_id?: 
   return o.designation ?? `${o.square}:${o.track_id ?? ''}`;
 }
 
-/** When each object was first found (s), by objectsFromEvents' key. */
+/**
+ * When each object was first found (s), by objectsFromEvents' key. Predicted events are not finds:
+ * a predicted-only object has no entry (its label keeps "predicted · V…"), and an object predicted
+ * first and detected later is found at its detection, the time its tick shows (as ticksOf).
+ */
 export function foundAtOf(run: RunRecord): Map<string, number> {
   const out = new Map<string, number>();
   for (const e of run.events) {
     const o = e.type === 'found' ? e.object : undefined;
-    if (!o) continue;
+    if (!o || o.kind === 'predicted') continue;
     const k = objectKey(o);
     const prev = out.get(k);
     if (prev === undefined || e.t < prev) out.set(k, e.t);
