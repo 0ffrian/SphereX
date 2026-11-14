@@ -326,6 +326,7 @@ class LiveJobs:
         self._queue: deque[QueueItem] = deque()
         self._thread: threading.Thread | None = None
         self._running: QueueItem | None = None
+        self._closed = False  # set by ``close()``: nothing new is queued during shutdown
         self._results_lock = threading.Lock()
         self._results: dict[str, tuple[tuple[tuple[int, str], ...], dict[str, Any]]] = {}
 
@@ -348,7 +349,7 @@ class LiveJobs:
             job = self._jobs.get(plan.area_id)
             if job is not None and job.joinable:
                 return job
-            if len(self._queue) >= MAX_WAITING:
+            if self._closed or len(self._queue) >= MAX_WAITING:
                 raise QueueFull()
             self._prune()
             job = Job(plan)
@@ -392,7 +393,7 @@ class LiveJobs:
         stored = dict(stored or {})
         post: list[Snapshot] = []
         with self._lock:
-            if len(self._queue) >= MAX_WAITING:
+            if self._closed or len(self._queue) >= MAX_WAITING:
                 raise QueueFull()
             run_id = self.runs.create(
                 kind,
@@ -433,7 +434,7 @@ class LiveJobs:
                 return
             if not isinstance(item, ScanJob) or item.state != "paused":
                 raise RunConflict("run_not_paused", "Only a paused scan can be resumed.")
-            if len(self._queue) >= MAX_WAITING:
+            if self._closed or len(self._queue) >= MAX_WAITING:
                 raise QueueFull()
             item.state = "queued"
             self._queue.append(item)
@@ -528,8 +529,10 @@ class LiveJobs:
         running one ends at its next check, which every queued cutout download makes, so the
         downloads still waiting in its pool end at once. Without this the process could not
         exit until every queued download had run (minutes when the archive is slow).
-        True when the worker has ended."""
+        True when the worker has ended. Afterwards nothing new is queued (``QueueFull``): a
+        request racing the shutdown must not start the worker again."""
         with self._lock:
+            self._closed = True
             runs = [run_id for run_id, item in self._by_run.items() if isinstance(item, ScanJob)]
             areas = [a for a, job in self._jobs.items() if job.state in ("queued", "running")]
         for run_id in runs:

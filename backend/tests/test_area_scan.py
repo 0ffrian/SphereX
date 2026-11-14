@@ -22,7 +22,7 @@ from app.core.area import clean as area_clean
 from app.core.area import frames as area_frames
 from app.core.area import live, runs, scan
 from app.core.area.live import Box, LiveAreaError, Plan
-from app.core.area.live_jobs import LiveJobs, Progress, RunConflict
+from app.core.area.live_jobs import LiveJobs, Progress, QueueFull, RunConflict
 from app.core.area.store import AreaStore
 from app.core.card.validate import check
 from app.main import create_app
@@ -475,6 +475,12 @@ def test_close_stops_the_running_scan_and_everything_waiting(tmp_path: Path) -> 
     assert single.run_id is not None and _run(jobs, single.run_id)["state"] == "stopped"
     assert jobs.reply(single)["error"]["code"] == "cancelled"
     assert jobs.close(timeout=1)  # nothing left: closing again is harmless
+    # A request racing the shutdown queues nothing and does not start the worker again.
+    with pytest.raises(QueueFull):
+        jobs.submit_scan(scan.plan_scan(200.0, 0.0, 2.0, 2.0), "discovery", RELEASE)
+    with pytest.raises(QueueFull):
+        jobs.submit(_plan_of(live.snap_box(12.0, 10.0, 0.5, 0.5)), kind="discovery")
+    assert jobs._thread is None or not jobs._thread.is_alive()
 
 
 def test_a_single_live_job_with_a_kind_is_a_run_of_one_square(tmp_path: Path) -> None:

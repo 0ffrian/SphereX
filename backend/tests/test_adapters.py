@@ -86,6 +86,13 @@ def test_skybot_204_is_empty() -> None:
     assert skybot.parse(204, b"") == []
 
 
+def test_skybot_object_without_data_is_not_an_empty_answer() -> None:
+    # An error object answered with 200 must not read (and be cached) as "no known objects".
+    with pytest.raises(ValueError):
+        skybot.parse(200, b'{"error": "service busy"}')
+    assert skybot.parse(200, b'{"data": []}') == []
+
+
 def test_sia_parse_recorded_rows_and_overflow() -> None:
     fixed = [(m, b) for m, b in entries("irsa_sia") if m["maxrec"] == 3]
     assert len(fixed) == 8  # one cone per fixed target; the moving cones are checked below

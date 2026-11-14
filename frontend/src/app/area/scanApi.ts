@@ -254,8 +254,10 @@ export function httpScanApi(
       }
     },
     async start(req, signal) {
+      let answered = false;
       try {
         const res = await post(req, true, signal);
+        answered = true;
         const body = await json(res);
         if (isObj(body) && isStr(body.error) && isScanError(body.error))
           return { kind: 'error', code: body.error, detail: isStr(body.detail) ? body.detail : '' };
@@ -263,9 +265,12 @@ export function httpScanApi(
         return { kind: 'started', run: parseRunRecord(body) };
       } catch (e) {
         if (aborted(e)) throw e;
-        // No answer at all (no network, or the time limit): the server is not reachable, which is
-        // not the same as a server with no scan routes.
-        return { kind: 'error', code: 'scan:unreachable', detail: '' };
+        // The time limit, or a reply that could not be read: the server may have queued the scan,
+        // so the card must not say nothing started (Select again would start a second one).
+        // Only a request that never got through (no network) is `scan:unreachable`.
+        const timedOut = e instanceof DOMException && e.name === 'TimeoutError';
+        const code = answered || timedOut ? 'scan:no_answer' : 'scan:unreachable';
+        return { kind: 'error', code, detail: '' };
       }
     },
     async run(id, signal) {
