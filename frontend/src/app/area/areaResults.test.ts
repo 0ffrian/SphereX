@@ -107,7 +107,7 @@ describe('provenance lines and messages', () => {
       message: 'No prepared data for this area yet.',
     });
     expect(t.title).toBe('No data for this area here');
-    expect(t.line).toMatch(/Draw again/);
+    expect(t.line).toMatch(/Choose a region/);
   });
 });
 

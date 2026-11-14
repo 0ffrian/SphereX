@@ -177,10 +177,12 @@ function DrawCard() {
       <p className="sr-only" role="status" aria-live="polite" data-testid="area-live">
         {stage === 'set' && box ? `Area set on the sky, ${size}.` : ''}
       </p>
-      <span role="status" data-testid="area-hint">
+      <span data-testid="area-hint">
         <span className="sr-only">{flow === 'known' ? 'Known objects' : 'Discovery'}: </span>
         {lead} <span className="sx-area-hint-keys">· {rest}</span>
-        <span className="sr-only">. Press Enter to select the region in the middle, Escape to leave.</span>
+        <span className="sr-only">
+          . Press Enter to select the region in the middle, Escape to leave.
+        </span>
       </span>
     </div>
   );

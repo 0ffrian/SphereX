@@ -5,19 +5,12 @@ import { describe, expect, it } from 'vitest';
 import type { ApiClient } from '@/app/api/client';
 import { areaFixture, areaIndexFixture, erosPackStage, spectraFixture } from '@/test/areaFixtures';
 import { loadDiscovery, missingText } from './realArea';
-import {
-  httpSpectraApi,
-  parseAreaSpectra,
-  SPECTRUM_VERDICTS,
-  type AreaSpectra,
-  type SpectraApi,
-} from './spectraApi';
+import { httpSpectraApi, parseAreaSpectra, SPECTRUM_VERDICTS, type AreaSpectra, type SpectraApi } from './spectraApi';
 
 const EROS = erosPackStage<AreaSpectra>('spectra');
 const reply = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
-const fetchOf = (res: () => Response | Promise<Response>) =>
-  (async () => res()) as unknown as typeof fetch;
+const fetchOf = (res: () => Response | Promise<Response>) => (async () => res()) as unknown as typeof fetch;
 
 describe('reply check', () => {
   it('accepts the Eros pack: the verdicts A17.13 expects for the recorded area', () => {
@@ -50,122 +43,54 @@ describe('reply check', () => {
       f(o);
       return () => parseAreaSpectra(o);
     };
-    expect(bad((o) => ((o.tracks[0] as { verdict: string }).verdict = 'asteroid'))).toThrow(
-      /verdict/,
-    );
+    expect(bad((o) => ((o.tracks[0] as { verdict: string }).verdict = 'asteroid'))).toThrow(/verdict/);
     expect(bad((o) => ((o.tracks[0]!.pairs[0] as { rho: unknown }).rho = '1.2'))).toThrow(/rho/);
-    expect(bad((o) => ((o.calibration[0] as { source: string }).source = 'guess'))).toThrow(
-      /source/,
-    );
+    expect(bad((o) => ((o.calibration[0] as { source: string }).source = 'guess'))).toThrow(/source/);
     expect(bad((o) => ((o.tracks[0]!.points[0] as { used: unknown }).used = 1))).toThrow(/used/);
-    expect(bad((o) => ((o.tracks[0]!.points[0] as { visit: unknown }).visit = null))).toThrow(
-      /visit/,
-    );
+    expect(bad((o) => ((o.tracks[0]!.points[0] as { visit: unknown }).visit = null))).toThrow(/visit/);
     expect(() => parseAreaSpectra(null)).toThrow();
     // The Spectrum section's badge reads provenance.points and provenance.colour: never guessed.
-    expect(bad((o) => delete (o.provenance as Partial<AreaSpectra['provenance']>).colour)).toThrow(
-      /provenance\.colour/,
-    );
-    expect(bad((o) => ((o.provenance.colour as { tag: string }).tag = 'artistic'))).toThrow(
-      /provenance\.colour\.tag/,
-    );
-    expect(bad((o) => ((o.provenance.points as { tag: string }).tag = 'artistic'))).toThrow(
-      /provenance\.points\.tag/,
-    );
+    expect(bad((o) => delete (o.provenance as Partial<AreaSpectra['provenance']>).colour)).toThrow(/provenance\.colour/);
+    expect(bad((o) => ((o.provenance.colour as { tag: string }).tag = 'artistic'))).toThrow(/provenance\.colour\.tag/);
+    expect(bad((o) => ((o.provenance.points as { tag: string }).tag = 'artistic'))).toThrow(/provenance\.points\.tag/);
   });
 
   it('knows every verdict of A17.13', () => {
-    expect(SPECTRUM_VERDICTS).toEqual([
-      'rock',
-      'very_red',
-      'too_red',
-      'too_blue',
-      'flickers',
-      'too_faint',
-      'one_colour',
-    ]);
+    expect(SPECTRUM_VERDICTS).toEqual(['rock', 'very_red', 'too_red', 'too_blue', 'flickers', 'too_faint', 'one_colour']);
   });
 });
 
 describe('the HTTP client', () => {
   it('ok; 404 spectra_not_prepared is not run; everything else unavailable', async () => {
-    expect(
-      (
-        await httpSpectraApi(
-          '/v1',
-          fetchOf(() => reply(EROS)),
-        ).areaSpectra('eros-2026-03')
-      ).kind,
-    ).toBe('ok');
-    const artistic = {
-      ...EROS,
-      provenance: { ...EROS.provenance, colour: { ...EROS.provenance.colour, tag: 'artistic' } },
-    };
-    expect(
-      await httpSpectraApi(
-        '/v1',
-        fetchOf(() => reply(artistic)),
-      ).areaSpectra('eros-2026-03'),
-    ).toEqual({ kind: 'unavailable' });
+    expect((await httpSpectraApi('/v1', fetchOf(() => reply(EROS))).areaSpectra('eros-2026-03')).kind).toBe('ok');
+    const artistic = { ...EROS, provenance: { ...EROS.provenance, colour: { ...EROS.provenance.colour, tag: 'artistic' } } };
+    expect(await httpSpectraApi('/v1', fetchOf(() => reply(artistic))).areaSpectra('eros-2026-03')).toEqual({ kind: 'unavailable' });
     const noColour = structuredClone(EROS);
     delete (noColour.provenance as Partial<AreaSpectra['provenance']>).colour;
-    expect(
-      await httpSpectraApi(
-        '/v1',
-        fetchOf(() => reply(noColour)),
-      ).areaSpectra('eros-2026-03'),
-    ).toEqual({ kind: 'unavailable' });
+    expect(await httpSpectraApi('/v1', fetchOf(() => reply(noColour))).areaSpectra('eros-2026-03')).toEqual({ kind: 'unavailable' });
     const notRun = reply({ error: 'spectra_not_prepared', detail: 'x' }, 404);
-    expect(
-      await httpSpectraApi(
-        '/v1',
-        fetchOf(() => notRun),
-      ).areaSpectra('a'),
-    ).toEqual({ kind: 'not_run' });
-    expect(
-      await httpSpectraApi(
-        '/v1',
-        fetchOf(() => reply({ error: 'area_not_found' }, 404)),
-      ).areaSpectra('a'),
-    ).toEqual({ kind: 'unavailable' });
-    expect(
-      await httpSpectraApi(
-        '/v1',
-        fetchOf(() => reply({}, 500)),
-      ).areaSpectra('a'),
-    ).toEqual({ kind: 'unavailable' });
-    expect(
-      await httpSpectraApi(
-        '/v1',
-        fetchOf(() => reply({ tracks: 'no' })),
-      ).areaSpectra('a'),
-    ).toEqual({ kind: 'unavailable' });
+    expect(await httpSpectraApi('/v1', fetchOf(() => notRun)).areaSpectra('a')).toEqual({ kind: 'not_run' });
+    expect(await httpSpectraApi('/v1', fetchOf(() => reply({ error: 'area_not_found' }, 404))).areaSpectra('a')).toEqual({ kind: 'unavailable' });
+    expect(await httpSpectraApi('/v1', fetchOf(() => reply({}, 500))).areaSpectra('a')).toEqual({ kind: 'unavailable' });
+    expect(await httpSpectraApi('/v1', fetchOf(() => reply({ tracks: 'no' }))).areaSpectra('a')).toEqual({ kind: 'unavailable' });
     const offline = (async () => {
       throw new TypeError('fetch failed');
     }) as unknown as typeof fetch;
     expect(await httpSpectraApi('/v1', offline).areaSpectra('a')).toEqual({ kind: 'unavailable' });
   });
 
-  it("refuses another area's reply", async () => {
-    expect(
-      await httpSpectraApi(
-        '/v1',
-        fetchOf(() => reply(EROS)),
-      ).areaSpectra('live-0123456789ab'),
-    ).toEqual({ kind: 'unavailable' });
+  it('refuses another area\'s reply', async () => {
+    expect(await httpSpectraApi('/v1', fetchOf(() => reply(EROS))).areaSpectra('live-0123456789ab')).toEqual({ kind: 'unavailable' });
   });
 
   it('asks the area route, escaped', async () => {
     let url = '';
-    const f = (async (u: string) => (
-      (url = u),
-      reply({ ...EROS, area_id: 'a b' })
-    )) as unknown as typeof fetch;
+    const f = (async (u: string) => ((url = u), reply({ ...EROS, area_id: 'a b' }))) as unknown as typeof fetch;
     expect((await httpSpectraApi('/v1', f).areaSpectra('a b')).kind).toBe('ok');
     expect(url).toBe('/v1/areas/a%20b/spectra');
   });
 
-  it("passes the caller's abort through", async () => {
+  it('passes the caller\'s abort through', async () => {
     const ctl = new AbortController();
     ctl.abort();
     const f = (async () => {
@@ -183,9 +108,7 @@ describe('loadDiscovery', () => {
     areaDots: async () => ({ data: f.dots, fixture: 'synthetic' }),
     areaTracks: async () => ({ data: f.tracks, fixture: 'synthetic' }),
   } as unknown as ApiClient;
-  const of = (a: Awaited<ReturnType<SpectraApi['areaSpectra']>>): SpectraApi => ({
-    areaSpectra: async () => a,
-  });
+  const of = (a: Awaited<ReturnType<SpectraApi['areaSpectra']>>): SpectraApi => ({ areaSpectra: async () => a });
 
   it('404: no verdicts, and "Spectrum check not run" under Not shown', async () => {
     const r = await loadDiscovery(api, entry, 'synthetic', undefined, of({ kind: 'not_run' }));
