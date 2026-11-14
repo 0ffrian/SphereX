@@ -745,3 +745,146 @@ def test_a_stored_reusable_area_with_spectra_answers_done_on_start(client: TestC
     assert r.status_code == 200 and r.json()["state"] == "done"
     assert client.app.state.live_jobs.get(area_id) is None  # type: ignore[attr-defined]
     assert ran == []
+
+
+# --- issue #169 code review: the recheck cooldown, a failed recheck, refills ---------------
+
+
+def test_a_second_start_within_the_cooldown_answers_done_and_makes_no_run(
+    client: TestClient,
+) -> None:
+    """Review #9: through ``POST /v1/areas/live`` (not ``submit``), a stored area whose check
+    failed is rechecked once; the next start within the cooldown answers done at once, with
+    no job and no new run."""
+    area_id, ran = _stored_client(client, ("skybot:1",), spectra=True)
+    r = client.post("/v1/areas/live", json={**BOX, "start": True, "kind": "discovery"})
+    assert r.status_code == 202
+    jobs: Any = client.app.state.live_jobs  # type: ignore[attr-defined]
+    assert jobs.wait(10) and ran == [area_id]
+    n_runs = len(client.get("/v1/runs").json()["runs"])
+    again = client.post("/v1/areas/live", json={**BOX, "start": True, "kind": "discovery"})
+    assert again.status_code == 200 and again.json()["state"] == "done"
+    assert "run_id" not in again.json()
+    assert jobs.wait(10) and ran == [area_id]
+    assert len(client.get("/v1/runs").json()["runs"]) == n_runs
+
+
+def test_a_refill_that_cannot_be_done_is_not_queued_again(client: TestClient) -> None:
+    """Review #4: when the spectra refill cannot be done (here the store has no head in the
+    app's cache), the next start answers done instead of queueing a job and a run each time."""
+    area_id, ran = _stored_client(client, (), spectra=False)
+    r = client.post("/v1/areas/live", json={**BOX, "start": True, "kind": "discovery"})
+    assert r.status_code == 202
+    jobs: Any = client.app.state.live_jobs  # type: ignore[attr-defined]
+    assert jobs.wait(10) and ran == []
+    assert not jobs.needs_spectra(area_id)
+    n_runs = len(client.get("/v1/runs").json()["runs"])
+    again = client.post("/v1/areas/live", json={**BOX, "start": True, "kind": "discovery"})
+    assert again.status_code == 200 and again.json()["state"] == "done"
+    assert len(client.get("/v1/runs").json()["runs"]) == n_runs
+
+
+def _stored_jobs(tmp_path: Path, runner: Any) -> tuple[LiveJobs, Plan, Any]:
+    from tests.test_area_scan import FakeStore, _replies
+
+    plan = _plan()
+    store = FakeStore()
+    store.areas[plan.area_id] = _replies(plan.area_id, unchecked_at=10.0, missing=("skybot:1",))
+    return LiveJobs(_ctx(tmp_path, offline=False), runner, store=store), plan, store
+
+
+def test_a_failed_recheck_keeps_the_stored_result_and_its_cooldown(tmp_path: Path) -> None:
+    """Review #2 and #3: a recheck of a stored area that fails leaves the job and its run
+    done with the stored result (Q-481 (3)), and keeps the cooldown, so a lasting failure is
+    not computed again at every start."""
+    ran: list[str] = []
+
+    def runner(ctx: Context, pl: Plan, prog: Progress) -> None:
+        ran.append(pl.area_id)
+        raise LiveAreaError("area:frames_incomplete", "a cutout failed")
+
+    jobs, plan, _ = _stored_jobs(tmp_path, runner)
+    job = jobs.submit(plan, kind="discovery")
+    assert jobs.wait(10) and ran == [plan.area_id]
+    assert job.state == "done" and job.error is None
+    assert job.run_id is not None
+    run = jobs.runs.get(job.run_id)
+    assert run["state"] == "done" and run["squares"][0]["state"] == "done"
+    assert run["squares"][0]["area_id"] == plan.area_id
+    assert jobs.reusable(plan.area_id)  # the cooldown holds
+
+
+def test_a_stopped_recheck_clears_its_cooldown(tmp_path: Path) -> None:
+    """Review #3: a recheck stopped by ``DELETE`` checked nothing, so the area may be
+    rechecked at once; its stored result is still served."""
+    started, gate = threading.Event(), threading.Event()
+
+    def runner(ctx: Context, pl: Plan, prog: Progress) -> None:
+        started.set()
+        gate.wait(10)
+        prog.check()
+
+    jobs, plan, _ = _stored_jobs(tmp_path, runner)
+    job = jobs.submit(plan, kind="discovery")
+    assert started.wait(10)
+    assert jobs.cancel(plan.area_id)
+    gate.set()
+    assert jobs.wait(10)
+    assert job.state == "failed" and job.error is not None and job.error[0] == "cancelled"
+    assert not jobs.reusable(plan.area_id)
+
+
+def test_a_first_compute_that_stores_codes_starts_the_cooldown(tmp_path: Path) -> None:
+    """Review #1: a first compute that stores an area with a ``skybot:`` code starts the
+    cooldown, so the area is not computed again at once."""
+    from tests.test_area_scan import FakeStore, _replies
+
+    store = FakeStore()
+    ran: list[str] = []
+
+    def runner(ctx: Context, pl: Plan, prog: Progress) -> None:
+        ran.append(pl.area_id)
+        store.areas[pl.area_id] = _replies(pl.area_id, unchecked_at=10.0, missing=("skybot:1",))
+
+    jobs = LiveJobs(_ctx(tmp_path, offline=False), runner, store=store)
+    plan = _plan()
+    jobs.submit(plan)
+    assert jobs.wait(10) and ran == [plan.area_id]
+    assert jobs.reusable(plan.area_id)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "unexpected access_url host: https://evil.example/x",
+        "cutout redirected off the IRSA host: https://evil.example/x",
+        "cutout response is not FITS",
+        "bad FITS from cutout service: truncated FITS header",
+        "https://irsa/cutout: HTTP 403",
+    ],
+)
+def test_the_cutout_adapters_own_refusals_are_not_retried(text: str) -> None:
+    """Review #6: only the http adapter's passing failures get a second pass."""
+    assert not cutout_retryable(_unavailable(text))
+    assert not cutout_retryable(UpstreamError(text))
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "https://irsa/cutout: HTTP 503",
+        "https://irsa/cutout: HTTP 429",
+        "https://irsa/cutout: connection failed: ConnectError('x')",
+        "https://irsa/cutout: transport error: ReadError('reset')",
+        "https://irsa/cutout: timeout: ReadTimeout('')",
+    ],
+)
+def test_the_http_adapters_passing_failures_are_retried(text: str) -> None:
+    assert cutout_retryable(_unavailable(text))
+
+
+def test_an_unknown_failure_is_not_retried() -> None:
+    exc = UpstreamUnavailable("irsa_cutout: boom")
+    exc.__cause__ = ValueError("boom")
+    assert not cutout_retryable(exc)
+    assert not cutout_retryable(OSError("disk full"))
