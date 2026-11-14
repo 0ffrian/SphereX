@@ -28,7 +28,10 @@ describe('aim rectangle', () => {
     expect(at20.w / at20.h).toBeCloseTo(1280 / 800, 9);
     expect(at40.h).toBeLessThan(at20.h);
     // Gnomonic scale: tan(1.1°)/tan(10°) of the height at 20°.
-    expect(at20.h).toBeCloseTo((800 * Math.tan((1.1 * Math.PI) / 180)) / Math.tan((10 * Math.PI) / 180), 6);
+    expect(at20.h).toBeCloseTo(
+      (800 * Math.tan((1.1 * Math.PI) / 180)) / Math.tan((10 * Math.PI) / 180),
+      6,
+    );
   });
   it('names the next view: 2.2° tall, wider by the aspect', () => {
     const v = aimViewDeg(1280, 800);
@@ -68,7 +71,10 @@ describe('2° clamp', () => {
   });
   it('no "too large" box exists: a huge drag on a curved measure still ends at 2°', () => {
     // A measure that grows faster than linear, as the gnomonic projection does off-centre.
-    const curved = (d: AreaDrag) => ({ w: Math.tan(Math.abs(d.x1 - d.x0) / 1000) * 5, h: Math.abs(d.y1 - d.y0) / 100 });
+    const curved = (d: AreaDrag) => ({
+      w: Math.tan(Math.abs(d.x1 - d.x0) / 1000) * 5,
+      h: Math.abs(d.y1 - d.y0) / 100,
+    });
     const d = clampDrag({ x0: 0, y0: 0, x1: 1400, y1: 50 }, curved);
     expect(curved(d).w).toBeLessThanOrEqual(2);
     expect(curved(d).w).toBeCloseTo(2, 4);
