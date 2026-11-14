@@ -357,6 +357,8 @@ export function getScanApi(): ScanApi {
   }
   return api;
 }
+/** True when the scan API in use is the dev-server mock (its runs are invented test values). */
+export const scanIsMock = (): boolean => 'marker' in getScanApi();
 /** Tests: put an implementation in place (null: choose again from the URL and env). */
 export function setScanApi(next: ScanApi | null): void {
   api = next;

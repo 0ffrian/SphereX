@@ -132,7 +132,9 @@ export function ticksOf(run: RunRecord, measured = false): Tick[] {
     const o = e.type === 'found' ? e.object : undefined;
     if (!o || o.kind === 'predicted') continue;
     if (measured) {
-      if (!o.track_id) continue;
+      // As the sky at Measured only: only finds whose positions were measured (a matched known
+      // object's event carries Horizons positions, so it has no mark here, nor a ring).
+      if (!o.track_id || o.positions_tag !== 'measured') continue;
       const key = `${o.square}:${o.track_id}`;
       if (seen.has(key)) continue;
       seen.add(key);

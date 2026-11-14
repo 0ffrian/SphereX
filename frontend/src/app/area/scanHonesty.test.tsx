@@ -21,6 +21,7 @@ import {
 } from './scanApi';
 import { resetScans, useScanStore } from './scanStore';
 import { ticksOf } from './replay';
+import { scanEcsv } from './scanExport';
 
 declare global {
   var IS_REACT_ACT_ENVIRONMENT: boolean;
@@ -304,10 +305,45 @@ describe('the Done card', () => {
     expect(q('scan-filter-found')).not.toBeNull();
     expect(q('scan-rows')?.textContent).toMatch(/Unexplained track|Sean|Abramenko/);
   });
-  it('announces the end once, in a live region', async () => {
+  it('announces the end once, in a live region; the honesty toggle does not re-announce it', async () => {
     await show(true);
     const live = q('scan-announce')!;
     expect(live.getAttribute('aria-live')).toBe('polite');
-    expect(live.textContent).toMatch(/^Scan done: /);
+    const said = live.textContent;
+    expect(said).toMatch(/^Scan done: /);
+    await act(async () => useAppStore.setState({ honesty: 'measured' }));
+    expect(q('scan-announce')!.textContent).toBe(said);
+  });
+  it('a scan from the dev-server mock wears the Test data tag', async () => {
+    setScanApi(mockScanApi({ persist: false }));
+    await show(true);
+    expect(q('scan-test-data')?.textContent).toBe('Test data');
+  });
+});
+
+describe('ECSV export at Measured only', () => {
+  it('holds the tracks only: no known rows, designations, status, magnitudes or rates', async () => {
+    const { record, results } = await finished(true);
+    const normal = scanEcsv(results, REGION);
+    const measured = scanEcsv(results, REGION, true);
+    expect(normal).toMatch(/^known,/m);
+    expect(measured).not.toMatch(/^known,/m);
+    expect(measured).toContain('honesty: measured only');
+    const body = measured.split('\n').filter((l) => l.startsWith('track,'));
+    expect(body).toHaveLength(trackRowsOf(results).length);
+    for (const l of body) expect(l).toMatch(/^track,,T\w+,,,,/);
+    expect(measured).not.toMatch(/Sean|Abramenko|unexplained,|unchecked,/);
+    expect(record.run_id).toBeTruthy();
+  });
+});
+
+describe('replay marks match the sky at Measured only', () => {
+  it('a matched known object (Horizons positions) has no mark', async () => {
+    const { record } = await finished(true);
+    const measuredKeys = new Set(
+      measuredObjects(record.events, null).map((o) => `${o.squares[0]}:${o.trackId}`),
+    );
+    const marks = ticksOf(record, true).filter((k) => k.kind === 'track');
+    expect(marks.length).toBe(measuredKeys.size);
   });
 });

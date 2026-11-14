@@ -25,6 +25,7 @@ import { releaseName, stepCount } from './liveJobStore';
 import { NO_ORBIT_NOTE } from './RealTrackCard';
 import { useMeasuredOnly } from './measuredOnly';
 import {
+  scanIsMock,
   trackRowsOf,
   tracksOf,
   uncheckedOf,
@@ -64,6 +65,16 @@ export function ScanCard() {
   const closePanel = useShellStore((s) => s.closePanel);
   const bodyRef = useRef<HTMLDivElement>(null);
   const measured = useMeasuredOnly();
+  // The live region speaks when the scan moves on (a square starts, the scan ends), not when the
+  // honesty toggle rewords the same moment.
+  const [said, setSaid] = useState({ key: '', text: '' });
+  const momentKey =
+    view?.kind === 'run' && view.record
+      ? `${view.runId}:${view.record.state}:${view.record.squares.find((s) => s.state === 'running')?.index ?? ''}`
+      : '';
+  // Derived state (React's "adjust state while rendering"): only a new moment changes the text.
+  if (momentKey !== said.key) setSaid({ key: momentKey, text: scanAnnounce(view, measured) });
+  const announced = momentKey === said.key ? said.text : scanAnnounce(view, measured);
   const record = view?.kind === 'run' ? view.record : null;
   const done = record !== null && isFinished(record.state);
   const stateKey = view
@@ -122,7 +133,7 @@ export function ScanCard() {
         data-state={view.kind === 'run' ? (record?.state ?? 'starting') : view.kind}
       >
         <p className="sr-only" role="status" aria-live="polite" data-testid="scan-announce">
-          {scanAnnounce(view, measured)}
+          {announced}
         </p>
         {view.kind === 'offer' && <Offer view={view} />}
         {view.kind === 'failed' && <Failed view={view} />}
@@ -762,6 +773,8 @@ function Done({
 }) {
   const [filter, setFilter] = useState<Filter>('found');
   const measured = useMeasuredOnly();
+  // The dev-server mock's runs are invented: say so (the production build has no mock).
+  const mock = useMemo(() => scanIsMock(), []);
   const n = record.squares.length;
   const doneN = record.totals.squares_done;
   const release = releaseName(record.release);
@@ -792,7 +805,7 @@ function Done({
   const download = () => {
     if (!results) return;
     const url = URL.createObjectURL(
-      new Blob([scanEcsv(results, record.region)], { type: 'text/plain' }),
+      new Blob([scanEcsv(results, record.region, measured)], { type: 'text/plain' }),
     );
     const a = document.createElement('a');
     a.href = url;
@@ -805,6 +818,16 @@ function Done({
       <div className="sx-area-prov" data-testid="scan-prov">
         <span>
           <b>{how}</b> · {release} · {doneN} of {n} squares
+          {mock && (
+            <span
+              className="sx-tagbadge"
+              style={{ ['--dot' as string]: 'var(--p-asm)', marginLeft: 8 }}
+              title="Test data: an invented scan from the dev-server mock, not SPHEREx measurements."
+              data-testid="scan-test-data"
+            >
+              Test data
+            </span>
+          )}
         </span>
         {span && (
           <span>
