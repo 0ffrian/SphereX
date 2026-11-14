@@ -45,6 +45,10 @@ class RunResultSquare(BaseModel):
     index: int = Field(..., ge=1)
     area_id: run_schema.RunAreaId
     state: run_schema.RunSquareState
+    missing: list[area_index_schema.AreaMissingCode] = Field(
+        ...,
+        description="The skybot: and horizons: codes of the square's stored summary: a known-object check that failed (Q-479). Empty for a square not done.",
+    )
 
 
 class RunKnownRow(BaseModel):
@@ -72,7 +76,7 @@ class RunTrackRow(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    kind: Literal["found", "unexplained"]
+    kind: Literal["found", "unexplained", "unchecked"]
     designation: Designation | None
     squares: list[Square] = Field(..., min_length=1)
     tracks: list[RunTrackRef] = Field(..., min_length=1)
@@ -80,6 +84,11 @@ class RunTrackRow(BaseModel):
         ..., description="Visit start times of the squares the row comes from."
     )
     positions: list[run_schema.RunPosition]
+    unchecked_by: list[area_index_schema.AreaMissingCode] | None = Field(
+        None,
+        description="The members' skybot: and horizons: codes (Q-479): required on an unchecked row, also on an unexplained row with an unchecked member.",
+        min_length=1,
+    )
 
 
 class RunResults(BaseModel):
