@@ -1,5 +1,5 @@
 // Issue #157 (live-areas mock-up states 1, 2, 10 and 11) on the SYNTHETIC fixture server with the
-// MOCKED scan API (`?scan=mock`, app/area/scanApi.ts; its objects are invented test values):
+// MOCKED scan API (`?scan=mock`, app/area/scanMock.ts; its objects are invented test values):
 // select a region of 15 squares, the gridded offer, scanning square by square (states, skipped
 // square, circles with the predicted toggle), a page reload mid-scan, then the combined results.
 import { expect, test, type Page } from '@playwright/test';
@@ -36,6 +36,8 @@ test('select, grid, scan square by square, reload mid-scan, then the combined re
   await expect(page.getByTestId('area-hint')).toContainText(
     'Click a region to scan · scroll to resize · drag to turn the sky',
   );
+  // Before the pointer is on the sky, the region waits in the middle and says Enter selects it.
+  await expect(page.getByTestId('area-aim')).toContainText(/ · Enter to select$/);
   await page.mouse.move(640, 400);
   await page.mouse.move(645, 402);
   await expect(page.getByTestId('area-aim')).toHaveText(

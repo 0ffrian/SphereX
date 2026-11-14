@@ -5,13 +5,10 @@ import {
   deltaRa,
   panByPixels,
   raDecToScreen,
-  screenToRaDec,
-  separationDeg,
   wrapRa,
   type SkyCamera,
 } from '@/viewer/sky/skyMath';
-import { useAreaStore, type AreaBox, type AreaDrag } from '@/app/shell/areaStore';
-import { clampCentred, clampDrag } from '@/app/area/aim';
+import { useAreaStore, type AreaBox, type PixelRect } from '@/app/shell/areaStore';
 import { regionBox, selectionAt, type Selection } from '@/app/area/scanGrid';
 import { isFinished, runningScan, useScanStore, viewRegion } from '@/app/area/scanStore';
 import { getScanApi, RunGone } from '@/app/area/scanApi';
@@ -32,52 +29,6 @@ export function registerAreaView(
 ): void {
   access = a;
   setFlyCancel = flyCancel ?? null;
-}
-
-/** The rectangle with the given pixel corners, as a sky box and its angular width and height. */
-export function boxFromPixels(d: AreaDrag): AreaBox | null {
-  if (!access) return null;
-  const cam = access.getView();
-  const { width, height } = access.getSize();
-  const a = screenToRaDec(cam, d.x0, d.y0, width, height, { ra: 0, dec: 0 });
-  const b = screenToRaDec(cam, d.x1, d.y1, width, height, { ra: 0, dec: 0 });
-  const ym = (d.y0 + d.y1) / 2;
-  const l = screenToRaDec(cam, d.x0, ym, width, height, { ra: 0, dec: 0 });
-  const r = screenToRaDec(cam, d.x1, ym, width, height, { ra: 0, dec: 0 });
-  const xm = (d.x0 + d.x1) / 2;
-  const t = screenToRaDec(cam, xm, d.y0, width, height, { ra: 0, dec: 0 });
-  const u = screenToRaDec(cam, xm, d.y1, width, height, { ra: 0, dec: 0 });
-  const widthDeg = separationDeg(l.ra, l.dec, r.ra, r.dec);
-  const heightDeg = separationDeg(t.ra, t.dec, u.ra, u.dec);
-  if (!(widthDeg > 0) || !(heightDeg > 0)) return null;
-  return { a: { ra: a.ra, dec: a.dec }, b: { ra: b.ra, dec: b.dec }, widthDeg, heightDeg };
-}
-
-/** A drag turned into a free rectangle: from where it started to the pointer, any aspect. */
-export function rectOf(x0: number, y0: number, x1: number, y1: number): AreaDrag {
-  return { x0, y0, x1, y1 };
-}
-
-/** A pixel rectangle's angular width and height now (the clamp's measure), or null off the sky. */
-export function measurePixels(d: AreaDrag): { w: number; h: number } | null {
-  const b = boxFromPixels(d);
-  return b ? { w: b.widthDeg, h: b.heightDeg } : null;
-}
-
-/** A drag from its anchor to the pointer, each side stopped at 2° (issue #144). */
-export function clampedRect(x0: number, y0: number, x1: number, y1: number): AreaDrag {
-  return clampDrag(rectOf(x0, y0, x1, y1), measurePixels);
-}
-
-/**
- * The Enter shortcut: a wide default box (about half by a third of the shorter side's span),
- * centred, each side stopped at 2° (issue #144).
- */
-export function centreRect(): AreaBox | null {
-  if (!access) return null;
-  const { width, height } = access.getSize();
-  const m = Math.min(width, height);
-  return boxFromPixels(clampCentred(width / 2, height / 2, m * 0.3, m * 0.18, measurePixels));
 }
 
 /** The selection rectangle at (x, y) now (issue #157, state 1), or null with no view. */
@@ -159,20 +110,11 @@ export function restoreSavedScan(): void {
     );
 }
 
-/**
- * Enter in the area tools (the keyboard way to select): while selecting, the region in the middle
- * of the screen, as a click there would; in the #144 draw step, a centred box of at most 2° a side.
- */
+/** Enter in the area tools (the keyboard way to select): the region in the middle of the screen. */
 export function enterInArea(): void {
-  if (!access) return;
-  const s = useAreaStore.getState();
-  if (s.stage === 'aiming') {
-    const { width, height } = access.getSize();
-    pickRegionAt(width / 2, height / 2);
-    return;
-  }
-  const b = centreRect();
-  if (b) s.setBox(b);
+  if (!access || useAreaStore.getState().stage !== 'aiming') return;
+  const { width, height } = access.getSize();
+  pickRegionAt(width / 2, height / 2);
 }
 
 /** The live camera and the pane's size (the aim rectangle's scale), or null with no view. */
@@ -182,7 +124,7 @@ export function viewNow(): { cam: SkyCamera; width: number; height: number } | n
 }
 
 /** The set area's screen corners now (it follows the view), or null when a corner is behind. */
-export function boxToPixels(box: AreaBox): AreaDrag | null {
+export function boxToPixels(box: AreaBox): PixelRect | null {
   if (!access) return null;
   const cam = access.getView();
   const { width, height } = access.getSize();

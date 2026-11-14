@@ -226,7 +226,7 @@ export function KnownList() {
           data-testid="area-redraw"
           onClick={() => useAreaStore.getState().redraw()}
         >
-          Draw again
+          Choose another region
         </button>
       </div>
       </div>

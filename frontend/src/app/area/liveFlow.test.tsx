@@ -68,10 +68,9 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-/** Draw a box in a flow and wait out the island's search and the coverage check. */
+/** Select a one-square region in a flow and wait out the island's search and the coverage check. */
 async function draw(flow: 'known' | 'discovery'): Promise<void> {
   useAreaStore.getState().startFlow(flow);
-  useAreaStore.getState().pickPatch();
   useAreaStore.getState().setBox(box);
   await vi.advanceTimersByTimeAsync(2000);
 }
@@ -385,7 +384,7 @@ describe('LiveAreaCard', () => {
   });
   const q = (id: string) => host.querySelector<HTMLElement>(`[data-testid="${id}"]`);
 
-  it('offer: data, visits, frames, time; Compute this area and Draw again; no icon tile', async () => {
+  it('offer: data, visits, frames, time; Compute this area and Choose another region; no icon tile', async () => {
     useLiveJobStore.setState({ view: { kind: 'offer', box, flow: 'known', plan } });
     await act(async () => root.render(<LiveAreaCard />));
     expect(host.querySelector('h2')?.textContent).toBe('Known objects');
@@ -435,7 +434,7 @@ describe('LiveAreaCard', () => {
     });
     expect(document.activeElement?.tagName).toBe('H2');
   });
-  it('Draw again goes back to aiming and closes the card', async () => {
+  it('Choose another region goes back to aiming and closes the card', async () => {
     useLiveJobStore.setState({ view: { kind: 'failed', box, flow: 'known', code: 'upstream_unavailable', detail: '' } });
     await act(async () => root.render(<LiveAreaCard />));
     expect(q('live-retry')).not.toBeNull();

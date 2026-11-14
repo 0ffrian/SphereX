@@ -140,5 +140,5 @@ test('Escape leaves the tool while aiming', async ({ page }) => {
   await expect(page.getByTestId('sky-canvas')).toHaveAttribute('data-area-mode', 'aim');
   await page.keyboard.press('Escape');
   await expect(page.getByTestId('tool-known')).toHaveAttribute('aria-pressed', 'false');
-  await expect(page.getByTestId('sky-canvas')).not.toHaveAttribute('data-area-mode', /aim|draw/);
+  await expect(page.getByTestId('sky-canvas')).not.toHaveAttribute('data-area-mode', /aim/);
 });

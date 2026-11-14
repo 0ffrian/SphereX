@@ -1,6 +1,6 @@
 // 1b6c849: a scan draws its own grid and frame (ScanOverlay), so the single-area outline is not
-// drawn while the area tool is on its scan screen; elsewhere a set box is outlined, and a drag
-// still reads out its size.
+// drawn while the area tool is on its scan screen; elsewhere a set box is outlined. (The #144 drag
+// and its readout were removed in PR #166.)
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -46,27 +46,16 @@ const outline = () => host.querySelector<HTMLElement>('[data-testid="area-box"]'
 
 describe('AreaOverlay under a scan', () => {
   it('outlines a set box away from the scan screen', async () => {
-    useAreaStore.setState({ box: BOX, drag: null, screen: 'search' });
+    useAreaStore.setState({ box: BOX, screen: 'search' });
     await act(async () => root.render(<AreaOverlay view={view} />));
     expect(outline().style.display).toBe('block');
     expect(outline().textContent).not.toBe('');
   });
 
   it('draws no outline and no size while the scan screen shows', async () => {
-    useAreaStore.setState({ box: BOX, drag: null, screen: 'scan' });
+    useAreaStore.setState({ box: BOX, screen: 'scan' });
     await act(async () => root.render(<AreaOverlay view={view} />));
     expect(outline().style.display).toBe('none');
     expect(outline().textContent).toBe('');
-  });
-
-  it('a drag still shows its rectangle and readout on the scan screen', async () => {
-    useAreaStore.setState({
-      box: BOX,
-      drag: { x0: 100, y0: 100, x1: 300, y1: 220 },
-      screen: 'scan',
-    });
-    await act(async () => root.render(<AreaOverlay view={view} />));
-    expect(outline().style.display).toBe('block');
-    expect(host.querySelector('[data-testid="area-readout"]')).not.toBeNull();
   });
 });

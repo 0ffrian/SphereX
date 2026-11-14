@@ -40,7 +40,7 @@ export function refusalText(r: AreaRefusal): { title: string; line: string } {
   if (r.code === 'area:not_prepared')
     return {
       title: 'No data for this area here',
-      line: 'This server cannot compute new areas. Draw again over a prepared area.',
+      line: 'This server cannot compute new areas. Choose a region over a prepared area.',
     };
   return { title: 'Could not load this area', line: r.message };
 }

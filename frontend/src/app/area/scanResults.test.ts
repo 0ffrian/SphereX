@@ -1,7 +1,7 @@
 // State 11 (issue #157): the combined result rows of a filter, and the ECSV of the merged results.
 import { describe, expect, it } from 'vitest';
 import { dayOf, scanRows } from './ScanCard';
-import { mockResultsOf, mockScanApi } from './scanApi';
+import { mockResultsOf, mockScanApi } from './scanMock';
 import { scanEcsv } from './scanExport';
 
 const REGION = { ra: 30, dec: 10, width_deg: 9, height_deg: 5.4 };

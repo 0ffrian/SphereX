@@ -1,7 +1,8 @@
 // The scan store (issue #157): plan -> offer, start -> run, pause/resume/stop, the end with the
 // merged results, refusals, and a reload mid-scan that redraws every square from GET /v1/runs/{id}.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { httpScanApi, mockScanApi, parseScanPlan, setScanApi, type RunRecord } from './scanApi';
+import { httpScanApi, parseScanPlan, setScanApi, type RunRecord } from './scanApi';
+import { mockScanApi } from './scanMock';
 import { resetScans, scanFailureText, skippedText, useScanStore } from './scanStore';
 
 // 5 × 3 squares, as the mock-up draws (#156's split: 1.8° parts stay under 2° when padded and snapped).

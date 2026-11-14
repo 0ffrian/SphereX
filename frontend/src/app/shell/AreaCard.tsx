@@ -13,7 +13,6 @@ import { LiveAreaCard } from '@/app/area/LiveAreaCard';
 import { TrackJobCard } from '@/app/area/TrackJobCard';
 import { ScanCard } from '@/app/area/ScanCard';
 import { backToScan, fitCamera, flyToView, enterInArea, safeRect } from '@/app/sky/areaDraw';
-import { MAX_SIDE_DEG } from '@/app/area/aim';
 import { formatAreaDims, useAreaStore } from './areaStore';
 import { useShellStore } from './shellStore';
 
@@ -149,8 +148,8 @@ export function AreaCard() {
 }
 
 function DrawCard() {
-  // Moon (12 Nov 2026): no card while drawing; the user drags an area of their own choice.
-  // A small hint says what to do. Keyboard users press Enter for a box in the middle (WCAG 2.5.7).
+  // No card while selecting (issue #157): a small hint says what to do. Keyboard users press Enter
+  // for the region in the middle (WCAG 2.5.7).
   const flow = useAreaStore((s) => s.flow);
   const stage = useAreaStore((s) => s.stage);
   const box = useAreaStore((s) => s.box);
@@ -171,20 +170,18 @@ function DrawCard() {
   }, []);
   // Issue #157 (mock-up state 1): the pointer is the region; a click or tap selects it.
   const coarse = typeof window !== 'undefined' && (window.matchMedia?.('(pointer: coarse)').matches ?? false);
-  const [lead, rest] =
-    stage === 'aiming'
-      ? [`${coarse ? 'Tap' : 'Click'} a region to scan`, `${coarse ? 'pinch' : 'scroll'} to resize · drag to turn the sky`]
-      : ['Drag to draw your area', `up to ${MAX_SIDE_DEG}° a side`];
+  const lead = `${coarse ? 'Tap' : 'Click'} a region to scan`;
+  const rest = `${coarse ? 'pinch' : 'scroll'} to resize · drag to turn the sky`;
   return (
     <div className="sx-area-hint" data-testid="area-card" data-stage={stage}>
       <p className="sr-only" role="status" aria-live="polite" data-testid="area-live">
         {stage === 'set' && box ? `Area set on the sky, ${size}.` : ''}
       </p>
-      <span role="status" data-testid="area-hint">
+      <span data-testid="area-hint">
         <span className="sr-only">{flow === 'known' ? 'Known objects' : 'Discovery'}: </span>
         {lead} <span className="sx-area-hint-keys">· {rest}</span>
         <span className="sr-only">
-          {stage === 'aiming' ? '. Press Enter to select the region in the middle, Escape to leave.' : '. Press Enter for an area in the middle, Escape to leave.'}
+          . Press Enter to select the region in the middle, Escape to leave.
         </span>
       </span>
     </div>
