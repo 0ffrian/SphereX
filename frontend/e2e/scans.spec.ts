@@ -138,3 +138,50 @@ test('Stop keeps the finished squares; Escape leaves while selecting', async ({ 
   await page.keyboard.press('Escape');
   await expect(page.getByTestId('tool-known')).toHaveAttribute('aria-pressed', 'false');
 });
+
+// Issue #170 against the mock answering as #169 proposes (`?scan=mock-gaps`): square 2 fails,
+// square 3 has two tracks the known-object check could not judge.
+test('a run with a failed square and unchecked tracks says so on the sky, the card and the Runs list', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await open(page, '?scan=mock-gaps&scan_ms=800');
+  await page.getByTestId('tool-area').click();
+  await page.mouse.move(640, 400);
+  await page.mouse.move(645, 402);
+  await page.mouse.click(645, 402);
+  await page.getByTestId('scan-start').click();
+  const card = page.getByTestId('scan-card');
+  await expect(card).toHaveAttribute('data-state', 'done', { timeout: 60_000 });
+
+  // The sky: a cross on the failed and the skipped square, a tick on a done one (not colour alone).
+  await expect(square(page, 2)).toHaveAttribute('data-state', 'failed');
+  await expect(square(page, 2).locator('text')).toHaveText('2 ✕');
+  await expect(square(page, 4).locator('text')).toHaveText('4 ✕');
+  await expect(square(page, 1).locator('text')).toHaveText('1 ✓');
+  // The unchecked tracks: dotted amber rings, from the results.
+  await expect(page.locator('[data-testid="scan-object"][data-kind="unchecked"]')).toHaveCount(2);
+
+  // The card: a fourth total, one status-dot message, a filter, where the positions come from.
+  await expect(page.getByTestId('scan-total-unchecked')).toContainText('2');
+  await expect(page.getByTestId('scan-unchecked')).toContainText(
+    '2 tracks could not be checked against known objects.',
+  );
+  await expect(page.getByTestId('scan-prov-tags').getByTestId('provenance-badge')).toHaveCount(2);
+  await page.getByTestId('scan-filter-unchecked').click();
+  await expect(page.getByTestId('scan-row')).toHaveCount(2);
+  await expect(page.getByTestId('scan-row').first()).toContainText('Track not checked');
+  await expect(page.getByTestId('scan-rates')).toContainText(
+    'How many movers a scan misses is not known.',
+  );
+  await expect(page.getByTestId('scan-announce')).toHaveText(/^Scan done: .*2 not checked\.$/);
+
+  // The Runs list: the not-checked count in amber, the failed square in red.
+  // The card sits over the top-right corner (as every panel does), so close it first.
+  await page.getByRole('button', { name: 'Close Discovery' }).click();
+  await page.getByTestId('runs-button').click();
+  const row = page.getByTestId('runs-row').first();
+  await expect(row.getByTestId('runs-flag').first()).toHaveText('2 not checked');
+  await expect(row.getByTestId('runs-flag').nth(1)).toHaveText('1 of 15 squares failed');
+  await expect(row.getByTestId('runs-flag').first()).toHaveAttribute('data-tone', 'warn');
+});

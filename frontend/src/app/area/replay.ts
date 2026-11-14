@@ -104,7 +104,7 @@ export function squareAt(run: RunRecord, t: number): number {
   return n;
 }
 
-export type TickKind = 'known' | 'unexplained' | 'skipped';
+export type TickKind = 'known' | 'unexplained' | 'skipped' | 'track';
 export interface Tick {
   t: number;
   kind: TickKind;
@@ -112,8 +112,12 @@ export interface Tick {
   label: string;
 }
 
-/** The timeline's marks, in time order. Predicted-only objects (not found) have no mark. */
-export function ticksOf(run: RunRecord): Tick[] {
+/**
+ * The timeline's marks, in time order. Predicted-only objects (not found) have no mark. At Measured
+ * only (#170) a find is named by its track ("Track T4 found", square in the label) and is a plain
+ * `known`-shaped mark: no verdict colour and no known name; a find without a track id has none.
+ */
+export function ticksOf(run: RunRecord, measured = false): Tick[] {
   const out: Tick[] = [];
   const seen = new Set<string>();
   for (const e of [...run.events].sort((a, b) => a.t - b.t)) {
@@ -127,6 +131,16 @@ export function ticksOf(run: RunRecord): Tick[] {
     }
     const o = e.type === 'found' ? e.object : undefined;
     if (!o || o.kind === 'predicted') continue;
+    if (measured) {
+      // As the sky at Measured only: only finds whose positions were measured (a matched known
+      // object's event carries Horizons positions, so it has no mark here, nor a ring).
+      if (!o.track_id || o.positions_tag !== 'measured') continue;
+      const key = `${o.square}:${o.track_id}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({ t: e.t, kind: 'track', label: `Track ${o.track_id} found, square ${o.square}` });
+      continue;
+    }
     const key = objectKey(o);
     if (seen.has(key)) continue;
     seen.add(key);

@@ -1,7 +1,9 @@
 // Export ECSV of a scan's combined results (issue #157, mock-up state 11): one row per object or
 // track of the merged results, with the square(s), visit dates and area ids it came from. Written
 // from the results reply as it is (#156); a value the reply does not carry is left empty. Pure.
-import type { RunResults, ScanBox } from './scanApi';
+// At Measured only (#170, D-21) the file holds what the card shows: the tracks, by id, squares,
+// dates and area, with no designation, status, magnitude or rate, and no known-object rows.
+import { trackRowsOf, type RunResults, type ScanBox } from './scanApi';
 import { rateOf } from './scanObjects';
 
 const csv = (v: string | number | null | undefined): string => {
@@ -29,7 +31,8 @@ const COLUMNS: { name: string; datatype: string; description: string }[] = [
   {
     name: 'status',
     datatype: 'string',
-    description: 'detected or predicted (known); found or unexplained (track)',
+    description:
+      'detected or predicted (known); found, unexplained or unchecked (track); empty at Measured only',
   },
   { name: 'v_mag', datatype: 'float64', description: 'SkyBoT V magnitude' },
   {
@@ -46,7 +49,7 @@ const COLUMNS: { name: string; datatype: string; description: string }[] = [
   },
 ];
 
-export function scanEcsv(res: RunResults, region: ScanBox): string {
+export function scanEcsv(res: RunResults, region: ScanBox, measured = false): string {
   const head = [
     '# %ECSV 1.0',
     '# ---',
@@ -60,6 +63,9 @@ export function scanEcsv(res: RunResults, region: ScanBox): string {
     `#   region: {ra: ${region.ra}, dec: ${region.dec}, width_deg: ${region.width_deg}, height_deg: ${region.height_deg}}`,
     `#   squares_done: ${res.squares.filter((s) => s.state === 'done').length}`,
     `#   squares_total: ${res.squares.length}`,
+    ...(measured
+      ? ['#   honesty: measured only (tracks only; no names, status, magnitudes or rates)']
+      : []),
     `#   squares_skipped: [${res.squares
       .filter((s) => s.state === 'skipped' || s.state === 'failed')
       .map((s) => s.index)
@@ -68,7 +74,7 @@ export function scanEcsv(res: RunResults, region: ScanBox): string {
     COLUMNS.map((c) => c.name).join(','),
   ];
   const rows = [
-    ...res.known.map((k) =>
+    ...(measured ? [] : res.known).map((k) =>
       [
         'known',
         k.designation,
@@ -83,14 +89,16 @@ export function scanEcsv(res: RunResults, region: ScanBox): string {
         .map(csv)
         .join(','),
     ),
-    ...res.tracks.map((t) =>
+    ...trackRowsOf(res).map((t) =>
       [
         'track',
-        t.designation,
+        measured ? null : t.designation,
         t.tracks.map((r) => r.track_id).join(' '),
-        t.kind,
+        measured ? null : t.kind,
         null,
-        rateOf(t.positions.slice().sort((a, b) => Date.parse(a.time) - Date.parse(b.time))),
+        measured
+          ? null
+          : rateOf(t.positions.slice().sort((a, b) => Date.parse(a.time) - Date.parse(b.time))),
         t.squares.join(' '),
         t.visits.join(' '),
         t.tracks.map((r) => r.area_id).join(' '),
