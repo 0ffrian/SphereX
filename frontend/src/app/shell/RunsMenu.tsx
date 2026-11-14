@@ -6,13 +6,16 @@
 // finished (Running, Paused, Waiting, Stopped, Failed). A click on the row opens its results (or the
 // live progress of a run still going); the play button replays it on the sky. While a replay plays,
 // the button ends it. Escape closes the list and gives focus back to the button.
+// Issue #170: a row says "n not checked" (amber) and "n of N squares failed" (red) when #169 reports
+// them, and under Measured only (D-21) "n tracks" in place of the verdict counts.
 import { useEffect, useId, useRef, type KeyboardEvent } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { Menu01Icon } from '@/components/animate-ui/icons/hugeicons/menu-01';
 import { OrbitIcon } from '@/components/animate-ui/icons/hugeicons/orbit';
 import { ViewIcon } from '@/components/animate-ui/icons/hugeicons/view';
 import { EXPLORE_SPRING } from '@/app/build/exploreMotion';
-import type { RunSummary } from '@/app/area/scanApi';
+import { squaresFailedOf, tracksOf, uncheckedOf, type RunSummary } from '@/app/area/scanApi';
+import { useMeasuredOnly } from '@/app/area/measuredOnly';
 import { lengthText, regionText, whenText } from '@/app/area/replay';
 import { filteredRuns, useRunsStore, type RunsFilter } from '@/app/area/runsStore';
 
@@ -23,22 +26,55 @@ const FILTERS: { id: RunsFilter; label: string }[] = [
 ];
 const TOOL_NAME = { discovery: 'Discovery', known: 'Known objects' } as const;
 
-/** What a run found, in the list's words (Discovery: found and unexplained; Known: known and detected). */
-export function foundText(r: RunSummary, soFar = false): string {
+/**
+ * What a run found, in the list's words (Discovery: found and unexplained; Known: known and
+ * detected). At Measured only, the number of tracks: the verdicts are not measured (#170).
+ */
+export function foundText(r: RunSummary, soFar = false, measured = false): string {
   const t = r.totals;
-  const text =
-    r.kind === 'known'
+  const n = tracksOf(t);
+  const text = measured
+    ? `${n} ${n === 1 ? 'track' : 'tracks'}`
+    : r.kind === 'known'
       ? `${t.known} known, ${t.found} detected`
       : `${t.found} found, ${t.unexplained} unexplained`;
   return soFar ? `${text} so far` : text;
 }
 
+export interface RunFlag {
+  text: string;
+  tone: 'warn' | 'fail';
+}
+
+/**
+ * What #169 says went wrong in a run, each only when above 0: tracks not checked (amber; folded
+ * into "n tracks" at Measured only) and failed squares (red; a failed run already says Failed).
+ */
+export function runFlags(r: RunSummary, measured = false): RunFlag[] {
+  const out: RunFlag[] = [];
+  const u = uncheckedOf(r.totals);
+  if (u && !measured) out.push({ text: `${u} not checked`, tone: 'warn' });
+  const f = squaresFailedOf(r.totals);
+  if (f > 0 && r.state !== 'failed')
+    out.push({ text: `${f} of ${r.squares_total} squares failed`, tone: 'fail' });
+  return out;
+}
+
 /** The row's second line, and its state word (null for a finished run: it needs no label). */
-export function runLine(r: RunSummary): {
+export function runLine(
+  r: RunSummary,
+  measured = false,
+): {
   before: string | null;
   state: { word: string; tone: 'accent' | 'fail' | 'muted' } | null;
   line: string;
+  /** #169's flags, after the line; absent when there are none. */
+  flags?: RunFlag[];
+  /** After the flags: the run's length (a finished run), as the approved mock-up orders them. */
+  tail?: string;
 } {
+  const flags = runFlags(r, measured);
+  const withFlags = <T extends object>(o: T) => (flags.length ? { ...o, flags } : o);
   const when = whenText(r.created_at);
   const squares = `${r.squares_total} square${r.squares_total === 1 ? '' : 's'}`;
   const length = r.duration_s !== null ? lengthText(r.duration_s) : null;
@@ -46,27 +82,35 @@ export function runLine(r: RunSummary): {
     case 'running':
     case 'paused': {
       const at = Math.min(r.squares_total, r.squares_done + (r.state === 'running' ? 1 : 0));
-      return {
+      return withFlags({
         before: null,
-        state: { word: r.state === 'running' ? 'Running' : 'Paused', tone: 'accent' },
-        line: [`square ${at} of ${r.squares_total}`, foundText(r, true)].join(' · '),
-      };
+        state: { word: r.state === 'running' ? 'Running' : 'Paused', tone: 'accent' as const },
+        line: [`square ${at} of ${r.squares_total}`, foundText(r, true, measured)].join(' · '),
+      });
     }
     case 'queued':
       return { before: when, state: { word: 'Waiting', tone: 'muted' }, line: squares };
     case 'stopped':
-      return {
+      return withFlags({
         before: when,
-        state: { word: 'Stopped', tone: 'fail' },
+        state: { word: 'Stopped', tone: 'fail' as const },
         line: `after ${r.squares_done} of ${r.squares_total} squares`,
-      };
+      });
     case 'failed':
       return { before: when, state: { word: 'Failed', tone: 'fail' }, line: squares };
     default:
+      if (!flags.length)
+        return {
+          before: null,
+          state: null,
+          line: [when, squares, foundText(r, false, measured), length].filter(Boolean).join(' · '),
+        };
       return {
         before: null,
         state: null,
-        line: [when, squares, foundText(r), length].filter(Boolean).join(' · '),
+        line: [when, squares, foundText(r, false, measured)].join(' · '),
+        flags,
+        ...(length ? { tail: length } : {}),
       };
   }
 }
@@ -257,8 +301,9 @@ function RunsList({ titleId, onClose }: { titleId: string; onClose(): void }) {
 
 function RunRow({ run }: { run: RunSummary }) {
   const loading = useRunsStore((s) => s.loadingReplay === run.run_id);
+  const measured = useMeasuredOnly();
   const what = regionText(run.region);
-  const { before, state, line } = runLine(run);
+  const { before, state, line, flags = [], tail } = runLine(run, measured);
   const sep = run.state === 'stopped' ? ' ' : ' · ';
   const started = run.duration_s !== null;
   const tool = TOOL_NAME[run.kind];
@@ -268,7 +313,7 @@ function RunRow({ run }: { run: RunSummary }) {
         type="button"
         className="sx-runs-open"
         onClick={() => useRunsStore.getState().openRun(run)}
-        aria-label={`${tool}: ${what}. ${[before, state ? `${state.word}${sep}${line}` : line].filter(Boolean).join(', ')}. ${run.state === 'running' || run.state === 'paused' || run.state === 'queued' ? 'Show its progress' : 'Open its results'}`}
+        aria-label={`${tool}: ${what}. ${[before, state ? `${state.word}${sep}${line}` : line, ...flags.map((f) => f.text), tail].filter(Boolean).join(', ')}. ${run.state === 'running' || run.state === 'paused' || run.state === 'queued' ? 'Show its progress' : 'Open its results'}`}
         data-testid="runs-open"
       >
         <span className="sx-runs-kind" title={tool} aria-hidden="true">
@@ -298,6 +343,15 @@ function RunRow({ run }: { run: RunSummary }) {
             </>
           )}
           {line}
+          {flags.map((f) => (
+            <span key={f.text}>
+              {' · '}
+              <span data-tone={f.tone} data-testid="runs-flag">
+                {f.text}
+              </span>
+            </span>
+          ))}
+          {tail && ` · ${tail}`}
         </span>
       </button>
       <button
