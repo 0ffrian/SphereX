@@ -1,4 +1,4 @@
-# Shift & Spectrum
+# Odysseus
 
 NASA Space Apps 2026, Port Louis. Challenge: **Planet X and SPHEREx**.
 
