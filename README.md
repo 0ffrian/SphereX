@@ -4,6 +4,8 @@ NASA Space Apps 2026, Port Louis. Challenge: **Planet X and SPHEREx**.
 
 A public web tool: enter coordinates or a name, watch real SPHEREx frames of that patch play as a series, click any object to see its spectrum, then explore it as a 3D body you can rotate and listen to.
 
+Read the [technical paper on how the engine works](https://drive.google.com/file/d/17-vdnUqvNrglVh3bVlsuxJ6PKWRMTTpe/view?usp=drive_link).
+
 ## Repo map
 
 | Path | What |
