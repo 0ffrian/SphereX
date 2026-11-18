@@ -19,8 +19,28 @@ Delete this file in the last PR (step 7); the lasting rules go into `CONTRIBUTIN
 ## 1. Target behaviour
 
 1. Nobody pushes, force-pushes or deletes `main`. Every change goes through a PR, admins included.
-2. Every path is owned by **all three**: `@JoottunAtish @MintHerbs @KevinYerkiah`. A PR touching an owned path needs an approval from **one of the three who is not the PR author and not the last pusher**.
-3. A short list of **open paths** has no code owner. A PR that touches *only* open paths can be approved by **any reviewer with write access**, code owner or not. That is how non-code-owners review each other's work there.
+2. Every owned area has a **lead** and **backups** (section 1a). A PR touching an owned path needs an approval from **one of that area's owners who is not the PR author and not the last pusher**. Backups exist so a lead's own PR can always be approved (GitHub blocks self-approval, and the ruleset has no bypass).
+3. **Open paths** have no code owner: `frontend/` (except Moon's UI-design files). A PR that touches *only* open paths can be approved by **any reviewer with write access**, code owner or not. That is how non-code-owners review each other's work there.
+
+### 1a. Ownership map (agreed 18 Nov 2026)
+
+| Path | Lead | Backups | Notes |
+|---|---|---|---|
+| `/docs/` (incl. `docs/architecture/`) | Atish, Moon, Kevin (equal) | — | all three |
+| `/backend/` | Kevin | Atish, Moon | |
+| `/mockup/` | Atish, Moon | Kevin | |
+| `/.claude/` (skills, agents) | Atish | Moon, Kevin | |
+| `/CLAUDE.md` | Atish | Moon, Kevin | |
+| `/frontend/` | **open** | — | any write-access reviewer |
+| Moon's UI design: `/frontend/src/components/`, `/frontend/src/index.css`, `/frontend/components.json` | Moon | Atish, Kevin | owned inside the open `frontend/` |
+| `/docs/design-language.md` | Moon | Atish, Kevin | inside docs, Moon leads |
+| `/frontend/package.json`, `/frontend/package-lock.json` | all three | — | **proposed**: dependency changes in a public repo stay owned (supply chain); drop if you want `frontend/` fully open |
+| `/.github/` (CI, CODEOWNERS) | all three | — | |
+| everything else (`shared/`, `README.md`, root `package.json`, any new folder) | all three | — | the `*` default; new folders start owned, never open |
+
+**What "lead" means on GitHub:** CODEOWNERS can't mark a lead. GitHub requests a review from **every** owner on the line, and any one of them can approve. The lead is listed first, and `CONTRIBUTING.md` says the lead reviews by default and the backups step in when the lead is the author or away. In practice every owned path has the same three owners; the only real difference between areas is open versus owned.
+
+**Departs from D-17:** `frontend/src/sound/` and `viewer/fields/` (Atish) and `frontend/src/app/`, `state/` (Moon) are open under this map. The D-17 owners stay in charge of the work itself; only the merge gate is open. Record this as a `Q-` entry in `docs/decisions/scope-process.md` in step 4.
 4. A PR touching both open and owned paths still needs a code owner (GitHub checks code owners per file).
 5. One required check, `ci-gate`, always reports on every PR, so a docs-only PR is never stuck on "Expected — waiting for status".
 6. A new push after approval dismisses the approval.
@@ -48,7 +68,7 @@ Delete this file in the last PR (step 7); the lasting rules go into `CONTRIBUTIN
 
 | ID | Question | Recommendation |
 |---|---|---|
-| D-A | Which paths are **open** (no code owner)? | `/mockup/` and `/docs/screenshots/` only. Keep `docs/decisions/`, the specs, `.claude/` and all code owned. Widen later if needed: easier than narrowing. |
+| D-A | Which paths are **open** (no code owner)? | **Decided (Atish, 18 Nov 2026):** section 1a. Still open: (1) is "Moon's UI design" exactly `components/`, `index.css`, `components.json` and `design-language.md`? (2) keep `frontend/package*.json` owned? |
 | D-B | Alt accounts `atish-syntarengine`, `munazir-syntarengine`? | Lower both to `read` (or remove). Otherwise they can self-approve on open paths and bypass/disable rules. |
 | D-C | Who are the **non-code-owner reviewers**, if any exist yet? | Add them with the `write` role when named (P7). None exist today besides the alt accounts. |
 | D-D | Bypass list on the ruleset? | **Empty** (no bypass, admins included). Emergencies follow P13. |
@@ -137,26 +157,42 @@ jobs:
 
 ```
 # Order matters: the LAST matching line wins.
+# Lead first, then backups. GitHub requests all of them; any one can approve.
+# Map and reasons: CONTRIBUTING.md.
 
-# 1. Default: everything is owned by the three code owners.
-*                       @JoottunAtish @MintHerbs @KevinYerkiah
+# 1. Default: anything not listed below (shared/, README.md, new folders).
+*                               @JoottunAtish @MintHerbs @KevinYerkiah
 
-# 2. Open paths: no owner. Any reviewer with write access can approve
-#    a PR that touches only these paths.
-/mockup/
-/docs/screenshots/
+# 2. Areas.
+/docs/                          @JoottunAtish @MintHerbs @KevinYerkiah
+/backend/                       @KevinYerkiah @JoottunAtish @MintHerbs
+/mockup/                        @JoottunAtish @MintHerbs @KevinYerkiah
 
-# 3. Governance: always owned. Keep this block LAST so no rule above can un-own it.
-/.github/               @JoottunAtish @MintHerbs @KevinYerkiah
-/CLAUDE.md              @JoottunAtish @MintHerbs @KevinYerkiah
-/.claude/               @JoottunAtish @MintHerbs @KevinYerkiah
+# 3. Open: no owner. Any reviewer with write access can approve.
+/frontend/
+
+# 4. Owned inside open frontend/ (must come after line 3).
+/frontend/src/components/       @MintHerbs @JoottunAtish @KevinYerkiah
+/frontend/src/index.css         @MintHerbs @JoottunAtish @KevinYerkiah
+/frontend/components.json       @MintHerbs @JoottunAtish @KevinYerkiah
+/frontend/package.json          @JoottunAtish @MintHerbs @KevinYerkiah
+/frontend/package-lock.json     @JoottunAtish @MintHerbs @KevinYerkiah
+/docs/design-language.md        @MintHerbs @JoottunAtish @KevinYerkiah
+
+# 5. Governance. Keep this block LAST so no rule above can un-own it.
+/.claude/                       @JoottunAtish @MintHerbs @KevinYerkiah
+/CLAUDE.md                      @JoottunAtish @MintHerbs @KevinYerkiah
+/.github/                       @JoottunAtish @MintHerbs @KevinYerkiah
 ```
 
+- Generated code: `frontend/src/contract/` is open, but CI's `npm run contract:check` fails if it differs from `shared/schemas/` (owned), so a hand edit can't merge.
+
 - Before merging: `gh api "repos/0ffrian/SphereX/codeowners/errors?ref=chore/codeowners"` returns `{"errors":[]}` (also enforced by the step 2 `codeowners` job).
-- On the PR's "Files changed" tab, hover the shield icon on a backend file: it names the three owners; on a `mockup/` file: no owner.
+- On the PR's "Files changed" tab, hover the shield icon: a `backend/` file names Kevin first; `frontend/src/app/` has no owner; `frontend/src/components/` names Moon first.
 
 ### Step 4: CONTRIBUTING.md and CLAUDE.md (can ride with step 3)
-- `CONTRIBUTING.md`: who owns what, the open paths, how to request a review (PR sidebar → Reviewers), "never approve your own work via a second account", the emergency path (P13).
+- `docs/decisions/scope-process.md` (+ index row): a `Q-` entry recording section 1a and where it departs from D-17 (use the next free Q- number on `main`).
+- `CONTRIBUTING.md`: the section 1a table, the lead/backup convention (lead reviews by default; a backup reviews when the lead is the author or away), the open paths, how to request a review (PR sidebar → Reviewers), "never approve your own work via a second account", the emergency path (P13).
 - `CLAUDE.md` "Git workflow": add that `main` is protected, merges need `ci-gate` + a code-owner approval, and that agents must not try to bypass it.
 
 ### Step 5: ruleset on `main` (GitHub settings, Atish as admin, after steps 2 and 3 are merged)
@@ -197,8 +233,10 @@ Create via `gh api -X POST repos/0ffrian/SphereX/rulesets --input ruleset.json`:
 | T1 | Atish opens a PR changing `backend/` | Only `backend` runs; merge blocked until Moon **or** Kevin approves; Atish can't approve |
 | T2 | (if alt accounts kept) `atish-syntarengine` approves T1 | Still blocked: "Review required from code owners" |
 | T3 | PR touching only `docs/README.md` | `backend`/`frontend` skipped, `ci-gate` green, needs an owner approval |
-| T4 | PR touching only `mockup/`, approved by a non-owner with write | Mergeable |
-| T5 | PR touching `mockup/` + `frontend/` approved by that non-owner | Blocked on code-owner review |
+| T4 | PR touching only `frontend/src/app/`, approved by a non-owner with write | Mergeable |
+| T5 | PR touching `frontend/src/app/` + `frontend/src/components/` approved by that non-owner | Blocked until an owner (Moon, or a backup) approves |
+| T5b | PR touching only `frontend/package.json`, approved by a non-owner | Blocked on code-owner review |
+| T5c | Kevin opens a `backend/` PR | Atish or Moon can approve it (backup rule, no deadlock) |
 | T6 | After an approval on T1, push a new commit | Approval dismissed |
 | T7 | PR adding `/.github/` to the open block (above the governance block) | Still owned (last match); `codeowners` job green; needs owner |
 | T8 | Admin runs `git push origin HEAD:main`, a force push and a branch delete | All rejected |
