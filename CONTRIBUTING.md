@@ -11,6 +11,10 @@ Every change reaches `main` through a pull request. Nobody pushes, force-pushes 
 
 A new push after an approval dismisses it, so ask for a fresh review.
 
+**One code owner is enough.** GitHub requests a review from every owner listed for the files, but one approval from any of them covers those files. You don't need all three.
+
+**"Changes requested" blocks the merge until that reviewer re-reviews.** If one owner approves and another requests changes, the PR can't merge. New pushes don't clear it: only approvals are dismissed on push. The reviewer who requested changes must review again and approve (PR page → **Re-request review** to ask them). Don't dismiss someone's review to get round it; if they're away and it's urgent, say so in the PR and agree it with another owner first.
+
 ## Merging: the merge queue
 
 When the PR is approved and green, press **Merge when ready**. GitHub adds it to the merge queue, combines it with the latest `main` (and any PRs ahead of it), runs `ci-gate` again on that combined commit, and merges only if it passes. If it fails, the PR leaves the queue and stays open, and the PR page shows why. Two PRs that pass on their own can't break `main` together, and you never need to update your branch just to merge it.
