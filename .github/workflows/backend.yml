@@ -16,6 +16,7 @@ jobs:
   check:
     name: ruff, mypy, pytest (offline)
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     env:
       # Tests never touch the network: recorded cache entries only (A12, D-25).
       SX_OFFLINE: '1'
