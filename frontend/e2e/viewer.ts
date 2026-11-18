@@ -26,6 +26,20 @@ export function viewerCanvas(page: Page): Locator {
   return page.getByTestId('build-pane').locator('canvas[aria-label]');
 }
 
+/**
+ * The DOM text that sits on the viewer's canvas box in a reference picture: the sr-only name label
+ * (a visible label before the D-38 redesign) and the build pane's title and subtitle, which are drawn
+ * over the top left of the stage ("3D view / No object loaded" here). Reference screenshots mask them,
+ * so a picture compares the body, not the pane's copy or the rasteriser's text.
+ */
+export function overlayMasks(page: Page): Locator[] {
+  return [
+    page.getByTestId('viewer-label'),
+    page.getByTestId('build-title'),
+    page.getByTestId('build-subtitle'),
+  ];
+}
+
 /** The honesty states of D-21 (the level the viewer and the sky show). */
 export type HonestyLevel = 'measured' | 'derived' | 'artistic';
 
