@@ -90,6 +90,9 @@ test('Discovery on the Eros pack: row verdicts, T3 chart with heat glow, the acc
   await expect(page.getByTestId('disc-steps')).toContainText(
     '3 rock-like, 1 very red, 5 one colour',
   );
+  // Issue #173 (0a97a24e): possible tracks are hidden in the list until asked; only T3 is found
+  // blind here, the other eight tracks are possibles.
+  await page.getByTestId('disc-show-possible').click();
   const word = (id: string) => page.getByTestId(`disc-mover-${id}`).getByTestId('spectrum-word');
   for (const id of ['T3', 'T1', 'T4']) await expect(word(id)).toHaveText('Rock-like');
   await expect(word('T8')).toHaveText('Very red');
