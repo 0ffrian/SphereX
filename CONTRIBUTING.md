@@ -1,0 +1,47 @@
+# Contributing
+
+Every change reaches `main` through a pull request. Nobody pushes, force-pushes or deletes `main`, admins included.
+
+## What a PR needs to merge
+
+1. **`ci-gate` is green.** It is the only required check and runs on every PR. The backend and frontend checks run only when their files change; when they are skipped, `ci-gate` still reports.
+2. **One approval** from someone with write access who is **not the PR author** and **did not push its last commit**.
+3. **A code owner's approval** for every owned file the PR touches (see the map below). A PR that touches only open paths needs no code owner.
+4. **All review threads resolved.**
+
+A new push after an approval dismisses it, so ask for a fresh review.
+
+## Who owns what
+
+The file that enforces this is [.github/CODEOWNERS](.github/CODEOWNERS) (decision Q-484 in [docs/decisions/scope-process.md](docs/decisions/scope-process.md)).
+
+| Path | Lead | Backups |
+|---|---|---|
+| `docs/` (incl. `docs/architecture/`) | Atish, Moon, Kevin (equal) | none needed |
+| `backend/` | Kevin | Atish, Moon |
+| `mockup/` | Atish, Moon | Kevin |
+| `.claude/` (skills, agents), `CLAUDE.md` | Atish | Moon, Kevin |
+| `frontend/` | **open**: any reviewer with write access | none |
+| Moon's UI design: `frontend/src/components/`, `frontend/src/index.css`, `frontend/components.json`, `docs/design-language.md` | Moon | Atish, Kevin |
+| `frontend/package.json`, `frontend/package-lock.json` (dependencies) | all three | none needed |
+| `.github/` (CI, CODEOWNERS), `CONTRIBUTING.md` | all three | none needed |
+| Everything else (`shared/`, `README.md`, any new folder) | all three | none needed |
+
+GitHub: Atish is `JoottunAtish`, Moon is `MintHerbs`, Kevin is `KevinYerkiah`.
+
+**Leads and backups.** GitHub can't mark a lead: it requests a review from every owner on the line, and any one of them can approve. By convention the lead reviews. A backup reviews when the lead wrote the PR or is away. Without backups a lead's own PR could never merge, because nobody can approve their own PR.
+
+**Open paths.** A PR that touches only open paths can be approved by any collaborator with write access, code owner or not. Ask them in the PR sidebar under **Reviewers**. An approval from someone with read or triage access doesn't count. If the PR also touches an owned file, that file still needs its code owner.
+
+The D-17 owners in [docs/decisions/scope-process.md](docs/decisions/scope-process.md) still lead the work in their areas, inside `frontend/` too. This table only decides who can approve the merge.
+
+## Rules
+
+- Work on a branch (`feat/…`, `fix/…`, `docs/…`, `chore/…`) and open a PR.
+- One person, one GitHub account. Never approve your own work from a second account.
+- Don't hand-edit generated code (`frontend/src/contract/`, `backend/app/contract/`). CI fails if it differs from `shared/schemas/`.
+- Fork PRs from first-time outside contributors wait for a maintainer to approve their CI run.
+
+## Emergencies
+
+If a fix can't wait for a reviewer, an admin may disable the `main` ruleset (Settings → Rules → Rulesets), merge, and **re-enable it straight away**. Say so in the PR with the reason. GitHub's audit log records the change.
