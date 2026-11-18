@@ -14,7 +14,8 @@ import { ensureLoaded, useSoundSettings } from '../settings';
 
 export const SOUND_STATUS_OFF = 'Sound is off.';
 export const SOUND_STATUS_NONE = 'This browser cannot play sound.';
-export const SOUND_STATUS_SUSPENDED = 'The browser paused the sound. Click Ambience again to resume it.';
+export const SOUND_STATUS_SUSPENDED =
+  'The browser paused the sound. Click Ambience again to resume it.';
 export const SOUND_STATUS_READY = 'Ambience plays in the fly view when Show is set to + Artistic.';
 export const SOUND_STATUS_AMBIENCE_OFF = 'Ambience is off.';
 export const FLASHES_HINT = 'Lightning in the fly view. Off with reduced motion.';
@@ -97,7 +98,12 @@ export function SoundControls() {
         </p>
       )}
       <div className="sx-snd-group">
-        <SwitchRow label="Sound" checked={s.soundOn} onChange={(v) => s.update({ soundOn: v })} testId="sound-on" />
+        <SwitchRow
+          label="Sound"
+          checked={s.soundOn}
+          onChange={(v) => s.update({ soundOn: v })}
+          testId="sound-on"
+        />
         <Volume
           label="Sound volume"
           value={s.volume}
@@ -122,7 +128,12 @@ export function SoundControls() {
         />
       </div>
       <div className="sx-snd-group" aria-describedby={hintId}>
-        <SwitchRow label="Flashes" checked={s.flashesOn} onChange={(v) => s.update({ flashesOn: v })} testId="sound-flashes" />
+        <SwitchRow
+          label="Flashes"
+          checked={s.flashesOn}
+          onChange={(v) => s.update({ flashesOn: v })}
+          testId="sound-flashes"
+        />
         <p id={hintId} className="sx-snd-hint">
           {FLASHES_HINT}
         </p>

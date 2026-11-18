@@ -163,7 +163,11 @@ export function App() {
                 </ErrorBoundary>
               </div>
               {buildOpen && (
-                <div className={buildMini ? 'sx-bp-mini' : 'contents'} inert={buildMini || undefined} aria-hidden={buildMini || undefined}>
+                <div
+                  className={buildMini ? 'sx-bp-mini' : 'contents'}
+                  inert={buildMini || undefined}
+                  aria-hidden={buildMini || undefined}
+                >
                   <ErrorBoundary
                     area="The build pane"
                     resetKeys={resetKeys}

@@ -22,7 +22,8 @@ import {
   type LiveView,
 } from './liveJobStore';
 
-const flowTitle = (flow: 'known' | 'discovery') => (flow === 'known' ? 'Known objects' : 'Discovery');
+const flowTitle = (flow: 'known' | 'discovery') =>
+  flow === 'known' ? 'Known objects' : 'Discovery';
 
 export function LiveAreaCard() {
   const view = useLiveJobStore((s) => s.view);
@@ -30,24 +31,36 @@ export function LiveAreaCard() {
   const busy = useLiveJobStore((s) => s.busy);
   const closePanel = useShellStore((s) => s.closePanel);
   const bodyRef = useRef<HTMLDivElement>(null);
-  const stateKey = view ? `${view.kind}:${view.kind === 'job' ? (job?.status?.state ?? 'starting') : ''}` : '';
+  const stateKey = view
+    ? `${view.kind}:${view.kind === 'job' ? (job?.status?.state ?? 'starting') : ''}`
+    : '';
   // The card changes state under the button just pressed (Compute, Stop, Try again), which goes
   // away: focus moves to the card's title instead of being lost to the page (WCAG 2.4.3).
   useEffect(() => {
     const a = document.activeElement;
     if (a && a !== document.body) return;
-    bodyRef.current?.closest('section')?.querySelector<HTMLElement>('h2')?.focus({ preventScroll: true });
+    bodyRef.current
+      ?.closest('section')
+      ?.querySelector<HTMLElement>('h2')
+      ?.focus({ preventScroll: true });
   }, [stateKey]);
   if (!view) return null;
   const title = flowTitle(view.flow);
   const status = view.kind === 'job' ? (job?.status ?? null) : null;
-  const release = view.kind === 'offer' ? releaseName(view.plan.release) : job?.plan ? releaseName(job.plan.release) : '';
+  const release =
+    view.kind === 'offer'
+      ? releaseName(view.plan.release)
+      : job?.plan
+        ? releaseName(job.plan.release)
+        : '';
   const subtitle =
     view.kind === 'offer'
       ? 'In this area'
       : view.kind === 'failed'
         ? `Area · ${formatBoxDeg(view.box.widthDeg, view.box.heightDeg)}`
-        : [status?.state === 'queued' ? 'Waiting' : 'Computing this area', release].filter(Boolean).join(' · ');
+        : [status?.state === 'queued' ? 'Waiting' : 'Computing this area', release]
+            .filter(Boolean)
+            .join(' · ');
   const minimise = () => useAreaStore.getState().setMinimised(true);
   return (
     <PanelCard
@@ -55,10 +68,17 @@ export function LiveAreaCard() {
       subtitle={subtitle}
       onClose={closePanel}
       onMinimise={minimise}
-      returnFocusTo={view.flow === 'known' ? '[data-testid="tool-known"]' : '[data-testid="tool-area"]'}
+      returnFocusTo={
+        view.flow === 'known' ? '[data-testid="tool-known"]' : '[data-testid="tool-area"]'
+      }
       testId="area-card"
     >
-      <div ref={bodyRef} className="sx-live" data-testid="live-card" data-state={view.kind === 'job' ? (status?.state ?? 'starting') : view.kind}>
+      <div
+        ref={bodyRef}
+        className="sx-live"
+        data-testid="live-card"
+        data-state={view.kind === 'job' ? (status?.state ?? 'starting') : view.kind}
+      >
         {view.kind === 'offer' && <Offer view={view} busy={busy} />}
         {view.kind === 'job' && <Job job={job} status={status} busy={busy} onMinimise={minimise} />}
         {view.kind === 'failed' && <Failed view={view} busy={busy} />}
@@ -71,18 +91,28 @@ function Offer({ view, busy }: { view: Extract<LiveView, { kind: 'offer' }>; bus
   const { plan } = view;
   return (
     <>
-      <p className="sx-live-p">This area hasn&rsquo;t been computed yet. SPHEREx covers it, so it can be computed now.</p>
+      <p className="sx-live-p">
+        This area hasn&rsquo;t been computed yet. SPHEREx covers it, so it can be computed now.
+      </p>
       <dl className="sx-live-facts" data-testid="live-facts">
         <dt>Data</dt>
         <dd>{releaseName(plan.release)}</dd>
         <dt>Visits</dt>
-        <dd>{plan.alternatives.length > 0 ? <VisitPicker plan={plan} busy={busy} /> : visitsText(plan)}</dd>
+        <dd>
+          {plan.alternatives.length > 0 ? (
+            <VisitPicker plan={plan} busy={busy} />
+          ) : (
+            visitsText(plan)
+          )}
+        </dd>
         <dt>Frames</dt>
         <dd>about {plan.n_frames}</dd>
         <dt>Time</dt>
         <dd>{aboutMinutes(plan.estimate_s)}</dd>
       </dl>
-      <p className="sx-live-m">The result is kept: anyone who draws this area later sees it at once.</p>
+      <p className="sx-live-m">
+        The result is kept: anyone who draws this area later sees it at once.
+      </p>
       <div className="sx-live-btns">
         <button
           type="button"
@@ -132,7 +162,12 @@ function VisitPicker({ plan, busy }: { plan: LivePlan; busy: boolean }) {
 
 function DrawAgain() {
   return (
-    <button type="button" className="sx-btn-outline" onClick={() => useAreaStore.getState().redraw()} data-testid="live-draw-again">
+    <button
+      type="button"
+      className="sx-btn-outline"
+      onClick={() => useAreaStore.getState().redraw()}
+      data-testid="live-draw-again"
+    >
       Choose another region
     </button>
   );
@@ -146,7 +181,17 @@ function announceOf(status: LiveJobStatus | null): string {
   return i < 0 ? '' : `Step ${i + 1} of ${status.steps.length}: ${status.steps[i]!.label}.`;
 }
 
-function Job({ job, status, busy, onMinimise }: { job: LiveJob | null; status: LiveJobStatus | null; busy: boolean; onMinimise(): void }) {
+function Job({
+  job,
+  status,
+  busy,
+  onMinimise,
+}: {
+  job: LiveJob | null;
+  status: LiveJobStatus | null;
+  busy: boolean;
+  onMinimise(): void;
+}) {
   const queued = status?.state === 'queued';
   const stop = () => void useLiveJobStore.getState().stop();
   return (
@@ -161,17 +206,31 @@ function Job({ job, status, busy, onMinimise }: { job: LiveJob | null; status: L
           <ol className="sx-live-steps" aria-label="Progress" data-testid="live-steps">
             {(status?.steps ?? []).map((s) => {
               const n = stepCount(s);
-              const bar = s.state === 'running' && s.total ? Math.min(1, (s.done ?? 0) / s.total) : null;
+              const bar =
+                s.state === 'running' && s.total ? Math.min(1, (s.done ?? 0) / s.total) : null;
               return (
-                <li key={s.id} data-state={s.state} aria-current={s.state === 'running' ? 'step' : undefined}>
+                <li
+                  key={s.id}
+                  data-state={s.state}
+                  aria-current={s.state === 'running' ? 'step' : undefined}
+                >
                   <span className="sx-live-mk" aria-hidden="true" />
                   <span>
                     {s.label}
-                    <span className="sr-only">{s.state === 'done' ? ', done' : s.state === 'running' ? ', now' : ', to do'}</span>
+                    <span className="sr-only">
+                      {s.state === 'done' ? ', done' : s.state === 'running' ? ', now' : ', to do'}
+                    </span>
                   </span>
                   <span className="sx-live-n">{n}</span>
                   {bar !== null && (
-                    <span className="sx-live-bar" role="progressbar" aria-label={`${s.label}: ${n}`} aria-valuemin={0} aria-valuemax={s.total} aria-valuenow={s.done ?? 0}>
+                    <span
+                      className="sx-live-bar"
+                      role="progressbar"
+                      aria-label={`${s.label}: ${n}`}
+                      aria-valuemin={0}
+                      aria-valuemax={s.total}
+                      aria-valuenow={s.done ?? 0}
+                    >
                       <i style={{ transform: `scaleX(${bar})` }} />
                     </span>
                   )}
@@ -181,16 +240,35 @@ function Job({ job, status, busy, onMinimise }: { job: LiveJob | null; status: L
           </ol>
           <div className="sx-live-time" data-testid="live-time">
             <span>{status ? `${clock(status.elapsed_s)} elapsed` : 'Starting'}</span>
-            <span>{status?.eta_s == null ? '' : status.eta_s > 0 ? `${aboutMinutes(status.eta_s)} left` : 'almost done'}</span>
+            <span>
+              {status?.eta_s == null
+                ? ''
+                : status.eta_s > 0
+                  ? `${aboutMinutes(status.eta_s)} left`
+                  : 'almost done'}
+            </span>
           </div>
-          <p className="sx-live-m">You can close this card. The area keeps computing and opens here when it&rsquo;s ready.</p>
+          <p className="sx-live-m">
+            You can close this card. The area keeps computing and opens here when it&rsquo;s ready.
+          </p>
         </>
       )}
       <div className="sx-live-btns">
-        <button type="button" className="sx-btn-outline" onClick={onMinimise} data-testid="live-minimise">
+        <button
+          type="button"
+          className="sx-btn-outline"
+          onClick={onMinimise}
+          data-testid="live-minimise"
+        >
           Minimise
         </button>
-        <button type="button" className="sx-btn-outline" disabled={busy || !job} onClick={stop} data-testid="live-stop">
+        <button
+          type="button"
+          className="sx-btn-outline"
+          disabled={busy || !job}
+          onClick={stop}
+          data-testid="live-stop"
+        >
           {queued ? 'Cancel' : 'Stop'}
         </button>
       </div>
@@ -207,7 +285,9 @@ function Waiting({ status, job }: { status: LiveJobStatus | null; job: LiveJob |
   return (
     <>
       <p className="sx-live-p" data-testid="live-waiting">
-        {pos > 1 ? `Other areas are computing. Yours is number ${pos} in line.` : 'Another area is computing. Yours starts next.'}
+        {pos > 1
+          ? `Other areas are computing. Yours is number ${pos} in line.`
+          : 'Another area is computing. Yours starts next.'}
       </p>
       <div className="sx-live-time" data-testid="live-time">
         {wait !== null && run !== null ? (
@@ -233,7 +313,13 @@ function Failed({ view, busy }: { view: Extract<LiveView, { kind: 'failed' }>; b
       </div>
       <div className="sx-live-btns">
         {t.retry && (
-          <button type="button" className="sx-btn-outline" disabled={busy} onClick={() => void useLiveJobStore.getState().retry()} data-testid="live-retry">
+          <button
+            type="button"
+            className="sx-btn-outline"
+            disabled={busy}
+            onClick={() => void useLiveJobStore.getState().retry()}
+            data-testid="live-retry"
+          >
             Try again
           </button>
         )}

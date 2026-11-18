@@ -16,7 +16,14 @@ import {
   type PathSoundOutput,
 } from './pathSound';
 
-const GEOM = { x: 28.5, y: 29, nx: 58, ny: 59, north: [0, 1] as [number, number], east: [1, 0] as [number, number] };
+const GEOM = {
+  x: 28.5,
+  y: 29,
+  nx: 58,
+  ny: 59,
+  north: [0, 1] as [number, number],
+  east: [1, 0] as [number, number],
+};
 // Two exposures of two frames each (D1 and D4), midpoints 1 ms apart within an exposure (as Eros).
 const A1: PathFrame = { ...GEOM, mjd_avg: 61119.356749534, wl_um: 0.9861 };
 const A4: PathFrame = { ...GEOM, mjd_avg: 61119.356749546, wl_um: 3.3319 };
@@ -138,7 +145,10 @@ describe('PathSoundController: start / scrub / stop', () => {
     expect(c.active).toBe(true);
     await p;
     expect(out.groups).toHaveLength(1);
-    expect(out.groups[0]!.map((n) => n.pitch)).toEqual([wavelengthToPitch(A1.wl_um), wavelengthToPitch(A4.wl_um)]);
+    expect(out.groups[0]!.map((n) => n.pitch)).toEqual([
+      wavelengthToPitch(A1.wl_um),
+      wavelengthToPitch(A4.wl_um),
+    ]);
     expect(out.tones.size).toBe(0); // not playing: no path voice
   });
 
@@ -176,7 +186,10 @@ describe('PathSoundController: start / scrub / stop', () => {
     const c = new PathSoundController(out);
     c.scrub({ hop: A1, frames: FRAMES, playing: true });
     await c.start();
-    expect(out.tones.get('path')).toMatchObject({ pitch: PATH_VOICE_PITCH, tag: 'model_dependent' });
+    expect(out.tones.get('path')).toMatchObject({
+      pitch: PATH_VOICE_PITCH,
+      tag: 'model_dependent',
+    });
     c.scrub({ hop: B1, frames: FRAMES, playing: true });
     expect(out.log).toContain('update:path');
     c.scrub({ hop: B1, frames: FRAMES, playing: false });

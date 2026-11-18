@@ -27,7 +27,13 @@ describe('PanelCard focus on restore', () => {
   it('focuses the heading when focus was on <body>', async () => {
     await act(async () =>
       root.render(
-        <PanelCard title="Known objects" icon="details" onClose={() => {}} returnFocusTo="body" testId="card">
+        <PanelCard
+          title="Known objects"
+          icon="details"
+          onClose={() => {}}
+          returnFocusTo="body"
+          testId="card"
+        >
           <p>body</p>
         </PanelCard>,
       ),
@@ -39,7 +45,14 @@ describe('PanelCard focus on restore', () => {
   it('a bare card focuses its own heading', async () => {
     await act(async () =>
       root.render(
-        <PanelCard bare title="Flipbook" icon="details" onClose={() => {}} returnFocusTo="body" testId="card">
+        <PanelCard
+          bare
+          title="Flipbook"
+          icon="details"
+          onClose={() => {}}
+          returnFocusTo="body"
+          testId="card"
+        >
           <h2 tabIndex={-1}>Barnard&apos;s Star</h2>
         </PanelCard>,
       ),
@@ -53,7 +66,13 @@ describe('PanelCard focus on restore', () => {
     input.focus();
     await act(async () =>
       root.render(
-        <PanelCard title="Discovery" icon="details" onClose={() => {}} returnFocusTo="body" testId="card">
+        <PanelCard
+          title="Discovery"
+          icon="details"
+          onClose={() => {}}
+          returnFocusTo="body"
+          testId="card"
+        >
           <p>body</p>
         </PanelCard>,
       ),

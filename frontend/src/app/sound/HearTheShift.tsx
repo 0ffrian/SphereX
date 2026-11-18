@@ -43,7 +43,13 @@ export function HearTheShift() {
     });
   };
 
-  const line = path.on ? (noAudio ? HEAR_SHIFT_NO_AUDIO : status?.muted ? HEAR_SHIFT_MUTED : HEAR_SHIFT_HINT) : null;
+  const line = path.on
+    ? noAudio
+      ? HEAR_SHIFT_NO_AUDIO
+      : status?.muted
+        ? HEAR_SHIFT_MUTED
+        : HEAR_SHIFT_HINT
+    : null;
 
   return (
     <div className="flex flex-col" data-testid="hear-shift">
@@ -52,14 +58,21 @@ export function HearTheShift() {
         className="sx-amb-btn self-start"
         aria-pressed={path.on}
         aria-describedby={line ? lineId : undefined}
-        title={path.on ? 'Stop the notes' : "Hear this object's frames as notes while the player runs"}
+        title={
+          path.on ? 'Stop the notes' : "Hear this object's frames as notes while the player runs"
+        }
         onClick={toggle}
         data-testid="hear-shift-toggle"
       >
         {HEAR_SHIFT_LABEL}
       </button>
       {/* Always rendered, so the live region exists before its text changes. */}
-      <p className={line ? 'sx-hr-hint mt-2' : 'sx-hr-hint'} id={lineId} role="status" data-testid="hear-shift-line">
+      <p
+        className={line ? 'sx-hr-hint mt-2' : 'sx-hr-hint'}
+        id={lineId}
+        role="status"
+        data-testid="hear-shift-line"
+      >
         {line ?? ''}
       </p>
     </div>

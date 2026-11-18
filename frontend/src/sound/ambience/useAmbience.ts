@@ -18,7 +18,11 @@ import { publishStrike, publishWeather } from './weatherBus';
 
 export function ambienceKilled(): boolean {
   try {
-    if (typeof location !== 'undefined' && new URLSearchParams(location.search).has('sx-noambience')) return true;
+    if (
+      typeof location !== 'undefined' &&
+      new URLSearchParams(location.search).has('sx-noambience')
+    )
+      return true;
     return typeof localStorage !== 'undefined' && localStorage.getItem('sx.ambience.kill') === '1';
   } catch {
     return false;
@@ -52,7 +56,14 @@ export interface UseAmbienceArgs {
   applied?: () => EngineOverrides;
 }
 
-export function useAmbience({ engine, world, entered, paused, failed, applied }: UseAmbienceArgs): void {
+export function useAmbience({
+  engine,
+  world,
+  entered,
+  paused,
+  failed,
+  applied,
+}: UseAmbienceArgs): void {
   const honesty = useAppStore((s) => s.honesty);
   const soundOn = useSoundSettings((s) => s.soundOn);
   const ambienceOn = useSoundSettings((s) => s.ambienceOn);

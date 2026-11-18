@@ -2,7 +2,14 @@
 // shared/fixtures/area/ (issue #92), main (2 visits) and multivisit (4 visits). Test code only.
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { AreaDots, AreaIndex, AreaKnown, AreaSpectra, AreaSummary, AreaTracks } from '@/contract';
+import type {
+  AreaDots,
+  AreaIndex,
+  AreaKnown,
+  AreaSpectra,
+  AreaSummary,
+  AreaTracks,
+} from '@/contract';
 
 const files = import.meta.glob('../../../shared/fixtures/area/**/*.json', {
   eager: true,
@@ -43,12 +50,25 @@ export const spectraFixture = (): AreaSpectra => pick<AreaSpectra>('', 'spectra'
  * backend's bytes, parsed. `spectra` is #161's spectrum check of the recorded Eros area.
  */
 export function erosPackStage<T>(stage: 'summary' | 'dots' | 'tracks' | 'spectra'): T {
-  const root = join(process.cwd(), '..', 'backend', 'assets', 'areas', 'v1', 'derived.area', 'spherex_qr2');
+  const root = join(
+    process.cwd(),
+    '..',
+    'backend',
+    'assets',
+    'areas',
+    'v1',
+    'derived.area',
+    'spherex_qr2',
+  );
   for (const dir of readdirSync(root))
     for (const f of readdirSync(join(root, dir)).filter((x) => x.endsWith('.json'))) {
-      const meta = JSON.parse(readFileSync(join(root, dir, f), 'utf8')) as { key: { query: { stage: string; id: string } } };
+      const meta = JSON.parse(readFileSync(join(root, dir, f), 'utf8')) as {
+        key: { query: { stage: string; id: string } };
+      };
       if (meta.key.query.stage === stage && meta.key.query.id === 'eros-2026-03')
-        return JSON.parse(readFileSync(join(root, dir, f.replace(/\.json$/, '.body')), 'utf8')) as T;
+        return JSON.parse(
+          readFileSync(join(root, dir, f.replace(/\.json$/, '.body')), 'utf8'),
+        ) as T;
     }
   throw new Error(`no ${stage} stage of eros-2026-03 in the pack`);
 }

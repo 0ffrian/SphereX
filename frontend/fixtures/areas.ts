@@ -115,7 +115,10 @@ export function areaReply(pathname: string): AreaAnswer | null {
   // The spectrum check (A17.13, #161): only the main fixture area has one; the other answers as an
   // area stored without it.
   if (what === 'spectra' && !existsSync(join(dir, 'spectra.json'))) {
-    const body = { error: 'spectra_not_prepared', detail: 'Synthetic fixture: no spectrum check stored for this area.' };
+    const body = {
+      error: 'spectra_not_prepared',
+      detail: 'Synthetic fixture: no spectrum check stored for this area.',
+    };
     return { status: 404, contentType: 'application/json', body: JSON.stringify(body) };
   }
   return jsonFile(dir, `${what}.json`);

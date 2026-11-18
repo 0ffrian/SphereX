@@ -94,7 +94,9 @@ describe('DiscoveryCard with a prepared area', () => {
     disc.real = { ...disc.real!, entry: { ...disc.real!.entry, area_id: 'live-0123456789ab' } };
     useAreaStore.setState({ box, disc, screen: 'disc', step: 4, running: false });
     await act(async () => root.render(<DiscoveryCard />));
-    expect(host.querySelector('[data-testid="area-precomputed"]')?.textContent).toMatch(/^Computed live · /);
+    expect(host.querySelector('[data-testid="area-precomputed"]')?.textContent).toMatch(
+      /^Computed live · /,
+    );
   });
 
   it('opens the stored track, not the demo mover card', async () => {
@@ -112,22 +114,37 @@ describe('DiscoveryCard with a prepared area', () => {
     await act(async () => root.render(<MoverCard />));
     const track = host.querySelector<HTMLButtonElement>('[data-testid="track-track"]')!;
     expect(track.disabled).toBe(true);
-    expect(host.querySelector('[data-testid="track-no-orbit"]')?.textContent).toBe('Orbit not known');
+    expect(host.querySelector('[data-testid="track-no-orbit"]')?.textContent).toBe(
+      'Orbit not known',
+    );
     await act(async () => host.querySelector<HTMLElement>('[data-testid="track-build"]')!.click());
     expect(useShellStore.getState().build.open).toBe(true);
     const card = useAppStore.getState().card;
     expect(card?.id).toBe(`area:${disc.real!.entry.area_id}:${disc.movers[i]!.id}`);
-    expect(useAppStore.getState().params?.layers.map((l) => [l.id, l.tag])).toEqual([['placeholder_shape', 'artistic']]);
+    expect(useAppStore.getState().params?.layers.map((l) => [l.id, l.tag])).toEqual([
+      ['placeholder_shape', 'artistic'],
+    ]);
     useShellStore.getState().closeBuild();
   });
 
-  it('a track matched to a known object: Track it computes its Track around the track\'s own frame times', async () => {
+  it("a track matched to a known object: Track it computes its Track around the track's own frame times", async () => {
     const disc = realDisc();
     const i = 0;
     const m0 = disc.movers[i]!;
     // Held UI issue 1: SkyBoT's designation already holds the number; never "433 433 Eros".
-    const match = { designation: '433 Eros', number: 433, object_id: 'sbdb-9', v_mag: 11.2, median_sep_px: 0.31, fetched_at: '2026-11-13T07:00:00Z' };
-    disc.movers[i] = { ...m0, known: '433 Eros', track: { ...m0.track!, verdict: 'found_blind', match } };
+    const match = {
+      designation: '433 Eros',
+      number: 433,
+      object_id: 'sbdb-9',
+      v_mag: 11.2,
+      median_sep_px: 0.31,
+      fetched_at: '2026-11-13T07:00:00Z',
+    };
+    disc.movers[i] = {
+      ...m0,
+      known: '433 Eros',
+      track: { ...m0.track!, verdict: 'found_blind', match },
+    };
     const openTrack = vi.fn();
     useAreaStore.setState({ box, disc, screen: 'mover', sel: i, step: 4, openTrack });
     await act(async () => root.render(<MoverCard />));
@@ -138,7 +155,9 @@ describe('DiscoveryCard with a prepared area', () => {
     const [obj, around] = openTrack.mock.calls[0]!;
     expect(obj.objectId).toBe('sbdb-9');
     expect(Date.parse(around)).toBeGreaterThan(0);
-    expect(host.querySelector('[data-testid="track-known"]')?.textContent).toBe('433 Eros · 0.31 px from predicted');
+    expect(host.querySelector('[data-testid="track-known"]')?.textContent).toBe(
+      '433 Eros · 0.31 px from predicted',
+    );
     expect(host.textContent).not.toContain('433 433');
   });
 });
@@ -183,13 +202,23 @@ describe('the spectrum check', () => {
     expect(words[0]!.textContent).toBe('Rock-like');
     expect(words[0]!.getAttribute('data-tone')).toBe('ok');
     // The verdict is extra: the stored chip stays, and so does the order.
-    expect(host.querySelectorAll('[data-testid^="disc-mover-"] .sx-chip')).toHaveLength(disc.movers.length);
-    expect(host.querySelector('[data-testid="disc-steps"]')?.textContent).toContain('Check the spectrum');
+    expect(host.querySelectorAll('[data-testid^="disc-mover-"] .sx-chip')).toHaveLength(
+      disc.movers.length,
+    );
+    expect(host.querySelector('[data-testid="disc-steps"]')?.textContent).toContain(
+      'Check the spectrum',
+    );
   });
 
   it('the filter gains Rock-like n', async () => {
     const disc = spectrumDisc();
-    useAreaStore.setState({ box, disc, screen: 'disc', step: disc.steps.length - 1, running: false });
+    useAreaStore.setState({
+      box,
+      disc,
+      screen: 'disc',
+      step: disc.steps.length - 1,
+      running: false,
+    });
     await act(async () => root.render(<DiscoveryCard />));
     const rock = host.querySelector<HTMLElement>('[data-testid="disc-filter-rock"]')!;
     const n = disc.movers.filter((m) => m.spectrum?.verdict === 'rock').length;
@@ -200,7 +229,13 @@ describe('the spectrum check', () => {
 
   it('the demo path shows no spectrum check', async () => {
     const disc = realDisc();
-    useAreaStore.setState({ box, disc: { ...disc, demo: true, real: null }, screen: 'disc', step: 4, running: false });
+    useAreaStore.setState({
+      box,
+      disc: { ...disc, demo: true, real: null },
+      screen: 'disc',
+      step: 4,
+      running: false,
+    });
     await act(async () => root.render(<DiscoveryCard />));
     expect(host.querySelector('[data-testid="spectrum-word"]')).toBeNull();
     expect(host.querySelector('[data-testid="disc-filter"]')).toBeNull();
@@ -218,15 +253,23 @@ describe('the spectrum check', () => {
     expect(chart.getAttribute('aria-label')).toMatch(/14 points.*Looks like sunlight off a rock/);
     expect(host.querySelector('[data-testid="spectrum-band"]')).not.toBeNull();
     expect(host.querySelector('[data-testid="spectrum-glow"]')).not.toBeNull();
-    expect(host.querySelector('[data-testid="spectrum-distance"]')?.textContent).toBe('1.16 AU from the Sun, from its parallax');
-    expect(host.querySelector('[data-testid="spectrum-section"] [data-testid="provenance-badge"]')?.getAttribute('data-tag')).toBe('model_dependent');
+    expect(host.querySelector('[data-testid="spectrum-distance"]')?.textContent).toBe(
+      '1.16 AU from the Sun, from its parallax',
+    );
+    expect(
+      host
+        .querySelector('[data-testid="spectrum-section"] [data-testid="provenance-badge"]')
+        ?.getAttribute('data-tag'),
+    ).toBe('model_dependent');
     // The accordion: the formula (KaTeX, MathML for screen readers) and Points used n.
     const how = host.querySelector('[data-testid="spectrum-how"] button')!;
     expect(how.getAttribute('aria-expanded')).toBe('false');
     await act(async () => (how as HTMLElement).click());
     expect(how.getAttribute('aria-expanded')).toBe('true');
     expect(host.querySelector('[data-testid="spectrum-formula"] math')).not.toBeNull();
-    expect(host.querySelector('[data-testid="spectrum-points"] button')?.textContent).toContain('14');
+    expect(host.querySelector('[data-testid="spectrum-points"] button')?.textContent).toContain(
+      '14',
+    );
     expect(host.querySelectorAll('[data-testid="spectrum-points-list"] li')).toHaveLength(14);
   });
 
@@ -258,7 +301,9 @@ describe('the spectrum check', () => {
     const last = steps.querySelectorAll('li')[at]!;
     expect(last.textContent).toContain('Check the spectrum');
     const n = disc.real!.spectra!.tracks.length;
-    expect(last.querySelector('small')?.textContent).toBe(`${n} track${n === 1 ? '' : 's'} checked`);
+    expect(last.querySelector('small')?.textContent).toBe(
+      `${n} track${n === 1 ? '' : 's'} checked`,
+    );
     expect(steps.textContent).not.toMatch(/rock-like|very red|one colour/i);
     expect(host.querySelectorAll('[data-testid^="disc-mover-"]')).toHaveLength(disc.movers.length);
     // Back to the default: the words, the filter and the counts return.
@@ -270,9 +315,17 @@ describe('the spectrum check', () => {
 
   it('a Rock-like filter chosen before Measured only does not stay applied under it', async () => {
     const disc = spectrumDisc(['T8']);
-    useAreaStore.setState({ box, disc, screen: 'disc', step: disc.steps.length - 1, running: false });
+    useAreaStore.setState({
+      box,
+      disc,
+      screen: 'disc',
+      step: disc.steps.length - 1,
+      running: false,
+    });
     await act(async () => root.render(<DiscoveryCard />));
-    await act(async () => host.querySelector<HTMLElement>('[data-testid="disc-filter-rock"]')!.click());
+    await act(async () =>
+      host.querySelector<HTMLElement>('[data-testid="disc-filter-rock"]')!.click(),
+    );
     expect(host.querySelectorAll('[data-testid^="disc-mover-"]')).toHaveLength(0);
     await act(async () => useAppStore.setState({ honesty: 'measured' }));
     expect(host.querySelectorAll('[data-testid^="disc-mover-"]')).toHaveLength(disc.movers.length);
@@ -287,18 +340,30 @@ describe('the spectrum check', () => {
     expect(host.querySelector('[data-testid="spectrum-steady"]')).toBeNull();
     expect(host.querySelector('[data-testid="spectrum-colour"]')).not.toBeNull();
     // The reply's provenance.points tag (measured); a synthetic area reads "Fixture", never "Measured".
-    const badge = host.querySelector('[data-testid="spectrum-section"] [data-testid="provenance-badge"]')!;
+    const badge = host.querySelector(
+      '[data-testid="spectrum-section"] [data-testid="provenance-badge"]',
+    )!;
     expect(badge.getAttribute('data-tag')).toBe(disc.real!.spectra!.provenance.points.tag);
     expect(badge.textContent).toBe('Fixture');
   });
 
-  it('the Spectrum tag follows the reply\'s provenance.colour', async () => {
+  it("the Spectrum tag follows the reply's provenance.colour", async () => {
     const disc = spectrumDisc();
     const sp = disc.real!.spectra!;
-    disc.real = { ...disc.real!, spectra: { ...sp, provenance: { ...sp.provenance, colour: { ...sp.provenance.colour, tag: 'derived' } } } };
+    disc.real = {
+      ...disc.real!,
+      spectra: {
+        ...sp,
+        provenance: { ...sp.provenance, colour: { ...sp.provenance.colour, tag: 'derived' } },
+      },
+    };
     useAreaStore.setState({ box, disc, screen: 'mover', sel: 0, step: 5 });
     await act(async () => root.render(<MoverCard />));
-    expect(host.querySelector('[data-testid="spectrum-section"] [data-testid="provenance-badge"]')?.getAttribute('data-tag')).toBe('derived');
+    expect(
+      host
+        .querySelector('[data-testid="spectrum-section"] [data-testid="provenance-badge"]')
+        ?.getAttribute('data-tag'),
+    ).toBe('derived');
   });
 
   it('Points used counts only the points that entered a pair or a step', async () => {
@@ -311,7 +376,9 @@ describe('the spectrum check', () => {
     const row = host.querySelector('[data-testid="spectrum-points"] button')!;
     expect(row.textContent).toMatch(new RegExp(`Points used\\s*${used}\\b`));
     // The list still names every point, with why a point was not used.
-    expect(host.querySelectorAll('[data-testid="spectrum-points-list"] li')).toHaveLength(t.points.length);
+    expect(host.querySelectorAll('[data-testid="spectrum-points-list"] li')).toHaveLength(
+      t.points.length,
+    );
   });
 
   it('One colour: no chart, the Steady row only', async () => {
@@ -320,7 +387,9 @@ describe('the spectrum check', () => {
     expect(i).toBe(0);
     useAreaStore.setState({ box, disc, screen: 'mover', sel: i, step: 5 });
     await act(async () => root.render(<MoverCard />));
-    expect(host.querySelector('[data-testid="spectrum-verdict"] b')?.textContent).toBe('One colour only');
+    expect(host.querySelector('[data-testid="spectrum-verdict"] b')?.textContent).toBe(
+      'One colour only',
+    );
     expect(host.querySelector('[data-testid="spectrum-chart"]')).toBeNull();
     expect(host.querySelector('[data-testid="spectrum-steady"]')).not.toBeNull();
     expect(host.querySelector('[data-testid="spectrum-colour"]')).toBeNull();
@@ -346,7 +415,13 @@ describe('the spectrum chart', () => {
     const i = disc.movers.findIndex((m) => m.track);
     const m0 = disc.movers[i]!;
     disc.movers[i] = { ...m0, track: { ...m0.track!, verdict: 'possible' } };
-    useAreaStore.setState({ box, disc, screen: 'disc', step: disc.steps.length - 1, running: false });
+    useAreaStore.setState({
+      box,
+      disc,
+      screen: 'disc',
+      step: disc.steps.length - 1,
+      running: false,
+    });
     await act(async () => root.render(<DiscoveryCard />));
     const row = () => host.querySelector(`[data-testid="disc-mover-${m0.id}"]`);
     expect(row()).toBeNull();
@@ -357,7 +432,7 @@ describe('the spectrum chart', () => {
     expect(btn.textContent).toBe('Hide possible (1)');
   });
 
-  it('#173: a single square\'s list has a ← back to your patch, which folds the card away', async () => {
+  it("#173: a single square's list has a ← back to your patch, which folds the card away", async () => {
     useAreaStore.setState({ box, disc: realDisc(), screen: 'disc', step: 4, running: false });
     await act(async () => root.render(<DiscoveryCard />));
     const back = host.querySelector<HTMLButtonElement>('[data-testid="area-back"]')!;
@@ -366,7 +441,7 @@ describe('the spectrum chart', () => {
     expect(useAreaStore.getState().minimised).toBe(true);
   });
 
-  it('#173: a track\'s ← goes back to the Discovery list; Escape does the same', async () => {
+  it("#173: a track's ← goes back to the Discovery list; Escape does the same", async () => {
     useAreaStore.setState({ box, disc: realDisc(), screen: 'mover', sel: 0, step: 4 });
     await act(async () => root.render(<MoverCard />));
     const back = host.querySelector<HTMLButtonElement>('[data-testid="area-back"]')!;

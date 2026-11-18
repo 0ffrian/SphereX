@@ -7,27 +7,51 @@ const nrm = (v: number[]): [number, number, number] => {
   return [v[0]! / l, v[1]! / l, v[2]! / l];
 };
 const cross = (a: number[], b: number[]): number[] => [
-  a[1]! * b[2]! - a[2]! * b[1]!, a[2]! * b[0]! - a[0]! * b[2]!, a[0]! * b[1]! - a[1]! * b[0]!,
+  a[1]! * b[2]! - a[2]! * b[1]!,
+  a[2]! * b[0]! - a[0]! * b[2]!,
+  a[0]! * b[1]! - a[1]! * b[0]!,
 ];
 
 /** core.js flyCamera (the horizon dip included) at (lon, lat), head, pitch, alt km over flat ground at groundKm. */
-export function makeBasis(o: { lon?: number; lat?: number; head?: number; pitch?: number; altKm?: number; groundKm?: number; rkm?: number; ex?: number } = {}): Basis {
-  const lon = o.lon ?? 0, lat = o.lat ?? 0, head = o.head ?? 0, rkm = o.rkm ?? 6371, ex = o.ex ?? 3;
+export function makeBasis(
+  o: {
+    lon?: number;
+    lat?: number;
+    head?: number;
+    pitch?: number;
+    altKm?: number;
+    groundKm?: number;
+    rkm?: number;
+    ex?: number;
+  } = {},
+): Basis {
+  const lon = o.lon ?? 0,
+    lat = o.lat ?? 0,
+    head = o.head ?? 0,
+    rkm = o.rkm ?? 6371,
+    ex = o.ex ?? 3;
   const up = [Math.cos(lat) * Math.cos(lon), Math.sin(lat), Math.cos(lat) * Math.sin(lon)];
   const east = nrm(cross([0, 1, 0], up));
   const north = cross(up, east);
   const r = 1 + ((o.groundKm ?? 0) * ex + (o.altKm ?? 1)) / rkm;
   const pitch = (o.pitch ?? 0) - Math.acos(Math.min(1 / r, 1));
-  const ch = Math.cos(head), sh = Math.sin(head);
+  const ch = Math.cos(head),
+    sh = Math.sin(head);
   const fh = [0, 1, 2].map((k) => north[k]! * ch + east[k]! * sh);
-  const cp = Math.cos(pitch), sp = Math.sin(pitch);
+  const cp = Math.cos(pitch),
+    sp = Math.sin(pitch);
   const fwd = nrm([0, 1, 2].map((k) => fh[k]! * cp + up[k]! * sp));
   const rt = nrm(cross(fwd, up));
   const cu = cross(rt, fwd) as [number, number, number];
   return { cam: [up[0]! * r, up[1]! * r, up[2]! * r], fwd, rt, up: cu, rkm, ex, fov: 0.62 };
 }
 
-export interface Call { op: string; args: unknown[]; style?: unknown; width?: number }
+export interface Call {
+  op: string;
+  args: unknown[];
+  style?: unknown;
+  width?: number;
+}
 
 /** A recording Ctx2D: every call with the fill/stroke style and line width at the time. */
 export function recordingCtx() {
@@ -43,7 +67,8 @@ export function recordingCtx() {
     moveTo: (...args: unknown[]) => calls.push({ op: 'moveTo', args }),
     lineTo: (...args: unknown[]) => calls.push({ op: 'lineTo', args }),
     rect: (...args: unknown[]) => calls.push({ op: 'rect', args }),
-    stroke: () => calls.push({ op: 'stroke', args: [], style: ctx.strokeStyle, width: ctx.lineWidth }),
+    stroke: () =>
+      calls.push({ op: 'stroke', args: [], style: ctx.strokeStyle, width: ctx.lineWidth }),
     fill: () => calls.push({ op: 'fill', args: [], style: ctx.fillStyle }),
     fillRect: (...args: unknown[]) => calls.push({ op: 'fillRect', args, style: ctx.fillStyle }),
     setTransform: (...args: unknown[]) => calls.push({ op: 'setTransform', args }),

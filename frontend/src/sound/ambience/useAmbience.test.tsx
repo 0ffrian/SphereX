@@ -3,7 +3,13 @@ import { act, StrictMode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAppStore } from '@/state/store';
-import { heldAmbience, releaseAmbience, reportIdle, setPaletteFactory, sharedPalette } from './ambienceHolder';
+import {
+  heldAmbience,
+  releaseAmbience,
+  reportIdle,
+  setPaletteFactory,
+  sharedPalette,
+} from './ambienceHolder';
 import { makeFakeEngine, makeWorld } from './fakeEngine.testutil';
 import type { WorldEngineWithSpinup } from './place';
 import { KEEP_ALIVE_MS } from './tuning';
@@ -69,7 +75,10 @@ describe('useAmbience', () => {
 describe('ambience holder keep-alive (§13)', () => {
   it('releases the palette 2 minutes after every loop went idle; activity cancels it', () => {
     const dispose = vi.fn();
-    setPaletteFactory(() => ({ palette: { request() {}, get: () => null, unavailable: () => [] }, dispose }));
+    setPaletteFactory(() => ({
+      palette: { request() {}, get: () => null, unavailable: () => [] },
+      dispose,
+    }));
     expect(sharedPalette()).not.toBeNull();
     const a = {},
       b = {};

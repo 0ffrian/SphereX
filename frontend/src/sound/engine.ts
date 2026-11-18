@@ -480,10 +480,13 @@ export class SoundEngine {
       }
       this.sendTone(t, now);
     } else if (t.timer === null) {
-      t.timer = this.timers.setTimeout(() => {
-        t.timer = null;
-        if (this.tones.get(id) === t) this.sendTone(t, this.clock());
-      }, t.lastSent + TONE_UPDATE_MIN_MS - now);
+      t.timer = this.timers.setTimeout(
+        () => {
+          t.timer = null;
+          if (this.tones.get(id) === t) this.sendTone(t, this.clock());
+        },
+        t.lastSent + TONE_UPDATE_MIN_MS - now,
+      );
     }
     return true;
   }

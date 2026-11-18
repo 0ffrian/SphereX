@@ -4747,7 +4747,8 @@ body {
   box-shadow: none;
 }
 /* Wells and toggles inside a glass surface: a lighter veil, not a solid grey block. */
-:is(.sx-panel, .sx-fl, .sx-player) :is(.sx-seg, .fb-spec, .fb-empty, .sx-kn-chart, .sx-kn-det, .sx-kn-spec-none) {
+:is(.sx-panel, .sx-fl, .sx-player)
+  :is(.sx-seg, .fb-spec, .fb-empty, .sx-kn-chart, .sx-kn-det, .sx-kn-spec-none) {
   background: var(--glass-inner);
   border-color: var(--glass-inner-edge);
 }

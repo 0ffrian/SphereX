@@ -184,9 +184,10 @@ export function createAppSound(options: AppSoundOptions = {}): AppSound {
       muted: !s.soundOn,
       volume: s.volume,
       listening: sweep.playing,
-      chord: chord.playing && chordOwner !== null && chord.mode !== null
-        ? { owner: chordOwner, mode: chord.mode }
-        : null,
+      chord:
+        chord.playing && chordOwner !== null && chord.mode !== null
+          ? { owner: chordOwner, mode: chord.mode }
+          : null,
     };
   };
   const getStatus = (): SoundStatus => {

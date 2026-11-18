@@ -40,7 +40,13 @@ export function WhatYouHear({ id, onClose }: { id: string; onClose: () => void }
 
   const preparing = ui.selected > ui.ready && (ui.status === 'baking' || ui.status === 'playing');
   return (
-    <section id={id} className="sx-amb-panel" role="region" aria-labelledby={titleId} data-testid="what-you-hear">
+    <section
+      id={id}
+      className="sx-amb-panel"
+      role="region"
+      aria-labelledby={titleId}
+      data-testid="what-you-hear"
+    >
       <h2 id={titleId} className="sx-amb-h">
         What you hear
       </h2>
@@ -131,7 +137,12 @@ export function WhatYouHear({ id, onClose }: { id: string; onClose: () => void }
       <p>{HOW_TEXT}</p>
 
       <label className="sx-amb-check" htmlFor={readId}>
-        <input id={readId} type="checkbox" checked={readCaptions} onChange={() => update({ readCaptions: !readCaptions })} />
+        <input
+          id={readId}
+          type="checkbox"
+          checked={readCaptions}
+          onChange={() => update({ readCaptions: !readCaptions })}
+        />
         Read changes aloud
       </label>
     </section>

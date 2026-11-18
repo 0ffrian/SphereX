@@ -70,7 +70,8 @@ export function reportIdle(loopId: object, on: boolean): void {
     releaseTimer = null;
     return;
   }
-  if (releaseTimer === null && (palette || mixer)) releaseTimer = setTimeout(releaseAmbience, KEEP_ALIVE_MS);
+  if (releaseTimer === null && (palette || mixer))
+    releaseTimer = setTimeout(releaseAmbience, KEEP_ALIVE_MS);
 }
 
 /** Release the palette (worker, buffers) and the mixer now. */

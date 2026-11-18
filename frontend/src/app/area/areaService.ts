@@ -113,7 +113,11 @@ export interface KnownObject {
    * its median distance from the predicted position; null when Discovery did not detect it, and
    * undefined when that is not known (the tracks did not load, or the demo).
    */
-  detection?: { trackId: string; sepPx: number | null; points?: { ra: number; dec: number }[] } | null;
+  detection?: {
+    trackId: string;
+    sepPx: number | null;
+    points?: { ra: number; dec: number }[];
+  } | null;
 }
 export interface KnownObjectsResult {
   /** True for the made-up demo answer; false for a prepared area's stored reply. */
@@ -164,8 +168,7 @@ export interface DiscoveryResult {
 
 export type AreaFlow = 'known' | 'discovery';
 export type AreaSearchResult =
-  | ({ flow: 'known' } & KnownObjectsResult)
-  | ({ flow: 'discovery' } & DiscoveryResult);
+  ({ flow: 'known' } & KnownObjectsResult) | ({ flow: 'discovery' } & DiscoveryResult);
 
 export const NOT_PREPARED = 'No prepared data for this area yet.';
 
@@ -181,7 +184,9 @@ export class AreaRefused extends Error {
 }
 
 /** The prepared Eros area on the sky: centre, and half sides in degrees (null when the file lacks them). */
-export function erosArea(d: ErosDemo): { ra: number; dec: number; halfW: number; halfH: number } | null {
+export function erosArea(
+  d: ErosDemo,
+): { ra: number; dec: number; halfW: number; halfH: number } | null {
   const c = d.wide.center;
   const k = d.wide.deg_per_px;
   if (!c || !k || !(d.wide.w > 0) || !(d.wide.h > 0)) return null;
@@ -229,7 +234,9 @@ export function erosDemo(): Promise<ErosDemo | null> {
     .then((r) => (r.ok ? (r.json() as Promise<ErosDemo>) : null))
     .then((d) => {
       if (!d) return null;
-      d.hops = d.hops.slice().sort((a, b) => a.mjd_avg - b.mjd_avg || a.detector.localeCompare(b.detector));
+      d.hops = d.hops
+        .slice()
+        .sort((a, b) => a.mjd_avg - b.mjd_avg || a.detector.localeCompare(b.detector));
       return d;
     })
     .catch(() => null)
@@ -247,17 +254,30 @@ async function demoKnownIn(box: AreaBox): Promise<KnownObjectsResult> {
     demo: true,
     real: null,
     objects: [
-      { id: '433', name: 'Eros', kind: 'asteroid', frames: d?.hops.length ?? 16, visits: 2, trackAvailable: true },
+      {
+        id: '433',
+        name: 'Eros',
+        kind: 'asteroid',
+        frames: d?.hops.length ?? 16,
+        visits: 2,
+        trackAvailable: true,
+      },
     ],
   };
 }
 
 /** "433 Eros" with number 433 -> { id: "433", name: "Eros" }; unnumbered: the designation is the id. */
-export function splitDesignation(designation: string, number: number | null): { id: string; name: string } {
+export function splitDesignation(
+  designation: string,
+  number: number | null,
+): { id: string; name: string } {
   if (number !== null && designation.startsWith(`${number} `)) {
     return { id: String(number), name: designation.slice(String(number).length + 1) };
   }
-  return { id: number !== null ? String(number) : designation, name: number !== null ? designation : '' };
+  return {
+    id: number !== null ? String(number) : designation,
+    name: number !== null ? designation : '',
+  };
 }
 
 /** The latest SkyBoT answer date of the area's visits (ISO), null when none answered. */
@@ -290,10 +310,14 @@ export function knownRow(
 ): KnownObject {
   let detection: KnownObject['detection'];
   if (tracks) {
-    const t = tracks.find((x) => x.verdict === 'found_blind' && x.match !== null && matchesKnown(x.match, k));
+    const t = tracks.find(
+      (x) => x.verdict === 'found_blind' && x.match !== null && matchesKnown(x.match, k),
+    );
     detection = t ? { trackId: t.track_id, sepPx: t.match?.median_sep_px ?? null } : null;
     if (t && dots) {
-      const points = t.tracklets.flatMap((tl) => tl.dot_ids.map((id) => dots.get(id)).filter((p) => p !== undefined));
+      const points = t.tracklets.flatMap((tl) =>
+        tl.dot_ids.map((id) => dots.get(id)).filter((p) => p !== undefined),
+      );
       detection = { ...detection!, points };
     }
   }
@@ -317,13 +341,15 @@ export function knownRow(
  * then by designation, so the same reply always lists the same way. Pure; returns a new array.
  */
 export function sortKnown(objects: readonly KnownObject[]): KnownObject[] {
-  const v = (o: KnownObject) => (o.vMag ?? null) === null ? Infinity : (o.vMag as number);
-  return objects.slice().sort(
-    (a, b) =>
-      Number(!a.detection) - Number(!b.detection) ||
-      v(a) - v(b) ||
-      (a.designation ?? a.id).localeCompare(b.designation ?? b.id),
-  );
+  const v = (o: KnownObject) => ((o.vMag ?? null) === null ? Infinity : (o.vMag as number));
+  return objects
+    .slice()
+    .sort(
+      (a, b) =>
+        Number(!a.detection) - Number(!b.detection) ||
+        v(a) - v(b) ||
+        (a.designation ?? a.id).localeCompare(b.designation ?? b.id),
+    );
 }
 
 /**
@@ -332,7 +358,11 @@ export function sortKnown(objects: readonly KnownObject[]): KnownObject[] {
  * same exposure) the demo's cutout, mask and brightness are kept (still demo); a real frame the demo
  * has no cutout for is listed with `no_cutout`. The path is projected onto the demo sky image.
  */
-export function mergeReal(demo: ErosDemo | null, frames: readonly Frame[], path: TrackPath | null): ErosDemo {
+export function mergeReal(
+  demo: ErosDemo | null,
+  frames: readonly Frame[],
+  path: TrackPath | null,
+): ErosDemo {
   const byId = new Map((demo?.hops ?? []).map((h) => [h.frame_id, h]));
   const hops: ErosHop[] = frames.map((f) => {
     const d = byId.get(f.frame_id);
@@ -456,9 +486,36 @@ async function demoDiscoverIn(box: AreaBox): Promise<DiscoveryResult> {
   const X = () => 30 + r() * 1220;
   const Y = () => 30 + r() * 660;
   const movers: DiscoveryMover[] = [
-    { id: 'T1', known: '433 Eros', kind: 'known', pts: [a, z], visits: 2, track: null, spectrum: null },
-    { id: 'T2', known: null, kind: 'unexplained', pts: [[430, 540], [700, 330]], visits: 2, track: null, spectrum: null },
-    { id: 'T3', known: null, kind: 'once', pts: [[1010, 560]], visits: 1, track: null, spectrum: null },
+    {
+      id: 'T1',
+      known: '433 Eros',
+      kind: 'known',
+      pts: [a, z],
+      visits: 2,
+      track: null,
+      spectrum: null,
+    },
+    {
+      id: 'T2',
+      known: null,
+      kind: 'unexplained',
+      pts: [
+        [430, 540],
+        [700, 330],
+      ],
+      visits: 2,
+      track: null,
+      spectrum: null,
+    },
+    {
+      id: 'T3',
+      known: null,
+      kind: 'once',
+      pts: [[1010, 560]],
+      visits: 1,
+      track: null,
+      spectrum: null,
+    },
   ];
   const dots: DiscoveryDot[] = [];
   for (let i = 0; i < 58; i++) dots.push({ p: [X(), Y()], k: 'glitch' });
@@ -489,7 +546,8 @@ function refuse(e: unknown): never {
 /** The steps of a prepared area, from its stored counts (A18.3); nothing is computed here. */
 export function realSteps(r: RealDiscovery): DiscoveryStep[] {
   const n = r.summary.steps;
-  const checked = `${n.n_found_blind} found blind, ${n.n_unexplained} unexplained` +
+  const checked =
+    `${n.n_found_blind} found blind, ${n.n_unexplained} unexplained` +
     (n.n_unchecked > 0 ? `, ${n.n_unchecked} not checked` : '');
   return [
     { label: 'Find dots', result: `${n.n_dots} in ${r.summary.n_frames} frames` },
@@ -539,14 +597,27 @@ export function realMovers(r: RealDiscovery): DiscoveryMover[] {
  * outside Eros's area). The demo also stands in when the index cannot be read (no backend); a
  * prepared area whose `/known` fails, or breaks the contract, refuses with `area:failed`.
  */
-export async function knownObjectsIn(box: AreaBox, signal?: AbortSignal): Promise<KnownObjectsResult> {
+export async function knownObjectsIn(
+  box: AreaBox,
+  signal?: AbortSignal,
+): Promise<KnownObjectsResult> {
   const api = getSkyApi();
   const hit = await findArea(api, box, signal);
   if (!hit) return demoKnownIn(box);
   const real = await loadKnown(api, hit.entry, hit.fixture, signal).catch(refuse);
   const tracks = real.tracks?.tracks ?? null;
-  const dots = real.dots ? new Map(real.dots.visits.flatMap((v) => v.dots.map((d) => [d.dot_id, { ra: d.ra, dec: d.dec }] as const))) : null;
-  return { demo: false, real, objects: sortKnown(real.known.known.map((k) => knownRow(k, tracks, dots))) };
+  const dots = real.dots
+    ? new Map(
+        real.dots.visits.flatMap((v) =>
+          v.dots.map((d) => [d.dot_id, { ra: d.ra, dec: d.dec }] as const),
+        ),
+      )
+    : null;
+  return {
+    demo: false,
+    real,
+    objects: sortKnown(real.known.known.map((k) => knownRow(k, tracks, dots))),
+  };
 }
 
 /** Discovery: a prepared area's stored replies, else the demo (which refuses outside Eros's area). */

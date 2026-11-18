@@ -46,7 +46,12 @@ export type LiveJobState = LiveAreaJob['state'];
 export type LiveErrorCode = string;
 /** An error body of the live routes. Anything else (`not_found`: no such route) is "unavailable". */
 export function isLiveError(code: string): boolean {
-  return code === 'upstream_unavailable' || code === 'offline' || code === 'queue_full' || code.startsWith('area:');
+  return (
+    code === 'upstream_unavailable' ||
+    code === 'offline' ||
+    code === 'queue_full' ||
+    code.startsWith('area:')
+  );
 }
 
 /** The box asked about: centre and sides in degrees. */
@@ -87,7 +92,12 @@ export interface LiveAreaApi {
    * `kind`: the tool that asked (Q-471 (2)). The server records the job as a run of one square
    * only when it is told which tool started it, so the Runs list shows it.
    */
-  start(box: LiveBox, signal?: AbortSignal, visits?: VisitPick, kind?: LiveKind): Promise<StartAnswer>;
+  start(
+    box: LiveBox,
+    signal?: AbortSignal,
+    visits?: VisitPick,
+    kind?: LiveKind,
+  ): Promise<StartAnswer>;
   /** Throws LiveJobGone when the server has no such job, another error when it cannot be read. */
   status(areaId: string, signal?: AbortSignal): Promise<LiveJobStatus>;
   stop(areaId: string): Promise<void>;
@@ -119,7 +129,8 @@ export function liveBoxOf(b: {
 
 // ---- Reply checks (shape only; the schema of #141 replaces them) -------------------------------
 
-const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
+const isObj = (v: unknown): v is Record<string, unknown> =>
+  typeof v === 'object' && v !== null && !Array.isArray(v);
 const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 const isStr = (v: unknown): v is string => typeof v === 'string';
 const isVisit = (v: unknown): v is LiveVisit => isObj(v) && isStr(v.start) && isStr(v.end);
@@ -130,10 +141,18 @@ export function parsePlanReply(body: unknown): PlanAnswer {
     return { kind: 'error', code: body.error, detail: isStr(body.detail) ? body.detail : '' };
   if (!isStr(body.area_id)) return { kind: 'unavailable' };
   if (body.state === 'done') return { kind: 'stored', areaId: body.area_id };
-  if (body.state === 'queued' || body.state === 'running') return { kind: 'running', areaId: body.area_id, state: body.state };
+  if (body.state === 'queued' || body.state === 'running')
+    return { kind: 'running', areaId: body.area_id, state: body.state };
   const v = body.visits;
   // The fields the UI reads are checked; the backend checks the whole reply against its schema.
-  if (isStr(body.release) && Array.isArray(v) && v.length === 2 && v.every(isVisit) && isNum(body.n_frames) && isNum(body.estimate_s))
+  if (
+    isStr(body.release) &&
+    Array.isArray(v) &&
+    v.length === 2 &&
+    v.every(isVisit) &&
+    isNum(body.n_frames) &&
+    isNum(body.estimate_s)
+  )
     return { kind: 'plan', plan: body as unknown as LivePlan };
   return { kind: 'unavailable' };
 }
@@ -144,7 +163,8 @@ export function parseStartReply(body: unknown): StartAnswer {
     return { kind: 'error', code: body.error, detail: isStr(body.detail) ? body.detail : '' };
   if (!isStr(body.area_id)) return { kind: 'unavailable' };
   if (body.state === 'done') return { kind: 'stored', areaId: body.area_id };
-  if (body.state === 'queued' || body.state === 'running') return { kind: 'started', areaId: body.area_id, state: body.state };
+  if (body.state === 'queued' || body.state === 'running')
+    return { kind: 'started', areaId: body.area_id, state: body.state };
   return { kind: 'unavailable' };
 }
 
@@ -154,10 +174,29 @@ const JOB_STATES: readonly string[] = ['queued', 'running', 'done', 'failed'];
 
 export function parseStatusReply(body: unknown): LiveJobStatus {
   const bad = () => new Error('Live area job reply does not match the contract.');
-  if (!isObj(body) || !isStr(body.area_id) || !isStr(body.state) || !JOB_STATES.includes(body.state)) throw bad();
-  if (!Array.isArray(body.steps) || !isNum(body.elapsed_s) || !(isNum(body.eta_s) || body.eta_s === null)) throw bad();
+  if (
+    !isObj(body) ||
+    !isStr(body.area_id) ||
+    !isStr(body.state) ||
+    !JOB_STATES.includes(body.state)
+  )
+    throw bad();
+  if (
+    !Array.isArray(body.steps) ||
+    !isNum(body.elapsed_s) ||
+    !(isNum(body.eta_s) || body.eta_s === null)
+  )
+    throw bad();
   const steps: LiveStep[] = body.steps.map((s: unknown) => {
-    if (!isObj(s) || !isStr(s.id) || !STEP_IDS.includes(s.id) || !isStr(s.label) || !isStr(s.state) || !STEP_STATES.includes(s.state)) throw bad();
+    if (
+      !isObj(s) ||
+      !isStr(s.id) ||
+      !STEP_IDS.includes(s.id) ||
+      !isStr(s.label) ||
+      !isStr(s.state) ||
+      !STEP_STATES.includes(s.state)
+    )
+      throw bad();
     return {
       id: s.id as LiveStep['id'],
       label: s.label,
@@ -175,7 +214,9 @@ export function parseStatusReply(body: unknown): LiveJobStatus {
     elapsed_s: body.elapsed_s,
     eta_s: isNum(body.eta_s) ? body.eta_s : null,
     ...(isNum(body.queue_position) ? { queue_position: body.queue_position } : {}),
-    ...(isObj(err) && isStr(err.code) ? { error: { code: err.code, detail: isStr(err.detail) ? err.detail : '' } } : {}),
+    ...(isObj(err) && isStr(err.code)
+      ? { error: { code: err.code, detail: isStr(err.detail) ? err.detail : '' } }
+      : {}),
   };
 }
 
@@ -191,18 +232,32 @@ export const STATUS_TIMEOUT_MS = 10_000;
 export const REQUEST_TIMEOUT_MS = 60_000;
 
 /** The backend (#141). A route it does not serve, a reply that is not JSON or no backend: `unavailable`. */
-export function httpLiveAreaApi(base = API_BASE, fetchImpl: typeof fetch = (i, init) => globalThis.fetch(i, init)): LiveAreaApi {
+export function httpLiveAreaApi(
+  base = API_BASE,
+  fetchImpl: typeof fetch = (i, init) => globalThis.fetch(i, init),
+): LiveAreaApi {
   const json = async (res: Response): Promise<unknown> => {
     const type = res.headers.get('content-type') ?? '';
     if (!type.includes('json')) return null;
     return res.json().catch(() => null);
   };
-  const post = async (box: LiveBox, start: boolean, signal?: AbortSignal, visits?: VisitPick, kind?: LiveKind): Promise<unknown> => {
+  const post = async (
+    box: LiveBox,
+    start: boolean,
+    signal?: AbortSignal,
+    visits?: VisitPick,
+    kind?: LiveKind,
+  ): Promise<unknown> => {
     const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
     const res = await fetchImpl(`${base}/areas/live`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ ...box, start, ...(visits ? { visits: [...visits] } : {}), ...(kind ? { kind } : {}) }),
+      body: JSON.stringify({
+        ...box,
+        start,
+        ...(visits ? { visits: [...visits] } : {}),
+        ...(kind ? { kind } : {}),
+      }),
       signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
     });
     return json(res);
@@ -232,7 +287,12 @@ export function httpLiveAreaApi(base = API_BASE, fetchImpl: typeof fetch = (i, i
         signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
       });
       const body = await json(res);
-      if (res.status === 404 && typeof body === 'object' && body !== null && (body as { error?: unknown }).error === 'job_not_found')
+      if (
+        res.status === 404 &&
+        typeof body === 'object' &&
+        body !== null &&
+        (body as { error?: unknown }).error === 'job_not_found'
+      )
         throw new LiveJobGone(areaId);
       return parseStatusReply(body);
     },
@@ -249,10 +309,16 @@ export function httpLiveAreaApi(base = API_BASE, fetchImpl: typeof fetch = (i, i
 
 // ---- Mock (opt-in; invented test values) -------------------------------------------------------
 
-export type MockScenario = 'ok' | 'queued' | 'no_pair' | 'unreachable' | 'offline' | 'stored' | 'fail';
+export type MockScenario =
+  'ok' | 'queued' | 'no_pair' | 'unreachable' | 'offline' | 'stored' | 'fail';
 
 /** The six steps of a live area job, with their share of the run time and what they count. */
-export const MOCK_STEPS: readonly { id: LiveStep['id']; label: string; weight: number; total?: 'visits' | 'frames' }[] = [
+export const MOCK_STEPS: readonly {
+  id: LiveStep['id'];
+  label: string;
+  weight: number;
+  total?: 'visits' | 'frames';
+}[] = [
   { id: 'visits', label: 'Find a pair of visits', weight: 0.05 },
   { id: 'frames', label: 'Download frames', weight: 0.45, total: 'frames' },
   { id: 'dots', label: 'Find dots', weight: 0.2, total: 'frames' },
@@ -270,7 +336,8 @@ const MOCK_ALT: [LiveVisit, LiveVisit] = [
   { start: '2026-06-18T02:05:00Z', end: '2026-06-18T02:18:00Z', n_frames: 6 },
   { start: '2026-06-18T05:40:00Z', end: '2026-06-18T05:53:00Z', n_frames: 6 },
 ];
-const gapH = (p: readonly [LiveVisit, LiveVisit]) => (Date.parse(p[1].start) - Date.parse(p[0].end)) / 3_600_000;
+const gapH = (p: readonly [LiveVisit, LiveVisit]) =>
+  (Date.parse(p[1].start) - Date.parse(p[0].end)) / 3_600_000;
 const MOCK_PLAN = (
   areaId: string,
   box: LiveBox = { ra: 0, dec: 0, width_deg: 1, height_deg: 1 },
@@ -279,14 +346,16 @@ const MOCK_PLAN = (
   const alt = pick !== null && pick[0] === MOCK_ALT[0].start;
   const [visits, other] = alt ? [MOCK_ALT, MOCK_VISITS] : [MOCK_VISITS, MOCK_ALT];
   return {
-  area_id: alt ? `${areaId}-b` : areaId,
-  release: 'spherex_dr1',
-  box,
-  visits,
-  n_frames: visits[0].n_frames + visits[1].n_frames,
-  estimate_s: 540,
-  alternatives: [{ visits: other, gap_h: Math.round(gapH(other) * 100) / 100 }],
-  provenance: { visits: { tag: 'measured', source: 'mock (invented test values)', formula: 'mock' } },
+    area_id: alt ? `${areaId}-b` : areaId,
+    release: 'spherex_dr1',
+    box,
+    visits,
+    n_frames: visits[0].n_frames + visits[1].n_frames,
+    estimate_s: 540,
+    alternatives: [{ visits: other, gap_h: Math.round(gapH(other) * 100) / 100 }],
+    provenance: {
+      visits: { tag: 'measured', source: 'mock (invented test values)', formula: 'mock' },
+    },
   };
 };
 
@@ -301,8 +370,20 @@ export function mockStatusAt(areaId: string, f: number, plan: LivePlan): LiveJob
     const total = s.total === 'visits' ? 2 : s.total === 'frames' ? plan.n_frames : undefined;
     const state: LiveStepState = f >= acc ? 'done' : f >= lo ? 'running' : 'todo';
     if (state === 'running') current = s.id;
-    const done = total === undefined ? undefined : state === 'done' ? total : state === 'running' ? Math.floor(((f - lo) / s.weight) * total) : 0;
-    steps.push({ id: s.id, label: s.label, state, ...(total !== undefined ? { total, done } : {}) });
+    const done =
+      total === undefined
+        ? undefined
+        : state === 'done'
+          ? total
+          : state === 'running'
+            ? Math.floor(((f - lo) / s.weight) * total)
+            : 0;
+    steps.push({
+      id: s.id,
+      label: s.label,
+      state,
+      ...(total !== undefined ? { total, done } : {}),
+    });
   }
   return {
     area_id: areaId,
@@ -327,7 +408,11 @@ export function mockLiveAreaApi(
   const idOf = (b: LiveBox) => `live-dr1-${b.ra.toFixed(2)}-${b.dec.toFixed(2)}`;
   const failure = (): PlanAnswer | null =>
     scenario === 'no_pair'
-      ? { kind: 'error', code: 'area:no_visit_pair', detail: 'No two visits within 6 h at this position.' }
+      ? {
+          kind: 'error',
+          code: 'area:no_visit_pair',
+          detail: 'No two visits within 6 h at this position.',
+        }
       : scenario === 'unreachable'
         ? { kind: 'error', code: 'upstream_unavailable', detail: 'IRSA did not answer.' }
         : scenario === 'offline'
@@ -353,13 +438,19 @@ export function mockLiveAreaApi(
       if (!job) throw new LiveJobGone(areaId);
       const plan = MOCK_PLAN(areaId);
       if (job.stopped) {
-        return { ...mockStatusAt(areaId, 0, plan), state: 'failed', eta_s: null, error: { code: 'cancelled', detail: 'The job was stopped. Nothing was saved.' } };
+        return {
+          ...mockStatusAt(areaId, 0, plan),
+          state: 'failed',
+          eta_s: null,
+          error: { code: 'cancelled', detail: 'The job was stopped. Nothing was saved.' },
+        };
       }
       let t = now() - job.t0;
       if (scenario === 'queued') {
         // Held (screenshots): always waiting, 4 min before it starts.
         if (hold !== null || t < queueMs) {
-          const wait = hold !== null ? 240 : Math.round(((queueMs - t) / durationMs) * plan.estimate_s);
+          const wait =
+            hold !== null ? 240 : Math.round(((queueMs - t) / durationMs) * plan.estimate_s);
           const base = mockStatusAt(areaId, 0, plan);
           return {
             ...base,
@@ -374,7 +465,12 @@ export function mockLiveAreaApi(
       }
       const f = hold ?? Math.min(1, t / durationMs);
       if (scenario === 'fail' && f > 0.3) {
-        return { ...mockStatusAt(areaId, 0.3, plan), state: 'failed', eta_s: null, error: { code: 'upstream_unavailable', detail: 'IRSA stopped answering.' } };
+        return {
+          ...mockStatusAt(areaId, 0.3, plan),
+          state: 'failed',
+          eta_s: null,
+          error: { code: 'upstream_unavailable', detail: 'IRSA stopped answering.' },
+        };
       }
       return mockStatusAt(areaId, f, plan);
     },
@@ -391,13 +487,24 @@ export function mockFromEnv(search: string, env: string | undefined): LiveAreaAp
   const v = q.get('live') ?? env ?? '';
   if (!v.startsWith('mock')) return null;
   const name = v.slice('mock'.length).replace(/^-/, '').replace(/-/g, '_');
-  const scenarios: readonly MockScenario[] = ['ok', 'queued', 'no_pair', 'unreachable', 'offline', 'stored', 'fail'];
+  const scenarios: readonly MockScenario[] = [
+    'ok',
+    'queued',
+    'no_pair',
+    'unreachable',
+    'offline',
+    'stored',
+    'fail',
+  ];
   const scenario = (scenarios as readonly string[]).includes(name) ? (name as MockScenario) : 'ok';
   const ms = Number(q.get('live_ms'));
   const hold = q.get('live_hold');
   return mockLiveAreaApi(scenario, {
     ...(ms > 0 ? { durationMs: ms } : {}),
-    hold: hold !== null && Number.isFinite(Number(hold)) ? Math.min(1, Math.max(0, Number(hold))) : null,
+    hold:
+      hold !== null && Number.isFinite(Number(hold))
+        ? Math.min(1, Math.max(0, Number(hold)))
+        : null,
   });
 }
 
@@ -408,7 +515,9 @@ export function getLiveAreaApi(): LiveAreaApi {
     // The URL switch works on the dev server only (e2e, screenshots): a public build never shows
     // invented visit pairs because of a link.
     const search = typeof location === 'undefined' || !import.meta.env.DEV ? '' : location.search;
-    const env = import.meta.env.DEV ? (import.meta.env.VITE_SX_LIVE_AREAS as string | undefined) : undefined;
+    const env = import.meta.env.DEV
+      ? (import.meta.env.VITE_SX_LIVE_AREAS as string | undefined)
+      : undefined;
     api = mockFromEnv(search, env) ?? httpLiveAreaApi();
   }
   return api;

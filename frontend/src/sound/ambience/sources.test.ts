@@ -3,11 +3,29 @@ import { describe, expect, it } from 'vitest';
 import { buildAirModel } from './airModel';
 import { earthRef } from './air';
 import { EARTH_MODEL, makeFakeEngine, makeWorld } from './fakeEngine.testutil';
-import { earthAir, makeAir, makeFeatures, makePlace, makeWind, marsAir, titanAir } from './fakeEngine.testutil';
+import {
+  earthAir,
+  makeAir,
+  makeFeatures,
+  makePlace,
+  makeWind,
+  marsAir,
+  titanAir,
+} from './fakeEngine.testutil';
 import { hash32 } from './hash';
 import { bubbleFactor, dropPhysics } from './liquids';
 import {
-  aeolianHz, BED_RATE_OF, gates, PARAM_KEYS, PRIORITY, reynolds, selectBeds, SOURCE_TEXT, strouhal, uSand, wavesPM,
+  aeolianHz,
+  BED_RATE_OF,
+  gates,
+  PARAM_KEYS,
+  PRIORITY,
+  reynolds,
+  selectBeds,
+  SOURCE_TEXT,
+  strouhal,
+  uSand,
+  wavesPM,
   whitecapFraction,
 } from './sources';
 import type { SourceId } from './types';
@@ -31,7 +49,14 @@ describe('R4: the whistle gate, size by size', () => {
 
   it('the refusal caption appears only when every size is gated out', () => {
     // Test input: 300 Pa CO2 at 2 m/s puts every size (Re 6 mm ≈ 9) below 47.
-    const thin = makeAir({ T0: 200, P0: 300, mu: 43.3, fluid: 'co2', liquidState: false, oceanF: 0 });
+    const thin = makeAir({
+      T0: 200,
+      P0: 300,
+      mu: 43.3,
+      fluid: 'co2',
+      liquidState: false,
+      oceanF: 0,
+    });
     const g = gates(thin, 2);
     expect(g.S2).toEqual({ pass: false, reason: SOURCE_TEXT.whistle });
     expect(g.S3).toEqual({ pass: false, reason: SOURCE_TEXT.whistle });
@@ -87,12 +112,15 @@ describe('waves, whitecaps, sand', () => {
 });
 
 function earthPlace(U10 = 8) {
-  return makePlace(0.3, (s) => ({ cls: s.s_km > 1.5 ? 'sea' : 'land', coast: s.s_km > 1.5 }), { wind: makeWind({ U10, Uz: U10 }) });
+  return makePlace(0.3, (s) => ({ cls: s.s_km > 1.5 ? 'sea' : 'land', coast: s.s_km > 1.5 }), {
+    wind: makeWind({ U10, Uz: U10 }),
+  });
 }
 
 describe('seeds use the shared hash (#113 hash.ts)', () => {
   it('BedSpec.seed = hash32(seed, id, variant)', () => {
-    for (const b of selectBeds(earthAir(), earthPlace()).beds) expect(b.seed).toBe(hash32(101, b.id, b.variant));
+    for (const b of selectBeds(earthAir(), earthPlace()).beds)
+      expect(b.seed).toBe(hash32(101, b.id, b.variant));
   });
 });
 
@@ -103,7 +131,18 @@ describe('selectBeds', () => {
     const ids = beds.map((b) => b.id);
     const order = ids.map((id) => PRIORITY.indexOf(id));
     expect([...order].sort((a, b) => a - b)).toEqual(order);
-    for (const id of ['S1_land', 'S1_sea', 'S4', 'S5', 'S6', 'S2', 'S3', 'S7', 'S9', 'thunder'] as SourceId[]) {
+    for (const id of [
+      'S1_land',
+      'S1_sea',
+      'S4',
+      'S5',
+      'S6',
+      'S2',
+      'S3',
+      'S7',
+      'S9',
+      'thunder',
+    ] as SourceId[]) {
       expect(ids).toContain(id);
     }
     for (const b of beds) {
@@ -142,31 +181,67 @@ describe('selectBeds', () => {
     expect(dry).not.toContain('S1_sea');
     expect(dry).not.toContain('S4');
     expect(dry).not.toContain('S5');
-    const jup = makeAir({ T0: 130, P0: 1e4, mu: 2.3, gas: true, U: 150, presetId: 'jup', regime: 'Ammonia clouds' });
-    const r = selectBeds(jup, makePlace(50, () => ({}), { wind: makeWind({ U10: 150, Uz: 150, parts: [{ kind: 'jet', U: 150 }] }) }));
+    const jup = makeAir({
+      T0: 130,
+      P0: 1e4,
+      mu: 2.3,
+      gas: true,
+      U: 150,
+      presetId: 'jup',
+      regime: 'Ammonia clouds',
+    });
+    const r = selectBeds(
+      jup,
+      makePlace(50, () => ({}), {
+        wind: makeWind({ U10: 150, Uz: 150, parts: [{ kind: 'jet', U: 150 }] }),
+      }),
+    );
     expect([...new Set(r.beds.map((b) => b.id))]).toEqual(['S12', 'thunder']);
     expect(r.refusals.filter((x) => x.source !== 'lightning')).toEqual([]);
   });
 
   it('a refused world bakes nothing and passes its refusal through', () => {
-    const air = { ...earthAir(), airOK: false, refusals: [{ source: 'all' as const, reason: 'No air here, so there is no sound.' }] };
+    const air = {
+      ...earthAir(),
+      airOK: false,
+      refusals: [{ source: 'all' as const, reason: 'No air here, so there is no sound.' }],
+    };
     expect(selectBeds(air, earthPlace())).toEqual({ beds: [], refusals: air.refusals });
   });
 
   it('Methane world: thunder refused with the Titan reason', () => {
-    const r = selectBeds(titanAir(), makePlace(0.3, () => ({}), { ...makeFeatures(), z_km: 0.3 }));
-    expect(r.refusals).toContainEqual({ source: 'lightning', reason: 'No lightning has ever been detected on Titan, so there is no thunder here.' });
+    const r = selectBeds(
+      titanAir(),
+      makePlace(0.3, () => ({}), { ...makeFeatures(), z_km: 0.3 }),
+    );
+    expect(r.refusals).toContainEqual({
+      source: 'lightning',
+      reason: 'No lightning has ever been detected on Titan, so there is no thunder here.',
+    });
   });
 
   it('R6: a real-Mars card at 0.006 bar gets wind beds, about 20 dB quieter than Earth for ground sources', () => {
     const e = makeFakeEngine({
-      model: { ...EARTH_MODEL, Ts: 210, H: 11100, gv: 3.71, U: 70, airless: true, state: 'frozen', canLiquid: false, zc: null },
+      model: {
+        ...EARTH_MODEL,
+        Ts: 210,
+        H: 11100,
+        gv: 3.71,
+        U: 70,
+        airless: true,
+        state: 'frozen',
+        canLiquid: false,
+        zc: null,
+      },
       state: { Ps: 0.006, fluid: 'co2' },
       climate: { stats: { ocean: 0, max: 260 } },
       hydro: { n: 0, lava: false },
     });
     const air = buildAirModel(makeWorld({ id: 'mars', Ps: 0.006, mu: 43.3, fluid: 'co2' }), e);
-    const { beds, refusals } = selectBeds(air, makePlace(0.3, () => ({}), { wind: makeWind({ U10: 8, Uz: 8 }) }));
+    const { beds, refusals } = selectBeds(
+      air,
+      makePlace(0.3, () => ({}), { wind: makeWind({ U10: 8, Uz: 8 }) }),
+    );
     expect(beds.map((b) => b.id)).toContain('S1_land');
     expect(refusals.some((r) => r.source === 'all')).toBe(false);
     for (const id of ['S4', 'S5', 'S6', 'S7']) expect(beds.map((b) => b.id)).not.toContain(id);
@@ -176,22 +251,41 @@ describe('selectBeds', () => {
 
   it('R6: the lava preset (0.005 bar rock vapour) gets wind, lava and vent beds with the assumed-atmosphere label', () => {
     const e = makeFakeEngine({
-      model: { ...EARTH_MODEL, Ts: 1800, H: 30000, gv: 23, U: 300, airless: true, state: 'vapour', canLiquid: false, zc: null },
+      model: {
+        ...EARTH_MODEL,
+        Ts: 1800,
+        H: 30000,
+        gv: 23,
+        U: 300,
+        airless: true,
+        state: 'vapour',
+        canLiquid: false,
+        zc: null,
+      },
       state: { Ps: 0.005, locked: true },
       climate: { stats: { ocean: 0, max: 2500 } },
       hydro: { n: 4, lava: true },
     });
-    const air = buildAirModel(makeWorld({ id: 'lava', Ps: 0.005, mu: 44, locked: true, sea: 0 }), e);
+    const air = buildAirModel(
+      makeWorld({ id: 'lava', Ps: 0.005, mu: 44, locked: true, sea: 0 }),
+      e,
+    );
     expect(air.lavaWorld).toBe(true);
     expect(air.inputs.find((i) => i.label === 'Atmosphere')?.tag).toBe('inferred_from_analog');
-    const ids = selectBeds(air, makePlace(0.3, () => ({ cls: 'lava' }), { wind: makeWind({ U10: 8, Uz: 8 }) })).beds.map((b) => `${b.id}|${b.variant}`);
+    const ids = selectBeds(
+      air,
+      makePlace(0.3, () => ({ cls: 'lava' }), { wind: makeWind({ U10: 8, Uz: 8 }) }),
+    ).beds.map((b) => `${b.id}|${b.variant}`);
     expect(ids).toContain('S1_land|0');
     expect(ids).toContain('S8|0');
     expect(ids).toContain('S8|1');
   });
 
   it('R6: P0 = 0.5 Pa refuses everything', () => {
-    const e = makeFakeEngine({ model: { ...EARTH_MODEL, Ts: 210, airless: true, state: 'frozen' }, state: { Ps: 5e-6 } });
+    const e = makeFakeEngine({
+      model: { ...EARTH_MODEL, Ts: 210, airless: true, state: 'frozen' },
+      state: { Ps: 5e-6 },
+    });
     const air = buildAirModel(makeWorld({ Ps: 5e-6 }), e);
     const r = selectBeds(air, makePlace(0.3));
     expect(r.beds).toEqual([]);

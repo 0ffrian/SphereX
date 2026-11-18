@@ -16,7 +16,8 @@ import { useAppStore, type HonestyState } from '@/state/store';
 import type { AreaKnownPosition as KnownPosition } from '@/contract';
 
 /** Estimated layers show in "+ Estimated" and "+ Artistic", not in "Measured only" (D-21, R5.3). */
-export const knownPositionsVisible = (honesty: HonestyState | null): boolean => honesty !== 'measured';
+export const knownPositionsVisible = (honesty: HonestyState | null): boolean =>
+  honesty !== 'measured';
 
 export const MEASURED_ONLY_NOTE = 'Tracks and known paths are Estimated';
 
@@ -42,14 +43,18 @@ export function KnownPositionsLayer({ view }: { view: View | null }) {
     s.flow === 'known' &&
     // On the Eros card: only once its frames are in and it has no sky image of its own (while
     // loading, the track window is about to draw; the diamonds would show, then vanish).
-    (s.screen === 'list' || s.screen === 'track' || (s.screen === 'eros' && s.eros !== null && !(s.eros.wide.w > 0))) &&
+    (s.screen === 'list' ||
+      s.screen === 'track' ||
+      (s.screen === 'eros' && s.eros !== null && !(s.eros.wide.w > 0))) &&
     !s.refusal
       ? s.known
       : null,
   );
   const focus = useAreaStore((s) => s.focus);
   const screen = useAreaStore((s) => s.screen);
-  const withPositions = (known?.objects ?? []).filter((o) => (o.positions?.length ?? 0) > 0 || (o.detection?.points?.length ?? 0) > 0);
+  const withPositions = (known?.objects ?? []).filter(
+    (o) => (o.positions?.length ?? 0) > 0 || (o.detection?.points?.length ?? 0) > 0,
+  );
   useEffect(() => (view ? view.onRender(tick) : undefined), [view]);
   if (!known || withPositions.length === 0) return null;
   const predicted = knownPositionsVisible(honesty);
@@ -57,14 +62,18 @@ export function KnownPositionsLayer({ view }: { view: View | null }) {
   // On the Track and Eros cards only the focused object is labelled.
   const one = screen === 'list' ? null : focus;
   const drawn = withPositions.map((o) => {
-    const pts = predicted ? distinctTimes(o.positions ?? []).map((p) => skyToPixels(p.ra, p.dec)) : [];
+    const pts = predicted
+      ? distinctTimes(o.positions ?? []).map((p) => skyToPixels(p.ra, p.dec))
+      : [];
     // A position behind the camera breaks the line: no segment is drawn across the gap.
     const segs: { x: number; y: number }[][] = [[]];
     for (const p of pts) {
       if (p) segs[segs.length - 1]!.push(p);
       else if (segs[segs.length - 1]!.length) segs.push([]);
     }
-    const meas = (o.detection?.points ?? []).map((p) => skyToPixels(p.ra, p.dec)).filter((p) => p !== null);
+    const meas = (o.detection?.points ?? [])
+      .map((p) => skyToPixels(p.ra, p.dec))
+      .filter((p) => p !== null);
     return { o, segs, line: segs.flat(), meas };
   });
   const key = (o: (typeof withPositions)[number]) => o.designation ?? o.id;
@@ -74,18 +83,37 @@ export function KnownPositionsLayer({ view }: { view: View | null }) {
     const anchor = d.meas[d.meas.length - 1] ?? d.line[d.line.length - 1];
     if (!labelled || !anchor) continue;
     const text = [d.o.id, d.o.name].filter(Boolean).join(' ');
-    wanted.push({ id: key(d.o), x: anchor.x, y: anchor.y, w: text.length * CHAR_PX, h: LABEL_FONT_PX + 3, rank: d.o === focus ? 0 : 1 });
+    wanted.push({
+      id: key(d.o),
+      x: anchor.x,
+      y: anchor.y,
+      w: text.length * CHAR_PX,
+      h: LABEL_FONT_PX + 3,
+      rank: d.o === focus ? 0 : 1,
+    });
   }
-  const labels = new Map(placeLabels(wanted, { x: 0, y: 0, w: size.width, h: size.height }).map((p) => [p.id, p]));
+  const labels = new Map(
+    placeLabels(wanted, { x: 0, y: 0, w: size.width, h: size.height }).map((p) => [p.id, p]),
+  );
   return (
     <>
-      <svg className="sx-area-pos" aria-hidden="true" data-testid="known-positions" data-tag="model_dependent">
+      <svg
+        className="sx-area-pos"
+        aria-hidden="true"
+        data-testid="known-positions"
+        data-tag="model_dependent"
+      >
         {drawn.map(({ o, segs, line, meas }) => {
           const on = !focus || focus === o;
           const det = !!o.detection;
           const lbl = labels.get(key(o));
           return (
-            <g key={key(o)} data-object={key(o)} data-detected={det || undefined} opacity={on ? 1 : 0.45}>
+            <g
+              key={key(o)}
+              data-object={key(o)}
+              data-detected={det || undefined}
+              opacity={on ? 1 : 0.45}
+            >
               {segs
                 .filter((sg) => sg.length > 1)
                 .map((sg, i) => (
@@ -104,10 +132,22 @@ export function KnownPositionsLayer({ view }: { view: View | null }) {
                 />
               ))}
               {meas.map((p, i) => (
-                <circle key={`m${i}`} cx={p.x} cy={p.y} r={3.5} className="sx-area-pos-meas" data-testid="known-measured" />
+                <circle
+                  key={`m${i}`}
+                  cx={p.x}
+                  cy={p.y}
+                  r={3.5}
+                  className="sx-area-pos-meas"
+                  data-testid="known-measured"
+                />
               ))}
               {lbl && (
-                <text x={lbl.x} y={lbl.y} className={det ? 'sx-area-pos-lbl sx-det' : 'sx-area-pos-lbl'} data-testid="known-label">
+                <text
+                  x={lbl.x}
+                  y={lbl.y}
+                  className={det ? 'sx-area-pos-lbl sx-det' : 'sx-area-pos-lbl'}
+                  data-testid="known-label"
+                >
                   {[o.id, o.name].filter(Boolean).join(' ')}
                 </text>
               )}
@@ -124,7 +164,11 @@ export function KnownPositionsLayer({ view }: { view: View | null }) {
           />
         </span>
       ) : (
-        <span className="sx-area-track-tag sx-area-pos-tag" role="status" data-testid="known-positions-note">
+        <span
+          className="sx-area-track-tag sx-area-pos-tag"
+          role="status"
+          data-testid="known-positions-note"
+        >
           <span className="sx-tagbadge">{MEASURED_ONLY_NOTE}</span>
         </span>
       )}

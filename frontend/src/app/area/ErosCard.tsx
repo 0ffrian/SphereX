@@ -101,7 +101,15 @@ function Cutout({ hop }: { hop: ErosHop }) {
     };
     draw();
   }, [hop, ov, measured]);
-  return <canvas ref={ref} className="sx-kn-canvas" role="img" aria-label="SPHEREx cutout" data-testid="eros-cutout" />;
+  return (
+    <canvas
+      ref={ref}
+      className="sx-kn-canvas"
+      role="img"
+      aria-label="SPHEREx cutout"
+      data-testid="eros-cutout"
+    />
+  );
 }
 
 /** Brightness against wavelength, one dot per exposure taken so far. */
@@ -125,7 +133,13 @@ function Chart({ eros, cur, name }: { eros: ErosDemo; cur: ErosHop; name: string
     .map((h) => `${h.wl_um.toFixed(2)} µm ${h.flux.toFixed(0)}`)
     .join('; ')}`;
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={label} className="sx-kn-chart" data-testid="eros-chart">
+    <svg
+      viewBox={`0 0 ${W} ${H}`}
+      role="img"
+      aria-label={label}
+      className="sx-kn-chart"
+      data-testid="eros-chart"
+    >
       {[1, 2, 3, 4, 5].map((l) => (
         <g key={l}>
           <line x1={X(l)} x2={X(l)} y1={T} y2={H - B} className="sx-kn-grid" />
@@ -145,9 +159,23 @@ function Chart({ eros, cur, name }: { eros: ErosDemo; cur: ErosHop; name: string
         return (
           <g key={h.frame_id}>
             {h.flux_err ? (
-              <line x1={x} x2={x} y1={Y(h.flux - h.flux_err)} y2={Y(h.flux + h.flux_err)} stroke={c} strokeOpacity={0.35} />
+              <line
+                x1={x}
+                x2={x}
+                y1={Y(h.flux - h.flux_err)}
+                y2={Y(h.flux + h.flux_err)}
+                stroke={c}
+                strokeOpacity={0.35}
+              />
             ) : null}
-            <circle cx={x} cy={y} r={3.2} fill={hollow ? 'none' : c} stroke={hollow ? c : undefined} strokeWidth={hollow ? 1.4 : undefined} />
+            <circle
+              cx={x}
+              cy={y}
+              r={3.2}
+              fill={hollow ? 'none' : c}
+              stroke={hollow ? c : undefined}
+              strokeWidth={hollow ? 1.4 : undefined}
+            />
             {h === cur && <circle cx={x} cy={y} r={7} fill="none" className="sx-kn-cur" />}
           </g>
         );
@@ -198,12 +226,19 @@ function CheckGroup({ disabled }: { disabled?: boolean }) {
   const measured = useMeasuredOnly();
   const off = (k: keyof ErosOverlays) => !!disabled || (measured && ESTIMATED_OVERLAYS.has(k));
   return (
-    <div className="sx-kn-opts" role="group" aria-label="Show on the image" data-off={disabled ? '' : undefined}>
+    <div
+      className="sx-kn-opts"
+      role="group"
+      aria-label="Show on the image"
+      data-off={disabled ? '' : undefined}
+    >
       {OVERLAYS.map((o) => (
         <label
           key={o.key}
           className="sx-kn-opt"
-          title={!disabled && off(o.key) ? `${MEASURED_ONLY_NOTE}: hidden in Measured only` : undefined}
+          title={
+            !disabled && off(o.key) ? `${MEASURED_ONLY_NOTE}: hidden in Measured only` : undefined
+          }
         >
           <input
             type="checkbox"
@@ -309,12 +344,22 @@ export function ErosCard({ title: given, back }: { title?: string; back?: AreaBa
             <dl className="fb-dl">
               <dt>Wavelength</dt>
               <dd data-testid="eros-wl">
-                {hop && <i className="sx-kn-dot" style={{ background: wavelengthColor(hop.wl_um) }} aria-hidden="true" />}
-                {hop ? `${hop.wl_um.toFixed(2)} µm · ${DETECTORS[detectorIndex(hop)]?.name ?? ''}` : '-'}
+                {hop && (
+                  <i
+                    className="sx-kn-dot"
+                    style={{ background: wavelengthColor(hop.wl_um) }}
+                    aria-hidden="true"
+                  />
+                )}
+                {hop
+                  ? `${hop.wl_um.toFixed(2)} µm · ${DETECTORS[detectorIndex(hop)]?.name ?? ''}`
+                  : '-'}
               </dd>
               <dt>Taken</dt>
               <dd data-testid="eros-taken">
-                {hop ? `${mjdDay(hop.mjd_avg)} ${mjdHM(hop.mjd_avg)} UTC · exposure ${hop.exposure} of 4` : '-'}
+                {hop
+                  ? `${mjdDay(hop.mjd_avg)} ${mjdHM(hop.mjd_avg)} UTC · exposure ${hop.exposure} of 4`
+                  : '-'}
               </dd>
             </dl>
             {real && (
@@ -344,9 +389,18 @@ export function ErosCard({ title: given, back }: { title?: string; back?: AreaBa
             )}
             {known && (
               <div className="sx-kn-leg" aria-hidden="true">
-                <span><i />path so far</span>
-                <span><i className="d" />path to come</span>
-                <span><i className="dot" />every 6 h</span>
+                <span>
+                  <i />
+                  path so far
+                </span>
+                <span>
+                  <i className="d" />
+                  path to come
+                </span>
+                <span>
+                  <i className="dot" />
+                  every 6 h
+                </span>
               </div>
             )}
             <CheckGroup />
