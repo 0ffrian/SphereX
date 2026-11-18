@@ -1,6 +1,6 @@
 # Plan: code owners, required CI and `main` protection
 
-Status (18 Nov 2026): step 1 done (alt accounts removed; fork-PR approval setting still to check). Step 2 built on `chore/ci-gate`; steps 3–4 built on `chore/codeowners`. Neither pushed. Steps 5–7 not started.
+Status (18 Nov 2026): step 1 done (alt accounts removed; fork-PR CI approval set to `all_external_contributors`). Step 2 built on `chore/ci-gate`; steps 3–4 built on `chore/codeowners`. Neither pushed. Steps 5–7 not started.
 Delete this file in the last PR (step 7); the lasting rules go into `CONTRIBUTING.md`.
 
 ## 0. Starting state (checked 18 Nov 2026)
