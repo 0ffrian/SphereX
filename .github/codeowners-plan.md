@@ -1,6 +1,6 @@
 # Plan: code owners, required CI and `main` protection
 
-Status (18 Nov 2026): step 1 done (alt accounts removed; fork-PR CI approval set to `all_external_contributors`). Step 2 built on `chore/ci-gate`; steps 3–4 built on `chore/codeowners`. Neither pushed. Steps 5–7 not started.
+Status (18 Nov 2026): step 1 done (alt accounts removed; fork-PR CI approval set to `all_external_contributors`). Step 2 built on `chore/ci-gate`; steps 3–4 built on `chore/codeowners`. Neither pushed. **Step 5 done early** (ruleset `main`, id 27523962, active, no bypass, `ci-gate` pinned to app 15368, verified from a real check run): the `chore/ci-gate` PR reports `ci-gate` from its own run, so it can merge; other PRs report `ci-gate` only once `ci.yml` is on `main` and they are updated. Steps 6–7 not started.
 Delete this file in the last PR (step 7); the lasting rules go into `CONTRIBUTING.md`.
 
 ## 0. Starting state (checked 18 Nov 2026)
