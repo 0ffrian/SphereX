@@ -11,13 +11,17 @@ on:
   merge_group:
   push:
     branches: [main]
+  # Manual run of every check on any branch (Actions tab).
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  # Only a newer push to the same PR cancels a run; runs on main finish, so main's history
+  # shows each commit's real result.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   changes:
@@ -45,8 +49,8 @@ jobs:
           echo "Changed files:"; echo "$files"
           has() { if grep -qE "$1" <<< "$files"; then echo true; else echo false; fi; }
           {
-            echo "backend=$(has '^(backend/|shared/|\.github/workflows/)')"
-            echo "frontend=$(has '^(frontend/|shared/|\.github/workflows/)')"
+            echo "backend=$(has '^(backend/|shared/|\.github/workflows/|package\.json$)')"
+            echo "frontend=$(has '^(frontend/|shared/|\.github/workflows/|package\.json$)')"
             echo "codeowners=$(has '^\.github/CODEOWNERS$')"
           } >> "$GITHUB_OUTPUT"
           cat "$GITHUB_OUTPUT"
@@ -72,7 +76,8 @@ jobs:
           # The PR merge commit lives in this repo, fork PRs included.
           URL: repos/${{ github.repository }}/codeowners/errors?ref=${{ github.sha }}
         run: |
-          out=$(gh api "$URL")
+          # 404 means the PR deletes .github/CODEOWNERS; fail with a clear message.
+          out=$(gh api "$URL") || { echo "::error::Could not read CODEOWNERS errors (was the file deleted?)"; exit 1; }
           echo "$out"
           [ "$(jq '.errors | length' <<< "$out")" = 0 ]
 
