@@ -500,4 +500,5 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | Q-481 | A scan whose every square failed ends `failed`; `squares_failed` in the totals | Proposed (14 Nov 2026, issue #169) | [moving-objects](moving-objects.md) |
 | Q-482 | Cutout second pass with a failure budget; spectra refilled in the worker; a stored area whose known-object check failed is rechecked (cooldown) | Proposed (14 Nov 2026, issue #169) | [moving-objects](moving-objects.md) |
 | Q-483 | Discovery journey: scanning rings (live and replay), the dock becomes the replay player with a plain ←, a ← on every area card, possibles hidden until asked | Proposed (14 Nov 2026, issue #173) | [moving-objects](moving-objects.md) |
+| Q-484 | GitHub code owners (lead + backups per area, `frontend/` open) and the `main` ruleset with required `ci-gate`; relates to D-17 | Decided (Atish, 18 Nov 2026) | [scope-process](scope-process.md) |
 | B-01 to B-04 | Post-event backlog | Backlog | [scope-process](scope-process.md#post-event-backlog) |

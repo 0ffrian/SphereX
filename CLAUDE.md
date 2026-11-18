@@ -34,6 +34,7 @@ If two docs disagree and `docs/decisions/` is silent, follow the precedence (dec
 - **All development happens on a branch** (`feat/…`, `fix/…`, `docs/…`) and reaches `main` through a pull request. Review it with `/sx-pr-review`.
 - **Never commit or push directly to `main`.** The only exceptions were the initial repo and frontend setup (4 Nov 2026), which the user approved explicitly.
 - Agents may create branches and commit locally. Pushing and opening PRs happen when the user asks.
+- **`main` is protected by a ruleset** (Q-484): a merge needs the `ci-gate` check, an approval from someone other than the author and last pusher, and a code-owner approval for owned paths. Owners and open paths: [CONTRIBUTING.md](CONTRIBUTING.md) and `.github/CODEOWNERS`. Agents never disable the ruleset or try to get around it; if a PR is blocked, report it.
 
 ## Agents and skills
 
@@ -81,7 +82,7 @@ frontend/   Vite + TypeScript + React app, viewer, sound     (Moon; Atish for so
 shared/     JSON schemas shared by backend and frontend      (Moon)
 ```
 
-Owners per area: decisions D-17.
+Owners per area: decisions D-17 (who leads the work); merge approvals: Q-484 and [CONTRIBUTING.md](CONTRIBUTING.md).
 
 **Moving objects.** Track (one known object's path, frames, zoom and spectrum; the MVP is 433 Eros, Q-131, Q-137) and Area search (draw a square, then Known objects or Discovery, Q-146) are specified in A16–A20 in [docs/architecture/moving-objects/](docs/architecture/README.md#fragments); decisions in [moving-objects.md](docs/decisions/moving-objects.md) (agreed), [moving-frames.md](docs/decisions/moving-frames.md) (the path cone search, its refusal codes, MOST) and [moving-objects-review.md](docs/decisions/moving-objects-review.md) (proposed fixes, Moon's review list Q-202).
 - Q-146 is the plan. Q-203 adds four **gated extras** after the core demo works (12 Nov): completeness with a planted test mover, the shuffled-time control, the spectrum smoothness score and the rate-grid linker (A16.7, A16.8, tickets D4 to D7); an extra not finished and tested by 13 Nov is cut and hidden. Phase 2 (after the event, do not build now): ADES, live areas anywhere, a larger completeness grid. Planted data never enters `known`, `tracks`, the step counts or the real export and always carries the Injected badge. No single catch-rate number; an unmatched track is never "an asteroid", "new" or "a discovery" (A16.5).
