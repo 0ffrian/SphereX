@@ -217,6 +217,12 @@ for (const tint of [false, true]) {
     page,
   }) => {
     await openBarnard(page, tint);
+    // Test harness only: headless Chromium composites in software, where every backdrop blur of the
+    // matte glass (Q-418, 7ae1665e: 15 rules, none on 9 Nov) over a picture that changes 8 times a
+    // second costs a whole core. On 2 vCPUs with 2 workers the sampler then saw 23 to 94 animation
+    // frames in 6 s (238 to 267 without the blur; 300 before the glass), and a sampler that misses
+    // frames cannot prove that none was skipped. What is drawn does not change, only the blur.
+    await page.addStyleTag({ content: '* { backdrop-filter: none !important; }' });
     await setFps(page, 8);
     const play = page.getByTestId('play-pause');
     await play.click();
