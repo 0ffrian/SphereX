@@ -23,7 +23,7 @@ import {
   GOLDEN_MIN_SSIM,
   SPACE_BACKGROUND_RGB,
 } from './golden';
-import { openViewer, viewerCanvas } from './viewer';
+import { openViewer, overlayMasks, viewerCanvas } from './viewer';
 import { scoreFrames, type Rgb } from './ssim';
 
 const EXCLUDED = new Set(['candidate']);
@@ -129,6 +129,7 @@ for (const kind of kinds) {
               setQualityTier?(t: string): void;
               freezeClock?(s: number): Promise<void>;
               whenSettled?(): Promise<void>;
+              whenLoaded?(timeoutMs?: number): Promise<void>;
               body: { drawn: string[] } | null;
             };
             __sxShow(c: unknown, p: unknown, h: string): { drawn: { id: string; tag: string }[] };
@@ -140,6 +141,11 @@ for (const kind of kinds) {
           // Generated surfaces and point clouds arrive from the worker a little later.
           for (let i = 0; i < 200 && honesty === 'artistic' && !v.body?.drawn.length; i++)
             await new Promise((r) => setTimeout(r, 25));
+          // Textures, meshes, the generated surface and the shader compile (ViewerApp.whenLoaded): the
+          // surface comes from the field worker some time after the build, later on a loaded
+          // machine, and a frame frozen before it arrived is a different picture (seen at + Estimated
+          // on planet_trappist1f and planet_kepler186f under parallel load).
+          await v.whenLoaded?.(30_000);
           await v.freezeClock?.(0);
           await v.whenSettled?.();
           return {
@@ -167,7 +173,7 @@ for (const kind of kinds) {
       // A clip screenshot of the page, not canvas.screenshot(): a heavy body (the shape-model
       // asteroid) keeps the main thread so busy that Playwright's "element is stable" wait never ends.
       const box = (await canvas.boundingBox())!;
-      const shoot = () => page.screenshot({ clip: box, mask: [page.getByTestId('viewer-label')] });
+      const shoot = () => page.screenshot({ clip: box, mask: overlayMasks(page) });
       let shot = await shoot();
       if (!(hooks.freeze && hooks.settled)) {
         for (let i = 0; i < 20; i++) {
