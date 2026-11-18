@@ -69,7 +69,7 @@ Delete this file in the last PR (step 7); the lasting rules go into `CONTRIBUTIN
 | ID | Question | Recommendation |
 |---|---|---|
 | D-A | Which paths are **open** (no code owner)? | **Decided (Atish, 18 Nov 2026):** section 1a. Still open: (1) is "Moon's UI design" exactly `components/`, `index.css`, `components.json` and `design-language.md`? (2) keep `frontend/package*.json` owned? |
-| D-B | Alt accounts `atish-syntarengine`, `munazir-syntarengine`? | Lower both to `read` (or remove). Otherwise they can self-approve on open paths and bypass/disable rules. |
+| D-B | Alt accounts `atish-syntarengine`, `munazir-syntarengine`? | **Done (Atish, 18 Nov 2026):** both removed from the repo. Collaborators now: `JoottunAtish` admin, `MintHerbs` admin, `KevinYerkiah` maintain. P6 and test T2 no longer apply. |
 | D-C | Who are the **non-code-owner reviewers**, if any exist yet? | Add them with the `write` role when named (P7). None exist today besides the alt accounts. |
 | D-D | Bypass list on the ruleset? | **Empty** (no bypass, admins included). Emergencies follow P13. |
 | D-E | Require the branch to be up to date before merging? | **No**. It causes rebase churn; `ci-gate` already runs on the merge commit. |
