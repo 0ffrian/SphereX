@@ -29,9 +29,17 @@ export const RH_ASSUMED = 0.5;
 export const ISO_H_MAX = 0.5;
 /** P: ISO 9613-1:1993 constants (reference pressure, reference T, triple point, coefficients). */
 export const ISO = {
-  pr: 101325, T0: 293.15, T01: 273.16, cl: 1.84e-11,
-  aO: 0.01275, bO: 2239.1, aN: 0.1068, bN: 3352,
-  psA: -6.8346, psB: 1.261, psC: 4.6151,
+  pr: 101325,
+  T0: 293.15,
+  T01: 273.16,
+  cl: 1.84e-11,
+  aO: 0.01275,
+  bO: 2239.1,
+  aN: 0.1068,
+  bN: 3352,
+  psA: -6.8346,
+  psB: 1.261,
+  psC: 4.6151,
 } as const;
 /** Nepers to decibels. */
 export const DB_PER_NP = 8.686;
@@ -43,17 +51,34 @@ export const DB_PER_NP = 8.686;
  * 10992306, and Petculescu 2016, JASA 140:1439].
  */
 export const CO2_ABS = {
-  aCl: 1.7e-9, fr: 240, pRef: 600, tRef: 210, alphaInf: 0.18,
-  venusA100: 4.645e-4, venusExp: 1.19, venusP: 9.2e6,
+  aCl: 1.7e-9,
+  fr: 240,
+  pRef: 600,
+  tRef: 210,
+  alphaInf: 0.18,
+  venusA100: 4.645e-4,
+  venusExp: 1.19,
+  venusP: 9.2e6,
 } as const;
 /** P/V: H2/He transport properties (§4.3) [verify NIST]. */
-export const H2_TRANSPORT = { mu0: 6e-6, muExp: 0.7, k0: 0.12, kExp: 0.8, cp: 1.43e4, tRef: 150 } as const;
+export const H2_TRANSPORT = {
+  mu0: 6e-6,
+  muExp: 0.7,
+  k0: 0.12,
+  kExp: 0.8,
+  cp: 1.43e4,
+  tRef: 150,
+} as const;
 /**
  * P/V: Sutherland viscosity law mu = mu0 (T/T0)^1.5 (T0 + S)/(T + S), White 2006 "Viscous Fluid Flow" Table 1-2
  * (N2: 1.663e-5 Pa s, S 107 K; CO2: 1.370e-5 Pa s, S 222 K). Only used for the S2/S3 Reynolds gate. The Mars
  * Re(4 mm) margin against 47 is ~4 %, so these decide R4 [verify].
  */
-export const SUTHERLAND = { T0: 273.15, N2: { mu0: 1.663e-5, S: 107 }, CO2: { mu0: 1.37e-5, S: 222 } } as const;
+export const SUTHERLAND = {
+  T0: 273.15,
+  N2: { mu0: 1.663e-5, S: 107 },
+  CO2: { mu0: 1.37e-5, S: 222 },
+} as const;
 
 /**
  * Earth reference air (§1 "Earth reference"). ASSUMPTION: fixed ISA-like constants (288 K, 1 atm, the engine's earth
@@ -109,7 +134,15 @@ export const ABS_DEAD_DB = 60;
  * P: the engine's hurricane maximum (core.js worldUi): sqrt(eff (Tmax - To)/To Lv qst Ck), shown only for water with
  * EB.stats.max > 299.65 K and cyclones present.
  */
-export const HURRICANE = { Tmin: 299.65, To: 200, eff: 0.9, Lv: 2.5e6, ck: 0.2, PsMin: 0.1, VmaxCap: 100 } as const;
+export const HURRICANE = {
+  Tmin: 299.65,
+  To: 200,
+  eff: 0.9,
+  Lv: 2.5e6,
+  ck: 0.2,
+  PsMin: 0.1,
+  VmaxCap: 100,
+} as const;
 // R9: PsMin (bar) and VmaxCap (m/s, model_dependent: Emanuel potential intensity rarely exceeds ~90 m/s) are rulings.
 
 // ---------- sources (§7) ----------
@@ -299,7 +332,15 @@ export const SILENT_DB = -120;
 export const REF_LISTENER_M = 2;
 /** C: Earth reference levels, dB SPL (§11.3); surf follows Bolin & Abom. */
 export const L_REF = {
-  wind: 55, hissRel: -10, sea: 62, rain: 58, river: 60, lava: 65, sand: 50, gas: 60, thunder: 100,
+  wind: 55,
+  hissRel: -10,
+  sea: 62,
+  rain: 58,
+  river: 60,
+  lava: 65,
+  sand: 50,
+  gas: 60,
+  thunder: 100,
 } as const;
 /** C: live-caption minimum interval (consumed by T6). */
 export const CAPTION_MIN_S = 3;

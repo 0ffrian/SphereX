@@ -146,7 +146,7 @@ const STAR_COLOUR_OPTIONS: { value: StarColourView; label: string }[] = [
 const STAR_SCALE_OPTIONS: { value: StarScale; label: string }[] = [
   { value: 'enlarged', label: 'Larger detail' },
   { value: 'true', label: 'True scale' },
-];  // no Close-up option: the left pane is the close-up now
+]; // no Close-up option: the left pane is the close-up now
 const STAR_SCALE_LABEL: Record<StarScale, string> = {
   enlarged: 'Whole star, larger detail',
   true: 'Whole star, true scale',
@@ -572,11 +572,23 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
   // reads the engineStar / engineWorld published below and the rock view RockStage publishes.
   const enginesShown = honesty === 'artistic' && enginesOn;
   const engineStar =
-    pane && enginesShown && plan?.threeD && card && !blocked && engineStarCard && starFailedId !== engineKey(card.id, engineStarCard.preset.id)
+    pane &&
+    enginesShown &&
+    plan?.threeD &&
+    card &&
+    !blocked &&
+    engineStarCard &&
+    starFailedId !== engineKey(card.id, engineStarCard.preset.id)
       ? engineStarCard
       : null;
   const engineWorld =
-    pane && enginesShown && plan?.threeD && card && !blocked && engineWorldCard && worldFailedId !== engineKey(card.id, engineWorldCard.preset.id)
+    pane &&
+    enginesShown &&
+    plan?.threeD &&
+    card &&
+    !blocked &&
+    engineWorldCard &&
+    worldFailedId !== engineKey(card.id, engineWorldCard.preset.id)
       ? engineWorldCard
       : null;
   // Issue #93: the build steps wait for a world engine to compile and form the planet (`hold`). The key of the
@@ -628,7 +640,15 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
   useEffect(() => {
     if (!pane || buildMinimised) return;
     const onKey = (e: globalThis.KeyboardEvent) => {
-      if (e.key.toLowerCase() !== 'p' || e.altKey || e.ctrlKey || e.metaKey || e.defaultPrevented || isEditableTarget(e.target)) return;
+      if (
+        e.key.toLowerCase() !== 'p' ||
+        e.altKey ||
+        e.ctrlKey ||
+        e.metaKey ||
+        e.defaultPrevented ||
+        isEditableTarget(e.target)
+      )
+        return;
       e.preventDefault();
       toggleMotion();
     };
@@ -706,14 +726,25 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
   const tintTag = plan?.tint.tag ?? null;
   const tintKey = plan?.tint.rgb.join(',') ?? '';
   // eslint-disable-next-line react-hooks/exhaustive-deps -- tintKey stands for the rgb values
-  const rockTint = useMemo<[number, number, number] | null>(() => (tintTag && plan ? [plan.tint.rgb[0]!, plan.tint.rgb[1]!, plan.tint.rgb[2]!] : null), [tintTag, tintKey]);
+  const rockTint = useMemo<[number, number, number] | null>(
+    () => (tintTag && plan ? [plan.tint.rgb[0]!, plan.tint.rgb[1]!, plan.tint.rgb[2]!] : null),
+    [tintTag, tintKey],
+  );
   // Hidden by the user, or held back until the build has shifted to the right half (stream U).
   const closeHidden = useCloseUpStore((s) => s.hidden || s.held);
   const closeInfo = useCloseUpStore((s) => s.info);
   const shaderKey = plan?.shader?.key ?? '';
   const pubFixture = fixture || (card?.id.startsWith('fixture:') ?? false);
   useEffect(() => {
-    useCloseUpStore.getState().publish({ viewer, plan, type: params?.type ?? null, fixture: pubFixture, reducedMotion, engineStar, engineWorld });
+    useCloseUpStore.getState().publish({
+      viewer,
+      plan,
+      type: params?.type ?? null,
+      fixture: pubFixture,
+      reducedMotion,
+      engineStar,
+      engineWorld,
+    });
   }, [viewer, plan, params?.type, reducedMotion, pubFixture, engineStar, engineWorld]);
   useEffect(() => () => useCloseUpStore.getState().reset(), []);
   useEffect(() => {
@@ -745,7 +776,19 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
     }
     viewer.openCloseUp(closeKind === 'body', closeKind === 'star', gate);
     return () => viewer.closeUpOff(true);
-  }, [viewer, pane, closeKind, closeHidden, blocked, plan?.threeD, objectKey, shaderKey, artisticShown, engineStar, engineWorld]);
+  }, [
+    viewer,
+    pane,
+    closeKind,
+    closeHidden,
+    blocked,
+    plan?.threeD,
+    objectKey,
+    shaderKey,
+    artisticShown,
+    engineStar,
+    engineWorld,
+  ]);
   // A gas giant that is still forming opens when it has settled.
   useEffect(() => {
     if (!viewer || !closeInfo?.refusal || !/forming/.test(closeInfo.refusal) || closeHidden) return;
@@ -768,12 +811,13 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
   const motionPaused = (reducedMotion && !playAnyway) || spinPaused || idlePaused;
 
   // In the build pane, an engine-drawn body shows its notes as "Assumed values" lines, not as a paragraph list.
-  const assumedLines = plan && engineOwns
-    ? [
-        ...plan.notes.filter((n) => !/no motion data/i.test(n)),
-        ...lapses.map((t) => timeLapseText(t)),
-      ]
-    : [];
+  const assumedLines =
+    plan && engineOwns
+      ? [
+          ...plan.notes.filter((n) => !/no motion data/i.test(n)),
+          ...lapses.map((t) => timeLapseText(t)),
+        ]
+      : [];
   const honestyGroup = plan ? (
     <ToggleGroup
       label="Show"
@@ -806,7 +850,13 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
         <section hidden={pop !== 'acc'} data-testid="build-pop-acc">
           {pop === 'acc' &&
             (params?.confidence ? (
-              <ConfidencePopover inline isShown={(t) => t === 'missing' || isTagShown(honesty, t)} params={params} name={displayName(plan?.name)} onClose={() => pane.onPop?.(null)} />
+              <ConfidencePopover
+                inline
+                isShown={(t) => t === 'missing' || isTagShown(honesty, t)}
+                params={params}
+                name={displayName(plan?.name)}
+                onClose={() => pane.onPop?.(null)}
+              />
             ) : (
               <>
                 <div className="sx-pop-h">
@@ -876,24 +926,33 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
             />
           )}
           {engineStar && (
-            <StarGlobeStage key={engineStar.preset.id} star={engineStar} onFail={() => useWorldStore.getState().failStar(engineKey(card?.id, engineStar.preset.id))} />
+            <StarGlobeStage
+              key={engineStar.preset.id}
+              star={engineStar}
+              onFail={() =>
+                useWorldStore.getState().failStar(engineKey(card?.id, engineStar.preset.id))
+              }
+            />
           )}
           {engineWorld && (
             <WorldGlobeStage
               key={engineWorld.preset.id}
               world={engineWorld}
-              onFail={() => useWorldStore.getState().fail(engineKey(card?.id, engineWorld.preset.id))}
+              onFail={() =>
+                useWorldStore.getState().fail(engineKey(card?.id, engineWorld.preset.id))
+              }
               onFormed={() => setFormedKey(engineKey(card?.id, engineWorld.preset.id))}
             />
           )}
           {!pane && params && plan?.threeD && (
-            <ConfidenceChip
-              params={params}
-              onOpen={() => setFormulaOpen(true)}
-            />
+            <ConfidenceChip params={params} onOpen={() => setFormulaOpen(true)} />
           )}
           {!pane && params && formulaOpen && (
-            <ConfidencePopover params={params} name={displayName(plan?.name)} onClose={() => setFormulaOpen(false)} />
+            <ConfidencePopover
+              params={params}
+              name={displayName(plan?.name)}
+              onClose={() => setFormulaOpen(false)}
+            />
           )}
           {pane && (
             <MouldOverlay
@@ -908,7 +967,13 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
                 tint: rockTint,
               }}
               reduced={reducedMotion}
-              caption={worldForming ? (params?.type === 'gas_giant' ? 'Forming the atmosphere' : 'Forming the planet\u2026') : 'Loading the 3D view'}
+              caption={
+                worldForming
+                  ? params?.type === 'gas_giant'
+                    ? 'Forming the atmosphere'
+                    : 'Forming the planet\u2026'
+                  : 'Loading the 3D view'
+              }
             />
           )}
           <p
@@ -919,7 +984,9 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
                 : 'pointer-events-none absolute left-3 top-3 max-w-[85%] rounded bg-neutral-900/80 px-2 py-1 text-xs text-neutral-300'
             }
           >
-            {plan ? `${displayName(plan.name)}${plan.threeD ? '' : ' (no 3D model)'}` : PLACEHOLDER_LABEL}
+            {plan
+              ? `${displayName(plan.name)}${plan.threeD ? '' : ' (no 3D model)'}`
+              : PLACEHOLDER_LABEL}
           </p>
           {plan && !plan.threeD && plan.message && (
             <p
@@ -957,434 +1024,448 @@ export function ViewerPanel({ pane }: { pane?: PaneOptions } = {}) {
       {/* Moon (11 Nov 2026): no "N hidden at this level" button on the render; the way back down is the Show row in Details. */}
       {pane?.caption?.(null)}
       {wrapPop(
-      <div
-        id={detailsId}
-        className={pane ? 'sx-bp-details' : 'contents'}
-        hidden={pane ? pane.pop !== 'details' : undefined}
-        data-testid={pane ? 'build-details-panel' : undefined}
-      >
-        {pane && (
-          <>
-            <div className="sx-pop-h">
-              <b>Details</b>
-              <span>{displayName(plan?.name)}</span>
-            </div>
-            {/* Q-450 (PR #107 review, Atish): Hear it left the header, so Details keeps the way into it
-                (the spectrum sweep, and the chord the sound PRs add there). */}
-            <button
-              type="button"
-              className="sx-bp-row-btn"
-              aria-controls={BUILD_POP_ID}
-              onClick={() => pane.onPop?.('hear')}
-              data-testid="build-open-hear"
-            >
-              <span>Hear it</span>
-              <span className="sx-bp-row-sub">The spectrum as sound, and the atmosphere</span>
-            </button>
-            {engineStar && <StarEngineDetails />}
-          </>
-        )}
-        {params && (!pane || params.confidence?.gate.passed === false) && (
-          <ConfidenceDetails params={params} />
-        )}
-        {plan && (
-          <>
-            {/* Q-412 / D-21: Build raises the level once (Q-113 item 7); the Show row (and Motion,
-                WCAG 2.2.2) sit in Details so the level can always be lowered again. */}
-            {honestyGroup}
-            {pane && !engineOwns && (
-              <ToggleGroup
-                label="Motion"
-                options={MOTION_OPTIONS}
-                value={motionPaused ? 'paused' : 'playing'}
-                onChange={(v) => { if ((v === 'paused') !== motionPaused) toggleMotion(); }}
-                testId="build-motion"
-              />
-            )}
-
-            {plan.threeD && plan.modes.length > 0 && (
-              <>
-                <ToggleGroup
-                  label="Colour"
-                  value={plan.mode ?? null}
-                  options={plan.modes.map((m) => ({
-                    value: m.id,
-                    label: pane ? shortModeLabel(m.label) : m.label,
-                    disabled: !m.available,
-                    title: m.available ? m.badge : 'Not available for this object. See the list below.',
-                    describedBy: irHidesJets && m.id === 'visible' ? 'ir-jets-hint' : undefined,
-                  }))}
-                  onChange={onMode}
-                />
-                {plan.mode && !pane && (
-                  <span className="text-xs" style={{ color: 'var(--muted)' }}>
-                    {plan.modes.find((m) => m.id === plan.mode)?.badge}
-                  </span>
-                )}
-              </>
-            )}
-
-            {/* Sits under the mode buttons it refers to. The region stays mounted while an object is
-              shown, so a change of mode or level is announced politely when the text appears. */}
-            {plan.threeD && plan.modes.length > 0 && (
-              <div
-                id="ir-jets-hint"
-                role="status"
-                aria-live="polite"
-                className="empty:hidden"
-                data-testid="ir-jets-hint"
-              >
-                {irHidesJets && <p className="text-sm text-neutral-200">{IR_JETS_HINT}</p>}
+        <div
+          id={detailsId}
+          className={pane ? 'sx-bp-details' : 'contents'}
+          hidden={pane ? pane.pop !== 'details' : undefined}
+          data-testid={pane ? 'build-details-panel' : undefined}
+        >
+          {pane && (
+            <>
+              <div className="sx-pop-h">
+                <b>Details</b>
+                <span>{displayName(plan?.name)}</span>
               </div>
-            )}
-
-            {plan.type === 'comet' && (
-              <ToggleGroup
-                label="Epoch"
-                value={epoch}
-                options={COMET_EPOCHS.map((e) => ({
-                  value: e,
-                  label: `${EPOCH_LABEL[e]}${plan.epochs.includes(e) ? '' : ' (no gas data)'}`,
-                }))}
-                onChange={onEpoch}
-              />
-            )}
-
-            {pane && <BuildControls />}
-
-            {plan.star && !engineStar && (
-              <div className="flex flex-col gap-2" data-testid="star-views">
+              {/* Q-450 (PR #107 review, Atish): Hear it left the header, so Details keeps the way into it
+                (the spectrum sweep, and the chord the sound PRs add there). */}
+              <button
+                type="button"
+                className="sx-bp-row-btn"
+                aria-controls={BUILD_POP_ID}
+                onClick={() => pane.onPop?.('hear')}
+                data-testid="build-open-hear"
+              >
+                <span>Hear it</span>
+                <span className="sx-bp-row-sub">The spectrum as sound, and the atmosphere</span>
+              </button>
+              {engineStar && <StarEngineDetails />}
+            </>
+          )}
+          {params && (!pane || params.confidence?.gate.passed === false) && (
+            <ConfidenceDetails params={params} />
+          )}
+          {plan && (
+            <>
+              {/* Q-412 / D-21: Build raises the level once (Q-113 item 7); the Show row (and Motion,
+                WCAG 2.2.2) sit in Details so the level can always be lowered again. */}
+              {honestyGroup}
+              {pane && !engineOwns && (
                 <ToggleGroup
-                  label="Light"
-                  value={starColour}
-                  options={STAR_COLOUR_OPTIONS}
-                  onChange={(c) =>
-                    setStarView(
-                      c,
-                      c === 'observatory' && starScale === 'close' ? 'enlarged' : starScale,
+                  label="Motion"
+                  options={MOTION_OPTIONS}
+                  value={motionPaused ? 'paused' : 'playing'}
+                  onChange={(v) => {
+                    if ((v === 'paused') !== motionPaused) toggleMotion();
+                  }}
+                  testId="build-motion"
+                />
+              )}
+
+              {plan.threeD && plan.modes.length > 0 && (
+                <>
+                  <ToggleGroup
+                    label="Colour"
+                    value={plan.mode ?? null}
+                    options={plan.modes.map((m) => ({
+                      value: m.id,
+                      label: pane ? shortModeLabel(m.label) : m.label,
+                      disabled: !m.available,
+                      title: m.available
+                        ? m.badge
+                        : 'Not available for this object. See the list below.',
+                      describedBy: irHidesJets && m.id === 'visible' ? 'ir-jets-hint' : undefined,
+                    }))}
+                    onChange={onMode}
+                  />
+                  {plan.mode && !pane && (
+                    <span className="text-xs" style={{ color: 'var(--muted)' }}>
+                      {plan.modes.find((m) => m.id === plan.mode)?.badge}
+                    </span>
+                  )}
+                </>
+              )}
+
+              {/* Sits under the mode buttons it refers to. The region stays mounted while an object is
+              shown, so a change of mode or level is announced politely when the text appears. */}
+              {plan.threeD && plan.modes.length > 0 && (
+                <div
+                  id="ir-jets-hint"
+                  role="status"
+                  aria-live="polite"
+                  className="empty:hidden"
+                  data-testid="ir-jets-hint"
+                >
+                  {irHidesJets && <p className="text-sm text-neutral-200">{IR_JETS_HINT}</p>}
+                </div>
+              )}
+
+              {plan.type === 'comet' && (
+                <ToggleGroup
+                  label="Epoch"
+                  value={epoch}
+                  options={COMET_EPOCHS.map((e) => ({
+                    value: e,
+                    label: `${EPOCH_LABEL[e]}${plan.epochs.includes(e) ? '' : ' (no gas data)'}`,
+                  }))}
+                  onChange={onEpoch}
+                />
+              )}
+
+              {pane && <BuildControls />}
+
+              {plan.star && !engineStar && (
+                <div className="flex flex-col gap-2" data-testid="star-views">
+                  <ToggleGroup
+                    label="Light"
+                    value={starColour}
+                    options={STAR_COLOUR_OPTIONS}
+                    onChange={(c) =>
+                      setStarView(
+                        c,
+                        c === 'observatory' && starScale === 'close' ? 'enlarged' : starScale,
+                      )
+                    }
+                  />
+                  <ToggleGroup
+                    label="View"
+                    value={starScale}
+                    options={STAR_SCALE_OPTIONS}
+                    onChange={(sc) => setStarView(starColour, sc)}
+                  />
+                  {plan.star.physics && (
+                    <p className="text-sm text-neutral-200" data-testid="star-caption">
+                      {starCaption(plan.star.physics, starScale)}
+                      {starColour === 'observatory' &&
+                        ' This is false colour (ultraviolet, as solar observatories show it), not the star\u2019s real colour.'}
+                    </p>
+                  )}
+                  {plan.star.plasma && (
+                    <StarFlarePanel
+                      viewer={viewer}
+                      paused={motionPaused}
+                      fixture={objectIsFixture}
+                    />
+                  )}
+                </div>
+              )}
+
+              {plan.star?.physics && !engineStar && (
+                <dl
+                  className="grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-1 text-sm"
+                  data-testid="star-readouts"
+                >
+                  {starReadouts(plan.star.physics).map((r) => (
+                    <div key={r.label} className="contents">
+                      <dt className="text-neutral-300">{r.label}</dt>
+                      <dd className="flex items-center justify-end gap-2 whitespace-nowrap text-neutral-100 tabular-nums">
+                        {r.value}{' '}
+                        {r.tag && <ProvenanceBadge tag={r.tag} fixture={objectIsFixture} />}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              )}
+
+              {planetMeasured.length > 0 && (
+                <dl
+                  className="grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-1 text-sm"
+                  data-testid="planet-measured"
+                >
+                  {planetMeasured.map((m) => (
+                    <div key={m.field} className="contents">
+                      <dt className="text-neutral-300">{m.label}</dt>
+                      <dd
+                        className="flex items-center justify-end gap-2 whitespace-nowrap text-neutral-100 tabular-nums"
+                        title={m.source}
+                      >
+                        {m.value} <ProvenanceBadge tag={m.tag} fixture={objectIsFixture} />
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              )}
+
+              {plan.type === 'comet' && emissionsRange && (
+                <SwitchRow
+                  label="View emissions"
+                  checked={emissionsJd !== null}
+                  onChange={() =>
+                    setEmissions(
+                      emissionsJd === null ? { key: objectKey, jd: EPOCH_JD[epoch] } : null,
                     )
                   }
+                  testId="emissions-toggle"
                 />
-                <ToggleGroup
-                  label="View"
-                  value={starScale}
-                  options={STAR_SCALE_OPTIONS}
-                  onChange={(sc) => setStarView(starColour, sc)}
-                />
-                {plan.star.physics && (
-                  <p className="text-sm text-neutral-200" data-testid="star-caption">
-                    {starCaption(plan.star.physics, starScale)}
-                    {starColour === 'observatory' &&
-                      ' This is false colour (ultraviolet, as solar observatories show it), not the star\u2019s real colour.'}
-                  </p>
-                )}
-                {plan.star.plasma && (
-                  <StarFlarePanel
-                    viewer={viewer}
-                    paused={motionPaused}
-                    fixture={objectIsFixture}
+              )}
+
+              {plan.scrub && (
+                <label className="flex flex-col gap-1 text-sm text-neutral-300">
+                  Light curve: point {plan.scrub.index + 1} of {plan.scrub.count}
+                  <input
+                    type="range"
+                    min={0}
+                    max={Math.max(0, plan.scrub.count - 1)}
+                    value={plan.scrub.index}
+                    className="min-h-11 w-full max-w-xl"
+                    aria-valuetext={`Point ${plan.scrub.index + 1} of ${plan.scrub.count}, ${formatMjdDate(plan.scrub.tMjd)}, brightness ${Math.round(plan.scrub.brightness * 100)}% of the maximum`}
+                    onChange={(e) => onScrub(Number(e.target.value))}
                   />
-                )}
-              </div>
-            )}
+                  <span className="text-xs text-neutral-400">
+                    {formatMjdDate(plan.scrub.tMjd)}, brightness{' '}
+                    {Math.round(plan.scrub.brightness * 100)}% of the maximum
+                    {plan.scrub.flagged > 0
+                      ? `; ${plan.scrub.flagged} flagged points are left out`
+                      : ''}
+                  </span>
+                </label>
+              )}
 
-            {plan.star?.physics && !engineStar && (
-              <dl
-                className="grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-1 text-sm"
-                data-testid="star-readouts"
-              >
-                {starReadouts(plan.star.physics).map((r) => (
-                  <div key={r.label} className="contents">
-                    <dt className="text-neutral-300">{r.label}</dt>
-                    <dd className="flex items-center justify-end gap-2 whitespace-nowrap text-neutral-100 tabular-nums">
-                      {r.value} {r.tag && <ProvenanceBadge tag={r.tag} fixture={objectIsFixture} />}
-                    </dd>
-                  </div>
-                ))}
-              </dl>
-            )}
-
-            {planetMeasured.length > 0 && (
-              <dl
-                className="grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-1 text-sm"
-                data-testid="planet-measured"
-              >
-                {planetMeasured.map((m) => (
-                  <div key={m.field} className="contents">
-                    <dt className="text-neutral-300">{m.label}</dt>
-                    <dd
-                      className="flex items-center justify-end gap-2 whitespace-nowrap text-neutral-100 tabular-nums"
-                      title={m.source}
-                    >
-                      {m.value} <ProvenanceBadge tag={m.tag} fixture={objectIsFixture} />
-                    </dd>
-                  </div>
-                ))}
-              </dl>
-            )}
-
-            {plan.type === 'comet' && emissionsRange && (
-              <SwitchRow
-                label="View emissions"
-                checked={emissionsJd !== null}
-                onChange={() =>
-                  setEmissions(
-                    emissionsJd === null ? { key: objectKey, jd: EPOCH_JD[epoch] } : null,
-                  )
-                }
-                testId="emissions-toggle"
-              />
-            )}
-
-            {plan.scrub && (
-              <label className="flex flex-col gap-1 text-sm text-neutral-300">
-                Light curve: point {plan.scrub.index + 1} of {plan.scrub.count}
-                <input
-                  type="range"
-                  min={0}
-                  max={Math.max(0, plan.scrub.count - 1)}
-                  value={plan.scrub.index}
-                  className="min-h-11 w-full max-w-xl"
-                  aria-valuetext={`Point ${plan.scrub.index + 1} of ${plan.scrub.count}, ${formatMjdDate(plan.scrub.tMjd)}, brightness ${Math.round(plan.scrub.brightness * 100)}% of the maximum`}
-                  onChange={(e) => onScrub(Number(e.target.value))}
-                />
-                <span className="text-xs text-neutral-400">
-                  {formatMjdDate(plan.scrub.tMjd)}, brightness{' '}
-                  {Math.round(plan.scrub.brightness * 100)}% of the maximum
-                  {plan.scrub.flagged > 0
-                    ? `; ${plan.scrub.flagged} flagged points are left out`
-                    : ''}
-                </span>
-              </label>
-            )}
-
-            {remnantShown && (
-              <div className="flex flex-col gap-1 text-sm text-neutral-300">
-                <span className="flex flex-wrap items-center gap-2">
-                  <label htmlFor={`${whyId}-age-input`} id={`${whyId}-age`}>
-                    Age of the remnant
-                  </label>
-                  <output aria-hidden="true" className="tabular-nums text-neutral-100">
-                    {formatYears(age)}
-                  </output>
-                  <ProvenanceBadge tag="artistic" fixture={objectIsFixture} />
-                </span>
-                <input
-                  id={`${whyId}-age-input`}
-                  type="range"
-                  min={AGE_LOG_MIN}
-                  max={AGE_LOG_MAX}
-                  step={AGE_LOG_STEP}
-                  value={Math.log10(age)}
-                  className="min-h-11 w-full max-w-xl"
-                  aria-labelledby={`${whyId}-age`}
-                  aria-describedby={`${whyId}-age-hint`}
-                  aria-valuetext={`${formatYears(age)} old`}
-                  onChange={(e) => onAge(Number(e.target.value))}
-                />
-                <span id={`${whyId}-age-hint`} className="text-xs text-neutral-400">
-                  Your choice, not a measurement. The shell is drawn smaller when it is younger, so
-                  the size shown is the shell{AT_AGE_MAX_PHRASE}.
-                </span>
-              </div>
-            )}
-
-            {bar && !engineOwns && (
-              <figure className="flex max-w-xl flex-col gap-1" data-testid="scale-bar">
-                <div className="flex flex-col gap-1" aria-hidden="true">
-                  <div
-                    className="h-1.5 rounded bg-sky-400"
-                    style={{ width: `${bar.bodyFraction * 100}%` }}
+              {remnantShown && (
+                <div className="flex flex-col gap-1 text-sm text-neutral-300">
+                  <span className="flex flex-wrap items-center gap-2">
+                    <label htmlFor={`${whyId}-age-input`} id={`${whyId}-age`}>
+                      Age of the remnant
+                    </label>
+                    <output aria-hidden="true" className="tabular-nums text-neutral-100">
+                      {formatYears(age)}
+                    </output>
+                    <ProvenanceBadge tag="artistic" fixture={objectIsFixture} />
+                  </span>
+                  <input
+                    id={`${whyId}-age-input`}
+                    type="range"
+                    min={AGE_LOG_MIN}
+                    max={AGE_LOG_MAX}
+                    step={AGE_LOG_STEP}
+                    value={Math.log10(age)}
+                    className="min-h-11 w-full max-w-xl"
+                    aria-labelledby={`${whyId}-age`}
+                    aria-describedby={`${whyId}-age-hint`}
+                    aria-valuetext={`${formatYears(age)} old`}
+                    onChange={(e) => onAge(Number(e.target.value))}
                   />
-                  <div
-                    className="h-1.5 rounded bg-neutral-400"
-                    style={{ width: `${bar.comparisonFraction * 100}%` }}
-                  />
+                  <span id={`${whyId}-age-hint`} className="text-xs text-neutral-400">
+                    Your choice, not a measurement. The shell is drawn smaller when it is younger,
+                    so the size shown is the shell{AT_AGE_MAX_PHRASE}.
+                  </span>
                 </div>
-                <figcaption className="text-sm text-neutral-200">
-                  {bar.headline}
-                  {size?.atSliderMax && AT_AGE_MAX_PHRASE}
-                  {bar.qualifier === 'upper_limit' && ' (upper limit)'}
-                  {size?.tag && (
-                    <>
-                      {' '}
-                      <ProvenanceBadge
-                        tag={size.tag}
-                        tooltip={size.why ?? undefined}
-                        srText
-                        fixture={objectIsFixture}
-                      />
-                    </>
-                  )}
-                  , {bar.comparison.text}.
-                </figcaption>
-                {size?.why && (
-                  <div className="flex flex-col items-start gap-1">
-                    <button
-                      type="button"
-                      className={buttonClass}
-                      aria-expanded={whyOpen}
-                      aria-controls={whyId}
-                      onClick={() => setWhyOpen((o) => !o)}
-                    >
-                      Why this size?
-                    </button>
-                    {whyOpen && (
-                      <p id={whyId} className="text-sm text-neutral-300" data-testid="size-why">
-                        {size.why}
-                      </p>
+              )}
+
+              {bar && !engineOwns && (
+                <figure className="flex max-w-xl flex-col gap-1" data-testid="scale-bar">
+                  <div className="flex flex-col gap-1" aria-hidden="true">
+                    <div
+                      className="h-1.5 rounded bg-sky-400"
+                      style={{ width: `${bar.bodyFraction * 100}%` }}
+                    />
+                    <div
+                      className="h-1.5 rounded bg-neutral-400"
+                      style={{ width: `${bar.comparisonFraction * 100}%` }}
+                    />
+                  </div>
+                  <figcaption className="text-sm text-neutral-200">
+                    {bar.headline}
+                    {size?.atSliderMax && AT_AGE_MAX_PHRASE}
+                    {bar.qualifier === 'upper_limit' && ' (upper limit)'}
+                    {size?.tag && (
+                      <>
+                        {' '}
+                        <ProvenanceBadge
+                          tag={size.tag}
+                          tooltip={size.why ?? undefined}
+                          srText
+                          fixture={objectIsFixture}
+                        />
+                      </>
                     )}
+                    , {bar.comparison.text}.
+                  </figcaption>
+                  {size?.why && (
+                    <div className="flex flex-col items-start gap-1">
+                      <button
+                        type="button"
+                        className={buttonClass}
+                        aria-expanded={whyOpen}
+                        aria-controls={whyId}
+                        onClick={() => setWhyOpen((o) => !o)}
+                      >
+                        Why this size?
+                      </button>
+                      {whyOpen && (
+                        <p id={whyId} className="text-sm text-neutral-300" data-testid="size-why">
+                          {size.why}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </figure>
+              )}
+
+              {lapses.length > 0 && !engineWorld && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-sm text-neutral-200" data-testid="motion-status">
+                    {reducedMotion && !playAnyway
+                      ? 'Motion is off because your device asks for reduced motion.'
+                      : spinPaused
+                        ? 'Motion is paused.'
+                        : idlePaused
+                          ? 'Motion paused after a minute without input. Tap the view to resume.'
+                          : 'Motion is playing.'}
+                  </p>
+                </div>
+              )}
+
+              {/* Issue #71 stream E: pacing of a simulated gas world; shown only for one. */}
+              {plan.type === 'gas_giant' &&
+                !engineWorld &&
+                lapses.some((t) => t.id === 'winds') && (
+                  <div className="flex flex-col gap-1" data-testid="gas-pacing">
+                    <ToggleGroup
+                      label="Time speed of the winds"
+                      value={String(gasPacing) as '0' | '1'}
+                      options={GAS_PACING_CHOICES.map((c) => ({
+                        value: String(c.value) as '0' | '1',
+                        label: c.label,
+                      }))}
+                      onChange={(v) => onGasPacing(Number(v) as 0 | 1)}
+                    />
+                    <p className="text-sm text-neutral-200" data-testid="gas-pacing-status">
+                      {gasPacingStatus(gasPacing)}
+                    </p>
                   </div>
                 )}
-              </figure>
-            )}
 
-            {lapses.length > 0 && !engineWorld && (
-              <div className="flex flex-wrap items-center gap-2">
-                <p className="text-sm text-neutral-200" data-testid="motion-status">
-                  {reducedMotion && !playAnyway
-                    ? 'Motion is off because your device asks for reduced motion.'
-                    : spinPaused
-                      ? 'Motion is paused.'
-                      : idlePaused
-                        ? 'Motion paused after a minute without input. Tap the view to resume.'
-                        : 'Motion is playing.'}
+              {qualityLowered && (
+                <p className="text-sm text-neutral-200" data-testid="quality-note">
+                  {QUALITY_DROP_ANNOUNCEMENT}.
                 </p>
-              </div>
-            )}
+              )}
 
-            {/* Issue #71 stream E: pacing of a simulated gas world; shown only for one. */}
-            {plan.type === 'gas_giant' && !engineWorld && lapses.some((t) => t.id === 'winds') && (
-              <div className="flex flex-col gap-1" data-testid="gas-pacing">
-                <ToggleGroup
-                  label="Time speed of the winds"
-                  value={String(gasPacing) as '0' | '1'}
-                  options={GAS_PACING_CHOICES.map((c) => ({ value: String(c.value) as '0' | '1', label: c.label }))}
-                  onChange={(v) => onGasPacing(Number(v) as 0 | 1)}
-                />
-                <p className="text-sm text-neutral-200" data-testid="gas-pacing-status">
-                  {gasPacingStatus(gasPacing)}
+              {/* Every time-lapse says where its rate comes from and its speed-up (R5.7, D-32). */}
+              {(engineOwns && pane ? [] : lapses).map((t) => (
+                <p key={t.id} className="text-sm text-neutral-200" data-testid="time-lapse-note">
+                  {timeLapseText(t)}
                 </p>
-              </div>
-            )}
+              ))}
 
-            {qualityLowered && (
-              <p className="text-sm text-neutral-200" data-testid="quality-note">
-                {QUALITY_DROP_ANNOUNCEMENT}.
-              </p>
-            )}
+              {pane && <BuildKeyNumbers fixture={objectIsFixture} />}
 
-            {/* Every time-lapse says where its rate comes from and its speed-up (R5.7, D-32). */}
-            {(engineOwns && pane ? [] : lapses).map((t) => (
-              <p key={t.id} className="text-sm text-neutral-200" data-testid="time-lapse-note">
-                {timeLapseText(t)}
-              </p>
-            ))}
-
-            {pane && <BuildKeyNumbers fixture={objectIsFixture} />}
-
-            <Rows>
-            {pane && (
-              <BuildSummaryRows
-                fixture={objectIsFixture}
-                flareChart={
-                  engineStar ? (
-                    <p className="text-xs" style={{ color: 'var(--muted)' }}>
-                      Example curve. Hard X-rays follow the rate of change of soft X-rays (the Neupert effect).
-                    </p>
-                  ) : undefined
-                }
-                extraAssumed={assumedLines}
-              />
-            )}
-            <Row title="What is drawn" count={plan.drawn.length} testId="legend-row">
-              <p className="text-xs text-neutral-400">
-                Measured: from observations. Estimated: worked out from data with a stated method.
-                Default: the artist&rsquo;s choice.
-              </p>
-              {plan.drawn.length === 0 ? (
-                <p className="text-sm text-neutral-400">Nothing yet.</p>
-              ) : (
-                <ul className="flex flex-col gap-1" data-testid="legend">
-                  {plan.drawn.map((l) => (
-                    <li
-                      key={l.id}
-                      className="flex flex-wrap items-center gap-2 text-sm text-neutral-200"
-                    >
-                      <ProvenanceBadge tag={l.tag} fixture={objectIsFixture} />
-                      {/* data-code keeps the raw id for debugging; users see plain words (Q-477). */}
-                      <span data-code={l.id}>{layerName(l.id)}</span>
-                      {l.tier ? (
-                        <span className="text-xs text-neutral-400" data-testid="layer-tier">
-                          {tierText(l.tier)}
-                        </span>
-                      ) : null}
-                      {l.swatches?.map((s) => (
-                        <span
-                          key={s.label}
-                          className="inline-flex items-center gap-1 text-xs text-neutral-300"
+              <Rows>
+                {pane && (
+                  <BuildSummaryRows
+                    fixture={objectIsFixture}
+                    flareChart={
+                      engineStar ? (
+                        <p className="text-xs" style={{ color: 'var(--muted)' }}>
+                          Example curve. Hard X-rays follow the rate of change of soft X-rays (the
+                          Neupert effect).
+                        </p>
+                      ) : undefined
+                    }
+                    extraAssumed={assumedLines}
+                  />
+                )}
+                <Row title="What is drawn" count={plan.drawn.length} testId="legend-row">
+                  <p className="text-xs text-neutral-400">
+                    Measured: from observations. Estimated: worked out from data with a stated
+                    method. Default: the artist&rsquo;s choice.
+                  </p>
+                  {plan.drawn.length === 0 ? (
+                    <p className="text-sm text-neutral-400">Nothing yet.</p>
+                  ) : (
+                    <ul className="flex flex-col gap-1" data-testid="legend">
+                      {plan.drawn.map((l) => (
+                        <li
+                          key={l.id}
+                          className="flex flex-wrap items-center gap-2 text-sm text-neutral-200"
                         >
-                          <span
-                            aria-hidden="true"
-                            className="inline-block h-3 w-3 rounded-sm border border-neutral-500"
-                            style={{ backgroundColor: s.css }}
-                          />
-                          {s.label}
-                        </span>
+                          <ProvenanceBadge tag={l.tag} fixture={objectIsFixture} />
+                          {/* data-code keeps the raw id for debugging; users see plain words (Q-477). */}
+                          <span data-code={l.id}>{layerName(l.id)}</span>
+                          {l.tier ? (
+                            <span className="text-xs text-neutral-400" data-testid="layer-tier">
+                              {tierText(l.tier)}
+                            </span>
+                          ) : null}
+                          {l.swatches?.map((s) => (
+                            <span
+                              key={s.label}
+                              className="inline-flex items-center gap-1 text-xs text-neutral-300"
+                            >
+                              <span
+                                aria-hidden="true"
+                                className="inline-block h-3 w-3 rounded-sm border border-neutral-500"
+                                style={{ backgroundColor: s.css }}
+                              />
+                              {s.label}
+                            </span>
+                          ))}
+                          {l.description && (
+                            <details className="w-full text-xs text-neutral-300">
+                              <summary className="min-h-11 cursor-pointer py-2 focus-visible:outline-2 focus-visible:outline-sky-400">
+                                How it is made
+                              </summary>
+                              <p className="pb-1">{l.description}</p>
+                            </details>
+                          )}
+                        </li>
                       ))}
-                      {l.description && (
-                        <details className="w-full text-xs text-neutral-300">
-                          <summary className="min-h-11 cursor-pointer py-2 focus-visible:outline-2 focus-visible:outline-sky-400">
-                            How it is made
-                          </summary>
-                          <p className="pb-1">{l.description}</p>
-                        </details>
-                      )}
-                    </li>
+                    </ul>
+                  )}
+                </Row>
+
+                {defaultsShown.length > 0 && (
+                  <Row title="Shown as a default" count={defaultsShown.length}>
+                    <ul
+                      className="flex flex-col gap-1 text-sm text-neutral-300"
+                      data-testid="default-list"
+                    >
+                      {defaultsShown.map((m) => (
+                        <li key={m.id} className="flex flex-wrap items-center gap-2">
+                          <ProvenanceBadge tag="artistic" />
+                          <span data-code={m.id}>{describeRefusal(m)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </Row>
+                )}
+
+                {notDrawn.length > 0 && (
+                  <Row title="Not drawn" count={notDrawn.length}>
+                    <ul
+                      className="list-disc pl-5 text-sm text-neutral-300"
+                      data-testid="missing-list"
+                    >
+                      {notDrawn.map((m) => (
+                        <li key={m.id} data-code={m.id}>
+                          {describeRefusal(m)}
+                        </li>
+                      ))}
+                    </ul>
+                  </Row>
+                )}
+              </Rows>
+
+              {plan.notes.length > 0 && !(engineOwns && pane) && (
+                <ul className="list-disc pl-5 text-xs text-neutral-400" data-testid="notes">
+                  {plan.notes.map((n) => (
+                    <li key={n}>{n}</li>
                   ))}
                 </ul>
               )}
-            </Row>
-
-            {defaultsShown.length > 0 && (
-              <Row title="Shown as a default" count={defaultsShown.length}>
-                <ul
-                  className="flex flex-col gap-1 text-sm text-neutral-300"
-                  data-testid="default-list"
-                >
-                  {defaultsShown.map((m) => (
-                    <li key={m.id} className="flex flex-wrap items-center gap-2">
-                      <ProvenanceBadge tag="artistic" />
-                      <span data-code={m.id}>{describeRefusal(m)}</span>
-                    </li>
-                  ))}
-                </ul>
-              </Row>
-            )}
-
-            {notDrawn.length > 0 && (
-              <Row title="Not drawn" count={notDrawn.length}>
-                <ul className="list-disc pl-5 text-sm text-neutral-300" data-testid="missing-list">
-                  {notDrawn.map((m) => (
-                    <li key={m.id} data-code={m.id}>
-                      {describeRefusal(m)}
-                    </li>
-                  ))}
-                </ul>
-              </Row>
-            )}
-            </Rows>
-
-            {plan.notes.length > 0 && !(engineOwns && pane) && (
-              <ul className="list-disc pl-5 text-xs text-neutral-400" data-testid="notes">
-                {plan.notes.map((n) => (
-                  <li key={n}>{n}</li>
-                ))}
-              </ul>
-            )}
-          </>
-        )}
-      </div>
+            </>
+          )}
+        </div>,
       )}
 
       <div aria-live="polite" aria-atomic="true" className="sr-only" data-testid="viewer-announcer">

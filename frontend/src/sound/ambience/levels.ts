@@ -5,13 +5,43 @@ import type { Tag } from '@/contract';
 import { absorption, airAt, bedWorldDb, earthRef, lowpassHz, meanPathAir } from './air';
 import { bedMembership, caption } from './captions';
 import {
-  bakeWind, bandCenterHz, isGroundBed, isHarmonicBed, PRIORITY, surfDb, uSand, wavesPM, whitecapFraction,
+  bakeWind,
+  bandCenterHz,
+  isGroundBed,
+  isHarmonicBed,
+  PRIORITY,
+  surfDb,
+  uSand,
+  wavesPM,
+  whitecapFraction,
 } from './sources';
 import type { AirModel, BedLevel, BedSpec, MixFrame, Place, PlaceSample, SourceId } from './types';
 import {
-  ABS_DEAD_DB, BROADBAND_F, CNV_RAIN_DB, FLOW_MIN_U, GAS_IU, PRESENCE_RANGE_DB, D_MIN_M, DB_PER_NP, EARTH_REF, G_PRESENT_MAX, IU_LAND, L_REF, L_TARGET, LP_F_MAX, PAN_MAX,
-  REF_LISTENER_M, RIVER_S_REF, SILENT_DB, SNOW_DB, STAGE_HEADROOM_DB, STAGE_WINDOW_DB, STORM_RAIN_DB, U_E_REF,
-  WATER_RHO, WHITECAP_MIN_U,
+  ABS_DEAD_DB,
+  BROADBAND_F,
+  CNV_RAIN_DB,
+  FLOW_MIN_U,
+  GAS_IU,
+  PRESENCE_RANGE_DB,
+  D_MIN_M,
+  DB_PER_NP,
+  EARTH_REF,
+  G_PRESENT_MAX,
+  IU_LAND,
+  L_REF,
+  L_TARGET,
+  LP_F_MAX,
+  PAN_MAX,
+  REF_LISTENER_M,
+  RIVER_S_REF,
+  SILENT_DB,
+  SNOW_DB,
+  STAGE_HEADROOM_DB,
+  STAGE_WINDOW_DB,
+  STORM_RAIN_DB,
+  U_E_REF,
+  WATER_RHO,
+  WHITECAP_MIN_U,
 } from './tuning';
 
 /** Provenance of everything the ambience plays (§2 rule 2). */
@@ -60,7 +90,10 @@ export function cellWeight(sample: Pick<PlaceSample, 's_km'>, z_km: number): num
 }
 
 /** The §6.2 sample pattern (centre + 3 rings x 12) at height z, for reference integrals and tests. */
-export function patternSamples(z_km: number, head = 0): { s_km: number; bearing: number; d_m: number }[] {
+export function patternSamples(
+  z_km: number,
+  head = 0,
+): { s_km: number; bearing: number; d_m: number }[] {
   const R = reachKm(z_km);
   const z = Math.max(z_km * 1000, D_MIN_M);
   const out = [{ s_km: 0, bearing: head, d_m: z }];
@@ -87,7 +120,11 @@ export function iRef(fHz: number): number {
   return I;
 }
 
-interface Area { I: number; dEff: number; pan: number }
+interface Area {
+  I: number;
+  dEff: number;
+  pan: number;
+}
 
 function areaIntegral(id: SourceId, place: Place, alpha: number): Area {
   const z = place.features.z_km;
@@ -104,7 +141,11 @@ function areaIntegral(id: SourceId, place: Place, alpha: number): Area {
     dI += Ii * d;
     pI += Ii * Math.sin(s.bearing - place.head);
   }
-  return { I, dEff: I > 0 ? dI / I : 0, pan: I > 0 ? Math.max(-PAN_MAX, Math.min(PAN_MAX, pI / I)) : 0 };
+  return {
+    I,
+    dEff: I > 0 ? dI / I : 0,
+    pan: I > 0 ? Math.max(-PAN_MAX, Math.min(PAN_MAX, pI / I)) : 0,
+  };
 }
 
 function db(x: number): number {
@@ -133,7 +174,11 @@ function groundDriverDb(id: SourceId, air: AirModel, place: Place): number {
       const l = air.liquid;
       if (!l) return -Infinity;
       // Dissipated power ∝ rho_l g Q S [SS §9]: Q is in the membership; rho g and the slope here (S_ref ASSUMPTION).
-      return L_REF.river + 10 * Math.log10((l.rho * air.gv) / (WATER_RHO * EARTH_REF.g)) + 10 * Math.log10(Math.max(f.slope, 1e-4) / RIVER_S_REF);
+      return (
+        L_REF.river +
+        10 * Math.log10((l.rho * air.gv) / (WATER_RHO * EARTH_REF.g)) +
+        10 * Math.log10(Math.max(f.slope, 1e-4) / RIVER_S_REF)
+      );
     }
     case 'S8':
       return L_REF.lava;
@@ -190,10 +235,23 @@ export function stageGainDb(trueDb: number, G: number): number {
 
 /** A bed that is not present: gain SILENT_DB, which the mixer treats as linear 0 (R8: never lifted, never captioned). */
 function silentBed(id: SourceId, variant: number): BedLevel {
-  return { id, variant, trueDb: SILENT_DB, gainDb: SILENT_DB, lowpassHz: LP_F_MAX, shelfDb: 0, pan: 0, playbackRate: 1, harmonic: isHarmonicBed(id) };
+  return {
+    id,
+    variant,
+    trueDb: SILENT_DB,
+    gainDb: SILENT_DB,
+    lowpassHz: LP_F_MAX,
+    shelfDb: 0,
+    pan: 0,
+    playbackRate: 1,
+    harmonic: isHarmonicBed(id),
+  };
 }
 
-interface Cand { bed: BedLevel; G: number }
+interface Cand {
+  bed: BedLevel;
+  G: number;
+}
 
 /**
  * §10/§11 one mixer tick. `baked` holds bedKey(id, variant) of the beds ready to play; thunder is an event and is not
@@ -227,7 +285,9 @@ export function mixFrame(
   keys.sort((a, b) => PRIORITY.indexOf(a.id) - PRIORITY.indexOf(b.id) || a.variant - b.variant);
   const hasLand = keys.some((k) => k.id === 'S1_land');
   const hasSea = keys.some((k) => k.id === 'S1_sea');
-  const hasHurricane = keys.some((k) => k.id === 'S9') && (f.wind.parts.find((p) => p.kind === 'hurricane')?.U ?? 0) > 0;
+  const hasHurricane =
+    keys.some((k) => k.id === 'S9') &&
+    (f.wind.parts.find((p) => p.kind === 'hurricane')?.U ?? 0) > 0;
 
   // Land/sea share of the area around the listener splits the two wind rumble variants (ASSUMPTION); when only one
   // variant is baked it takes the whole share (blue F4c).
@@ -269,7 +329,8 @@ export function mixFrame(
       const Lrel = 10 * Math.log10(area.I / iRef(fb));
       // Blue F5a (Q- proposal): the broadband loss is evaluated at min(band centre, 250 Hz), so a low bed is not
       // charged a 250 Hz loss on top of its own absorption.
-      const broadband = -DB_PER_NP * absorption(Math.min(fb, BROADBAND_F), Pm, Tm, air.cls) * area.dEff;
+      const broadband =
+        -DB_PER_NP * absorption(Math.min(fb, BROADBAND_F), Pm, Tm, air.cls) * area.dEff;
       if (!(Lrel + broadband > -ABS_DEAD_DB)) {
         cands.push(silentBed(id, variant));
         continue;
@@ -282,7 +343,10 @@ export function mixFrame(
       G = Gground;
     } else {
       // Review L5: with the hurricane bed playing, the rumble carries only the background (non-cyclone) wind.
-      const U = (id === 'S1_land' || id === 'S1_sea') && hasHurricane ? backgroundWind(place) : flowWind(id, place);
+      const U =
+        (id === 'S1_land' || id === 'S1_sea') && hasHurricane
+          ? backgroundWind(place)
+          : flowWind(id, place);
       const share = id === 'S1_land' ? landShare : id === 'S1_sea' ? seaShare : 1;
       if (!(U >= FLOW_MIN_U) || !(share > 0)) {
         cands.push(silentBed(id, variant));
@@ -297,14 +361,32 @@ export function mixFrame(
         const Iu = spec?.params.Iu ?? GAS_IU;
         trueDb = L_REF.gas + 2 * db(U / U_E_REF) + bedWorldDb(air, f.z_km, id) + db(Iu / IU_LAND);
       } else {
-        trueDb = L_REF.wind + 2 * db(U / U_E_REF) + bedWorldDb(air, f.z_km, id) + db(f.wind.Iu / IU_LAND) + 10 * Math.log10(share);
+        trueDb =
+          L_REF.wind +
+          2 * db(U / U_E_REF) +
+          bedWorldDb(air, f.z_km, id) +
+          db(f.wind.Iu / IU_LAND) +
+          10 * Math.log10(share);
       }
     }
     if (!Number.isFinite(trueDb)) {
       cands.push(silentBed(id, variant));
       continue;
     }
-    cands.push({ bed: { id, variant, trueDb, gainDb: SILENT_DB, lowpassHz: lp, shelfDb, pan, playbackRate, harmonic: isHarmonicBed(id) }, G });
+    cands.push({
+      bed: {
+        id,
+        variant,
+        trueDb,
+        gainDb: SILENT_DB,
+        lowpassHz: lp,
+        shelfDb,
+        pan,
+        playbackRate,
+        harmonic: isHarmonicBed(id),
+      },
+      G,
+    });
   }
 
   const live = cands.filter((c): c is Cand => 'bed' in c);
@@ -325,7 +407,10 @@ export function mixFrame(
   };
   const cap = caption(air, place, frame);
   frame.caption =
-    prev && prev.caption.line === cap.line && prev.caption.levelNote === cap.levelNote && prev.caption.silentReason === cap.silentReason
+    prev &&
+    prev.caption.line === cap.line &&
+    prev.caption.levelNote === cap.levelNote &&
+    prev.caption.silentReason === cap.silentReason
       ? prev.caption
       : cap;
   return frame;

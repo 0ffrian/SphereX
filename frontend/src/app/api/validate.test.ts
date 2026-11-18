@@ -194,16 +194,28 @@ describe('Area search replies (A17.8, A19.5; issue #130)', () => {
   it('refuses an index without the areas list or with a bad size', () => {
     const idx = shared('area/index.json') as { areas: Record<string, unknown>[] };
     expect(() => parseAreaIndex({ ...idx, areas: undefined })).toThrow(ApiError);
-    expect(() => parseAreaIndex({ ...idx, areas: [{ ...idx.areas[0], width_deg: 0 }] })).toThrow(/width_deg/);
+    expect(() => parseAreaIndex({ ...idx, areas: [{ ...idx.areas[0], width_deg: 0 }] })).toThrow(
+      /width_deg/,
+    );
   });
   it('refuses a known object with a bad kind, count or position', () => {
     const k = shared('area/known.json') as { known: Record<string, unknown>[] };
-    const bad = (patch: Record<string, unknown>) => parseAreaKnown({ ...k, known: [{ ...k.known[0], ...patch }] });
+    const bad = (patch: Record<string, unknown>) =>
+      parseAreaKnown({ ...k, known: [{ ...k.known[0], ...patch }] });
     expect(() => bad({ kind: 'planet' })).toThrow(/kind/);
     expect(() => bad({ n_frames: 0 })).toThrow(/n_frames/);
-    expect(() => bad({ positions: [{ frame_id: 'f', time: 'soon', ra: 1, dec: 1 }] })).toThrow(/time/);
-    expect(() => bad({ positions: [{ frame_id: 'f', time: '2026-03-20T00:00:00.000Z', ra: 400, dec: 1 }] })).toThrow(/ra/);
-    expect(() => parseAreaKnown({ ...k, provenance: { positions: { tag: 'artistic' }, skybot: { tag: 'measured' } } })).toThrow(/tag/);
+    expect(() => bad({ positions: [{ frame_id: 'f', time: 'soon', ra: 1, dec: 1 }] })).toThrow(
+      /time/,
+    );
+    expect(() =>
+      bad({ positions: [{ frame_id: 'f', time: '2026-03-20T00:00:00.000Z', ra: 400, dec: 1 }] }),
+    ).toThrow(/ra/);
+    expect(() =>
+      parseAreaKnown({
+        ...k,
+        provenance: { positions: { tag: 'artistic' }, skybot: { tag: 'measured' } },
+      }),
+    ).toThrow(/tag/);
   });
   it('refuses a path that is not model_dependent', () => {
     const p = shared('track/eros-2026-03/path.json') as Record<string, unknown>;

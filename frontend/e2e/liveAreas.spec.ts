@@ -13,15 +13,34 @@ const NOW = '2026-11-13T07:28:00.000Z';
 const VIEW = { ra: 30, dec: 10, fovDeg: 20 };
 
 async function open(page: Page, query: string, opts: { stored?: () => boolean } = {}) {
-  const json = (body: unknown) => ({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+  const json = (body: unknown) => ({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify(body),
+  });
   const stored = opts.stored ?? (() => false);
   await page.route('**/v1/areas', (r) =>
     r.fulfill(
       json({
         areas: stored()
-          ? [{ area_id: 'live-dr1', ra: 30, dec: 10, width_deg: 8, height_deg: 8, data_release: 'spherex_dr1', n_frames: 14, n_visits: 2, computed_at: NOW, cached_at: NOW }]
+          ? [
+              {
+                area_id: 'live-dr1',
+                ra: 30,
+                dec: 10,
+                width_deg: 8,
+                height_deg: 8,
+                data_release: 'spherex_dr1',
+                n_frames: 14,
+                n_visits: 2,
+                computed_at: NOW,
+                cached_at: NOW,
+              },
+            ]
           : [],
-        cached_at: NOW, computed_at: NOW, missing: [],
+        cached_at: NOW,
+        computed_at: NOW,
+        missing: [],
         provenance: { areas: { tag: 'derived', source: 'test', formula: 'test' } },
       }),
     ),
@@ -29,20 +48,43 @@ async function open(page: Page, query: string, opts: { stored?: () => boolean } 
   await page.route('**/v1/areas/live-dr1/known', (r) =>
     r.fulfill(
       json({
-        known: [{ designation: '9532 Abramenko', number: 9532, object_id: null, kind: 'asteroid', v_mag: 17.4, n_frames: 14, n_visits: 2, track_available: false, positions: [] }],
+        known: [
+          {
+            designation: '9532 Abramenko',
+            number: 9532,
+            object_id: null,
+            kind: 'asteroid',
+            v_mag: 17.4,
+            n_frames: 14,
+            n_visits: 2,
+            track_available: false,
+            positions: [],
+          },
+        ],
         skybot: [{ visit: 1, fetched_at: NOW }],
-        cached_at: NOW, computed_at: NOW, missing: [],
-        provenance: { positions: { tag: 'model_dependent', assumption: 'test', source: 'test' }, skybot: { tag: 'measured', source: 'test' } },
+        cached_at: NOW,
+        computed_at: NOW,
+        missing: [],
+        provenance: {
+          positions: { tag: 'model_dependent', assumption: 'test', source: 'test' },
+          skybot: { tag: 'measured', source: 'test' },
+        },
       }),
     ),
   );
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto(`/${query}`);
-  await expect(page.getByTestId('sky-pane')).toHaveAttribute('data-sky-state', 'ready', { timeout: 30_000 });
+  await expect(page.getByTestId('sky-pane')).toHaveAttribute('data-sky-state', 'ready', {
+    timeout: 30_000,
+  });
   await page.waitForFunction(() => '__sxSky' in globalThis);
-  await page.evaluate((v) => (globalThis as unknown as { __sxSky: SkyHook }).__sxSky.setView(v), VIEW);
+  await page.evaluate(
+    (v) => (globalThis as unknown as { __sxSky: SkyHook }).__sxSky.setView(v),
+    VIEW,
+  );
 }
-const fov = (page: Page) => page.evaluate(() => (globalThis as unknown as { __sxSky: SkyHook }).__sxSky.getView().fovDeg);
+const fov = (page: Page) =>
+  page.evaluate(() => (globalThis as unknown as { __sxSky: SkyHook }).__sxSky.getView().fovDeg);
 
 /**
  * State 1 (issue #157): the pointer is the region, drawn to scale; at the default view it is many
@@ -68,7 +110,10 @@ async function aimAndDraw(page: Page) {
   expect(await fov(page)).toBeCloseTo(20, 5);
   await expect(canvas).toHaveAttribute('data-area-mode', 'aim');
   // Zoomed in, the region is one square: a click selects it as a single area.
-  await page.evaluate((v) => (globalThis as unknown as { __sxSky: SkyHook }).__sxSky.setView(v), { ...VIEW, fovDeg: 3 });
+  await page.evaluate((v) => (globalThis as unknown as { __sxSky: SkyHook }).__sxSky.setView(v), {
+    ...VIEW,
+    fovDeg: 3,
+  });
   await page.mouse.move(645, 405);
   await expect(aim).toContainText(/1 square · about \d+ min$/);
   await page.mouse.click(640, 400);
@@ -82,11 +127,15 @@ test('select one square, offer, compute, then the Known list opens', async ({ pa
   const card = page.getByTestId('live-card');
   await expect(card).toHaveAttribute('data-state', 'offer', { timeout: 15_000 });
   await expect(page.getByTestId('live-facts')).toContainText('SPHEREx DR1');
-  await expect(page.getByTestId('live-facts')).toContainText('12 Jun 2026, 11:11 and 12:49 UTC (1.6 h apart)');
+  await expect(page.getByTestId('live-facts')).toContainText(
+    '12 Jun 2026, 11:11 and 12:49 UTC (1.6 h apart)',
+  );
   await expect(page.getByTestId('area-box')).toContainText(/^\d\.\d\d° × \d\.\d\d°$/);
   await page.getByTestId('live-compute').click();
   await expect(card).toHaveAttribute('data-state', 'running');
-  await expect(page.locator('[data-testid="live-steps"] li[data-state="done"]').first()).toBeVisible();
+  await expect(
+    page.locator('[data-testid="live-steps"] li[data-state="done"]').first(),
+  ).toBeVisible();
   await expect(page.getByTestId('live-time')).toContainText('elapsed');
   // Minimise: the island's pill keeps the step.
   await page.getByTestId('live-minimise').click();
@@ -101,13 +150,18 @@ test('waiting: another area is computing; Cancel goes back to the offer', async 
   await open(page, '?live=mock-queued&live_hold=0');
   await page.getByTestId('tool-known').click();
   // The keyboard way: Enter selects the region in the middle (one square when zoomed in).
-  await page.evaluate((v) => (globalThis as unknown as { __sxSky: SkyHook }).__sxSky.setView(v), { ...VIEW, fovDeg: 3 });
+  await page.evaluate((v) => (globalThis as unknown as { __sxSky: SkyHook }).__sxSky.setView(v), {
+    ...VIEW,
+    fovDeg: 3,
+  });
   await page.keyboard.press('Enter');
   const card = page.getByTestId('live-card');
   await expect(card).toHaveAttribute('data-state', 'offer', { timeout: 15_000 });
   await page.getByTestId('live-compute').click();
   await expect(card).toHaveAttribute('data-state', 'queued');
-  await expect(page.getByTestId('live-waiting')).toHaveText('Another area is computing. Yours starts next.');
+  await expect(page.getByTestId('live-waiting')).toHaveText(
+    'Another area is computing. Yours starts next.',
+  );
   await expect(page.getByTestId('live-time')).toHaveText('Starts in about 4 minthen about 9 min');
   await page.getByTestId('live-stop').click();
   await expect(card).toHaveAttribute('data-state', 'offer');
@@ -123,12 +177,17 @@ test('failures: no visit pair, archive not reachable (Try again), offline', asyn
   ] as const) {
     await open(page, `?live=${q}`);
     await page.getByTestId('tool-area').click();
-    await page.evaluate((v) => (globalThis as unknown as { __sxSky: SkyHook }).__sxSky.setView(v), { ...VIEW, fovDeg: 3 });
+    await page.evaluate((v) => (globalThis as unknown as { __sxSky: SkyHook }).__sxSky.setView(v), {
+      ...VIEW,
+      fovDeg: 3,
+    });
     await page.keyboard.press('Enter');
     const failed = page.getByTestId('live-failed');
     await expect(failed).toHaveAttribute('data-code', code, { timeout: 15_000 });
     await expect(failed.locator('b')).toHaveText(title);
-    await expect(page.getByTestId('live-retry')).toHaveCount(code === 'upstream_unavailable' ? 1 : 0);
+    await expect(page.getByTestId('live-retry')).toHaveCount(
+      code === 'upstream_unavailable' ? 1 : 0,
+    );
     await page.getByTestId('live-draw-again').click();
     await expect(page.getByTestId('sky-canvas')).toHaveAttribute('data-area-mode', 'aim');
   }

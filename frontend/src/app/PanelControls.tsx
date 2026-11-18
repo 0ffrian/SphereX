@@ -7,7 +7,10 @@ const SPRING_K = 500;
 const SPRING_C = 40; // damping 40, mass 1
 
 function reducedMotion(): boolean {
-  return typeof window !== 'undefined' && (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false);
+  return (
+    typeof window !== 'undefined' &&
+    (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false)
+  );
 }
 
 export interface ToggleOption<T extends string> {
@@ -124,7 +127,8 @@ export function ToggleGroup<T extends string>({
                 const enabled = options.filter((o) => !o.disabled);
                 const i = enabled.findIndex((o) => o.value === value);
                 let next = -1;
-                if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next = (i + 1) % enabled.length;
+                if (e.key === 'ArrowRight' || e.key === 'ArrowDown')
+                  next = (i + 1) % enabled.length;
                 else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp')
                   next = (i - 1 + enabled.length) % enabled.length;
                 else if (e.key === 'Home') next = 0;
@@ -140,7 +144,12 @@ export function ToggleGroup<T extends string>({
             : undefined
         }
       >
-        <span ref={thumbRef} className="sx-seg-thumb" aria-hidden="true" style={{ opacity: ready ? 1 : 0 }} />
+        <span
+          ref={thumbRef}
+          className="sx-seg-thumb"
+          aria-hidden="true"
+          style={{ opacity: ready ? 1 : 0 }}
+        />
         {options.map((o) => (
           <button
             key={o.value}
@@ -229,7 +238,15 @@ export function Row({
         <span>{title}</span>
         <span className="sx-row-r">
           {count !== undefined && count !== null && <span>{count}</span>}
-          <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg
+            aria-hidden="true"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
             <path d="m6 9 6 6 6-6" />
           </svg>
         </span>

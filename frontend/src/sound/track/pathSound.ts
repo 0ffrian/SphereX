@@ -227,7 +227,8 @@ export class PathSoundController {
     }
     const params = pathVoiceParams(hop);
     // updateTone is false after stop(), a hidden page or a honesty change: start the tone again.
-    if (this.ownsTone && this.sound.hasTone('path') && this.sound.updateTone('path', params)) return;
+    if (this.ownsTone && this.sound.hasTone('path') && this.sound.updateTone('path', params))
+      return;
     this.ownsTone = this.sound.startTone('path', params);
   }
 }

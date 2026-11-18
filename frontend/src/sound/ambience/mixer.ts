@@ -98,7 +98,8 @@ const defaultTimers: Timers = {
 };
 
 const clampPan = (p: number) => Math.max(-PAN_MAX, Math.min(PAN_MAX, Number.isFinite(p) ? p : 0));
-const clampHz = (f: number) => Math.max(LP_F_MIN, Math.min(LP_F_MAX, Number.isFinite(f) ? f : LP_F_MAX));
+const clampHz = (f: number) =>
+  Math.max(LP_F_MIN, Math.min(LP_F_MAX, Number.isFinite(f) ? f : LP_F_MAX));
 const linear = (db: number) => (db <= SILENT_DB + 1e-9 || !Number.isFinite(db) ? 0 : dbToGain(db));
 
 /** §10 the ambience mixer. One per AudioContext. */
@@ -268,7 +269,10 @@ export class AmbienceMixer {
       voices += vs.length;
       const live = g.events.filter((e) => !e.ended);
       events += live.length;
-      nodes += 2 + vs.reduce((n, v) => n + (v.pan ? 5 : 4), 0) + live.reduce((n, e) => n + e.nodes.length, 0);
+      nodes +=
+        2 +
+        vs.reduce((n, v) => n + (v.pan ? 5 : 4), 0) +
+        live.reduce((n, e) => n + e.nodes.length, 0);
     }
     return { groups: this.groups.size, voices, events, nodes };
   }
@@ -303,7 +307,16 @@ export class AmbienceMixer {
     gain.connect(this.bus);
     const send = this.harmonicSend();
     if (send) harm.connect(send);
-    g = { key, gain, harm, voices: new Map(), events: [], retired: [], stopTimer: null, fading: false };
+    g = {
+      key,
+      gain,
+      harm,
+      voices: new Map(),
+      events: [],
+      retired: [],
+      stopTimer: null,
+      fading: false,
+    };
     this.groups.set(key, g);
     return g;
   }
@@ -360,7 +373,13 @@ export class AmbienceMixer {
       gain,
       pan,
       // Filters and pan start at their targets; the gain starts silent so the first write always ramps it in.
-      last: { gainDb: SILENT_DB, lp: clampHz(bed.lowpassHz), shelf: bed.shelfDb, pan: clampPan(bed.pan), rate: bed.playbackRate },
+      last: {
+        gainDb: SILENT_DB,
+        lp: clampHz(bed.lowpassHz),
+        shelf: bed.shelfDb,
+        pan: clampPan(bed.pan),
+        rate: bed.playbackRate,
+      },
     };
   }
 
@@ -399,10 +418,13 @@ export class AmbienceMixer {
     g.voices.delete(v.key);
     v.gain.gain.setTargetAtTime(0, now, REBAKE_XFADE_S / FADE_TAU_DIVISOR);
     g.retired.push(v);
-    this.timers.set(() => {
-      this.stopVoice(v);
-      g.retired = g.retired.filter((r) => r !== v);
-    }, (REBAKE_XFADE_S + STOP_MARGIN_S) * 1000);
+    this.timers.set(
+      () => {
+        this.stopVoice(v);
+        g.retired = g.retired.filter((r) => r !== v);
+      },
+      (REBAKE_XFADE_S + STOP_MARGIN_S) * 1000,
+    );
   }
 
   private fadeGroup(g: Group, s: number): void {
@@ -416,11 +438,14 @@ export class AmbienceMixer {
       g.harm.gain.setTargetAtTime(0, now, tau);
     }
     if (g.stopTimer !== null) this.timers.clear(g.stopTimer);
-    g.stopTimer = this.timers.set(() => {
-      g.stopTimer = null;
-      this.teardown(g);
-      this.groups.delete(g.key);
-    }, (s + STOP_MARGIN_S) * 1000);
+    g.stopTimer = this.timers.set(
+      () => {
+        g.stopTimer = null;
+        this.teardown(g);
+        this.groups.delete(g.key);
+      },
+      (s + STOP_MARGIN_S) * 1000,
+    );
   }
 
   private dropEvent(e: EventVoice, now: number, pending = false): void {

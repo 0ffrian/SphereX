@@ -14,7 +14,12 @@ import { defaultSettings, flushSoundSettings, useSoundSettings } from '@/sound/s
 import { SoundProvider } from '@/sound/SoundProvider';
 import { initialAppData, useAppStore } from '@/state/store';
 import { FakeAudioContext } from '@/test/fakeAudio';
-import { HEAR_SHIFT_HINT, HEAR_SHIFT_LABEL, HEAR_SHIFT_NO_AUDIO, HearTheShift } from './HearTheShift';
+import {
+  HEAR_SHIFT_HINT,
+  HEAR_SHIFT_LABEL,
+  HEAR_SHIFT_NO_AUDIO,
+  HearTheShift,
+} from './HearTheShift';
 
 declare global {
   var IS_REACT_ACT_ENVIRONMENT: boolean;
@@ -171,7 +176,9 @@ describe('Hear the Shift (R8.9.2, A20.9)', () => {
 
   it('press, press, press while the unlock is pending: the cancelled start is not "no audio"', async () => {
     const pending: ((v: boolean) => void)[] = [];
-    vi.spyOn(sound, 'unlock').mockImplementation(() => new Promise<boolean>((r) => pending.push(r)));
+    vi.spyOn(sound, 'unlock').mockImplementation(
+      () => new Promise<boolean>((r) => pending.push(r)),
+    );
     await render();
     await click('hear-shift-toggle'); // start A (pending)
     await click('hear-shift-toggle'); // stop: cancels A

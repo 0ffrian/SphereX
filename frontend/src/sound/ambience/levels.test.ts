@@ -2,12 +2,22 @@
 import { describe, expect, it } from 'vitest';
 import { ceilingCaption, CEILING_TEXT } from './captions';
 import { earthAir, makeAir, makePlace, makeWind, marsAir, venusAir } from './fakeEngine.testutil';
-import { bedKey, cellWeight, flowOffsetDb, iRef, mixFrame, patternSamples, presentOffsetDb, stageGainDb } from './levels';
+import {
+  bedKey,
+  cellWeight,
+  flowOffsetDb,
+  iRef,
+  mixFrame,
+  patternSamples,
+  presentOffsetDb,
+  stageGainDb,
+} from './levels';
 import { SILENT_DB } from './tuning';
 
 const S5 = new Set([bedKey('S5', 0)]);
 const bed = (f: ReturnType<typeof mixFrame>, id: string) => f.beds.find((b) => b.id === id)!;
-const seaPlace = (z: number) => makePlace(z, () => ({ cls: 'sea' }), { wind: makeWind({ U10: 7, Uz: 7 }) });
+const seaPlace = (z: number) =>
+  makePlace(z, () => ({ cls: 'sea' }), { wind: makeWind({ U10: 7, Uz: 7 }) });
 
 describe('R1 area integral', () => {
   it('a full plane out to 1.25 R sums to the exact disc integral, ≈ 1/4 at any height (cos² directivity)', () => {
@@ -45,14 +55,22 @@ describe('monotone levels', () => {
     const S4 = new Set([bedKey('S4', 0)]);
     const at = (ring: number) =>
       bed(
-        mixFrame(air, makePlace(0.5, (s) => ({ coast: s.index > 0 && Math.ceil(s.index / 12) === ring }), { wind: makeWind({ U10: 8 }) }), S4),
+        mixFrame(
+          air,
+          makePlace(0.5, (s) => ({ coast: s.index > 0 && Math.ceil(s.index / 12) === ring }), {
+            wind: makeWind({ U10: 8 }),
+          }),
+          S4,
+        ),
         'S4',
       ).trueDb;
     expect(at(1)).toBeGreaterThan(at(2));
     expect(at(2)).toBeGreaterThan(at(3));
   });
   it('pan follows the side the sound comes from and is capped at 0.8', () => {
-    const east = makePlace(0.3, (s) => ({ cls: Math.abs(Math.sin(s.bearing) - 1) < 1e-9 ? 'sea' : 'land' }));
+    const east = makePlace(0.3, (s) => ({
+      cls: Math.abs(Math.sin(s.bearing) - 1) < 1e-9 ? 'sea' : 'land',
+    }));
     const p = bed(mixFrame(air, east, S5), 'S5').pan;
     expect(p).toBeGreaterThan(0);
     expect(p).toBeLessThanOrEqual(0.8);
@@ -74,12 +92,16 @@ describe('presentation (§11.4, §11.7)', () => {
     const quieter = bed(earth, 'S1_land').trueDb - bed(f, 'S1_land').trueDb;
     expect(quieter).toBeGreaterThan(30);
     const n = Math.max(5, Math.round(quieter / 5) * 5);
-    expect(f.caption.levelNote).toBe(`Real level: about ${n} dB quieter than on Earth (raised so you can hear it)`);
+    expect(f.caption.levelNote).toBe(
+      `Real level: about ${n} dB quieter than on Earth (raised so you can hear it)`,
+    );
     expect(f.caption.line).toContain(`real level about ${n} dB quieter than Earth`);
   });
   it('Venus-like wind is louder and lowered; Earth gets no note', () => {
     const S1 = new Set([bedKey('S1_land', 0)]);
-    expect(mixFrame(venusAir(), makePlace(0.3), S1).caption.levelNote).toMatch(/louder than on Earth \(lowered\)$/);
+    expect(mixFrame(venusAir(), makePlace(0.3), S1).caption.levelNote).toMatch(
+      /louder than on Earth \(lowered\)$/,
+    );
     expect(mixFrame(earthAir(), makePlace(0.3), S1).caption.levelNote).toBeNull();
   });
   it('the stage window lifts a quiet bed to -24 dB, holds +6 dB headroom, never lifts silence', () => {
@@ -107,13 +129,29 @@ describe('presentation (§11.4, §11.7)', () => {
     expect(b).toEqual(a);
     expect(a.beds.map((x) => x.id)).toEqual(['S1_land', 'S5']);
     expect(mixFrame(earthAir(), seaPlace(0.3), keys, a).caption).toBe(a.caption);
-    for (const x of a.beds) for (const v of Object.values(x)) if (typeof v === 'number') expect(Number.isNaN(v)).toBe(false);
+    for (const x of a.beds)
+      for (const v of Object.values(x))
+        if (typeof v === 'number') expect(Number.isNaN(v)).toBe(false);
   });
 
   it('R10: a gas giant roar at altitude is raised by the listener-height impedance and is audible', () => {
-    const jup = makeAir({ T0: 130, P0: 1e4, mu: 2.3, gas: true, U: 150, H_km: 27, presetId: 'jup' });
+    const jup = makeAir({
+      T0: 130,
+      P0: 1e4,
+      mu: 2.3,
+      gas: true,
+      U: 150,
+      H_km: 27,
+      presetId: 'jup',
+    });
     expect(flowOffsetDb(jup, 50)).toBeGreaterThan(presentOffsetDb(jup));
-    const f = mixFrame(jup, makePlace(50, () => ({}), { wind: makeWind({ U10: 120, Uz: 120, Iu: 0.15, parts: [{ kind: 'jet', U: 120 }] }) }), new Set([bedKey('S12', 0)]));
+    const f = mixFrame(
+      jup,
+      makePlace(50, () => ({}), {
+        wind: makeWind({ U10: 120, Uz: 120, Iu: 0.15, parts: [{ kind: 'jet', U: 120 }] }),
+      }),
+      new Set([bedKey('S12', 0)]),
+    );
     expect(f.beds[0]!.gainDb).toBeGreaterThan(-24);
     expect(f.caption.heard[0]?.id).toBe('S12');
   });
@@ -132,7 +170,9 @@ describe('R8 presence before presentation', () => {
   });
   it('still air (< 1 m/s) is silent', () => {
     const calm = makePlace(0.3, () => ({}), { wind: makeWind({ U10: 0.5, Uz: 0.5 }) });
-    expect(bed(mixFrame(air, calm, new Set([bedKey('S1_land', 0)])), 'S1_land').gainDb).toBe(SILENT_DB);
+    expect(bed(mixFrame(air, calm, new Set([bedKey('S1_land', 0)])), 'S1_land').gainDb).toBe(
+      SILENT_DB,
+    );
   });
   it('a bed more than 40 dB under the loudest present bed is silent and not captioned', () => {
     const p = makePlace(0.3, () => ({}), { exposure: 1e-4, wind: makeWind({ U10: 7, Uz: 7 }) });
@@ -143,7 +183,14 @@ describe('R8 presence before presentation', () => {
 
   it('review L5: inside a hurricane the rumble carries only the background wind and the caption names the wind once', () => {
     const air = earthAir({ Vmax: 70 });
-    const w = makeWind({ U10: 60, Uz: 60, parts: [{ kind: 'hurricane', U: 60 }, { kind: 'trade', U: 5 }] });
+    const w = makeWind({
+      U10: 60,
+      Uz: 60,
+      parts: [
+        { kind: 'hurricane', U: 60 },
+        { kind: 'trade', U: 5 },
+      ],
+    });
     const p = makePlace(0.3, () => ({}), { wind: w });
     const f = mixFrame(air, p, new Set([bedKey('S1_land', 0), bedKey('S9', 0)]));
     const solo = mixFrame(air, p, new Set([bedKey('S1_land', 0)]));

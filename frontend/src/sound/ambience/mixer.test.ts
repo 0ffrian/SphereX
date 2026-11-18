@@ -2,7 +2,14 @@
 // timers (no ticks), no node per tick, dead bands, world crossfades on the group gain only, events, the harmonic tap,
 // pan limits (the mono check, blue 14) and ducking through the shared bus.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { FakeAudioContext, FakeFilter, FakeGain, FakeNode, FakeParam, FakePanner } from '@/test/fakeAudio';
+import {
+  FakeAudioContext,
+  FakeFilter,
+  FakeGain,
+  FakeNode,
+  FakeParam,
+  FakePanner,
+} from '@/test/fakeAudio';
 import { getBus, holdDuck } from '../audioGraph';
 import { earthAir } from './fakeEngine.testutil';
 import { AmbienceMixer, type BufferSource } from './mixer';
@@ -20,7 +27,9 @@ import type { BedLevel, MixFrame, SourceId, Strike } from './types';
 
 const buf = (tag: string) => ({ tag }) as unknown as AudioBuffer;
 
-function palette(entries: Record<string, AudioBuffer | null>): BufferSource & { set(k: string, b: AudioBuffer | null): void } {
+function palette(
+  entries: Record<string, AudioBuffer | null>,
+): BufferSource & { set(k: string, b: AudioBuffer | null): void } {
   const m = new Map(Object.entries(entries));
   return {
     get: (id: SourceId, v: number) => m.get(`${id}|${v}`) ?? null,
@@ -29,11 +38,27 @@ function palette(entries: Record<string, AudioBuffer | null>): BufferSource & { 
 }
 
 function bed(id: SourceId, o: Partial<BedLevel> = {}): BedLevel {
-  return { id, variant: 0, trueDb: 60, gainDb: -6, lowpassHz: 8000, shelfDb: 0, pan: 0.2, playbackRate: 1, harmonic: false, ...o };
+  return {
+    id,
+    variant: 0,
+    trueDb: 60,
+    gainDb: -6,
+    lowpassHz: 8000,
+    shelfDb: 0,
+    pan: 0.2,
+    playbackRate: 1,
+    harmonic: false,
+    ...o,
+  };
 }
 
 function frame(beds: BedLevel[], silent = false): MixFrame {
-  return { beds, presentOffsetDb: 0, silent, caption: { line: '', heard: [], levelNote: null, silentReason: null } };
+  return {
+    beds,
+    presentOffsetDb: 0,
+    silent,
+    caption: { line: '', heard: [], levelNote: null, silentReason: null },
+  };
 }
 
 let ctx: FakeAudioContext;
@@ -77,7 +102,7 @@ describe('AmbienceMixer graph', () => {
     const m = mk({ harmonic: false });
     m.setWorld('w1');
     m.apply(frame([bed('S5')]), palette({ 'S5|0': buf('sea') }));
-    const g = (sources()[0]!.outputs[0]!.outputs[0]!.outputs[0]) as FakeGain;
+    const g = sources()[0]!.outputs[0]!.outputs[0]!.outputs[0] as FakeGain;
     expect(g.outputs[0]!.outputs).toContain(bus);
     expect(m.stats().nodes).toBe(2 + 4);
   });
@@ -131,7 +156,10 @@ describe('AmbienceMixer graph', () => {
   it('harmonic beds tap the harmonic branch; others do not', () => {
     const m = mk();
     m.setWorld('w1');
-    m.apply(frame([bed('S1_land', { harmonic: true }), bed('S5')]), palette({ 'S1_land|0': buf('w'), 'S5|0': buf('s') }));
+    m.apply(
+      frame([bed('S1_land', { harmonic: true }), bed('S5')]),
+      palette({ 'S1_land|0': buf('w'), 'S5|0': buf('s') }),
+    );
     const [wind, sea] = sources();
     const gw = wind!.outputs[0]!.outputs[0]!.outputs[0] as FakeGain;
     const gs = sea!.outputs[0]!.outputs[0]!.outputs[0] as FakeGain;
@@ -242,10 +270,16 @@ describe('AmbienceMixer fades (C1 to C3: audio clock + wall-clock stop, no ticks
     const oldGroup = worldGain();
     for (let i = 2; i <= 6; i++) {
       m.setWorld(`w${i}`);
-      m.apply(frame([bed('S5'), bed('S1_land')]), palette({ 'S5|0': buf(`s${i}`), 'S1_land|0': buf(`w${i}`) }));
+      m.apply(
+        frame([bed('S5'), bed('S1_land')]),
+        palette({ 'S5|0': buf(`s${i}`), 'S1_land|0': buf(`w${i}`) }),
+      );
       vi.advanceTimersByTime((REBAKE_XFADE_S + STOP_MARGIN_S) * 1000 + 1);
     }
-    expect(oldGroup.gain.targets.at(-1)).toMatchObject({ v: 0, tau: REBAKE_XFADE_S / FADE_TAU_DIVISOR });
+    expect(oldGroup.gain.targets.at(-1)).toMatchObject({
+      v: 0,
+      tau: REBAKE_XFADE_S / FADE_TAU_DIVISOR,
+    });
     expect(m.stats().nodes).toBe(one);
     expect(m.stats().groups).toBe(1);
     // no param anywhere received a value curve (the overlap rule)
@@ -277,14 +311,24 @@ describe('AmbienceMixer fades (C1 to C3: audio clock + wall-clock stop, no ticks
     m.setWorld('w1');
     m.apply(frame([bed('S5')]), palette({ 'S5|0': buf('s') }));
     const h = holdDuck(c);
-    const duck = ctx.nodes.filter((n): n is FakeGain => n instanceof FakeGain).find((g) => g.gain.calls.some((x) => x[0] === 'target' && x[1] < 0.5 && x[1] > 0.2));
+    const duck = ctx.nodes
+      .filter((n): n is FakeGain => n instanceof FakeGain)
+      .find((g) => g.gain.calls.some((x) => x[0] === 'target' && x[1] < 0.5 && x[1] > 0.2));
     expect(duck).toBeDefined();
     h.release();
   });
 });
 
 describe('AmbienceMixer events (thunder)', () => {
-  const strike = (o: Partial<Strike> = {}): Strike => ({ t0: 10, d_m: 2000, bearing: Math.PI / 2, seed: 1, variant: 2, flash: true, ...o });
+  const strike = (o: Partial<Strike> = {}): Strike => ({
+    t0: 10,
+    d_m: 2000,
+    bearing: Math.PI / 2,
+    seed: 1,
+    variant: 2,
+    flash: true,
+    ...o,
+  });
   const air = earthAir();
   const opts = { nowS: 9.7, z_km: 0.3, head: 0 };
   function live() {
@@ -317,7 +361,8 @@ describe('AmbienceMixer events (thunder)', () => {
   it('never fires above the silence ceiling, even for a near strike (§11.7, PR #124 review N1)', () => {
     const { m, p } = live();
     const n = sources().length;
-    for (const z_km of [100, 120, 400]) expect(m.fire(strike({ d_m: 50 }), air, p, { ...opts, z_km })).toBe(false);
+    for (const z_km of [100, 120, 400])
+      expect(m.fire(strike({ d_m: 50 }), air, p, { ...opts, z_km })).toBe(false);
     expect(m.fire(strike({ d_m: 50 }), { ...air, airOK: false }, p, opts)).toBe(false);
     expect(sources().length).toBe(n);
     expect(m.stats().events).toBe(0);
@@ -362,4 +407,3 @@ describe('AmbienceMixer events (thunder)', () => {
     expect(g.gain.targets).toHaveLength(0);
   });
 });
-

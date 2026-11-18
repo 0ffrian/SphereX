@@ -201,7 +201,9 @@ describe('ListenSweep on the audio clock', () => {
     // R13.9: the sweep's volume feeds the spectrum bus (then the master and the limiter).
     const bus = getBus(ctx.asAudioContext(), 'spectrum') as unknown as FakeNode;
     const shared = sharedNodes(ctx.asAudioContext()) as unknown as readonly FakeNode[];
-    const gains = ctx.nodes.filter((n): n is FakeGain => n instanceof FakeGain && !shared.includes(n));
+    const gains = ctx.nodes.filter(
+      (n): n is FakeGain => n instanceof FakeGain && !shared.includes(n),
+    );
     const volume = gains[0]!;
     expect(volume.gain.value).toBe(0.5);
     expect(volume.outputs).toContain(bus);

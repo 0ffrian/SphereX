@@ -26,7 +26,8 @@ export function Panels() {
   // opens from it when the data is in (or the search failed, so the error and Try again show).
   if (tool === 'area') return <AreaCard />;
   // Minimised: the island's pill holds its place (Island.tsx) and a click on it brings it back.
-  if ((tool === 'flipbook' || tool === 'spectrum') && !thinking && !minimised) return <ObjectPanel />;
+  if ((tool === 'flipbook' || tool === 'spectrum') && !thinking && !minimised)
+    return <ObjectPanel />;
   return null;
 }
 
@@ -90,7 +91,7 @@ function ObjectPanel() {
 
   const r = sky.resolved;
   const subtitle = r
-    ? (displayName(r.name) || formatCoords(r.ra, r.dec))
+    ? displayName(r.name) || formatCoords(r.ra, r.dec)
     : sky.query
       ? `Looking up ${sky.query.q}`
       : 'No object yet';

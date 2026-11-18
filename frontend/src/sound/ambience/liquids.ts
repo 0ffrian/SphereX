@@ -8,15 +8,39 @@ import { DROP_CD, DROP_R_EARTH_M, EARTH_REF, MF_SIZE_EXP, WATER_RHO, WATER_SIGMA
 export const LIQUIDS: Record<FluidKey | 'lava', LiquidProps> = {
   water: { name: 'water', rho: 998, sigma: 0.0728, viscous: false, tag: 'measured' },
   /** 94 K; rho [verify] (pure methane; a Titan lake is a methane-ethane-nitrogen mix). */
-  methane: { name: 'methane', rho: 450, sigma: 0.0178, viscous: false, tag: 'inferred_from_analog' },
+  methane: {
+    name: 'methane',
+    rho: 450,
+    sigma: 0.0178,
+    viscous: false,
+    tag: 'inferred_from_analog',
+  },
   /** 240 K: saturated liquid density 682 kg/m³ (NIST Chemistry WebBook, ammonia at its 239.8 K boiling point); sigma [verify]. */
   ammonia: { name: 'ammonia', rho: 682, sigma: 0.032, viscous: false, tag: 'measured' },
   /** Mixture; rho and sigma [verify]. */
-  ammoniaWater: { name: 'ammonia-water', rho: 850, sigma: 0.05, viscous: false, tag: 'inferred_from_analog' },
+  ammoniaWater: {
+    name: 'ammonia-water',
+    rho: 850,
+    sigma: 0.05,
+    viscous: false,
+    tag: 'inferred_from_analog',
+  },
   /** 77 K; [verify]. */
-  nitrogen: { name: 'nitrogen', rho: 807, sigma: 0.0089, viscous: false, tag: 'inferred_from_analog' },
+  nitrogen: {
+    name: 'nitrogen',
+    rho: 807,
+    sigma: 0.0089,
+    viscous: false,
+    tag: 'inferred_from_analog',
+  },
   /** At the triple point; sigma -> 0 at 304 K [verify]. */
-  co2: { name: 'carbon dioxide', rho: 1178, sigma: 0.017, viscous: false, tag: 'inferred_from_analog' },
+  co2: {
+    name: 'carbon dioxide',
+    rho: 1178,
+    sigma: 0.017,
+    viscous: false,
+    tag: 'inferred_from_analog',
+  },
   /** Basalt; rho [verify]. */
   lava: { name: 'lava', rho: 2650, sigma: 0.36, viscous: true, tag: 'inferred_from_analog' },
 };

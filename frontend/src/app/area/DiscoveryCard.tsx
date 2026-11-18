@@ -27,11 +27,21 @@ import type { RealDiscovery } from './realArea';
 
 /** The result chip of a mover row: the stored verdict for a prepared area, the demo's kind else. */
 function MoverChip({ m, step }: { m: DiscoveryMover; step: number }) {
-  if (step < 4) return m.known || m.track ? <span className="sx-chip">checking</span> : <span className="sx-chip">{m.visits < 2 ? 'Seen once' : 'Unexplained'}</span>;
+  if (step < 4)
+    return m.known || m.track ? (
+      <span className="sx-chip">checking</span>
+    ) : (
+      <span className="sx-chip">{m.visits < 2 ? 'Seen once' : 'Unexplained'}</span>
+    );
   const v = m.track?.verdict;
   if (v === 'possible') return <span className="sx-chip">Possible</span>;
   if (v === 'unchecked') return <span className="sx-chip">Not checked</span>;
-  if (v === 'found_blind' && !m.known) return <span className="sx-chip" data-tone="ok">Matched on file</span>;
+  if (v === 'found_blind' && !m.known)
+    return (
+      <span className="sx-chip" data-tone="ok">
+        Matched on file
+      </span>
+    );
   if (m.known) return <span className="sx-chip" data-tone="ok">{`Known: ${m.known}`}</span>;
   if (m.visits < 2) return <span className="sx-chip">Seen once</span>;
   return (
@@ -51,7 +61,14 @@ const keep = (m: DiscoveryMover, f: MoverFilter) =>
 /** A dot's flags from the area's `/dots` (Points used). */
 function useDotFlags(real: RealDiscovery | null) {
   return useMemo(
-    () => flagsFrom(new Map((real?.dots?.visits ?? []).flatMap((v) => v.dots.map((d) => [d.dot_id, d.flags] as const)))),
+    () =>
+      flagsFrom(
+        new Map(
+          (real?.dots?.visits ?? []).flatMap((v) =>
+            v.dots.map((d) => [d.dot_id, d.flags] as const),
+          ),
+        ),
+      ),
     [real],
   );
 }
@@ -60,8 +77,7 @@ function useDotFlags(real: RealDiscovery | null) {
 const ROW_SIZE = 19;
 const SEARCH_ROW = { ...SEARCHING_LOOK, size: ROW_SIZE };
 const THINK_ROW = { ...FETCHING_LOOK, size: ROW_SIZE };
-const stepLook = (label: string) =>
-  label.startsWith('Drop') ? THINK_ROW : SEARCH_ROW;
+const stepLook = (label: string) => (label.startsWith('Drop') ? THINK_ROW : SEARCH_ROW);
 
 export function DiscoveryCard() {
   const disc = useAreaStore((s) => s.disc);
@@ -76,7 +92,9 @@ export function DiscoveryCard() {
   const cameFrom = useAreaStore((s) => (s.sel >= 0 ? (s.disc?.movers[s.sel]?.id ?? null) : null));
   useEffect(() => {
     if (!cameFrom) return;
-    const row = document.querySelector<HTMLElement>(`[data-testid="disc-mover-${CSS.escape(cameFrom)}"]`);
+    const row = document.querySelector<HTMLElement>(
+      `[data-testid="disc-mover-${CSS.escape(cameFrom)}"]`,
+    );
     row?.scrollIntoView({ block: 'nearest' });
     row?.focus({ preventScroll: true });
     // Only on arrival.
@@ -124,156 +142,179 @@ export function DiscoveryCard() {
       back={back}
     >
       <div className="sx-live sx-results" data-testid="disc-card">
-      {refusal ? (
-        <AreaAlert refusal={refusal} />
-      ) : real ? (
-        <RealAreaNotes
-          areaId={real.entry.area_id}
-          release={real.summary.data_release}
-          computedAt={real.summary.computed_at}
-          summary={real.summary}
-          synthetic={real.synthetic}
-          missing={real.missing}
-        />
-      ) : disc?.demo ? (
-        <div className="sx-kn-foot">
-          <DemoTag />
-        </div>
-      ) : null}
-      <p className="sr-only" role="status" aria-live="polite">
-        {announce}
-      </p>
-      {total === 0 && !refusal && (
-        <div className="fb-muted sx-ar-wait">
-          <GridLoader {...SEARCH_ROW} />
-          Loading the area…
-        </div>
-      )}
-      <ol className="sx-ar-steps" data-testid="disc-steps">
-        {steps.map((s, k) => {
-          const on = k <= step;
-          const now = k === nowStep;
-          return (
-            <li key={s.label} data-state={on ? 'on' : now ? 'now' : undefined}>
-              <i aria-hidden="true">
-                {now ? (
-                  <GridLoader {...stepLook(s.label)} />
-                ) : (
-                  <svg viewBox="0 0 24 24">
-                    <path d="M5 12.5l4.5 4.5L19 7.5" />
-                  </svg>
-                )}
-              </i>
-              <span>{s.label}</span>
-              <small>{on ? (measuredOnly && s.measuredResult !== undefined ? s.measuredResult : s.result) : ''}</small>
-            </li>
-          );
-        })}
-      </ol>
-      {real && visits.length > 1 && step >= 0 && (
-        <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Visit shown on the sky">
-          <span className="fb-muted">Visit</span>
-          {visits.map((v) => {
-            const on = (visit ?? visits[0]) === v;
+        {refusal ? (
+          <AreaAlert refusal={refusal} />
+        ) : real ? (
+          <RealAreaNotes
+            areaId={real.entry.area_id}
+            release={real.summary.data_release}
+            computedAt={real.summary.computed_at}
+            summary={real.summary}
+            synthetic={real.synthetic}
+            missing={real.missing}
+          />
+        ) : disc?.demo ? (
+          <div className="sx-kn-foot">
+            <DemoTag />
+          </div>
+        ) : null}
+        <p className="sr-only" role="status" aria-live="polite">
+          {announce}
+        </p>
+        {total === 0 && !refusal && (
+          <div className="fb-muted sx-ar-wait">
+            <GridLoader {...SEARCH_ROW} />
+            Loading the area…
+          </div>
+        )}
+        <ol className="sx-ar-steps" data-testid="disc-steps">
+          {steps.map((s, k) => {
+            const on = k <= step;
+            const now = k === nowStep;
             return (
-              <button
-                key={v}
-                type="button"
-                className="sx-btn sx-btn-ghost"
-                aria-pressed={on}
-                data-on={on || undefined}
-                onClick={() => useAreaStore.getState().setVisit(v)}
-                data-testid={`area-visit-${v}`}
-              >
-                {on ? `${v} (shown)` : v}
-              </button>
+              <li key={s.label} data-state={on ? 'on' : now ? 'now' : undefined}>
+                <i aria-hidden="true">
+                  {now ? (
+                    <GridLoader {...stepLook(s.label)} />
+                  ) : (
+                    <svg viewBox="0 0 24 24">
+                      <path d="M5 12.5l4.5 4.5L19 7.5" />
+                    </svg>
+                  )}
+                </i>
+                <span>{s.label}</span>
+                <small>
+                  {on
+                    ? measuredOnly && s.measuredResult !== undefined
+                      ? s.measuredResult
+                      : s.result
+                    : ''}
+                </small>
+              </li>
             );
           })}
-        </div>
-      )}
-      {step >= 3 && showVerdicts && shownMovers.length > 0 && (
-        <ToggleGroup<MoverFilter>
-          label="Show"
-          hideLabel
-          options={[
-            { value: 'all', label: `All ${shownMovers.length}`, testId: 'disc-filter-all' },
-            { value: 'rock', label: `Rock-like ${shownMovers.filter((m) => keep(m, 'rock')).length}`, testId: 'disc-filter-rock' },
-            { value: 'known', label: `Known ${shownMovers.filter((m) => keep(m, 'known')).length}`, testId: 'disc-filter-known' },
-          ]}
-          value={active}
-          onChange={setFilter}
-          testId="disc-filter"
-        />
-      )}
-      {step >= 3 && active !== 'all' && shown.length === 0 && (
-        <p className="fb-muted" data-testid="disc-filter-none">
-          {active === 'rock' ? 'No rock-like tracks here.' : 'No known objects here.'}
-        </p>
-      )}
-      {step >= 3 && (
-        <div className="sx-lk-list" data-testid="disc-list">
-          {shown.map(({ m, i }) => (
-            <button
-              key={m.id}
-              type="button"
-              className="sx-lk-row"
-              onClick={() => useAreaStore.getState().openMover(i)}
-              data-testid={`disc-mover-${m.id}`}
-            >
-              <b>{m.id}</b>
-              <span>
-                {m.visits < 2
-                  ? 'Seen in 1 visit'
-                  : m.track
-                    ? `Moves across ${m.visits} visits`
-                    : 'Moves across both visits'}
-              </span>
-              <span className="sx-lk-end">
-                <MoverChip m={m} step={step} />
-                {showVerdicts && m.spectrum && <SpectrumRowWord spectrum={m.spectrum} />}
-              </span>
-            </button>
-          ))}
-        </div>
-      )}
-      {done && real && (
-        // Until the completeness and false-alarm checks (D4 to D7) exist (plan answer 4).
-        <Alert tone="warn" title="Detection rates not measured yet" line="Treat possible tracks as leads." testId="disc-rates" />
-      )}
-      {(done || refusal || nPossible > 0) && (
-        <div className="sx-live-btns">
-          {nPossible > 0 && (
-            <button
-              type="button"
-              className="sx-btn-outline"
-              onClick={() => useAreaStore.getState().setShowPossible(!showPossible)}
-              data-testid="disc-show-possible"
-            >
-              {`${showPossible ? 'Hide' : 'Show'} possible (${nPossible.toLocaleString('en-GB')})`}
-            </button>
-          )}
-          {done && real && (
-            <a
-              className="sx-btn-outline"
-              href={`${API_BASE}/areas/${encodeURIComponent(real.entry.area_id)}/export.ecsv`}
-              download
-              data-testid="disc-export"
-            >
-              Export ECSV
-            </a>
-          )}
-          {(done || refusal) && (
-            <button
-              type="button"
-              className="sx-btn-outline"
-              data-testid="area-redraw"
-              onClick={() => useAreaStore.getState().redraw()}
-            >
-              Choose another region
-            </button>
-          )}
-        </div>
-      )}
+        </ol>
+        {real && visits.length > 1 && step >= 0 && (
+          <div
+            className="flex flex-wrap items-center gap-2"
+            role="group"
+            aria-label="Visit shown on the sky"
+          >
+            <span className="fb-muted">Visit</span>
+            {visits.map((v) => {
+              const on = (visit ?? visits[0]) === v;
+              return (
+                <button
+                  key={v}
+                  type="button"
+                  className="sx-btn sx-btn-ghost"
+                  aria-pressed={on}
+                  data-on={on || undefined}
+                  onClick={() => useAreaStore.getState().setVisit(v)}
+                  data-testid={`area-visit-${v}`}
+                >
+                  {on ? `${v} (shown)` : v}
+                </button>
+              );
+            })}
+          </div>
+        )}
+        {step >= 3 && showVerdicts && shownMovers.length > 0 && (
+          <ToggleGroup<MoverFilter>
+            label="Show"
+            hideLabel
+            options={[
+              { value: 'all', label: `All ${shownMovers.length}`, testId: 'disc-filter-all' },
+              {
+                value: 'rock',
+                label: `Rock-like ${shownMovers.filter((m) => keep(m, 'rock')).length}`,
+                testId: 'disc-filter-rock',
+              },
+              {
+                value: 'known',
+                label: `Known ${shownMovers.filter((m) => keep(m, 'known')).length}`,
+                testId: 'disc-filter-known',
+              },
+            ]}
+            value={active}
+            onChange={setFilter}
+            testId="disc-filter"
+          />
+        )}
+        {step >= 3 && active !== 'all' && shown.length === 0 && (
+          <p className="fb-muted" data-testid="disc-filter-none">
+            {active === 'rock' ? 'No rock-like tracks here.' : 'No known objects here.'}
+          </p>
+        )}
+        {step >= 3 && (
+          <div className="sx-lk-list" data-testid="disc-list">
+            {shown.map(({ m, i }) => (
+              <button
+                key={m.id}
+                type="button"
+                className="sx-lk-row"
+                onClick={() => useAreaStore.getState().openMover(i)}
+                data-testid={`disc-mover-${m.id}`}
+              >
+                <b>{m.id}</b>
+                <span>
+                  {m.visits < 2
+                    ? 'Seen in 1 visit'
+                    : m.track
+                      ? `Moves across ${m.visits} visits`
+                      : 'Moves across both visits'}
+                </span>
+                <span className="sx-lk-end">
+                  <MoverChip m={m} step={step} />
+                  {showVerdicts && m.spectrum && <SpectrumRowWord spectrum={m.spectrum} />}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+        {done && real && (
+          // Until the completeness and false-alarm checks (D4 to D7) exist (plan answer 4).
+          <Alert
+            tone="warn"
+            title="Detection rates not measured yet"
+            line="Treat possible tracks as leads."
+            testId="disc-rates"
+          />
+        )}
+        {(done || refusal || nPossible > 0) && (
+          <div className="sx-live-btns">
+            {nPossible > 0 && (
+              <button
+                type="button"
+                className="sx-btn-outline"
+                onClick={() => useAreaStore.getState().setShowPossible(!showPossible)}
+                data-testid="disc-show-possible"
+              >
+                {`${showPossible ? 'Hide' : 'Show'} possible (${nPossible.toLocaleString('en-GB')})`}
+              </button>
+            )}
+            {done && real && (
+              <a
+                className="sx-btn-outline"
+                href={`${API_BASE}/areas/${encodeURIComponent(real.entry.area_id)}/export.ecsv`}
+                download
+                data-testid="disc-export"
+              >
+                Export ECSV
+              </a>
+            )}
+            {(done || refusal) && (
+              <button
+                type="button"
+                className="sx-btn-outline"
+                data-testid="area-redraw"
+                onClick={() => useAreaStore.getState().redraw()}
+              >
+                Choose another region
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </PanelCard>
   );
@@ -292,7 +333,9 @@ export function MoverCard() {
     const spectra = disc.real.spectra;
     return (
       <RealTrackCard
-        spectrum={spectra && m.spectrum ? { track: m.spectrum, spectra, flags, measuredOnly } : null}
+        spectrum={
+          spectra && m.spectrum ? { track: m.spectrum, spectra, flags, measuredOnly } : null
+        }
         track={m.track}
         provenance={disc.real.tracks.provenance}
         synthetic={disc.real.synthetic}
