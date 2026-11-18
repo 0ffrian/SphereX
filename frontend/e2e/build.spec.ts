@@ -236,11 +236,19 @@ test('Build it: split view, steps run to done, Escape and Back close it', async 
   await expect(page.getByTestId('build-title')).toHaveText('Building Aqua Prime');
   await expect(page.getByTestId('build-title')).toBeFocused();
   expect(new URL(page.url()).hash).toContain('build');
-  // The pane fills the view while it builds and slides to the right half after (mock-up
-  // `setShifted`); the sky stays under it at full width; the transport steps aside.
+  // The pane fills the view while it builds and, since Q-419 (b82f8d1e), keeps the whole view once
+  // built (no split by default: data-solo). Explore is the split view: it slides the pane to the
+  // right half (mock-up `setShifted`). The sky stays under it at full width and the transport
+  // steps aside as soon as the pane is open (App `split` is "Build it is open", not Explore).
   const view = (await page.locator('main.sx-view').boundingBox())!;
+  await expect(pane).toHaveAttribute('data-phase', 'done', { timeout: 100_000 });
+  await expect(pane).toHaveAttribute('data-solo', 'true');
   await expect
-    .poll(async () => (await pane.boundingBox())!.width, { timeout: 120_000 })
+    .poll(async () => (await pane.boundingBox())!.width)
+    .toBeGreaterThan(view.width * 0.95);
+  await page.getByTestId('build-explore').click();
+  await expect
+    .poll(async () => (await pane.boundingBox())!.width, { timeout: 30_000 })
     .toBeLessThan(view.width * 0.55);
   await expect(page.locator('.sx-transport-slot')).toHaveAttribute('inert', '');
   // The first build already shows the steps and raises the level to + Artistic by itself (the pane
