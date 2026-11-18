@@ -1,0 +1,89 @@
+name: ci
+
+# The only CI entry point. Every PR gets one required check, `ci-gate`, which
+# always reports, even when no checks were needed (docs-only PRs). backend.yml
+# and frontend.yml run only when their paths change. Plan: .github/codeowners-plan.md.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    name: changed paths
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+      codeowners: ${{ steps.filter.outputs.codeowners }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+      - id: filter
+        env:
+          BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          set -u
+          # Fail safe: if the changed files can't be listed, run every check.
+          if [ -z "$BASE" ] || ! files=$(git diff --name-only "$BASE" HEAD); then
+            echo "Could not diff against '$BASE'; running all checks."
+            { echo "backend=true"; echo "frontend=true"; echo "codeowners=true"; } >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "Changed files:"; echo "$files"
+          has() { if grep -qE "$1" <<< "$files"; then echo true; else echo false; fi; }
+          {
+            echo "backend=$(has '^(backend/|shared/|\.github/workflows/)')"
+            echo "frontend=$(has '^(frontend/|shared/|\.github/workflows/)')"
+            echo "codeowners=$(has '^\.github/CODEOWNERS$')"
+          } >> "$GITHUB_OUTPUT"
+          cat "$GITHUB_OUTPUT"
+
+  backend:
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    uses: ./.github/workflows/backend.yml
+
+  frontend:
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    uses: ./.github/workflows/frontend.yml
+
+  codeowners:
+    name: CODEOWNERS has no errors
+    needs: changes
+    if: needs.changes.outputs.codeowners == 'true' && github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          # The PR merge commit lives in this repo, fork PRs included.
+          URL: repos/${{ github.repository }}/codeowners/errors?ref=${{ github.sha }}
+        run: |
+          out=$(gh api "$URL")
+          echo "$out"
+          [ "$(jq '.errors | length' <<< "$out")" = 0 ]
+
+  gate:
+    name: ci-gate
+    needs: [changes, backend, frontend, codeowners]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          echo "$NEEDS" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
+          # `changes` must succeed; every other job must be success or skipped.
+          jq -e '.changes.result == "success"' <<< "$NEEDS" > /dev/null || { echo "changes job did not succeed"; exit 1; }
+          jq -e '[.[].result] | all(. == "success" or . == "skipped")' <<< "$NEEDS" > /dev/null || { echo "a required job failed or was cancelled"; exit 1; }
+          echo "ci-gate passed"
