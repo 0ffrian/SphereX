@@ -51,7 +51,8 @@ test('the dock draws the mock-up icons and its highlight slides to the hovered t
 }) => {
   await page.goto('/');
   for (const id of ['known', 'area'])
-    await expect(page.getByTestId(`tool-${id}`).locator('svg.ai-draw')).toHaveCount(1);
+    // Hugeicons from Animate UI (orbit, view), not the rail's `.ai-draw` icons (PR #157, b87274fc).
+    await expect(page.getByTestId(`tool-${id}`).locator('svg.sx-ico')).toHaveCount(1);
   const hl = page.locator('.sx-hl');
   // At rest nothing is active, so the highlight is hidden.
   await expect(hl).toHaveCSS('opacity', '0');
@@ -164,9 +165,9 @@ test('Try again from the keyboard: focus lands on the panel title, not <body>', 
   await page.keyboard.press('Enter');
   // The island thinks again (the panel unmounts, and with it the focused button), then returns.
   await expect(page.getByTestId('island')).toHaveAttribute('data-arrived', '');
-  // The Flipbook card has no header strip: focus lands on the card itself (its name is
-  // "Flipbook: <object>"), the sky's pixels being under it.
-  await expect(page.getByTestId('object-panel')).toBeFocused();
+  // The Flipbook card has no header strip but draws its own heading (the object's name, tabindex
+  // -1): focus lands on that title (A21.5, PR #107's PanelCard focus), the sky's pixels being under it.
+  await expect(page.getByTestId('object-panel').getByTestId('object-name')).toBeFocused();
 });
 
 test('phone width: no circle over the header text; Searching shows over the sky, then the sheet opens', async ({
