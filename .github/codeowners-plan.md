@@ -258,6 +258,8 @@ Test T12: two approved PRs queued together both merge after one `ci-gate` run ea
 | T8 | Admin runs `git push origin HEAD:main`, a force push and a branch delete | All rejected |
 | T9 | PR with a failing pytest | `ci-gate` red, merge blocked |
 | T10 | PR with an unresolved review thread | Merge blocked until resolved |
+| T10b | Owner A approves, owner B requests changes, author pushes a fix | Still blocked (A's approval dismissed, B's request stays); merges only after B approves |
+| T10c | All three owners requested on a `backend/` PR, only Moon approves | Mergeable: one code owner is enough |
 | T11 | Approver = last pusher (owner pushes a fix to someone's PR, then approves) | Doesn't count (`require_last_push_approval`) |
 
 Record the result of each row (pass/fail + PR link) in the step 7 PR description.
