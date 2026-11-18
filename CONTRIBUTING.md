@@ -11,6 +11,10 @@ Every change reaches `main` through a pull request. Nobody pushes, force-pushes 
 
 A new push after an approval dismisses it, so ask for a fresh review.
 
+## Merging: the merge queue
+
+When the PR is approved and green, press **Merge when ready**. GitHub adds it to the merge queue, combines it with the latest `main` (and any PRs ahead of it), runs `ci-gate` again on that combined commit, and merges only if it passes. If it fails, the PR leaves the queue and stays open, and the PR page shows why. Two PRs that pass on their own can't break `main` together, and you never need to update your branch just to merge it.
+
 ## Who owns what
 
 The file that enforces this is [.github/CODEOWNERS](.github/CODEOWNERS) (decision Q-484 in [docs/decisions/scope-process.md](docs/decisions/scope-process.md)).
