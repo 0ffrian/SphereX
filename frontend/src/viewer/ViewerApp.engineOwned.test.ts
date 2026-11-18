@@ -71,4 +71,15 @@ describe('ViewerApp.setEngineOwned', () => {
     await v.whenSettled();
     v.dispose();
   });
+
+  it('does not stall whenSettled while a settle burst is pending', async () => {
+    const { v } = make();
+    v.setEngineOwned(true);
+    // freezeClock restarts the settle burst (burstLeft > 0, as it does with a post chain) and waits
+    // for it; this viewer draws no frame while an engine owns the body, so the burst would never end.
+    (v as unknown as { burstLeft: number }).burstLeft = 3;
+    await v.freezeClock(0);
+    await v.whenSettled();
+    v.dispose();
+  });
 });
