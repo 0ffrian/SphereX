@@ -31,6 +31,33 @@ def test_check_reports_a_changed_file(tmp_path: Path) -> None:
     assert bf.main(["--check"], out_dir=tmp_path, params_dir=tmp_path / "params") == 1
 
 
+def _resave_png(path: Path, *, level: int, flip_pixel: bool = False) -> None:
+    with Image.open(path) as im:
+        im.load()
+        if flip_pixel:
+            px = im.load()
+            assert px is not None
+            v = px[0, 0]
+            px[0, 0] = tuple(255 - c for c in v) if isinstance(v, tuple) else 255 - v
+        im.save(path, "PNG", compress_level=level)
+
+
+def test_check_accepts_a_png_deflated_by_another_zlib(tmp_path: Path) -> None:
+    """Q-204: Windows and Linux zlib deflate the same pixels to other bytes; not a change."""
+    assert bf.main([], out_dir=tmp_path, params_dir=tmp_path / "params") == 0
+    victim = next(tmp_path.rglob("height.png"))
+    before = victim.read_bytes()
+    _resave_png(victim, level=1)
+    assert victim.read_bytes() != before
+    assert bf.main(["--check"], out_dir=tmp_path, params_dir=tmp_path / "params") == 0
+
+
+def test_check_reports_a_changed_png_pixel(tmp_path: Path) -> None:
+    assert bf.main([], out_dir=tmp_path, params_dir=tmp_path / "params") == 0
+    _resave_png(next(tmp_path.rglob("normal.png")), level=1, flip_pixel=True)
+    assert bf.main(["--check"], out_dir=tmp_path, params_dir=tmp_path / "params") == 1
+
+
 def test_demo_planet_params_are_baked_from_their_cards() -> None:
     """Issue #68 Part 6: the demo params are `card_to_params` of the card (plus sun_dir)."""
     for name, text in bf.demo_planet_params().items():

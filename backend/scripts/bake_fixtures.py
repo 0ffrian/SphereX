@@ -33,7 +33,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import unquote
 
-from app.core.render.bake import FILES, bake, encode, texture_dir
+from app.core.render.bake import FILES, bake, encode, same_png, texture_dir
 from app.core.render.card_to_params import card_to_params
 from app.core.render.params import params_from_card
 from app.settings import BACKEND_DIR
@@ -123,7 +123,7 @@ def main(
     ap.add_argument("--check", action="store_true", help="compare with the files on disk")
     args = ap.parse_args(argv)
     files = fixture_files()
-    stale = [rel for rel, data in files.items() if _read(out_dir / rel) != data]
+    stale = [rel for rel, data in files.items() if not _same(rel, _read(out_dir / rel), data)]
     params = {Path(n): t.encode("utf-8") for n, t in demo_planet_params().items()}
     stale_params = [n for n, data in params.items() if _read(params_dir / n) != data]
     if args.check:
@@ -150,6 +150,19 @@ def _read(path: Path) -> bytes | None:
         return path.read_bytes()
     except OSError:
         return None
+
+
+def _same(rel: Path, on_disk: bytes | None, fresh: bytes) -> bool:
+    """Byte-exact, except a PNG map: same chunks and inflated image data suffices (Q-204).
+
+    Pillow's zlib differs between platforms (1.2.13 on Windows, 1.3.x on Linux CI), so the same
+    pixels can deflate to other bytes. ``bake_demo_pack`` compares the same way.
+    """
+    if on_disk is None:
+        return False
+    if rel.suffix == ".png":
+        return same_png(on_disk, fresh)
+    return on_disk == fresh
 
 
 if __name__ == "__main__":
