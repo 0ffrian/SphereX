@@ -1,11 +1,14 @@
 name: ci
 
 # The only CI entry point. Every PR gets one required check, `ci-gate`, which
-# always reports, even when no checks were needed (docs-only PRs). backend.yml
+# always reports, even when no checks were needed (docs-only PRs), and runs
+# again in the merge queue on the PR combined with the latest main. backend.yml
 # and frontend.yml run only when their paths change. Plan: .github/codeowners-plan.md.
 
 on:
   pull_request:
+  # The merge queue tests each PR on top of the latest main before merging it.
+  merge_group:
   push:
     branches: [main]
 
@@ -30,7 +33,7 @@ jobs:
           fetch-depth: 0
       - id: filter
         env:
-          BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+          BASE: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
         run: |
           set -u
           # Fail safe: if the changed files can't be listed, run every check.
