@@ -1,6 +1,6 @@
 # Plan: code owners, required CI and `main` protection
 
-Status (18 Nov 2026): step 1 done (alt accounts removed; fork-PR CI approval set to `all_external_contributors`). Step 2 built on `chore/ci-gate`; steps 3–4 built on `chore/codeowners`. Neither pushed. **Step 5 done early** (ruleset `main`, id 27523962, active, no bypass, `ci-gate` pinned to app 15368, verified from a real check run): the `chore/ci-gate` PR reports `ci-gate` from its own run, so it can merge; other PRs report `ci-gate` only once `ci.yml` is on `main` and they are updated. Steps 6–7 not started.
+Status (18 Nov 2026): step 1 done (alt accounts removed; fork-PR CI approval set to `all_external_contributors`). Step 2 built on `chore/ci-gate`; steps 3–4 built on `chore/codeowners`. Neither pushed. **Step 5 done early** (ruleset `main`, id 27523962, active, no bypass, `ci-gate` pinned to app 15368, verified from a real check run): the `chore/ci-gate` PR reports `ci-gate` from its own run, so it can merge; other PRs report `ci-gate` only once `ci.yml` is on `main` and they are updated. Step 5b (merge queue) waits for the `chore/ci-gate` PR. Steps 6–7 not started.
 Delete this file in the last PR (step 7); the lasting rules go into `CONTRIBUTING.md`.
 
 ## 0. Starting state (checked 18 Nov 2026)
@@ -225,6 +225,22 @@ Create via `gh api -X POST repos/0ffrian/SphereX/rulesets --input ruleset.json`:
 - **[verify]** `integration_id` 15368 is the GitHub Actions app: read it back with `gh api repos/0ffrian/SphereX/commits/<sha>/check-runs --jq '.check_runs[] | select(.name=="ci-gate") | .app.id'` on any merged commit, and use that number.
 - Then re-trigger #182 (P10).
 - Rollback: `gh api -X PUT repos/0ffrian/SphereX/rulesets/<id> -f enforcement=disabled`.
+
+### Step 5b: merge queue (after the `chore/ci-gate` PR, which adds the `merge_group` trigger, is on `main`)
+Enabling it earlier would leave queued PRs waiting for a `ci-gate` that never runs. Add this rule to ruleset 27523962 (GET it, append to `rules`, PUT it back):
+
+```json
+{ "type": "merge_queue", "parameters": {
+    "merge_method": "MERGE",
+    "grouping_strategy": "ALLGREEN",
+    "max_entries_to_build": 5,
+    "min_entries_to_merge": 1,
+    "max_entries_to_merge": 5,
+    "min_entries_to_merge_wait_minutes": 0,
+    "check_response_timeout_minutes": 60 } }
+```
+
+Test T12: two approved PRs queued together both merge after one `ci-gate` run each on the combined commits; a PR whose combination fails leaves the queue and stays open.
 
 ### Step 6: test matrix (throwaway PRs, closed unmerged unless noted)
 
