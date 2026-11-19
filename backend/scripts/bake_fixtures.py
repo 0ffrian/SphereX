@@ -155,8 +155,8 @@ def _read(path: Path) -> bytes | None:
 def _same(rel: Path, on_disk: bytes | None, fresh: bytes) -> bool:
     """Byte-exact, except a PNG map: same chunks and inflated image data suffices (Q-204).
 
-    Pillow's zlib differs between platforms (1.2.13 on Windows, 1.3.x on Linux CI), so the same
-    pixels can deflate to other bytes. ``bake_demo_pack`` compares the same way.
+    The same locked Pillow deflates the same pixels to other bytes on Windows and on Linux CI; the
+    cause is not pinned (Q-204). ``bake_demo_pack`` compares the same way.
     """
     if on_disk is None:
         return False

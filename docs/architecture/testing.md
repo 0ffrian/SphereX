@@ -4,10 +4,10 @@
 
 ## A12 Testing
 
-**CI** (GitHub Actions, on every push and PR that touches the folder or `shared/`):
+**CI** (GitHub Actions). `.github/workflows/ci.yml` is the only entry point. It runs on every PR, in the merge queue (the PR on top of the latest `main`), on pushes to `main` and on manual runs. Its job `ci-gate` is the one required check: it always reports, and it fails if any job below failed or was cancelled. A path filter picks the jobs. The backend runs for `backend/`, `shared/`, `.github/workflows/`, the root `package.json` and the frontend files the backend checks read (`frontend/src/viewer/`, `frontend/src/app/search/`); the frontend runs for `frontend/`, `shared/`, `.github/workflows/` and the root `package.json`. If the changed files can't be listed, everything runs.
 
-- `.github/workflows/backend.yml`, job "ruff, mypy, pytest (offline)": `scripts.generate_contract --check`, `ruff check`, `ruff format --check`, `mypy`, `pytest -q`, all with `SX_OFFLINE=1`.
-- `.github/workflows/frontend.yml`, job "typecheck, lint, test, build": `contract:check`, `typecheck`, `lint`, `format:check`, `test` (Vitest 5.1.0), `build`; job "playwright (chromium)": `test:e2e` (Playwright 1.64.1), report uploaded on failure.
+- `.github/workflows/backend.yml` (reusable), job "ruff, mypy, pytest (offline)": `scripts.generate_contract --check`, `scripts.bake_fixtures --check`, `scripts.area_fixtures --check`, `scripts.bake_demo_pack --check`, `ruff check`, `ruff format --check`, `mypy`, `pytest -q`, all with `SX_OFFLINE=1`.
+- `.github/workflows/frontend.yml` (reusable), job "typecheck, lint, test, build": `contract:check`, `typecheck`, `lint`, `format:check`, `test` (Vitest 5.1.0), `build`; job "playwright (chromium)": `test:e2e` (Playwright 1.64.1), report uploaded on failure.
 
 | Layer | Method | Where | CI | Status |
 |---|---|---|---|---|
