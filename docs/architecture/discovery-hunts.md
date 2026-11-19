@@ -2,7 +2,7 @@
 
 > **Part of:** Architecture spec ([index](README.md)) · **Sections:** A22 to A22.16 (proposed numbers; see "Status" below) · **Builds on:** Area search and Discovery ([A16](moving-objects/area-search.md), [A17](moving-objects/area-backend.md), [A17.6 to A17.13](moving-objects/area-contract.md), [A18](moving-objects/area-ui.md)), scans and runs ([Q-470](../decisions/moving-objects.md), Q-471, Q-472, Q-473, Q-483), the gap analysis ([Q-478](../decisions/moving-objects.md)), the scan honesty rules ([Q-479](../decisions/moving-objects.md)) · **Rules it follows:** provenance tags and badges ([A5.2](data-contract.md#a52-provenance-tags-and-badges), D-02, D-21), the cache ([D-25](../decisions/data-sources.md)), the generated contract ([D-18](../decisions/contract.md)), the design language ([design-language.md](../design-language.md), D-38) · **Mock-up:** [`mockup/discovery-hunts.html`](../../mockup/discovery-hunts.html)
 
-**Status: proposal, revised 18 Nov 2026, not built.** First written on 17 Nov 2026. Revised the next day after Atish's review on PR #182 (three comments: findings per hunt, credit routes checked one by one, sizes, calibration, twelve citations to correct). Moon took twelve decisions on that review (R-1 to R-12, [A22.15](#a2215-decisions)) and changed the tool's purpose: **it is a scientific tool meant for research**, not an outreach tool. Three things are still needed before any code:
+**Status: proposal, revised 18 Nov 2026, not built.** First written on 17 Nov 2026. Revised on 18 and 19 Nov 2026 after Atish's two reviews on PR #182 (three comments: findings per hunt, credit routes checked one by one, sizes, calibration, twelve citations to correct). Moon took twelve decisions on the first review (R-1 to R-12) and answered the rest on the re-review (R-13 to R-28, and the PD rows; all in [A22.15](#a2215-decisions)) and changed the tool's purpose: **it is a scientific tool meant for research**, not an outreach tool. Three things are still needed before any code:
 
 1. **Moon approves the revised mock-up** (UI needs an approved mock-up before it is built).
 2. **The decisions in [A22.15](#a2215-decisions) get their `D-` and `Q-` rows** in `docs/decisions/`. This PR holds two files only (this spec and the mock-up), so the decision index, the section map in [README.md](README.md), the routing table in `docs/README.md` and the UML are **not** updated here. Run `/sx-spec-sync` after approval. Until then "A22" is a proposed number and nothing else in the docs links here.
@@ -71,7 +71,7 @@ The journey keeps the shape it has now:
 - **IASC dropped** (R-2). Atish proposed Pan-STARRS image sets through the International Astronomical Search Collaboration. It is a student programme with image sets handed to registered teams, not open research data.
 - **Rubin images not used.** Alerts are public worldwide, but images and data releases are proprietary for two years to anyone without data rights ([RTN-011](https://rtn-011.lsst.io/RTN-011.pdf)) **[verify Mauritius's status]**.
 
-**Left out on purpose:** galaxy distances for cosmology (needs whole-sky statistics); direct imaging of planets; our own difference imaging for transients; ice along sightlines (a later view, not a hunt); microlensing and primordial black holes (surveys catch the events, and no single event proves a primordial black hole); interstellar visitors as a search (precovery of named ones is in H4).
+**Left out on purpose:** Hubble and JWST archive searches for asteroid trails (small fields make finds rare per patch, and Asteroid Hunters on Zooniverse already covers Hubble); galaxy distances for cosmology (needs whole-sky statistics); direct imaging of planets; our own difference imaging for transients; ice along sightlines (a later view, not a hunt); microlensing and primordial black holes (surveys catch the events, and no single event proves a primordial black hole); interstellar visitors as a search (precovery of named ones is in H4).
 
 **Releases.**
 
@@ -108,13 +108,13 @@ Replaces the single-purpose offer card of state 3 for a Discovery scan. Known ob
   1. title (bold) and, right-aligned, the time estimate ("about 2 h") or a short state ("not here", "after 2 Dec");
   2. one line saying what it measures, in plain words;
   3. one muted line naming the data releases and the hunt version ("ZTF DR24, Gaia DR3 · v1.0");
-  4. where coverage is partial or the sample is limited, that third line becomes a status-dot line with the reason ("High latitude only: in the plane the sample is limited to r < 18") or ("ZTF reaches 28 of 35 squares; the bottom row is too far south").
+  4. where coverage is partial or the sample is limited, that third line becomes a status-dot line with the reason ("High latitude only: in the plane the sample is limited to r < 18") or ("ZTF covers 71% of the patch; the southern part is outside its reach", from the hunt's coverage MOC).
 - **Disabled rows** are greyed, cannot be ticked, and always say why ("Opens with Gaia DR4, 2 December 2026"). The reason comes from the plan reply (`hunts[].reason`), never from the frontend.
 - **Facts under the list:** Squares ("35 (7 × 5) of up to 2°"), Time ("about 26 h: 23 h of image work, then the rest"; see the rule below), Download ("about 40 GB"), Data (the distinct releases of the ticked hunts).
 - **Buttons:** primary "Run 6 hunts" (the count of ticked hunts; "Run 1 hunt"; disabled with "Choose a hunt" when none is ticked) and "Select again".
 - **Default ticks:** the Validated and Characterisation groups. Experimental and Context rows start unticked.
 - **Time rule (R-9).** The estimate is the heavy lane's **total** (its hunts run one after another), plus the light lane's work that does not overlap it, plus a contention factor for shared archives (IRSA serves H1, H2, H4 and H9). It is computed by the backend from per-unit costs measured on a reference PC ([A22.11](#a2211-running-on-a-home-gaming-pc)). It is **never** the largest single hunt. Ticking updates Time, Download and the button from the plan already fetched, with no new request.
-- **Size before start (R-6).** Each catalogue and light-curve hunt answers its expected row count and download size from a **count query** to the archive (for example `SELECT COUNT(*)` with the hunt's cuts) made when the plan is asked for. This is the one network call the plan adds to Q-470 (8), and it is cached. When a hunt's sample must be limited, the limit is a **stated selection criterion** (a magnitude limit, a contamination limit), shown on the row and written into the selection function of the result. There is never a silent row cap.
+- **Size before start (R-6).** Each catalogue and light-curve hunt answers its expected row count and download size from a **count query** to the archive (for example `SELECT COUNT(*)` with the hunt's cuts) made when the plan is asked for. This is the one network call the plan adds to Q-470 (8), and it is cached. **Offline (R-17, amends Q-470 (8)):** under `SX_OFFLINE=1` the plan uses a cached count when one exists; otherwise the row reads "Size not known offline" and the hunt can run only if its inputs are already cached. **Budget (R-26):** above a per-hunt download budget (default 50 GB, a setting), the row requires a stated limit (for example a magnitude limit) before Run is enabled; the plan never lets a run start that would not fit. When a hunt's sample must be limited, the limit is a **stated selection criterion** (a magnitude limit, a contamination limit), shown on the row and written into the selection function of the result. There is never a silent row cap.
 - **Keyboard and screen readers:** each row is one labelled checkbox; the group headings are real headings; a disabled row's reason is part of its accessible description; the estimate is read after the title.
 
 #### A22.3.3 Step 3: scanning (the scan card, extended)
@@ -123,7 +123,7 @@ Replaces the single-purpose offer card of state 3 for a Discovery scan. Known ob
 - **Mini grid, the "Square n of N · step" line and the time left:** as built. The square states on the sky and in the mini grid are those of the pixel hunts (H4 first). Catalogue and light-curve hunts do not walk squares (R-10); their rows show their own progress. When no pixel hunt is ticked, the mini grid is not shown.
 - **New: one progress row per ticked hunt,** in the existing step-list style: a state mark (spinner, tick, or a muted dot), the hunt's name, a count in the hunt's own unit, and a thin bar while running. Examples: "Variable stars · 18,000 of 52,000" (stars), "Known rocks · square 5 of 35", "Cold nearby worlds · 2 candidates · done".
 - **A finished hunt's row is a button** that opens its results while the others still run. Catalogue hunts finish in minutes; image hunts take hours.
-- **Messages:** one status-dot line per skipped square (as built) and one per hunt with a coverage gap ("Novae: squares 29 to 35 not covered. Too far south for ZTF."). A hunt that failed says so in its row and in one line, with the reason; the scan goes on (as a failed square does today, Q-471 (3)).
+- **Messages:** one status-dot line per skipped square (as built) and one per hunt with a coverage gap, stated for the whole patch from its MOC ("Variables: 71% of the patch covered. The south is outside ZTF's reach."). A hunt that failed says so in its row and in one line, with the reason; the scan goes on (as a failed square does today, Q-471 (3)).
 - **Pause and Stop:** as built; they act on the whole run. Stopping keeps every finished hunt's and square's results.
 - **Minimised:** the island pill reads "Discovery · 3 of 6 hunts done" (**Proposed**; today "Discovery · Square 7 of 15").
 - **Closing the card does not stop the scan** (as built).
@@ -132,7 +132,7 @@ Replaces the single-purpose offer card of state 3 for a Discovery scan. Known ob
 
 - **Header:** "Discovery", subtitle "Scan · 12.0° × 7.2° · 6 hunts".
 - **Hunt switch:** a segmented control inside the card, one segment per ticked hunt with its count of candidates ("Variables 24", "Cold 2", "Known rocks 12", "Runaway 1", "IR excess 3"). It wraps on a narrow card. The Known rocks segment shows today's combined results (state 11) with the additions of H4.
-- **Source line:** the releases and the hunt version ("Done · ZTF DR24 and TESS · variables v1.0 · 52,000 stars") and the coverage ("All 35 squares; ZTF adds 28 of them").
+- **Source line:** the releases and the hunt version ("Done · ZTF DR24 and TESS · variables v1.0 · 52,000 stars") and the coverage from the hunt's MOC ("71% of the patch: ZTF does not reach the south").
 - **Selection line (new):** the sample the hunt searched, in one line ("Stars with r 13 to 19.5, at least 40 epochs, |b| > 20°"). It opens the full selection function.
 - **Three totals** in the existing tiles: candidates, recovered known objects, and a third count that depends on the hunt (unsure, ruled out, too faint to see, blends rejected). Under Measured only (R-11) the totals that depend on a catalogue match are hidden and the tiles show detections only.
 - **Provenance line:** which parts of a row are Measured and which Estimated.
@@ -268,7 +268,7 @@ Rules for every hunt:
 #### A22.4.2 Jobs and scheduling (Decided R-9, extends Q-470 (6) and (7))
 
 - A scan stays **one run** with one record and **one job on the live-area worker**, as Q-470 (6). The job owns two lanes: a **heavy lane** (one unit at a time: pixels and anything on the GPU) and a **light lane** (catalogue queries and CPU light-curve work, a pool of 2 workers by default). Both lanes belong to the scan job, not to the server.
-- **One pause rule for both lanes (R-9).** Pause stops both lanes at their next unit boundary; the units already running finish and are stored; then the scan **leaves the worker** and resumes at the back of the queue (Q-470 (7)). Stop is immediate for queued units and at the next `Progress.check` for running ones.
+- **One pause rule for both lanes (R-9).** Pause stops both lanes at their next unit boundary; the units already running finish and are stored; then the scan **leaves the worker** and resumes at the back of the queue (Q-470 (7)). **Pause is refused only while both lanes are on their last unit** (R-18, amends Q-470 (7)), since only then could it never take effect. Stop is immediate for queued units and at the next `Progress.check` for running ones.
 - **Single live areas** wait behind the whole scan job, as today; the light lane does not let them jump ahead.
 - **Shared archives.** Each adapter has its own concurrency limit (IRSA, MAST, Gaia, NOIRLab, brokers), shared by both lanes, so the light lane cannot starve H4's IRSA downloads (Atish, item 3). The time estimate includes this contention.
 - Hunts are ordered so that quick results arrive first: light lane H8, H9 (catalogue stage), H2 (catalogue stage), H1, H3; heavy lane H4, then H5, H11, the pixel stages of H2 and H9.
@@ -328,7 +328,7 @@ Sources this spec adds to [A3](data-sources.md) (to move there when the spec is 
 
 | Mission or survey | Product we use | Archive and access | Used by | Status |
 |---|---|---|---|---|
-| **SPHEREx** | Level 2 spectral images: multi-extension FITS, about 70 MB each, one per detector (6 per pointing); layers IMAGE, FLAGS, VARIANCE, ZODI, PSF, WCS-WAVE. Pixel 6.15″. Wavelengths for science from the Spectral WCS product (CWAVE, CBAND), not the WCS-WAVE lookup table, which is "for visualization". | IRSA SIA and cutout service (as built); AWS open-data copy `nasa-irsa-spherex` | H4; forced photometry for H2, H9 | Documented ([data products](https://caltech-ipac.github.io/spherex-archive-documentation/spherex-data-products)). The app already runs on `spherex_dr1` (Q-463). QR2 frames pulled before April 2026 carry a PSF-header error and must be re-pulled **[verify]**. Depth: 5σ about AB 19.5 to 19.9 (0.75 to 3.8 µm) and 17.8 to 18.8 (3.8 to 5 µm) after the full survey ([Bock et al.](https://arxiv.org/abs/2511.02985)); **the single-frame per-channel limit is not published and must be measured from the VARIANCE layer**. |
+| **SPHEREx** | Level 2 spectral images: multi-extension FITS, about 70 MB each, one per detector (6 per pointing); layers IMAGE, FLAGS, VARIANCE, ZODI, PSF, WCS-WAVE. Pixel 6.15″. Wavelengths for science from the Spectral WCS product (CWAVE, CBAND), not the WCS-WAVE lookup table, which is "for visualization". | IRSA SIA and cutout service (as built); AWS open-data copy `nasa-irsa-spherex` | H4; forced photometry for H2, H9 | Documented ([data products](https://caltech-ipac.github.io/spherex-archive-documentation/spherex-data-products)). The app already runs on `spherex_dr1` (Q-463). QR2 frames pulled before April 2026 carry a PSF-header error and must be re-pulled **[verify]**. Depth: 5σ about AB 19.5 to 19.9 (0.75 to 3.8 µm) and 17.8 to 18.8 (3.8 to 5 µm) for 4 observations per channel ([Bock et al.](https://arxiv.org/abs/2511.02985)); Rustamkulov et al. 2026 quote similar depths per exposure, so which applies is **[verify]**; **the single-frame per-channel limit is not published and must be measured from the VARIANCE layer**. |
 | **ZTF** | DR24 light curves (g, r, i): one per field, filter and CCD quadrant (5.32 billion), tens to over 1,000 epochs each. | AWS HATS Parquet copy (since 26 May 2026) for patches; IRSA API (cones at most 10′) for single stars | H1; history for H7 | Documented ([API](https://irsa.ipac.caltech.edu/docs/program_interface/ztf_lightcurve_api.html), [AWS](https://registry.opendata.aws/ztf/)). Patch sizes **[verify by a real query]**. |
 | **ZTF, Rubin** | Public alerts: difference-image detections with a real/bogus score and image stamps. | Brokers: ALeRCE, Fink, Lasair, ANTARES (cone queries) | H7 | Rubin's public alert stream has been live since 24 Feb 2026 ([Rubin](https://rubinobservatory.org/for-scientists/data-products/alerts-and-brokers)). Broker API details, rate limits and terms for a public tool **[verify]**. |
 | **ATLAS** | Forced photometry at a position. | ATLAS forced-photometry server | H7 (history) | **[verify]** access terms |
@@ -368,7 +368,7 @@ All of this section is **Proposed** (R-11 decides the Measured-only rule in it).
 | `GET /v1/runs/{run_id}/hunts/{hunt_id}/export.zip` | The reproducibility bundle for the hunt (A22.7.5). | The file |
 | `GET /v1/runs/{run_id}/hunts/{hunt_id}/rows/{row_id}/submission.zip` | The package for a verified route (R-4), only where one exists. | The file; 404 `route_not_available` otherwise |
 | `POST /v1/runs/{run_id}/hunts/{hunt_id}/inject` | Run the hunt's injection test on this run's own data (R-5). Queued as a job. | 202; the result is a calibration table tied to the run |
-| `GET /v1/hunts/{hunt_id}/calibration` | The shipped calibration table of the running hunt version. | `hunt-calibration.schema.json` (A22.10.3) |
+| `GET /v1/hunts/{hunt_id}/calibration` | The shipped calibration table of the running hunt version. | `hunt-calibration.schema.json` (A22.10.4) |
 
 `/v1/runs/{run_id}/results` (the asteroid results) is unchanged. H4's rows route answers the same merged rows in the row shape.
 
@@ -452,7 +452,7 @@ One shape for every hunt. Hunt-specific numbers go in `evidence` and `series`.
 }
 ```
 
-- **`status`:** `candidate` (passed every check that ran and matched nothing known), `recovery` (matches a known object), `measurement` (characterisation of a named object), `unsure` (needs the user's eye), `ruled_out` (a check failed; kept with the reason), `unchecked` (a known-object query failed), `possible` (H4 tracks below the lead criteria of R-3).
+- **`status`:** `candidate` (passed every check that ran and matched nothing known), `recovery` (matches a known object), `measurement` (characterisation of a named object), `unsure` (needs the user's eye), `ruled_out` (a check failed; kept with the reason), `unchecked` (a known-object query failed), `possible` (H4 tracks below the lead criteria of R-3; a two-visit pair that passed the known-object check is shown as "unexplained pair · possible", see A22.9.4).
 - **`row_id`:** a letter per hunt and a number in order of right ascension, **assigned after the merge**: V, W, P and D (periodic and single dips), T (H4 tracks, as today), K (H4 known rocks), A, M (H11 slow movers), R, X, B (H10).
 - **`rates`** is null when the hunt version has no table, the row falls outside it, or the hunt is `experimental`. `scope` says whether the rate comes from the shipped reference fields or from this patch's own injection run.
 - **`routes`** lists only verified routes (R-4); empty for most rows.
@@ -461,7 +461,7 @@ One shape for every hunt. Hunt-specific numbers go in `evidence` and `series`.
 
 | Code | Meaning | Words on the card (proposed) |
 |---|---|---|
-| `hunt:<id>:not_covered:<where>` with a reason suffix (`:no_sector`, `:south_of_ztf`, `:outside_footprint`, `:no_visit_pair`) | The region lacks the hunt's input. | "Square 29 not covered. Too far south for ZTF." |
+| `hunt:<id>:not_covered:<where>` with a reason suffix (`:no_sector`, `:south_of_ztf`, `:outside_footprint`, `:no_visit_pair`) | The region lacks the hunt's input. | Pixel hunts: "Square 29 not covered. No visit pair." Catalogue hunts: "29% of the patch not covered: south of ZTF's reach." |
 | `hunt:<id>:needs_release:<release>` | The hunt waits for a data release. | "Opens with Gaia DR4." |
 | `hunt:<id>:archive:<service>` | A service failed after retries; the unit was not searched and is excluded from the MOC. | "TESS archive not reachable. 4 squares not searched." |
 | `hunt:<id>:known_check:<catalogue>` | A known-object query failed; rows are `unchecked`. | "Not checked against VSX." |
@@ -473,7 +473,7 @@ There is no `truncated` code: a query that would hit a row limit is split or the
 
 #### A22.7.5 Export formats and the reproducibility bundle
 
-**Every hunt exports the same bundle** (R-4), `export.zip`:
+**Every hunt exports the same bundle** (R-4), `export.zip`. **The bundle is always complete, whatever the Measured-only setting** (R-19, amends Q-479 (7) for hunt bundles): a research export must hold every value, and each column carries its provenance tag so a reader can filter it. The export dialog says so: "The export holds Measured and Estimated values, each tagged."
 
 | File | Contents |
 |---|---|
@@ -504,7 +504,7 @@ There is no `truncated` code: a query that would hit a row limit is split or the
 | A period from a periodogram; an amplitude; a transit depth and duration from the data alone; a motion from positions; a radial profile | `measured` when it is a direct statistic of measured points with its uncertainty; `derived` when a choice of method changes it materially | Measured or Estimated | Decision needed on the boundary (PD-5). The mock-up shows period and motion as Measured. |
 | A fitted model curve; a planet size from the depth and the star's catalogue radius; a temperature from a template fit; a distance from type and brightness; a speed from motion and parallax; a dust temperature; an unseen partner's mass; a lens ring radius | `model_dependent` | Estimated | The assumption is written in the tooltip ("star radius from the TESS Input Catalog"; "single blackbody"). |
 | A classifier's type and probability; a real/bogus score; a lens score | `derived` | Estimated | The method and its training set in `method`. Shown as a suggestion. |
-| A match or a non-match against a catalogue | `derived` | Estimated | Carries the catalogue version and `fetched_at`. |
+| A match or a non-match against a catalogue | `derived` | Estimated | Carries the catalogue version and `fetched_at`. **H4 keeps A16.5's `model_dependent` tag** for its known-object match (R-20), since the match uses orbit positions. |
 | Positions of known objects from an orbit | `model_dependent` | Estimated | As A16.5. |
 | Completeness and purity | `model_dependent` | Estimated | "Measured on planted test objects and controls in real data"; the expected signal-to-noise bin, interval and scope are always stated. |
 | The user's own grade (H5, H9) | not a provenance tag | none | Stored as `user_grade` with the time; never mixed with computed values. |
@@ -516,7 +516,7 @@ Nothing in a hunt is `artistic`. Under Measured only (D-21, R-11) Estimated valu
 - **A candidate needs a completed known-object check.** Otherwise it is `unchecked`.
 - **A candidate needs the hunt's confirmation rule** (the same period in a second data set; detections on two nights and an orbit fit; seen in both halves of the frames).
 - **Recoveries are first-class.** Every hunt counts and lists what it re-found.
-- **Rates are functions of expected signal-to-noise, with intervals** (R-5). The card shows the value for the row's own expected signal-to-noise, its interval and its calibration id; the export carries the whole table. This amends A16.5's "no single figure goes into a card", which stays true for an overall catch rate.
+- **Rates are functions of expected signal-to-noise, with intervals** (R-5). The card shows the value for the row's own expected signal-to-noise, its interval and its calibration id; the export carries the whole table. This amends A16.5 and Q-203 (1) ("no single figure goes into a card") for the row's own bin only (PD-3, decided 19 Nov 2026); the rule stays true for an overall catch rate.
 - **Purity is measured, not implied by the gate** ([A22.10](#a2210-calibration-and-proof)).
 - **Measured only (R-11, D-21).** Statuses and totals that come from catalogue matches (`candidate` against `recovery`, "already known", "ruled out" by a match) are hidden, as Q-479 (1) hides known names. Rows show their measured values only; the tiles show the number of detections only.
 - **Planted means planted** (A16.5). Injected objects exist only in calibration runs, never in a run's rows.
@@ -591,9 +591,9 @@ flowchart LR
 
 **Calibration and gate.** Inject sinusoids and eclipse templates into real, non-variable ZTF light curves (real sampling and noise) over expected signal-to-noise and period. A recovery is a period within 1% (a harmonic is reported separately). Purity: magnitudes shuffled at fixed times, real constant stars, and held-out years. **Gate (reference fields, once per version):** an integration test that recovers VSX stars above the calibrated limit. It is not evidence of purity: about 85% of VSX's ZTF-era entries came from Chen's own search, so the gate favours easy stars.
 
-**Route (verified).** AAVSO VSX: a free account; moderators review each star; there is no bulk channel ([VSX guidance](https://www.aavso.org/new-vsx-manual-data-submissions)). "Prepare a submission" works one star at a time.
+**Route (verified).** AAVSO VSX: a free account; moderators review each star; there is no bulk channel ([VSX guidance](https://www.aavso.org/new-vsx-manual-data-submissions); the page returned 403 to the reviewer, so its exact wording is **[verify]**). "Prepare a submission" works one star at a time.
 
-**Where candidates are realistic.** About 665,000 of Chen's 781,602 ZTF variables are already in VSX ([AAVSO](https://www.aavso.org/vsx-surpassed-2000000-object-milestone)). What remains: faint stars (r 19 to 20.5), low amplitudes, long periods, Gaia DR3 variables missing from VSX, stars that vary in ZTF or Gaia but are missing from VSX, a better type for stars listed only as "variable", and corrected periods.
+**Where candidates are realistic.** About 665,000 of Chen's 781,602 ZTF variables are already in VSX ([AAVSO](https://www.aavso.org/vsx-surpassed-2000000-object-milestone)). What remains: faint stars (r 19 to 20.5), low amplitudes, long periods, Gaia DR3 variables missing from VSX, stars that vary in ZTF or Gaia but are missing from VSX, a better type for stars listed only as "variable", and corrected periods. Chen's "suspected variables" table was apparently not imported into VSX **[verify]** (an AAVSO forum guide), which makes it a place to look.
 
 **At home.** Sizes as in "Sample", measured by the plan's count query before the run. The variability cut leaves a few thousand; their periodograms take minutes on CPU and are a natural GPU batch.
 
@@ -758,7 +758,13 @@ Rocks at V 19 to 22 will mostly be invisible in single frames. Stages A1 to A3 a
 | F | **Precovery** | For a named object: run its orbit and uncertainty back to every archived frame; search inside the uncertainty area; stack along the path when faint. This is how 3I/ATLAS was traced back in ZTF ([arXiv:2509.08792](https://arxiv.org/abs/2509.08792)) and TESS ([arXiv:2508.02499](https://arxiv.org/abs/2508.02499)), and the SPHEREx team observed it itself ([arXiv:2512.07318](https://arxiv.org/abs/2512.07318)) | 5σ, or a stack at the control's threshold seen in both halves |
 | G | **Spectra of known rocks** | Join A4's measurements: divide by the Sun's spectrum; scale to a common distance; **correct for rotation** (each channel is taken at a different time; the team's own Ophelia example swung 1.5 mag, [arXiv:2602.08037](https://arxiv.org/abs/2602.08037)) from LCDB or SOLO light curves, or the method of Ivezić et al. 2022 (Icarus 371, 114696); **correct phase reddening**; remove heat emission (NEATM) from about 3 µm for dark or near rocks; check against Gaia DR3 reflectance spectra where they overlap; compare with the Bus-DeMeo classes and measure the 3 µm band | at least 20 channels above 5σ; a rock without a rotation period is flagged and its class is a suggestion |
 
-**Lead criteria for a blind track (R-3).** A track is a `candidate` only with: detections on **at least 2 nights** (the MPC's rule for a designation); **at least 3 tracklets**; an **orbit fit** whose residuals pass a χ² test against the calibrated error model of B2; and a **false-link rate** measured from the shuffled-time control and shown with it. Anything less is `possible`. Two-visit pairs are always `possible`.
+**Lead criteria for a blind track (R-3; amends Q-146 (3), A16.5 track wording and Q-483 (4)).** A track is a `candidate` only with: detections on **at least 2 nights** (the MPC's rule for a designation); **at least 3 tracklets**; an **orbit fit** whose residuals pass a χ² test against the calibrated error model of B2; and a **false-link rate** measured from the shuffled-time control and shown with it. Anything less is `possible`. Two-visit pairs are always `possible`.
+
+**What the results card shows for a pair (R-14).** Today a two-visit pair checked against known objects reads "unexplained track" (Q-146 (3)), and Q-483 (4) hides single-visit possibles until asked. After R-3: a two-visit pair that passed the known-object check reads **"unexplained pair · possible"** and is listed in its own **visible** section, "Pairs: 1 night only (n)", under the candidates; it is not hidden. Q-483 (4)'s "Show possible (n)" keeps hiding single-visit dots only. A pair with a known match still reads "found blind = (designation)".
+
+**Release (R-24).** Multi-day linking and the orbit fit (stages D and E) move to **release 2**, pending V2 (the revisit pattern) and a licence check (Find_Orb and OpenOrb carry GPL-family licences). Release 1 H4 is known rocks (A to C, F, G) plus pairs.
+
+**First error model (R-23).** The 0 of 38 run recovered nothing to calibrate from, so B2 starts from A4: centroids measured at the predicted spots of known rocks detected above S/N 10, cross-checked against Track's Eros fixtures. It is refined as recoveries accumulate.
 
 **Output.** As A17.7 and A17.8, plus per known rock: predicted and measured flux per frame, the sort, the loss table, the error model used, the spectrum points (`measured`) with reflectance, rotation, phase and heat corrections and the class (`model_dependent`); per candidate: the orbit fit, its residuals and χ², the false-link rate.
 
@@ -860,7 +866,7 @@ Removed by R-7. Euclid DR1 (12 Nov 2026) shipped 15,072 high-confidence candidat
 
 **Reality check.** Among about 34 million Gaia DR3 stars with full 3D speeds, no star fast enough to leave the Galaxy was found ([Marchetti et al. 2022](https://arxiv.org/abs/2206.06962)). A 2025 search of stars without radial velocities found 149 candidates, about a third possibly from outside the Galaxy ([Carballo-Bello et al. 2025](https://arxiv.org/abs/2507.00150)). Most leads will be ordinary runaways: still worth a research note, and a good lesson.
 
-**Calibration and gate.** **Experimental** (recoveries only) until a control exists (Atish, item 8); the proposed control is the same search on stars whose motions are drawn from the local distribution. **Gate:** recover known runaways from the published lists when the patch holds them; a fixture test otherwise.
+**Calibration and gate.** **Experimental** (recoveries only) until its control is measured (R-16): the same search on stars whose motions are drawn from the local distribution gives the false-candidate rate; completeness comes from synthetic runaways added to the catalogue over expected signal-to-noise (A22.10.2). **Gate (fixture, once per version):** recover known runaways from the published lists.
 
 **Route (verified).** An RNAAS note: free, editor-reviewed, online in about 72 h. Candidates without a radial velocity need a spectrum. A Nov 2026 Zenodo dataset tracing all 33 million Gaia DR3 stars with radial velocities back to young clusters (not peer-reviewed) is used for "already known", with care **[verify]**.
 
@@ -879,7 +885,7 @@ Removed by R-7. Euclid DR1 (12 Nov 2026) shipped 15,072 high-confidence candidat
 | WISE | AllWISE W1 to W4 with quality flags (`w4snr`, `w4rchi2`, `w4nm`, `na`, `nb`, `cc_flags`); unWISE images | IRSA TAP; cutout service | the selection and the images |
 | 2MASS, Gaia DR3 | J, H, Ks; G, BP, RP; parallax, RUWE, neighbours | IRSA, TAP | the star |
 | SPHEREx | Spectral images | forced photometry | the 0.75 to 5 µm spectrum |
-| Known lists | Published debris-disk and young-star catalogues; Disk Detective's candidate lists | tables | recoveries |
+| Known lists | Published debris-disk and young-star catalogues; Disk Detective's candidate lists | tables | marks a measured star as already published (`recovery`) |
 | Models | Stellar model atmospheres **[verify grid and licence]** | download once | the photosphere |
 
 **Selection (Disk Detective's real cuts, [Kuchner et al. 2016](https://arxiv.org/abs/1607.05713)).** `w4snr` ≥ 10; W4 < W1 − 0.25 with the W1 − W4 excess significant at **5σ**; `w4rchi2` < 1.3; `w4nm` > 5; `na` = 0; `nb` = 1; exactly one 2MASS match within 3″; `cc_flags` clean in W1 and W4. RUWE below 1.4. All in the archive's query (R-6).
@@ -897,7 +903,7 @@ Removed by R-7. Euclid DR1 (12 Nov 2026) shipped 15,072 high-confidence candidat
 | 5 | Measure | SPHEREx excess from 3 to 5 µm with its significance; a single blackbody for the dust (temperature and fractional luminosity) | `model_dependent` |
 | 6 | Inspect | Band images for the user's grade | `user_grade` stored |
 
-**Output.** Per star: Gaia id, distance, photosphere fit, WISE magnitudes and flags, χ per band, SPHEREx spectrum and its excess, galaxy-feature test, dust temperature and fraction, rule-out reasons, the user's grade. Status `measurement` for every star that passed the selection; `ruled_out` with the reason otherwise.
+**Output.** Per star: Gaia id, distance, photosphere fit, WISE magnitudes and flags, χ per band, SPHEREx spectrum and its excess, galaxy-feature test, dust temperature and fraction, rule-out reasons, the user's grade. Status `measurement` for every star that passed the selection (`recovery` when it is already in a published list); `ruled_out` with the reason otherwise.
 
 **Accuracy.** At most 7.9 ± 0.2% of WISE-selected excesses are good disk candidates; earlier searches without image checks had false-positive rates above 70% ([Silverberg et al. 2018](https://arxiv.org/abs/1809.09663)). At high latitude, about zero per patch *(Atish)*: the hunt is most useful in star-forming regions and on targeted samples.
 
@@ -933,7 +939,7 @@ Removed by R-7. Euclid DR1 (12 Nov 2026) shipped 15,072 high-confidence candidat
 
 **Reality check.** Spectroscopy showed DR3's high-mass candidates other than BH1 to be spurious solutions ([El-Badry et al. 2023, BH1](https://arxiv.org/abs/2209.06833); [BH2](https://arxiv.org/abs/2302.07880)); published cuts also removed real systems: Andrews et al. 2022 excluded BH1. Müller-Horn et al. 2026 find 389 giant-star candidates from RUWE and radial-velocity scatter ([arXiv:2510.05982](https://arxiv.org/abs/2510.05982)).
 
-**Gate (fixture).** From DR3's table, return BH1 and BH2 and reject the published spurious solutions.
+**Gate (fixture, once per version).** From DR3's table, return BH1 and BH2 and reject the published spurious solutions.
 
 **Route.** None of its own: a table for follow-up planning.
 
@@ -976,13 +982,13 @@ A hunt that cannot say how complete and how pure it is does not return candidate
 |---|---|---|
 | **Off** | Not in the picker, or disabled with a reason. | n/a |
 | **Experimental** | The hunt runs and returns recoveries of known objects only, with the recovery count. | The code is merged and its known-object match works. |
-| **Validated** | Candidates, recoveries, completeness and purity. | (1) A calibration table for this exact version ships. (2) The gate passed on the reference fields. (3) Purity measured by a control and, where possible, on held-out data. (4) The run's own gate passes where the hunt has one (H4). |
+| **Validated** | Candidates, recoveries, completeness and purity. | (1) A calibration table for this exact version ships. (2) The gate passed on the reference fields. (3) Purity measured by a control. Held-out years are used where possible (H1, H3, perhaps H2) and are not required (R-25). (4) The run's own gate passes where the hunt has one (H4). |
 | **Characterisation** | Measurements of named objects. | The measurement's own check (H4 spectra against Gaia DR3; H9's galaxy test against known galaxies; H2's typing against known dwarfs). |
 | **Context** | Rows from other surveys' tables. | The adapter works and the table's version is recorded. |
 
 The level is a property of the hunt version in the register, never a setting. A run whose own gate fails drops that hunt to Experimental for that run and says why.
 
-**Gates are labelled by when they run** (Atish, item 7): **"reference fields, once per version"** (H1, H2, H3, H5, H11) or **"every run"** (H4). A gate is an **integration test**: it shows the search works, not that its candidates are real (Atish, item 8).
+**Gates are labelled by when they run** (Atish, item 7; R-15): **"reference fields, once per version"** (H1, H2, H3, H11), **"fixture, once per version"** for hunts whose real targets are too rare for reference fields (H5, H8, H10), or **"every run"** (H4). A gate is an **integration test**: it shows the search works, not that its candidates are real (Atish, item 8).
 
 #### A22.10.2 Completeness by injection, against expected signal-to-noise (R-5)
 
@@ -999,18 +1005,20 @@ Synthetic objects are added to **real** data, the unchanged hunt is run, and the
 | H5 | tail flux / sky noise in the wing annulus | tail strength | flagged and graded in at least 2 images |
 | H9 | excess / combined error at 22 µm | excess ratio | selected and not ruled out |
 | H11 | predicted flux / stack noise | rate and direction | position within 1 pixel, rate within the grid step |
+| H8 | peculiar speed / its uncertainty | distance | flagged above threshold with a trace-back |
 
 - **Inject at the earliest stage the hunt reads:** pixels (H4, H5, H11, image stage of H2), raw light curves before detrending (H1, H3), catalogue rows (catalogue stages of H2 and H9).
 - **The hunt is not told where.**
 - **Intervals.** Wilson intervals on every rate; at least 200 injections per bin, or the bin is not published.
 - **Reference fields.** At least five per hunt (Proposed: different Galactic latitudes, crowding and cadence; the Eros area is one), with the epochs or sectors they cover stored. A row outside their range gets `calibration:outside`.
-- **On the user's own patch (R-5).** `POST .../inject` runs the same injection on the run's own data and writes a calibration table tied to the run. The bundle then carries the patch's own completeness, which is what a paper needs.
+- **Version 1 is capped (R-22).** 3 to 4 expected-S/N bins and one second-axis bin per hunt where the physics allows, on the shipped reference fields only, about 1,000 injections per field per hunt; the cost of each table (machine hours, downloads) is recorded in it. Finer grids come with later versions.
+- **On the user's own patch (R-5, release 2 per R-22).** `POST .../inject` runs the same injection on the run's own data and writes a calibration table tied to the run. The plan shows its time and download before it starts. Every planted object carries A16.5's **Injected** badge wherever it is drawn (R-21) and never enters the run's rows. The bundle then carries the patch's own completeness, which is what a paper needs.
 
 #### A22.10.3 Purity
 
 Measured separately from the gate (R-5, Atish, section 8):
 
-- **Controls with no signal:** H1 magnitudes shuffled **at fixed times** (keeps the window function and its aliases) **and** real constant stars (keeps correlated noise, which shuffling removes); H3 inverted light curves (as Kepler DR25); H4 and H11 shuffled frame times and impossible directions; H2 shuffled epochs; H5 field stars at asteroid positions.
+- **Controls with no signal:** H1 magnitudes shuffled **at fixed times** (keeps the window function and its aliases) **and** real constant stars (keeps correlated noise, which shuffling removes); H3 inverted light curves (as Kepler DR25); H4 and H11 shuffled frame times and impossible directions; H2 shuffled epochs; H5 field stars at asteroid positions; H8 stars with motions drawn from the local distribution.
 - **Trials corrected:** every threshold accounts for the number of hypotheses tried (H1 over 10⁵ stars, H3 SDE, H4 stage E, H11).
 - **Held-out years** where possible: run the hunt on data before a cut-off date; of its candidates, how many later entered VSX, Gaia or the TOI list. This measures what the controls cannot.
 
@@ -1078,7 +1086,7 @@ Wall-clock time is set mostly by archive download speed and by sharing archives 
 1. **Catalogues before pixels.** Megabyte queries cut most of the work before any image is fetched.
 2. **Cutouts and ranged reads.** Read only the needed part of each file from the AWS open-data copies (SPHEREx, TESS, ZTF), with IRSA and MAST as fallback.
 3. **Stream, don't hoard.** Work in tiles of 32-bit floats; delete raw files when a unit finishes unless the user keeps them; a disk budget (a setting) evicts the oldest cached raw data first and never evicts results.
-4. **GPU where it pays:** shift-and-stack, FFT sky subtraction, batched box search, model-grid fits, network inference. Through one array library with a CPU twin (CuPy with NumPy, or PyTorch on CPU; the choice is HN-1's). **Both paths must give the same leads**; tests compare them within a stated tolerance, and stored results name the path used.
+4. **GPU where it pays:** shift-and-stack, FFT sky subtraction, batched box search, model-grid fits, network inference. Through one array library with a CPU twin (CuPy with NumPy, or PyTorch on CPU; the choice is HN-1's). **The CPU path is the reference; the GPU path is checked against it within stated tolerances** (PD-16), and stored results name the path used.
 5. **Calibrated once, shipped** (A22.10).
 
 #### A22.11.4 Living with a gaming machine
@@ -1098,7 +1106,7 @@ Per the pinned-versions rule, every library below gets an exact version in `back
 
 ### A22.12 Plan, tickets and owners
 
-Owners follow D-17 and are to be confirmed. Each search hunt ticket ends at **Experimental**; a second ticket per hunt ships its calibration and purity tables and makes it **Validated**.
+Owners follow D-17 and are to be confirmed. Each search hunt ticket ships its calibration and purity tables in the same ticket, and the hunt becomes **Validated** when its gate passes (R-27). **Release 1 minimum (R-27):** HN-0, HN-1, HN-2, HN-3, HN-4b, HN-5 and HN-6 (the core, the bundle, the H4 audit and H8); the other tickets follow in the order of the table.
 
 | Ticket | Content | Depends on | Owner (Proposed) |
 |---|---|---|---|
@@ -1114,12 +1122,12 @@ Owners follow D-17 and are to be confirmed. Each search hunt ticket ends at **Ex
 | **HN-8** | H2 cold worlds: catalogue stage with two tiers, images, then typing with SPIFF and Gagné's templates (after contacting that team) | HN-7 | Moon |
 | **HN-9** | H1 variables: HATS adapter, light-curve joining, periodograms, controls, classifier | HN-1, HN-4 | Kevin |
 | **HN-10** | H7 context layer (broker adapters with a token) | HN-1 | Atish |
-| **HN-11** | H4 spectra (stage G with rotation and phase corrections), precovery (F), ADES export once the MPC answers | HN-5 | Kevin |
-| **HN-12** | H4 multi-day linking and orbit fit (stage D), stacking (E), the lead criteria of R-3; then H4b on the NOIRLab Source Catalog (release 2) | HN-5 | Kevin |
+| **HN-11** | H4 spectra (stage G with rotation and phase corrections), precovery (F), ADES export once the MPC answers (V13) | HN-5 | Kevin |
+| **HN-12** | Release 2: H4 multi-day linking and orbit fit (stage D), stacking (E), the lead criteria of R-3; then H4b on the NOIRLab Source Catalog (release 2) | HN-5 | Kevin |
 | **HN-13** | H3 single transits (release 2) | HN-1, HN-4 | Atish |
 | **HN-14** | H5 active asteroids (release 2) | HN-1 | Atish |
 | **HN-15** | H11 TESS slow movers (release 2) | HN-4, GPU stacking from HN-12 | Moon |
-| **HN-16** | "Prepare a submission" for the verified routes (VSX, Backyard Worlds, RNAAS drafts; MPC after R-12) | HN-4b; V13 to V16 | Moon |
+| **HN-16** | "Prepare a submission" for the verified routes (VSX, Backyard Worlds, RNAAS drafts; MPC after R-12) | HN-4b; V13 to V15, V30 | Moon |
 | **HN-17** | H10 cross-match on Gaia DR4 | HN-1; DR4 | Kevin |
 | Later | Watch saved objects; sharing squares between PCs; replay with hunts | | |
 
@@ -1138,7 +1146,7 @@ Owners follow D-17 and are to be confirmed. Each search hunt ticket ends at **Ex
 | Honesty | No reply or card string contains "discovered", "new" or "confirmed" for a candidate; a failed known check gives `unchecked`; rates are absent, not defaulted, without a table; Measured only hides every Estimated value and every match-derived status and total (R-11). |
 | Frontend | The cards against fixtures: picker groups come from the register; ticking updates time and download from the plan; disabled rows read their reason; a finished hunt opens while others run; keyboard and screen-reader paths; phone width; reduced motion. |
 | Design review | Side-by-side screenshots against the approved mock-up before a card is called done. |
-| End to end, real data | One small patch per hunt against the live archives, by hand (CI has been off since 10 Nov 2026, Q-478 (h)); results and bundles recorded in the PR. |
+| End to end, real data | One small patch per hunt against the live archives, by hand; results and bundles recorded in the PR, alongside the required CI check. |
 
 ### A22.14 Open items and items to verify
 
@@ -1191,36 +1199,63 @@ The first draft's research (17 Nov 2026) was at the level of search results and 
 | V31 | The rate grid for H11 and the TESS shift-and-stack precedents | Open |
 | V32 | The orbit-fit library for H4 (Find_Orb, OpenOrb) and the VOTable validator | Open |
 
+**Which [verify] item blocks which ticket** (none blocks approval of this proposal):
+
+| Item | Blocks |
+|---|---|
+| V13 (MPC) | HN-11's ADES export and the MPC route in HN-16 |
+| V26 and the R-12 licences (Chen 2020, SPIFF, templates, network weights, the AAS template, orbit fitters) | any ticket that ships them |
+| V1 (single-frame depth) | HN-5's gate threshold |
+| V6 (IRSA tables and columns) | every adapter ticket |
+| V2 (revisit pattern) | HN-12 |
+| V31 (H11 precedents) | scheduling HN-15 |
+
 **Design questions still open:** the reference fields per hunt; replay with hunts; what "Build it" may draw for a cold world or a transit candidate without inventing anything; whether the picker remembers the last selection.
 
 ### A22.15 Decisions
 
-This PR may not touch `docs/decisions/`, so nothing here has an id yet. On approval each row becomes a `D-` or `Q-` entry (next free at the time of writing: D-41 and Q-484) in `docs/decisions/moving-objects.md` and the index. R-1 to R-12 were **decided by Moon on 18 Nov 2026**, taking the recommendations made on Atish's twelve questions.
+This PR may not touch `docs/decisions/`, so nothing here has an id yet. On approval each row becomes a `D-` or `Q-` entry (next free at the time of writing: D-41 and **Q-485**; PR #183 took Q-484) in `docs/decisions/moving-objects.md` and the index. R-1 to R-12 were **decided by Moon on 18 Nov 2026**, taking the recommendations made on Atish's twelve questions. R-13 to R-28 and the PD rows were **decided by Moon on 19 Nov 2026** on Atish's re-review (changes requested at 76eca86).
 
 | Ref | Decision | Status |
 |---|---|---|
-| R-0 | **Purpose:** a scientific tool meant for research. Outputs are tables usable in a paper: standard formats, provenance, completeness and purity, selection function, reproducibility. Supersedes the outreach framing of 16 Nov (PD-1) and the "odds of a credited find" grouping (PD-2). | Decided (Moon, 18 Nov 2026) |
+| R-0 | **Purpose:** a scientific tool meant for research. Outputs are tables usable in a paper: standard formats, provenance, completeness and purity, selection function, reproducibility. Supersedes PD-1 (the first draft's direction: an outreach tool for the public, students and amateurs) and PD-2 (the ten hunts grouped by an ordinary user's odds of a credited find). | Decided (Moon, 18 Nov 2026) |
 | R-1 | **SPHEREx is the characterisation layer,** not the discovery data. | Decided |
-| R-2 | **Datasets.** Release 1: SPHEREx DR1, CatWISE2020 and unWISE/unTimely, Gaia DR3 (DR4 after 2 Dec), ZTF DR light curves. Release 2: TESS full-frame-image shift-and-stack (H11), DECam archive and NOIRLab Source Catalog with multi-night linking (H4b). IASC dropped. | Decided |
+| R-2 | **Datasets.** Release 1: SPHEREx DR1, CatWISE2020 and unWISE/unTimely, Gaia DR3 (DR4 after 2 Dec), ZTF DR24 light curves. Release 2: TESS full-frame-image shift-and-stack (H11), DECam archive and NOIRLab Source Catalog with multi-night linking (H4b). IASC dropped. | Decided |
 | R-3 | **H4 candidates** need detections on at least 2 nights, at least 3 tracklets, an orbit fit passing a χ² test against a calibrated astrometric error model, and a measured false-link rate. Anything less is `possible`. | Decided |
 | R-4 | **Export first.** Every hunt exports the reproducibility bundle (VOTable or ECSV with provenance, selection function and MOC, calibration, method text, citation file; ADES for H4). "Prepare a submission" only for verified routes that take outside data (VSX, Backyard Worlds, RNAAS drafts; the MPC once a code exists). Zooniverse routes dropped. No "Your credit" wording. A Zenodo DOI per tool release. | Decided |
 | R-5 | **Calibration** against expected signal-to-noise; completeness and purity as functions with intervals; purity from controls (and held-out data) separately from the gate; per-patch injection offered to the user. | Decided |
 | R-6 | **No silent caps.** A count query before the run; any limit is a stated selection criterion written into the output. Cuts always in the archive's query. | Decided |
-| R-7 | **H6 lenses removed.** | Decided (settles PD-9) |
-| R-8 | **No learning mode.** H7 becomes a context layer; H9 becomes SPHEREx characterisation of excess candidates; H10 becomes a cross-match with Gaia DR4's own black-hole table plus our refit. Release 1: H1, H2, H4, H8, H9; release 2: H3, H5, H11, H4b. Picker grouped by readiness (Validated, Characterisation, Experimental, Context). | Decided (settles PD-7: Validated and Characterisation ticked by default) |
+| R-7 | **H6 lenses removed.** | Decided (settles PD-9, which asked whether lenses stay in "Good chance" or move to "Possible") |
+| R-8 | **No learning mode.** H7 becomes a context layer; H9 becomes SPHEREx characterisation of excess candidates; H10 becomes a cross-match with Gaia DR4's own black-hole table plus our refit. Release 1: H1, H2, H4, H8, H9, and H7 as context; release 2: H3, H5, H11, H4b. Picker grouped by readiness (Validated, Characterisation, Experimental, Context). | Decided (settles PD-7, which asked which hunts the picker ticks by default: now Validated and Characterisation) |
 | R-9 | **Time estimate** = the heavy lane's total plus bandwidth contention, from measured per-unit costs. **One pause rule:** both lanes stop at their next unit boundary and the scan leaves the worker (Q-470 (7)). | Decided |
-| R-10 | **Coverage.** Squares for pixel hunts only; catalogue and light-curve hunts report coverage for the whole patch as a MOC, part of the selection function. | Decided (settles PD-8) |
+| R-10 | **Coverage.** Squares for pixel hunts only; catalogue and light-curve hunts report coverage for the whole patch as a MOC, part of the selection function. | Decided (settles PD-8, which marked a square done when every ticked hunt had finished it) |
 | R-11 | **Measured only** hides statuses and totals that come from catalogue matches, as Q-479 (1); only measured detections and their counts show. | Decided |
-| R-12 | **Ask first:** the MPC (SPHEREx observatory code, archive program code, ADES spacecraft fields) before HN-5's export and HN-16; the Gagné et al. team before H2's typing stage; and the licence of every table, model grid, code and network shipped. | Decided |
-| PD-3 | Rates on the row card: the value at the row's own expected signal-to-noise, with its interval. Amends A16.5's "no single figure goes into a card" for overall rates only. | Proposed (follows from R-5) |
-| PD-5 | **Tag boundary.** A period, depth, motion or profile computed directly from measured points with its uncertainty is `measured`; anything needing a model or a catalogue parameter is `model_dependent`; classifier outputs are `derived`. | Proposed |
-| PD-6 | The selection label drops its time estimate once hunts exist. | Proposed |
-| PD-11 | **Contract** of A22.7: `hunts` and `options` on `POST /v1/scans` defaulting to `["asteroids"]`; rows, ids after the merge, `rows_ready`; `seed` and `software`; the bundle and inject routes. Extends Q-470 and Q-471. | Proposed |
-| PD-12 | **Two lanes** owned by the scan job, with per-archive limits shared by both. Extends Q-470 (6). | Proposed |
-| PD-13 | **Wording** of A22.3.6. Extends A16.5. | Proposed |
-| PD-14 | **H4 first:** the audit and the every-run gate before any search hunt is Validated. | Proposed |
-| PD-15 | Owners of the tickets in A22.12. | Proposed, under D-17 |
-| PD-16 | **Determinism** on the CPU path only; the GPU path is tested for agreement within a tolerance; stored results name the path. Amends the determinism rule for GPU work. | Proposed |
+| R-12 | **Ask first:** the MPC (SPHEREx observatory code, archive program code, ADES spacecraft fields) before HN-11's ADES export and HN-16; the Gagné et al. team before H2's typing stage; and the licence of every table, model grid, code and network shipped. | Decided |
+| R-13 | **Mock-up section 5 cut** to a pointer to this spec; the data-path and per-hunt signal diagrams stay as a visual appendix. | Decided (19 Nov) |
+| R-14 | **Pairs on the results card** (amends Q-146 (3), A16.5 track wording, Q-483 (4)): "unexplained pair · possible", listed in a visible section "Pairs: 1 night only (n)"; not hidden. | Decided (19 Nov) |
+| R-15 | **Gate labels:** "reference fields, once per version", "fixture, once per version" (H5, H8, H10), "every run" (H4). | Decided (19 Nov) |
+| R-16 | **H8's route to Validated:** expected S/N = peculiar speed / its uncertainty; control = motions drawn from the local distribution. | Decided (19 Nov) |
+| R-17 | **Offline plan** (amends Q-470 (8)): cached counts only; otherwise "Size not known offline", and only hunts with cached inputs run. | Decided (19 Nov) |
+| R-18 | **Pause with two lanes** (amends Q-470 (7)): refused only while both lanes are on their last unit. | Decided (19 Nov) |
+| R-19 | **Bundle and Measured only** (amends Q-479 (7) for hunt bundles): the bundle is always complete, every column tagged; the export dialog says so. | Decided (19 Nov) |
+| R-20 | **H4 known-object match** keeps A16.5's `model_dependent` tag. | Decided (19 Nov) |
+| R-21 | **Injected badge** (A16.5) on every planted object, including per-patch injection. | Decided (19 Nov) |
+| R-22 | **Calibration cost cap for version 1:** 3 to 4 S/N bins, shipped reference fields only, about 1,000 injections per field per hunt, cost recorded in the table; per-patch injection in release 2 with its estimate in the plan. | Decided (19 Nov) |
+| R-23 | **First H4 error model:** A4 centroids of known rocks above S/N 10, cross-checked against Track's Eros fixtures. | Decided (19 Nov) |
+| R-24 | **Multi-day linking and orbit fit move to release 2** (V2 and fitter licences first). Release 1 H4: known rocks plus pairs. | Decided (19 Nov) |
+| R-25 | **Held-out years** where possible, not required for Validated. | Decided (19 Nov) |
+| R-26 | **Download budget enforced before the run:** above 50 GB per hunt (a setting) the row needs a stated limit before Run is enabled. | Decided (19 Nov) |
+| R-27 | **Release 1 minimum:** HN-0, 1, 2, 3, 4b, 5, 6. A hunt's calibration ships in its own ticket; no separate "Validated" tickets. | Decided (19 Nov) |
+| R-28 | **Hubble and JWST archives** left out on purpose (small fields; Asteroid Hunters covers Hubble). | Decided (19 Nov) |
+| PD-3 | Rates on the row card: the value at the row's own expected signal-to-noise, with its interval. Amends A16.5's "no single figure goes into a card" for overall rates only. | Decided (Moon, 19 Nov 2026) |
+| PD-5 | **Tag boundary.** A period, depth, motion or profile computed directly from measured points with its uncertainty is `measured`; anything needing a model or a catalogue parameter is `model_dependent`; classifier outputs are `derived`. | Decided (Moon, 19 Nov 2026) |
+| PD-6 | The selection label drops its time estimate once hunts exist. | Decided (Moon, 19 Nov 2026) |
+| PD-11 | **Contract** of A22.7: `hunts` and `options` on `POST /v1/scans` defaulting to `["asteroids"]`; rows, ids after the merge, `rows_ready`; `seed` and `software`; the bundle and inject routes. Extends Q-470 and Q-471. | Decided (Moon, 19 Nov 2026) |
+| PD-12 | **Two lanes** owned by the scan job, with per-archive limits shared by both. Extends Q-470 (6). | Decided (Moon, 19 Nov 2026); Kevin to confirm feasibility in HN-1 |
+| PD-13 | **Wording** of A22.3.6. Extends A16.5. | Decided (Moon, 19 Nov 2026) |
+| PD-14 | **H4 first:** the audit and the every-run gate before any search hunt is Validated. | Decided (Moon, 19 Nov 2026) |
+| PD-15 | Owners of the tickets in A22.12. | Decided (Moon, 19 Nov 2026), under D-17; `app/sky/HuntMarkers.tsx` under Moon confirmed, as it is outside `app/sky/area/` (Q-406 (7)) |
+| PD-16 | **Determinism** on the CPU path only; the GPU path is tested for agreement within a tolerance; stored results name the path. Amends the determinism rule for GPU work. | Decided (Moon, 19 Nov 2026) |
 
 ### A22.16 The mock-up file
 
@@ -1236,7 +1271,7 @@ This PR may not touch `docs/decisions/`, so nothing here has an id yet. On appro
 | 2 Choose what to run | The picker card by readiness (A22.3.2). **Interactive:** tick and untick hunts; the time, data line and button update. | Sky and grid real; the card new |
 | 3 Scanning | The scan card with one row per hunt (A22.3.3) | Sky and square states real; the card new |
 | 4 Results by hunt | One tab per hunt, each with sky markers, the row card and the left-hand chart (A22.3.4, A22.3.5). **Interactive:** the tabs and the in-card switch. The Known rocks tab shows a real run. | Sky real; markers, cards and charts new |
-| 5 How the hunts work | The data path diagram, the detection catalogue, the ten hunt sheets with a diagram each, the home-PC budget, the to-check list | A summary of this spec for a general reader |
+| 5 How the hunts work | A pointer to this spec, then a visual appendix: the data-path diagram and one signal diagram per hunt (R-13). | Diagrams only; the spec owns the content |
 
 **How it was made.** Four screenshots of the running app (the frontend as on `main` in mid-November 2026, with `?scan=mock` for the scanning state) are embedded as images; the new cards use the app's own classes and tokens (`.sx-panel`, `.sx-live*`, `.sx-scan-*`, `.sx-seg`, the D-38 dark tokens and glass variables) copied into the page, so they read as the real cards would. Each stage is 1440 × 860 and scales to the column.
 
