@@ -149,6 +149,8 @@ async function rightClickBrackets(page: Page, testId: string): Promise<void> {
 test('right-click on the brackets brings the card back, without the browser menu', async ({
   page,
 }) => {
+  // Build it opens a SwiftShader pane: 26 to 33 s on a 2-core CI runner, over the 30 s default (PR #183).
+  test.setTimeout(90_000);
   await selectAquaPrime(page);
   await watchContextMenu(page);
   const card = page.getByTestId('selected-card');
@@ -464,7 +466,8 @@ test('the last frame of a build is the normal render of the same plan and seed',
   page,
   context,
 }) => {
-  test.setTimeout(150_000);
+  // Two SwiftShader builds plus two settled shots: 2.2 to 2.6 min on a 2-core CI runner (PR #183).
+  test.setTimeout(300_000);
   await selectAquaPrime(page, '/?engines=0');
   await page.getByTestId('build-it').click();
   const pane = page.getByTestId('build-pane');
