@@ -3,7 +3,7 @@ name: ci
 # The only CI entry point. Every PR gets one required check, `ci-gate`, which
 # always reports, even when no checks were needed (docs-only PRs), and runs
 # again in the merge queue on the PR combined with the latest main. backend.yml
-# and frontend.yml run only when their paths change. Plan: .github/codeowners-plan.md.
+# and frontend.yml run only when their paths change. Documented in docs/architecture/testing.md (A12).
 
 on:
   pull_request:
@@ -26,7 +26,8 @@ concurrency:
 jobs:
   changes:
     name: changed paths
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
     outputs:
       backend: ${{ steps.filter.outputs.backend }}
       frontend: ${{ steps.filter.outputs.frontend }}
@@ -40,6 +41,8 @@ jobs:
           BASE: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
         run: |
           set -u
+          # On a PR, HEAD is the merge commit and BASE the PR's base when it was last updated, so
+          # files that changed on main since then can show up too. That only runs extra checks.
           # Fail safe: if the changed files can't be listed, run every check.
           if [ -z "$BASE" ] || ! files=$(git diff --name-only "$BASE" HEAD); then
             echo "Could not diff against '$BASE'; running all checks."
@@ -49,7 +52,9 @@ jobs:
           echo "Changed files:"; echo "$files"
           has() { if grep -qE "$1" <<< "$files"; then echo true; else echo false; fi; }
           {
-            echo "backend=$(has '^(backend/|shared/|\.github/workflows/|package\.json$)')"
+            # The backend checks also read frontend files: bake_demo_pack (search/demoTargets.ts,
+            # viewer/altText.ts) and test_gas_giant_layers (viewer/renderers/shaderSpec.ts).
+            echo "backend=$(has '^(backend/|shared/|frontend/src/viewer/|frontend/src/app/search/|\.github/workflows/|package\.json$)')"
             echo "frontend=$(has '^(frontend/|shared/|\.github/workflows/|package\.json$)')"
             echo "codeowners=$(has '^\.github/CODEOWNERS$')"
           } >> "$GITHUB_OUTPUT"
@@ -65,11 +70,14 @@ jobs:
     if: needs.changes.outputs.frontend == 'true'
     uses: ./.github/workflows/frontend.yml
 
+  # Runs only on a PR that changes .github/CODEOWNERS (none exists on main yet); until then it is
+  # always skipped, which ci-gate counts as passing.
   codeowners:
     name: CODEOWNERS has no errors
     needs: changes
     if: needs.changes.outputs.codeowners == 'true' && github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
     steps:
       - env:
           GH_TOKEN: ${{ github.token }}
@@ -85,7 +93,8 @@ jobs:
     name: ci-gate
     needs: [changes, backend, frontend, codeowners]
     if: always()
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
     steps:
       - env:
           NEEDS: ${{ toJSON(needs) }}
