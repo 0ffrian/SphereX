@@ -2,7 +2,7 @@
 
 > **Part of:** Architecture spec ([index](README.md)) · **Sections:** A22 to A22.16 (proposed numbers; see "Status" below) · **Builds on:** Area search and Discovery ([A16](moving-objects/area-search.md), [A17](moving-objects/area-backend.md), [A17.6 to A17.13](moving-objects/area-contract.md), [A18](moving-objects/area-ui.md)), scans and runs ([Q-470](../decisions/moving-objects.md), Q-471, Q-472, Q-473, Q-483), the gap analysis ([Q-478](../decisions/moving-objects.md)), the scan honesty rules ([Q-479](../decisions/moving-objects.md)) · **Rules it follows:** provenance tags and badges ([A5.2](data-contract.md#a52-provenance-tags-and-badges), D-02, D-21), the cache ([D-25](../decisions/data-sources.md)), the generated contract ([D-18](../decisions/contract.md)), the design language ([design-language.md](../design-language.md), D-38) · **Mock-up:** [`mockup/discovery-hunts.html`](../../mockup/discovery-hunts.html)
 
-**Status: proposal, revised 18 Nov 2026, not built.** First written on 17 Nov 2026. Revised on 18 and 19 Nov 2026 after Atish's two reviews on PR #182 (three comments: findings per hunt, credit routes checked one by one, sizes, calibration, twelve citations to correct). Moon took twelve decisions on the first review (R-1 to R-12) and answered the rest on the re-review (R-13 to R-28, and the PD rows; all in [A22.15](#a2215-decisions)) and changed the tool's purpose: **it is a scientific tool meant for research**, not an outreach tool. Three things are still needed before any code:
+**Status: proposal, revised 18 Nov 2026, not built.** First written on 17 Nov 2026. Revised on 18 and 19 Nov 2026 after Atish's two reviews on PR #182 (three comments: findings per hunt, credit routes checked one by one, sizes, calibration, twelve citations to correct). Moon took twelve decisions on the first review (R-1 to R-12) answered the rest on the re-review (R-13 to R-28, and the PD rows), and improved them from the literature (R-29 to R-49; all in [A22.15](#a2215-decisions)) and changed the tool's purpose: **it is a scientific tool meant for research**, not an outreach tool. Three things are still needed before any code:
 
 1. **Moon approves the revised mock-up** (UI needs an approved mock-up before it is built).
 2. **The decisions in [A22.15](#a2215-decisions) get their `D-` and `Q-` rows** in `docs/decisions/`. This PR holds two files only (this spec and the mock-up), so the decision index, the section map in [README.md](README.md), the routing table in `docs/README.md` and the UML are **not** updated here. Run `/sx-spec-sync` after approval. Until then "A22" is a proposed number and nothing else in the docs links here.
@@ -274,7 +274,7 @@ Rules for every hunt:
 - Hunts are ordered so that quick results arrive first: light lane H8, H9 (catalogue stage), H2 (catalogue stage), H1, H3; heavy lane H4, then H5, H11, the pixel stages of H2 and H9.
 - H4 keeps walking squares in index order exactly as today (Q-470 (4)).
 - A hunt that fails does not fail the run. A run is `failed` only when every unit of every hunt failed (extends Q-481).
-- **GPU.** One GPU job at a time, with a memory cap. **Determinism is guaranteed on the CPU path only** (Atish, item 9): stored results name the path that produced them (`compute_path: cpu | gpu`). The GPU path is tested against the CPU path for agreement of the measured values within a stated tolerance; rows at a threshold may differ, and the test reports them rather than failing on them.
+- **GPU.** One GPU job at a time, with a memory cap. **Determinism is guaranteed on the CPU path only** (Atish, item 9): stored results name the path that produced them (`compute_path: cpu | gpu`), with the device, driver, CUDA and library versions, the tolerance used and the largest deviation the CPU check found (R-41). A headline number is always recomputed on the CPU. The GPU path is tested against the CPU path for agreement of the measured values within a stated tolerance; rows at a threshold may differ, and the test reports them rather than failing on them.
 
 #### A22.4.3 Code layout (Proposed)
 
@@ -485,9 +485,11 @@ There is no `truncated` code: a query that would hit a row limit is split or the
 | `cite.md` | The papers and data releases to cite for this hunt, and the tool's own DOI for the release used |
 | `series/` and `images/` | Light curves, spectra and cutouts per row (CSV and FITS; PNG previews) |
 
+**Bundle format, improved (R-39).** The bundle root is an **RO-Crate** (`ro-crate-metadata.json`, listing every file; Soiland-Reyes et al. 2022, doi:10.3233/DS-210053 **[verify]**), with an optional **W3C PROV / IVOA Provenance** export of the run: each external query an activity, each file an entity ([arXiv:2007.08615](https://arxiv.org/abs/2007.08615); the Recommendation's version and date **[verify]**). The provenance tag of a column sits in a VOTable FIELD attribute (and the ECSV column `meta`), never in the UCD. Per-row light curves, spectra and cutouts are linked from a **DataLink** table. Each cut is stored as its exact ADQL, with the TAP URL and the release. Whether a published selection function (for example GaiaUnlimited) was applied is stated.
+
 **Hunt-specific additions:** H4 adds `ades.xml` (ADES 2022 **[verify version]**; spacecraft position per record; precovery of named objects only until the MPC questions of R-12 are answered); H1 adds a VSX field sheet per star; H2 adds the Backyard Worlds form fields and the unWISE flip-book frames; H3, H8, H9, H11 add an RNAAS draft (`note.tex` from the AAS template **[verify licence]**, for the user to edit).
 
-**Citation policy.** Each tool release gets a DOI (Zenodo). The bundle cites it, the hunt's method papers and every data release used, with the archives' acknowledgement texts.
+**Citation policy (R-40).** Each tool release gets a Zenodo version DOI under one concept DOI, a `CITATION.cff` in the repository and an ASCL entry (Software Citation Principles, doi:10.7717/peerj-cs.86 **[verify]**). The provenance JSON records the lockfile hash and the container image digest. The bundle's citation file also cites astropy, astroquery and each archive. The bundle cites it, the hunt's method papers and every data release used, with the archives' acknowledgement texts.
 
 #### A22.7.6 Fixtures
 
@@ -595,6 +597,8 @@ flowchart LR
 
 **Where candidates are realistic.** About 665,000 of Chen's 781,602 ZTF variables are already in VSX ([AAVSO](https://www.aavso.org/vsx-surpassed-2000000-object-milestone)). What remains: faint stars (r 19 to 20.5), low amplitudes, long periods, Gaia DR3 variables missing from VSX, stars that vary in ZTF or Gaia but are missing from VSX, a better type for stars listed only as "variable", and corrected periods. Chen's "suspected variables" table was apparently not imported into VSX **[verify]** (an AAVSO forum guide), which makes it a place to look.
 
+**Improved (R-45).** Baluev's analytic false-alarm probability ([arXiv:0711.0330](https://arxiv.org/abs/0711.0330)) is a first screen only; the shuffle control over the **same frequency grid** decides (R-32). Aliasing makes Baluev's bound conservative (VanderPlas 2018 **[verify]**). Each row records the grid and the false-alarm method.
+
 **At home.** Sizes as in "Sample", measured by the plan's count query before the run. The variability cut leaves a few thousand; their periodograms take minutes on CPU and are a natural GPU batch.
 
 **Open.** VSX query terms for a tool; whether the Chen 2020 table may be redistributed with the app (licence); TESS blending rule; the fine-class list.
@@ -654,6 +658,8 @@ flowchart LR
 **Calibration and gate.** Inject synthetic movers into unWISE epoch images over expected signal-to-noise and motion; synthetic rows for the catalogue stage. Purity from shuffled epochs. **Gate (reference fields, once per version):** recover the UltracoolSheet objects above the calibrated limits.
 
 **Route (verified).** Backyard Worlds' public forms; volunteers who leave an email join the co-author group. **Overlap (R-12):** Gagné et al. 2026 already ran SPHEREx over all Backyard Worlds brown-dwarf candidates. Contact that team before building the typing stage, so H2 adds to their work rather than repeating it; the search tiers (especially Y) are where H2 adds most.
+
+**Improved (R-44).** Beside the colour cut, each CatWISE row gets the **XGBoost "moving-object" score** of Kota et al. 2022 ([arXiv:2112.11314](https://arxiv.org/abs/2112.11314)), since colour alone is contaminated; Backyard Worlds pre-selects candidates the same way. A Y-tier row needs a confirmed motion, and is called a Y dwarf only after Spitzer or JWST follow-up (Meisner et al. 2020, ApJ 899, 123).
 
 **At home.** CatWISE averages about 46,000 sources per square degree (about 4 million rows for 86 deg² without cuts); with the cuts in the query, a few MB; images are fetched for tens of survivors; the network is small enough for a CPU.
 
@@ -766,6 +772,14 @@ Rocks at V 19 to 22 will mostly be invisible in single frames. Stages A1 to A3 a
 
 **First error model (R-23).** The 0 of 38 run recovered nothing to calibrate from, so B2 starts from A4: centroids measured at the predicted spots of known rocks detected above S/N 10, cross-checked against Track's Eros fixtures. It is refined as recoveries accumulate.
 
+**Error model, improved (R-36).** The first layer is SPHEREx's **own WCS fit to Gaia stars** (each frame's residuals; the pipeline fits translation and rotation per image against isolated Gaia stars, [arXiv:2511.15823](https://arxiv.org/abs/2511.15823)); asteroid centroids above S/N 10 are the second layer, and Eros fixtures a sanity check. Centroids are **PSF fits, not moments**: moment centroids on undersampled pixels are biased by where the source falls in the pixel, which an effective-PSF fit largely removes (Anderson & King 2000, [astro-ph/0006325](https://arxiv.org/abs/astro-ph/0006325); [arXiv:2512.16764](https://arxiv.org/abs/2512.16764)). σ = S/N term ⊕ pixel-phase term ⊕ WCS floor, with the sub-pixel phase recorded. Frames with astrometric RMS above 1″ are flagged (the cut of [arXiv:2603.23620](https://arxiv.org/abs/2603.23620)). Before the model is trusted, the audit checks time conventions, sub-exposure timing and the WCS as causes of the 0 of 38, not only the centroid floor.
+
+**Lead criteria, improved (R-35).** An **orbit-residual RMS cut**, checked against the error model, joins the χ² test. The MPC's uncertainty parameter U is reported as context only, never as a pass test ([MPC](https://docs.minorplanetcenter.net/mpc-ops-docs/orbits/uncertainty-parameter/)). A **Rubin reference mode** applies Rubin's rule (tracklets of 2+ detections spanning 5 to 90 minutes, on at least 3 distinct nights within 14 days; [Rubin](https://prompt-products.lsst.io/processing/moving/ss_linking.html)). Our 2-night rule is looser and stated as such; it rests on our measured false-link rate.
+
+**Software route (R-37, refines R-24).** Linking with heliolinx (BSD-3) or THOR (BSD-3) with adam_core (MIT); orbit fitting with layup (MIT) or adam_core. Not linked into the tool: Find_Orb (GPL-2), OpenOrb, REBOUND and jorbit (GPL-3), ASSIST (GPL-3 **[verify]**). Licence labels were read from each repository page; the LICENSE files, and layup's own dependencies (it may use REBOUND), are **[verify]** before any pin.
+
+**Stacking null, improved (R-38).** Stage E's threshold comes from shuffled times **plus reverse-motion stacks** (as DEEP does, [arXiv:2309.09478](https://arxiv.org/abs/2309.09478); randomised shifts in [arXiv:2307.13773](https://arxiv.org/abs/2307.13773)), run through the same trial grid; the false-alarm rate is reported per trial grid, not per stack. A finer velocity grid raises false positives (KBMOD on the New Horizons Subaru survey, [arXiv:2407.21142](https://arxiv.org/abs/2407.21142)). Frame weights come from the rock's predicted reflectance, never fitted to the data; results are shown with and without weighting, since no published precedent for wavelength weighting was found.
+
 **Output.** As A17.7 and A17.8, plus per known rock: predicted and measured flux per frame, the sort, the loss table, the error model used, the spectrum points (`measured`) with reflectance, rotation, phase and heat corrections and the class (`model_dependent`); per candidate: the orbit fit, its residuals and χ², the false-link rate.
 
 **Accuracy.** Stacking N frames gains 2.5 log₁₀ √N magnitudes for a correctly guessed motion. Catalogue-based stacking is 10 to 1,000 times faster than image stacking for about 0.25 mag less depth ([arXiv:2509.26279](https://arxiv.org/abs/2509.26279), preprint). KBMOD searched 10¹⁰ trajectories in under a minute on one GPU ([Whidden et al. 2019](https://arxiv.org/abs/1901.02492)). About 100,000 asteroids are expected with useful SPHEREx flux, about 10,000 of high quality (Bock et al.).
@@ -870,6 +884,8 @@ Removed by R-7. Euclid DR1 (12 Nov 2026) shipped 15,072 high-confidence candidat
 
 **Route (verified).** An RNAAS note: free, editor-reviewed, online in about 72 h. Candidates without a radial velocity need a spectrum. A Nov 2026 Zenodo dataset tracing all 33 million Gaia DR3 stars with radial velocities back to young clusters (not peer-reviewed) is used for "already known", with care **[verify]**.
 
+**Improved (R-43).** Select on **significance plus speed** (peculiar speed / its uncertainty, and the km/s threshold), using the residual from Galactic rotation in 2D, as Carretero-Castrillo, Ribó & Paredes 2023 do ([arXiv:2311.01827](https://arxiv.org/abs/2311.01827)). Every 2D-only row carries "needs spectroscopy" ([arXiv:2209.14319](https://arxiv.org/abs/2209.14319)). The selection function warns that the parallax cut removes distant OB stars; no published study measures that bias yet, so it is an open item.
+
 **At home.** Catalogue only: under 0.2 GB a patch, minutes on the CPU.
 
 **Open.** The cluster catalogue to ship; the runaway-speed convention; extinction handling.
@@ -911,6 +927,8 @@ Removed by R-7. Euclid DR1 (12 Nov 2026) shipped 15,072 high-confidence candidat
 
 **Route.** An RNAAS note (Disk Detective 2.0 reports no discoveries yet; its FAQ).
 
+**Improved (R-46).** A **Galactic-dust screen** on the IRAS 100 µm background joins the rule-outs (Kuchner et al. 2016 name dust emission as a main contaminant). The card shows the measured contamination: background objects affect the excess of about 4 to 8% of candidates ([Silverberg et al. 2018](https://arxiv.org/abs/1809.09663)). The SPHEREx 3.3 µm galaxy test is labelled **our own method**: no published SPHEREx debris-disk work was found; SPHEREx ice and PAH maps exist ([arXiv:2603.12390](https://arxiv.org/abs/2603.12390), [arXiv:2603.22135](https://arxiv.org/abs/2603.22135)).
+
 **At home.** Catalogues plus SPHEREx forced photometry for tens of stars; minutes.
 
 **Open.** The model grid; SPHEREx sensitivity to hot dust at these brightnesses.
@@ -939,6 +957,8 @@ Removed by R-7. Euclid DR1 (12 Nov 2026) shipped 15,072 high-confidence candidat
 
 **Reality check.** Spectroscopy showed DR3's high-mass candidates other than BH1 to be spurious solutions ([El-Badry et al. 2023, BH1](https://arxiv.org/abs/2209.06833); [BH2](https://arxiv.org/abs/2302.07880)); published cuts also removed real systems: Andrews et al. 2022 excluded BH1. Müller-Horn et al. 2026 find 389 giant-star candidates from RUWE and radial-velocity scatter ([arXiv:2510.05982](https://arxiv.org/abs/2510.05982)).
 
+**Improved (R-47).** Our refit goes through the **Shahaf triage**: the mass function against the mass a luminous companion would need, with a conservative mass-luminosity relation ([Shahaf et al. 2023](https://arxiv.org/abs/2209.00828)). The DR4 cross-match is labelled "pending release" until 2 Dec 2026. No row uses black-hole wording without a radial-velocity check.
+
 **Gate (fixture, once per version).** From DR3's table, return BH1 and BH2 and reject the published spurious solutions.
 
 **Route.** None of its own: a table for follow-up planning.
@@ -949,7 +969,7 @@ Removed by R-7. Euclid DR1 (12 Nov 2026) shipped 15,072 high-confidence candidat
 
 **Data in.** TESS full-frame images (MAST; AWS copy; 21″ pixels; 200-second cadence in the current mission **[verify]**), TESS Input Catalog and Gaia DR3 for masking, MPC orbits and Horizons for known movers.
 
-**Precedent.** Shift-and-stack searches of TESS for distant solar-system objects and Planet Nine (Holman et al. 2019; Rice & Laughlin 2020 **[verify]**); TESS stacking traced 3I/ATLAS 55 days before its discovery ([arXiv:2508.02499](https://arxiv.org/abs/2508.02499)).
+**Precedent (R-48, corrected).** Payne, Holman & Pál 2019 ([arXiv:1911.03676](https://arxiv.org/abs/1911.03676)): stacking about 1,300 frames of a sector reaches about I = 22.0 ± 0.5 at 50% detection, the reference for our depth estimate. Rice & Laughlin 2020 ([arXiv:2010.13791](https://arxiv.org/abs/2010.13791)): a shift-stacking pipeline tested on known objects, then a blind search of Sectors 18 and 19 for bodies at 70 to 800 au. Two separate 3I/ATLAS precovery preprints: [arXiv:2508.02499](https://arxiv.org/abs/2508.02499) (about 900 stacked frames for a 3σ detection) and [arXiv:2507.21967](https://arxiv.org/abs/2507.21967).
 
 **Processing.**
 
@@ -1014,6 +1034,9 @@ Synthetic objects are added to **real** data, the unchanged hunt is run, and the
 - **Version 1 is capped (R-22).** 3 to 4 expected-S/N bins and one second-axis bin per hunt where the physics allows, on the shipped reference fields only, about 1,000 injections per field per hunt; the cost of each table (machine hours, downloads) is recorded in it. Finer grids come with later versions.
 - **On the user's own patch (R-5, release 2 per R-22).** `POST .../inject` runs the same injection on the run's own data and writes a calibration table tied to the run. The plan shows its time and download before it starts. Every planted object carries A16.5's **Injected** badge wherever it is drawn (R-21) and never enters the run's rows. The bundle then carries the patch's own completeness, which is what a paper needs.
 
+- **A fitted curve, not bins (R-29).** Completeness is fitted as a monotone curve in log expected S/N (a logistic, or the gamma CDF Kepler used in MES (Burke & Catanzarite 2017, KSCI-19111-002; Christiansen et al. 2020, [arXiv:2010.04796](https://arxiv.org/abs/2010.04796); the functional form **[verify]**)) by binomial maximum likelihood, with a bootstrap band. The 3 to 4 bins of R-22 stay as a goodness-of-fit check, drawn as points. Injections are concentrated where the curve rises, not spread evenly. Point intervals: Wilson, and Clopper-Pearson or Jeffreys when k = 0, k = n or n < 40 ([Brown, Cai & DasGupta 2001](https://doi.org/10.1214/ss/1009213286)). The project's 200 per bin is a precision choice, not a validity floor. A 3-parameter curve needing about 150 to 300 injections in the transition is an estimate to confirm by a small simulation in HN-4.
+- **Stale gates show (R-34).** A gate re-runs whenever an upstream input changes (data release, detrending, thresholds, control seeds), not only per version; a hash of those inputs is part of its label, so a stale gate is visible on the card. Kepler re-ran injection on its final pipeline version for DR25.
+
 #### A22.10.3 Purity
 
 Measured separately from the gate (R-5, Atish, section 8):
@@ -1021,6 +1044,10 @@ Measured separately from the gate (R-5, Atish, section 8):
 - **Controls with no signal:** H1 magnitudes shuffled **at fixed times** (keeps the window function and its aliases) **and** real constant stars (keeps correlated noise, which shuffling removes); H3 inverted light curves (as Kepler DR25); H4 and H11 shuffled frame times and impossible directions; H2 shuffled epochs; H5 field stars at asteroid positions; H8 stars with motions drawn from the local distribution.
 - **Trials corrected:** every threshold accounts for the number of hypotheses tried (H1 over 10⁵ stars, H3 SDE, H4 stage E, H11).
 - **Held-out years** where possible: run the hunt on data before a cut-off date; of its candidates, how many later entered VSX, Gaia or the TOI list. This measures what the controls cannot.
+
+- **A range, not a number (R-31).** Purity is reported as the range between at least two controls. Kepler DR25 found that inversion and scrambling bias false alarms in opposite directions, so "the truth likely lies somewhere in between" ([Thompson et al. 2018](https://arxiv.org/abs/1710.06758)). Shuffles keep blocks (seasons, sectors) so correlated noise survives. Injection goes in before detrending and the gate. The card says that the purity of a list is not the false-alarm probability of one row.
+- **Look-elsewhere by construction (R-32).** A hunt's threshold is set from the distribution of the **maximum** statistic of control runs over the **same search grid** as the real run (the same trial periods, positions or motions), which accounts for the number of trials directly. If the controls cannot reach the tail, the threshold is reported as a bound. Across many hunts or patches in a session, a Benjamini-Hochberg false-discovery-rate line is shown beside the per-hunt figure (Gross & Vitells 2010; Benjamini & Hochberg 1995 **[verify]**).
+- **Tuned or separate (R-33).** A purity figure measured on the same controls that set the threshold is labelled **"tuned on controls"**. Only controls kept separate (other seeds, sky or years) count towards Validated.
 
 #### A22.10.4 The calibration table
 
@@ -1049,6 +1076,8 @@ Measured separately from the gate (R-5, Atish, section 8):
 
 - On the card: "Completeness at this S/N: 0.86 (0.81 to 0.90)" and "False candidates: about 2 per 1,000 stars (control: magnitudes shuffled at fixed times)", with the calibration id in the tooltip and whether it is the reference fields' or this patch's.
 - No table, or outside it: "Completeness not measured for this kind of row." Never a default number.
+
+- **Continuous, bounded, never extrapolated (R-30, refines PD-3).** The card reads completeness from the fitted curve at the row's own expected S/N (no bin-edge jumps) and adds "average over the reference fields". When the row lies outside the injected range of any covariate the table records (period, number of transits, magnitude, crowding), no value is shown and the reason goes in `missing`. Completeness depends on more than S/N (Christiansen et al. 2020); the covariates and their validity range are published with the table, as Gaia's selection functions publish theirs ([Rix et al. 2021](https://arxiv.org/abs/2106.07653); [Cantat-Gaudin et al. 2023](https://arxiv.org/abs/2208.09335)).
 
 ### A22.11 Running on a home gaming PC
 
@@ -1099,6 +1128,8 @@ Wall-clock time is set mostly by archive download speed and by sharing archives 
 | Gaming mode | Low process priority; pauses when another program takes the GPU (read through the vendor's monitoring interface) or a laptop goes on battery; can be scheduled overnight. Phase "Later". |
 | Share the work | Export and import finished squares so a class or a club can split a large patch across several PCs and merge the results. Phase "Later". |
 | Offline | Under `SX_OFFLINE=1` a hunt runs only on cached inputs and lists the rest as `missing` (D-25). |
+
+**Archive handling (R-42).** Per-archive limits are read from each service's live TAP capabilities, not hard-coded; anything large uses asynchronous TAP; concurrent requests are capped per archive; HTTP 429 and 503 back off. Offline, a cached count older than a set age is marked stale, and its fetch time goes into provenance. Current IRSA, MAST and Gaia limits are **[verify]** (the Gaia synchronous cap of 2,000 rows is from an old FAQ).
 
 #### A22.11.5 Dependencies (to pin in each ticket; none is added by this spec)
 
@@ -1197,7 +1228,12 @@ The first draft's research (17 Nov 2026) was at the level of search results and 
 | V25 | ParSNIP figures | Resolved: 89% in five classes (Boone 2021); 82% is Aleo et al. 2023 (H7 no longer quotes either) |
 | V26 | Redistribution licences: Chen 2020, footprints, model grids, SPIFF and templates, network weights | Open (R-12) |
 | V31 | The rate grid for H11 and the TESS shift-and-stack precedents | Open |
-| V32 | The orbit-fit library for H4 (Find_Orb, OpenOrb) and the VOTable validator | Open |
+| V32 | The orbit-fit library for H4 and the VOTable validator | Partly resolved by R-37 (permissive routes); the validator is open |
+| V33 | THOR, ZTF, Pan-STARRS and NEOWISE linking criteria, read in full | Open: blocks HN-12 |
+| V34 | SPHEREx end-to-end astrometric accuracy: IRSA Explanatory Supplement section 4.2.2 and arXiv:2511.15823 in full | Open: blocks HN-5's error model |
+| V35 | LICENSE files of sorcha, OrbFit, ASSIST, heliolinx and layup, and layup's dependencies | Open: blocks any pin in HN-12 |
+| V36 | A simulation confirming 150 to 300 injections for a 3-parameter completeness curve | Open: blocks HN-4's table format |
+| V37 | The sources marked [verify] in R-29 to R-49 (the gamma-CDF reference, Gross & Vitells, Benjamini & Hochberg, RO-Crate, Provenance DM date, Software Citation Principles, VanderPlas 2018, archive limits) | Open: before the decision rows are registered |
 
 **Which [verify] item blocks which ticket** (none blocks approval of this proposal):
 
@@ -1214,7 +1250,7 @@ The first draft's research (17 Nov 2026) was at the level of search results and 
 
 ### A22.15 Decisions
 
-This PR may not touch `docs/decisions/`, so nothing here has an id yet. On approval each row becomes a `D-` or `Q-` entry (next free at the time of writing: D-41 and **Q-485**; PR #183 took Q-484) in `docs/decisions/moving-objects.md` and the index. R-1 to R-12 were **decided by Moon on 18 Nov 2026**, taking the recommendations made on Atish's twelve questions. R-13 to R-28 and the PD rows were **decided by Moon on 19 Nov 2026** on Atish's re-review (changes requested at 76eca86).
+This PR may not touch `docs/decisions/`, so nothing here has an id yet. On approval each row becomes a `D-` or `Q-` entry (next free at the time of writing: D-41 and **Q-485**; PR #183 took Q-484) in `docs/decisions/moving-objects.md` and the index. R-1 to R-12 were **decided by Moon on 18 Nov 2026**, taking the recommendations made on Atish's twelve questions. R-13 to R-28 and the PD rows were **decided by Moon on 19 Nov 2026** on Atish's re-review (changes requested at 76eca86). R-29 to R-50 were **decided by Moon on 19 Nov 2026** from a literature review (arXiv, ADS, IVOA and archive documentation; abstracts and repository pages, not full texts, so sources not opened are marked [verify] and listed as V37).
 
 | Ref | Decision | Status |
 |---|---|---|
@@ -1247,8 +1283,30 @@ This PR may not touch `docs/decisions/`, so nothing here has an id yet. On appro
 | R-26 | **Download budget enforced before the run:** above 50 GB per hunt (a setting) the row needs a stated limit before Run is enabled. | Decided (19 Nov) |
 | R-27 | **Release 1 minimum:** HN-0, 1, 2, 3, 4b, 5, 6. A hunt's calibration ships in its own ticket; no separate "Validated" tickets. | Decided (19 Nov) |
 | R-28 | **Hubble and JWST archives** left out on purpose (small fields; Asteroid Hunters covers Hubble). | Decided (19 Nov) |
+| R-29 | **Completeness as a fitted curve** (refines R-22): monotone curve in log expected S/N by binomial likelihood with a bootstrap band; bins as a fit check; injections concentrated in the rise; Wilson, or Clopper-Pearson/Jeffreys at k = 0, k = n or n < 40. | Decided (19 Nov), from the literature |
+| R-30 | **Card value from the curve** (refines PD-3), "average over the reference fields", and none outside the injected range of any covariate. | Decided (19 Nov) |
+| R-31 | **Purity as a range** between at least two controls (refines R-5); block shuffles; injection before detrending; purity is not a row's FAP. | Decided (19 Nov) |
+| R-32 | **Threshold from the control's maximum statistic over the same grid**; a bound when the tail is not reached; a session false-discovery-rate line. | Decided (19 Nov) |
+| R-33 | **"Tuned on controls"** label; only separate controls count for Validated (refines R-25). | Decided (19 Nov) |
+| R-34 | **Gate re-runs on any upstream change**, with an input hash in its label (refines R-15). | Decided (19 Nov) |
+| R-35 | **Orbit-residual RMS cut**, MPC U as context only, and a Rubin reference mode (refines R-3). | Decided (19 Nov) |
+| R-36 | **Error model from SPHEREx's Gaia WCS residuals first**, PSF-fit centroids, pixel phase, 1″ frame flag; audit time stamps and WCS first (refines R-23). | Decided (19 Nov) |
+| R-37 | **Permissive software route:** heliolinx or THOR with adam_core; layup or adam_core; no GPL code linked (refines R-24). | Decided (19 Nov) |
+| R-38 | **Stacking null** from shuffled times plus reverse-motion stacks on the same grid; weights from a reflectance model, shown with and without. | Decided (19 Nov) |
+| R-39 | **RO-Crate bundle root**, optional PROV / IVOA Provenance export, tags in FIELD attributes, DataLink for per-row products, ADQL stored per cut (refines R-4). | Decided (19 Nov) |
+| R-40 | **CITATION.cff, concept and version DOIs, ASCL entry**, lockfile hash and container digest. | Decided (19 Nov) |
+| R-41 | **GPU record:** device, driver, CUDA, libraries, tolerance, largest deviation; headline numbers recomputed on the CPU (refines PD-16). | Decided (19 Nov) |
+| R-42 | **Archive handling:** limits from live TAP capabilities, async TAP, per-archive concurrency, back-off, stale-count marking offline (refines R-6, R-17, R-26). | Decided (19 Nov) |
+| R-43 | **H8:** significance plus speed from the rotation residual; "needs spectroscopy" on 2D rows; parallax-cut bias warned (refines R-16). | Decided (19 Nov) |
+| R-44 | **H2:** add the XGBoost moving-object score; Y only after Spitzer or JWST follow-up. | Decided (19 Nov) |
+| R-45 | **H1:** Baluev FAP as a screen, shuffle control on the same grid decides; grid and method recorded. | Decided (19 Nov) |
+| R-46 | **H9:** IRAS 100 µm dust screen; 4 to 8% contamination shown; the SPHEREx galaxy test labelled as our own method. | Decided (19 Nov) |
+| R-47 | **H10:** Shahaf triage on our refit; "pending release" until DR4; RV check before black-hole wording. | Decided (19 Nov) |
+| R-48 | **H11 precedents corrected:** Payne, Holman & Pál 2019; Rice & Laughlin 2020; two separate 3I/ATLAS preprints. | Decided (19 Nov) |
+| R-49 | **PD-5 note:** measured statistics inherit the hunt's cuts. | Decided (19 Nov) |
+| R-50 | **Open questions from the research** (V33 to V37) are resolved by reading the named sources and running the HN-4 simulation, each blocking its ticket. | Decided (19 Nov) |
 | PD-3 | Rates on the row card: the value at the row's own expected signal-to-noise, with its interval. Amends A16.5's "no single figure goes into a card" for overall rates only. | Decided (Moon, 19 Nov 2026) |
-| PD-5 | **Tag boundary.** A period, depth, motion or profile computed directly from measured points with its uncertainty is `measured`; anything needing a model or a catalogue parameter is `model_dependent`; classifier outputs are `derived`. | Decided (Moon, 19 Nov 2026) |
+| PD-5 | **Tag boundary.** A period, depth, motion or profile computed directly from measured points with its uncertainty is `measured`; anything needing a model or a catalogue parameter is `model_dependent`; classifier outputs are `derived`. Measured statistics still inherit the hunt's cuts (R-49). | Decided (Moon, 19 Nov 2026) |
 | PD-6 | The selection label drops its time estimate once hunts exist. | Decided (Moon, 19 Nov 2026) |
 | PD-11 | **Contract** of A22.7: `hunts` and `options` on `POST /v1/scans` defaulting to `["asteroids"]`; rows, ids after the merge, `rows_ready`; `seed` and `software`; the bundle and inject routes. Extends Q-470 and Q-471. | Decided (Moon, 19 Nov 2026) |
 | PD-12 | **Two lanes** owned by the scan job, with per-archive limits shared by both. Extends Q-470 (6). | Decided (Moon, 19 Nov 2026); Kevin to confirm feasibility in HN-1 |
@@ -1280,6 +1338,8 @@ This PR may not touch `docs/decisions/`, so nothing here has an id yet. On appro
 ---
 
 ## Sources
+
+**Decision research, 19 Nov 2026 (R-29 to R-50).** [Brown, Cai & DasGupta 2001](https://doi.org/10.1214/ss/1009213286) · [Burke & Catanzarite 2017](https://exoplanetarchive.ipac.caltech.edu/docs/KSCI-19111-002.pdf) · [Christiansen et al. 2020](https://arxiv.org/abs/2010.04796) · [Thompson et al. 2018](https://arxiv.org/abs/1710.06758) · [Rix et al. 2021](https://arxiv.org/abs/2106.07653) · [Cantat-Gaudin et al. 2023](https://arxiv.org/abs/2208.09335) · [Everall & Boubert](https://arxiv.org/abs/2111.04127) · [Denneau et al. 2013](https://arxiv.org/abs/1302.7281) · [Sorcha](https://arxiv.org/abs/2506.02804) · [Rubin linking](https://prompt-products.lsst.io/processing/moving/ss_linking.html) · [MPC U parameter](https://docs.minorplanetcenter.net/mpc-ops-docs/orbits/uncertainty-parameter/) · [Anderson & King 2000](https://arxiv.org/abs/astro-ph/0006325) · [arXiv:2512.16764](https://arxiv.org/abs/2512.16764) · [arXiv:2603.23620](https://arxiv.org/abs/2603.23620) · [DEEP](https://arxiv.org/abs/2309.09478) · [arXiv:2307.13773](https://arxiv.org/abs/2307.13773) · [KBMOD Subaru](https://arxiv.org/abs/2407.21142) · [IVOA Provenance feedback](https://arxiv.org/abs/2007.08615) · [Carretero-Castrillo et al. 2023](https://arxiv.org/abs/2311.01827) · [arXiv:2209.14319](https://arxiv.org/abs/2209.14319) · [Kota et al. 2022](https://arxiv.org/abs/2112.11314) · [Baluev 2008](https://arxiv.org/abs/0711.0330) · [Shahaf et al. 2023](https://arxiv.org/abs/2209.00828) · [Payne, Holman & Pál 2019](https://arxiv.org/abs/1911.03676) · [Rice & Laughlin 2020](https://arxiv.org/abs/2010.13791) · [arXiv:2507.21967](https://arxiv.org/abs/2507.21967) · SPHEREx ice and PAH maps [arXiv:2603.12390](https://arxiv.org/abs/2603.12390), [arXiv:2603.22135](https://arxiv.org/abs/2603.22135)
 
 Grouped by hunt. "P" marks a preprint or a secondary source; treat its figures as **[verify]**.
 
