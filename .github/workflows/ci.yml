@@ -18,9 +18,10 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.ref }}
-  # Only a newer push to the same PR cancels a run; runs on main finish, so main's history
-  # shows each commit's real result.
+  # A PR shares one group, so a newer push cancels its older run. Every other run (main, merge
+  # queue, manual) gets a group per commit, so no run on main is cancelled or dropped while
+  # pending, and main's history shows each commit's real result.
+  group: ci-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
@@ -52,10 +53,15 @@ jobs:
           echo "Changed files:"; echo "$files"
           has() { if grep -qE "$1" <<< "$files"; then echo true; else echo false; fi; }
           {
-            # The backend checks also read frontend files: bake_demo_pack (search/demoTargets.ts,
-            # viewer/altText.ts) and test_gas_giant_layers (viewer/renderers/shaderSpec.ts).
-            echo "backend=$(has '^(backend/|shared/|frontend/src/viewer/|frontend/src/app/search/|\.github/workflows/|package\.json$)')"
-            echo "frontend=$(has '^(frontend/|shared/|\.github/workflows/|package\.json$)')"
+            # Each side's checks also read files from the other side (keep these lists in step):
+            # - backend reads frontend/src/app/search/demoTargets.ts and viewer/altText.ts
+            #   (bake_demo_pack), viewer/renderers/shaderSpec.ts (test_gas_giant_layers), and
+            #   .gitattributes (test_review_fixes);
+            # - frontend reads backend/app/core/ (backendReasons.test) and backend/assets/
+            #   (comet and Titan tests, the fixtures handler's shapes, spectrumCheck e2e).
+            # .gitattributes sets line endings for both.
+            echo "backend=$(has '^(backend/|shared/|frontend/src/viewer/|frontend/src/app/search/|\.github/workflows/|package\.json$|\.gitattributes$)')"
+            echo "frontend=$(has '^(frontend/|shared/|backend/app/core/|backend/assets/|\.github/workflows/|package\.json$|\.gitattributes$)')"
             echo "codeowners=$(has '^\.github/CODEOWNERS$')"
           } >> "$GITHUB_OUTPUT"
           cat "$GITHUB_OUTPUT"
