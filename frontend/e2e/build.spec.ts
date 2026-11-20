@@ -9,6 +9,17 @@ import { GOLDEN_MAX_COLOUR_DELTA, GOLDEN_MIN_CHANNEL_SSIM, GOLDEN_MIN_SSIM } fro
 import { scoreFrames, type Rgb } from './ssim';
 import { honestyLevel, setHonestyLevel } from './viewer';
 
+/**
+ * "Build it" at + Artistic raises the level and a D-37 world engine draws the planet: the steps wait
+ * for it to compile and form it (`forming`, #93, 16fc2e54). Measured on this machine pinned to 2 cores
+ * with 2 workers (the CI runner's shape): 120 s forming, then 17 to 20 s of steps, 138 s to Built; alone
+ * on 2 cores 72 s for the whole test. The 120 s test limit and 60 to 90 s phase limits were set for
+ * the three.js build of 9 Nov (31 s on a CI runner) and could not hold. Limits only: nothing asserted
+ * about the build is looser.
+ */
+const ENGINE_BUILD_MS = 240_000;
+const BUILD_TEST_MS = 330_000;
+
 async function skyReady(page: Page): Promise<void> {
   await expect(page.getByTestId('sky-pane')).toHaveAttribute('data-sky-state', /ready|no-image/, {
     timeout: 30_000,
@@ -17,8 +28,8 @@ async function skyReady(page: Page): Promise<void> {
 }
 
 /** Looks at Aqua Prime and right-clicks its marker (selects it and shows its card). */
-async function selectAquaPrime(page: Page): Promise<void> {
-  await page.goto('/');
+async function selectAquaPrime(page: Page, url = '/'): Promise<void> {
+  await page.goto(url);
   await skyReady(page);
   await page.evaluate(() =>
     (globalThis as unknown as { __sxSky: { setView(v: object): void } }).__sxSky.setView({
@@ -138,6 +149,8 @@ async function rightClickBrackets(page: Page, testId: string): Promise<void> {
 test('right-click on the brackets brings the card back, without the browser menu', async ({
   page,
 }) => {
+  // Build it opens a SwiftShader pane: 26 to 33 s on a 2-core CI runner, over the 30 s default (PR #183).
+  test.setTimeout(90_000);
   await selectAquaPrime(page);
   await watchContextMenu(page);
   const card = page.getByTestId('selected-card');
@@ -228,7 +241,7 @@ test('See fingerprint opens the object panel at the spectrum', async ({ page }) 
 });
 
 test('Build it: split view, steps run to done, Escape and Back close it', async ({ page }) => {
-  test.setTimeout(120_000);
+  test.setTimeout(BUILD_TEST_MS);
   await selectAquaPrime(page);
   await page.getByTestId('build-it').click();
   const pane = page.getByTestId('build-pane');
@@ -236,11 +249,19 @@ test('Build it: split view, steps run to done, Escape and Back close it', async 
   await expect(page.getByTestId('build-title')).toHaveText('Building Aqua Prime');
   await expect(page.getByTestId('build-title')).toBeFocused();
   expect(new URL(page.url()).hash).toContain('build');
-  // The pane fills the view while it builds and slides to the right half after (mock-up
-  // `setShifted`); the sky stays under it at full width; the transport steps aside.
+  // The pane fills the view while it builds and, since Q-419 (b82f8d1e), keeps the whole view once
+  // built (no split by default: data-solo). Explore is the split view: it slides the pane to the
+  // right half (mock-up `setShifted`). The sky stays under it at full width and the transport
+  // steps aside as soon as the pane is open (App `split` is "Build it is open", not Explore).
   const view = (await page.locator('main.sx-view').boundingBox())!;
+  await expect(pane).toHaveAttribute('data-phase', 'done', { timeout: ENGINE_BUILD_MS });
+  await expect(pane).toHaveAttribute('data-solo', 'true');
   await expect
-    .poll(async () => (await pane.boundingBox())!.width, { timeout: 120_000 })
+    .poll(async () => (await pane.boundingBox())!.width)
+    .toBeGreaterThan(view.width * 0.95);
+  await page.getByTestId('build-explore').click();
+  await expect
+    .poll(async () => (await pane.boundingBox())!.width, { timeout: 30_000 })
     .toBeLessThan(view.width * 0.55);
   await expect(page.locator('.sx-transport-slot')).toHaveAttribute('inert', '');
   // The first build already shows the steps and raises the level to + Artistic by itself (the pane
@@ -300,7 +321,7 @@ test('a marker without a 3D model: the pane says so, nothing is drawn', async ({
 test('Build it from a fresh load raises the level and builds all five steps (water planet)', async ({
   page,
 }) => {
-  test.setTimeout(120_000);
+  test.setTimeout(BUILD_TEST_MS);
   await selectAquaPrime(page);
   await page.getByTestId('build-it').click();
   const pane = page.getByTestId('build-pane');
@@ -314,7 +335,7 @@ test('Build it from a fresh load raises the level and builds all five steps (wat
   await expect(steps).toHaveText([/Base mould/, /Terrain/, /Oceans/, /Colour/, /Clouds/], {
     timeout: 60_000,
   });
-  await expect(pane).toHaveAttribute('data-phase', 'done', { timeout: 90_000 });
+  await expect(pane).toHaveAttribute('data-phase', 'done', { timeout: ENGINE_BUILD_MS });
   for (const st of await steps.all()) await expect(st).toHaveAttribute('data-state', 'done');
   // Built: the title keeps "Building" (the mock-up's, Q-298); the announcer says Built.
   await expect(page.getByTestId('build-title')).toHaveText('Building Aqua Prime');
@@ -325,11 +346,11 @@ test('Build it from a fresh load raises the level and builds all five steps (wat
 });
 
 test('the level changed mid-build ends the build on the new plan', async ({ page }) => {
-  test.setTimeout(120_000);
+  test.setTimeout(BUILD_TEST_MS);
   await selectAquaPrime(page);
   await page.getByTestId('build-it').click();
   const pane = page.getByTestId('build-pane');
-  await expect(pane).toHaveAttribute('data-phase', 'building', { timeout: 60_000 });
+  await expect(pane).toHaveAttribute('data-phase', 'building', { timeout: ENGINE_BUILD_MS });
   await setHonestyLevel(page, 'measured');
   // Not after the whole 11.5 s: it ends at once, ticked, on the Measured-only picture.
   await expect(pane).toHaveAttribute('data-phase', 'done', { timeout: 6_000 });
@@ -432,15 +453,22 @@ async function settledShot(page: Page): Promise<Buffer> {
   return page.screenshot({ clip: box, mask: [page.getByTestId('viewer-label')] });
 }
 
-// UNVERIFIED after the D-38 redesign: re-pointed to the first (animated) build and the `build` link
-// because the pane has no Replay or 3D viewer button now, but `freezeClock` in settledShot did not
-// return in the headless run here (150 s timeout), so the SSIM comparison itself was not reached.
+// The three.js viewer's build, with the D-37 engines off (`?engines=0`, #93 C4, kept in localStorage).
+// With the engines on, "Build it" raises the level to + Artistic and an engine draws the planet on its
+// own canvas in real time: the viewer builds no body (`__sxViewer.body` stays null, its clock cannot be
+// frozen for the engine) and two frames taken at different moments are not the same picture. The
+// property this test protects, that the pose and held layers of a build are cleared at its end so the
+// last frame is the normal render of the same card and seed, belongs to the three.js path, which is the
+// shipped fallback and the render of every other kind, so that is the path compared here. (Before: the
+// test hung 150 s in freezeClock, which waited for a settle burst that an engine-owned viewer never
+// draws; fixed in ViewerApp.whenSettled.)
 test('the last frame of a build is the normal render of the same plan and seed', async ({
   page,
   context,
 }) => {
-  test.setTimeout(150_000);
-  await selectAquaPrime(page);
+  // Two SwiftShader builds plus two settled shots: 2.2 to 2.6 min on a 2-core CI runner (PR #183).
+  test.setTimeout(300_000);
+  await selectAquaPrime(page, '/?engines=0');
   await page.getByTestId('build-it').click();
   const pane = page.getByTestId('build-pane');
   // The animated build of Build it (it raises the level to + Artistic by itself).

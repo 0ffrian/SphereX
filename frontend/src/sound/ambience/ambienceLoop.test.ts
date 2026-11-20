@@ -4,7 +4,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FakeAudioContext } from '@/test/fakeAudio';
 import { REFUSAL_TEXT } from './airModel';
-import { createAmbienceLoop, SOUND_UNAVAILABLE, type AmbienceUi, type LoopDeps, type PaletteLike } from './ambienceLoop';
+import {
+  createAmbienceLoop,
+  SOUND_UNAVAILABLE,
+  type AmbienceUi,
+  type LoopDeps,
+  type PaletteLike,
+} from './ambienceLoop';
 import type { GateInputs } from './ambienceState';
 import { ceilingCaption } from './captions';
 import { earthAir, makeFlyEngine, makePlace, makeWind, makeWorld } from './fakeEngine.testutil';
@@ -15,7 +21,14 @@ import type { AirModel, BedSpec, Strike } from './types';
 import type { WeatherSnapshot } from './weatherBus';
 
 const ON: GateInputs = {
-  entered: true, paused: false, hidden: false, artistic: true, failed: false, soundOn: true, ambienceOn: true, audioRunning: true,
+  entered: true,
+  paused: false,
+  hidden: false,
+  artistic: true,
+  failed: false,
+  soundOn: true,
+  ambienceOn: true,
+  audioRunning: true,
 };
 
 function fakePalette() {
@@ -57,9 +70,20 @@ function setup(over: Partial<LoopDeps> = {}, gate: Partial<GateInputs> = ON) {
     ps: 1,
     fly: { alt: 0.05, lon: 0, lat: 0, head: 0, pitch: 0, auto: false },
     // R12 readiness as the real engine reports it (the loop's m4 cache keys on it)
-    cpuFields: () => (waiting ? { terrain: null, climate: null, hydro: null } : { terrain: null, climate: { stats: {} }, hydro: {} }),
+    cpuFields: () =>
+      waiting
+        ? { terrain: null, climate: null, hydro: null }
+        : { terrain: null, climate: { stats: {} }, hydro: {} },
     state() {
-      return { Ps: this.ps, fluid: 'water', gas: false, locked: false, Tstar: 5772, orbit: 1, co2: false };
+      return {
+        Ps: this.ps,
+        fluid: 'water',
+        gas: false,
+        locked: false,
+        Tstar: 5772,
+        orbit: 1,
+        co2: false,
+      };
     },
   };
   engine = e as unknown as typeof engine;
@@ -74,21 +98,30 @@ function setup(over: Partial<LoopDeps> = {}, gate: Partial<GateInputs> = ON) {
       strike: (s) => strikes.push({ s, at: clock }),
       onUi: (u) => uis.push(u),
       clockS: () => clock,
-      timers: { set: (fn, ms) => setTimeout(fn, ms), clear: (h) => clearTimeout(h as ReturnType<typeof setTimeout>) },
+      timers: {
+        set: (fn, ms) => setTimeout(fn, ms),
+        clear: (h) => clearTimeout(h as ReturnType<typeof setTimeout>),
+      },
       idle,
       buildAir: () => {
         const a = airOf();
         return waiting ? { ...a, refusals: [{ source: 'all', reason: REFUSAL_TEXT.waiting }] } : a;
       },
       sample: (_e, a) =>
-        makePlace(0.05, ({ bearing }) => ({ cls: bearing > Math.PI / 2 && bearing < 1.5 * Math.PI ? 'sea' : 'land' }), {
-          wind: makeWind({ U10: 9, Uz: 9 }),
-          cnv: 1,
-          cnvRing: 1,
-          stormNear: 1,
-          rainRate: a.P0 > 0 ? 1 : 0,
-          precipPhase: 'rain',
-        }),
+        makePlace(
+          0.05,
+          ({ bearing }) => ({
+            cls: bearing > Math.PI / 2 && bearing < 1.5 * Math.PI ? 'sea' : 'land',
+          }),
+          {
+            wind: makeWind({ U10: 9, Uz: 9 }),
+            cnv: 1,
+            cnvRing: 1,
+            stormNear: 1,
+            rainRate: a.P0 > 0 ? 1 : 0,
+            precipPhase: 'rain',
+          },
+        ),
       ...over,
     },
     gate,
@@ -106,7 +139,9 @@ const ticks = (loop: { tick(): void }, n: number, dt = 0.1) => {
 beforeEach(() => {
   vi.useFakeTimers();
   ctx = new FakeAudioContext();
-  mixer = new AmbienceMixer(ctx.asAudioContext(), ctx.createGain() as unknown as AudioNode, { harmonic: false });
+  mixer = new AmbienceMixer(ctx.asAudioContext(), ctx.createGain() as unknown as AudioNode, {
+    harmonic: false,
+  });
   clock = 100;
   waiting = false;
   airOf = () => earthAir();
@@ -262,7 +297,11 @@ describe('ambience loop: #116 code review fixes', () => {
   it('M1: at the 400 km fly start (REAL buildAirModel and samplePlace) the ceiling caption shows on the first playing tick', () => {
     const fe = makeFlyEngine({ fly: { alt: 400 } });
     const { loop, palette } = setup(
-      { engine: () => fe as unknown as WorldEngineWithSpinup, buildAir: undefined, sample: undefined },
+      {
+        engine: () => fe as unknown as WorldEngineWithSpinup,
+        buildAir: undefined,
+        sample: undefined,
+      },
       { ...ON, audioRunning: false },
     );
     ticks(loop, 3); // before the click: the place is sampled and the beds are requested (M16)
@@ -273,7 +312,9 @@ describe('ambience loop: #116 code review fixes', () => {
     expect(loop.status()).toBe('playing');
     // Earth calibration model (H = 8.43 km, Ps = 1 bar): the derived ceiling is about 97 km
     expect(uis.at(-1)!.caption).toBe(ceilingCaption(earthAir({ P0: 1e5 })));
-    expect(uis.at(-1)!.caption).toMatch(/^Too high: the air here is too thin to carry sound\. Fly below about 97 km to hear it\.$/);
+    expect(uis.at(-1)!.caption).toMatch(
+      /^Too high: the air here is too thin to carry sound\. Fly below about 97 km to hear it\.$/,
+    );
     const at = uis.length;
     ticks(loop, 1); // the first playing tick with a mix frame
     expect(uis.slice(at - 1).every((u) => u.caption.startsWith('Too high'))).toBe(true);
@@ -283,7 +324,11 @@ describe('ambience loop: #116 code review fixes', () => {
 
   it('Q-447: above the ceiling the caption shows while the beds still bake', () => {
     const fe = makeFlyEngine({ fly: { alt: 400 } });
-    const { loop } = setup({ engine: () => fe as unknown as WorldEngineWithSpinup, buildAir: undefined, sample: undefined });
+    const { loop } = setup({
+      engine: () => fe as unknown as WorldEngineWithSpinup,
+      buildAir: undefined,
+      sample: undefined,
+    });
     ticks(loop, 1);
     expect(loop.status()).toBe('baking');
     expect(uis.at(-1)!.caption).toMatch(/^Too high: .* Fly below about \d+ km to hear it\.$/);
@@ -308,7 +353,11 @@ describe('ambience loop: #116 code review fixes', () => {
       log,
       sample: (_e, a) => {
         if (fail) throw new Error('arrays swapped');
-        return makePlace(0.05, () => ({ cls: 'land' }), { wind: makeWind({ U10: 9, Uz: 9 }), rainRate: a.P0 > 0 ? 1 : 0, precipPhase: 'rain' });
+        return makePlace(0.05, () => ({ cls: 'land' }), {
+          wind: makeWind({ U10: 9, Uz: 9 }),
+          rainRate: a.P0 > 0 ? 1 : 0,
+          precipPhase: 'rain',
+        });
       },
     });
     ticks(loop, 1);
@@ -370,7 +419,9 @@ describe('ambience loop: #116 code review fixes', () => {
       engine: () => fe as unknown as WorldEngineWithSpinup,
       buildAir: () => {
         build();
-        return fe.forming ? { ...earthAir(), refusals: [{ source: 'all', reason: REFUSAL_TEXT.waiting }] } : earthAir();
+        return fe.forming
+          ? { ...earthAir(), refusals: [{ source: 'all', reason: REFUSAL_TEXT.waiting }] }
+          : earthAir();
       },
     });
     ticks(loop, 20);

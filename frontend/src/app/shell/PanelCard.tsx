@@ -75,7 +75,9 @@ export function PanelCard({
     if (a && a !== document.body) return;
     // A21.5: restoring a minimised card (its pill unmounts, focus falls to <body>) focuses its
     // heading. A bare card draws its own heading; it takes focus when it is focusable (tabIndex -1).
-    const heading = bare ? rootEl.current?.querySelector<HTMLElement>('h2[tabindex]') : titleRef.current;
+    const heading = bare
+      ? rootEl.current?.querySelector<HTMLElement>('h2[tabindex]')
+      : titleRef.current;
     (heading ?? rootEl.current)?.focus({ preventScroll: true });
   }, [pending, bare]);
   const close = () => {
@@ -99,7 +101,9 @@ export function PanelCard({
   return (
     <section
       aria-labelledby={bare ? undefined : titleId}
-      aria-label={bare ? `${title}${typeof subtitle === 'string' ? `: ${subtitle}` : ''}` : undefined}
+      aria-label={
+        bare ? `${title}${typeof subtitle === 'string' ? `: ${subtitle}` : ''}` : undefined
+      }
       tabIndex={bare ? -1 : undefined}
       ref={(el) => {
         rootEl.current = el;
@@ -114,63 +118,63 @@ export function PanelCard({
       data-testid={testId}
     >
       {!bare && (
-      <header className="sx-panel-head">
-        {back && (
-          <button
-            type="button"
-            className="sx-panel-x sx-panel-back"
-            aria-label={back.label}
-            title={`${back.label} (Esc)`}
-            onClick={back.go}
-            data-testid="area-back"
-          >
-            <BackArrow />
-          </button>
-        )}
-        {icon && (
-          <span
-            className="grid size-9 flex-none place-items-center rounded-xl bg-sx-muted text-sx-green"
-            aria-hidden="true"
-          >
-            <Icon name={icon} />
-          </span>
-        )}
-        <div className="min-w-0">
-          <h2 id={titleId} ref={titleRef} tabIndex={-1}>
-            {title}
-          </h2>
-          {subtitle && (
-            // A long name is cut with an ellipsis; the tooltip has it in full.
-            <p
-              className={wrapSubtitle ? 'line-clamp-2' : 'truncate'}
-              title={typeof subtitle === 'string' ? subtitle : undefined}
+        <header className="sx-panel-head">
+          {back && (
+            <button
+              type="button"
+              className="sx-panel-x sx-panel-back"
+              aria-label={back.label}
+              title={`${back.label} (Esc)`}
+              onClick={back.go}
+              data-testid="area-back"
             >
-              {subtitle}
-            </p>
+              <BackArrow />
+            </button>
           )}
-        </div>
-        {onMinimise && (
+          {icon && (
+            <span
+              className="grid size-9 flex-none place-items-center rounded-xl bg-sx-muted text-sx-green"
+              aria-hidden="true"
+            >
+              <Icon name={icon} />
+            </span>
+          )}
+          <div className="min-w-0">
+            <h2 id={titleId} ref={titleRef} tabIndex={-1}>
+              {title}
+            </h2>
+            {subtitle && (
+              // A long name is cut with an ellipsis; the tooltip has it in full.
+              <p
+                className={wrapSubtitle ? 'line-clamp-2' : 'truncate'}
+                title={typeof subtitle === 'string' ? subtitle : undefined}
+              >
+                {subtitle}
+              </p>
+            )}
+          </div>
+          {onMinimise && (
+            <button
+              type="button"
+              className="sx-panel-x"
+              aria-label={`Minimise ${title}`}
+              title="Minimise"
+              onClick={onMinimise}
+              data-testid="area-min"
+            >
+              <Icon name="minus" className="size-4" />
+            </button>
+          )}
           <button
             type="button"
             className="sx-panel-x"
-            aria-label={`Minimise ${title}`}
-            title="Minimise"
-            onClick={onMinimise}
-            data-testid="area-min"
+            aria-label={`Close ${title}`}
+            title="Close (Esc)"
+            onClick={close}
           >
-            <Icon name="minus" className="size-4" />
+            <Icon name="x" className="size-4" />
           </button>
-        )}
-        <button
-          type="button"
-          className="sx-panel-x"
-          aria-label={`Close ${title}`}
-          title="Close (Esc)"
-          onClick={close}
-        >
-          <Icon name="x" className="size-4" />
-        </button>
-      </header>
+        </header>
       )}
       <div className="sx-panel-body" ref={bodyRef}>
         {typeof children === 'function' ? children(close) : children}

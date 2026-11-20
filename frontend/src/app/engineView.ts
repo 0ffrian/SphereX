@@ -130,5 +130,8 @@ export function useViewControls(): ViewControls {
   const closeUp = useStarView((s) => s.closeUp);
   // `globe` is a dependency: the world controls are off until its engine exists.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  return useMemo(() => resolveViewControls({ viewer, engineWorld, engineStar, rockView, rockKind }), [viewer, engineWorld, engineStar, rockView, rockKind, globe, closeUp]);
+  return useMemo(
+    () => resolveViewControls({ viewer, engineWorld, engineStar, rockView, rockKind }),
+    [viewer, engineWorld, engineStar, rockView, rockKind, globe, closeUp],
+  );
 }

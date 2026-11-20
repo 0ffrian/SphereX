@@ -66,7 +66,13 @@ import { useAreaStore } from '@/app/shell/areaStore';
 import { AreaOverlay } from './AreaOverlay';
 import { AreaTrackLayer } from '@/app/area/AreaTrackLayer';
 import { KnownPositionsLayer } from '@/app/area/KnownPositionsLayer';
-import { enterInArea, patchClickAt, pickRegionAt, registerAreaView, restoreSavedScan } from './areaDraw';
+import {
+  enterInArea,
+  patchClickAt,
+  pickRegionAt,
+  registerAreaView,
+  restoreSavedScan,
+} from './areaDraw';
 import { ScanOverlay, scanClickAt } from './ScanOverlay';
 import { AimOverlay } from './AimOverlay';
 import { ReplayBar } from './ReplayBar';
@@ -551,7 +557,8 @@ export function SkyPane({ children }: { children?: ReactNode }) {
     // A scan left running in this browser comes back after a reload (issue #157).
     restoreSavedScan();
     // Issue #157 (Q-472): selecting a region (a drag turns the sky, a click selects the region).
-    const areaStage = () => (useShellStore.getState().tool === 'area' ? useAreaStore.getState().stage : null);
+    const areaStage = () =>
+      useShellStore.getState().tool === 'area' ? useAreaStore.getState().stage : null;
     const areaPlacing = () => areaStage() === 'aiming';
     // The pointer is the selection rectangle (the canvas hides its own, index.css).
     const setMode = () => {
@@ -570,7 +577,12 @@ export function SkyPane({ children }: { children?: ReactNode }) {
     const sendReadout = () => {
       readoutFrame = null;
       const cam = view.getView();
-      if (lastCam === null || cam.ra !== lastCam.ra || cam.dec !== lastCam.dec || cam.fovDeg !== lastCam.fovDeg) {
+      if (
+        lastCam === null ||
+        cam.ra !== lastCam.ra ||
+        cam.dec !== lastCam.dec ||
+        cam.fovDeg !== lastCam.fovDeg
+      ) {
         if (lastCam !== null) publishMotion();
         lastCam = { ra: cam.ra, dec: cam.dec, fovDeg: cam.fovDeg };
       }
@@ -761,7 +773,9 @@ export function SkyPane({ children }: { children?: ReactNode }) {
     state.kind === 'ready' || state.kind === 'loading' || state.kind === 'error'
       ? state.survey
       : null;
-  const resolvedLabel = resolved ? (displayName(resolved.name) || formatCoords(resolved.ra, resolved.dec)) : '';
+  const resolvedLabel = resolved
+    ? displayName(resolved.name) || formatCoords(resolved.ra, resolved.dec)
+    : '';
   const showPicked =
     picked !== null &&
     !(

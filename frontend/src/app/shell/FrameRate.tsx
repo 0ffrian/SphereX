@@ -6,7 +6,11 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { FPS_OPTIONS, type Fps } from '@/app/flipbook/playback';
-import { COMPOSITE_TRANSPORT_NOTE, effectiveColour, transportLocked } from '@/app/flipbook/colourMode';
+import {
+  COMPOSITE_TRANSPORT_NOTE,
+  effectiveColour,
+  transportLocked,
+} from '@/app/flipbook/colourMode';
 import { useAppStore } from '@/state/store';
 import { demoPlayerOn, useAreaStore } from './areaStore';
 import { EXPLORE_SPRING } from '@/app/build/exploreMotion';
@@ -96,7 +100,11 @@ export function FrameRate() {
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
-        aria-label={locked ? `Frame rate, ${fps} frames a second. ${COMPOSITE_TRANSPORT_NOTE}` : `Frame rate, ${fps} frames a second`}
+        aria-label={
+          locked
+            ? `Frame rate, ${fps} frames a second. ${COMPOSITE_TRANSPORT_NOTE}`
+            : `Frame rate, ${fps} frames a second`
+        }
         title={locked ? COMPOSITE_TRANSPORT_NOTE : 'Frame rate'}
         // Focusable while locked, so the reason can be read (it is in the label and the title).
         aria-disabled={locked || undefined}
@@ -122,7 +130,17 @@ export function FrameRate() {
             onKeyDown={onMenuKey}
             initial={reduced ? false : { opacity: 0, y: -6, scale: 0.94, filter: 'blur(4px)' }}
             animate={{ opacity: 1, y: 0, scale: 1, filter: 'blur(0px)' }}
-            exit={reduced ? { opacity: 0, transition: { duration: 0 } } : { opacity: 0, y: -4, scale: 0.96, filter: 'blur(4px)', transition: { duration: 0.15 } }}
+            exit={
+              reduced
+                ? { opacity: 0, transition: { duration: 0 } }
+                : {
+                    opacity: 0,
+                    y: -4,
+                    scale: 0.96,
+                    filter: 'blur(4px)',
+                    transition: { duration: 0.15 },
+                  }
+            }
             transition={EXPLORE_SPRING}
             data-testid="frame-rate-menu"
           >

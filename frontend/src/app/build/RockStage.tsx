@@ -243,7 +243,12 @@ export function RockStage({
   const spec: BuildControlsSpec | null = useMemo(() => {
     if (!rock || !ready) return null;
     const i = rock.inputs;
-    const row = (id: string, label: string, v: { value: string; tag: Tag }, slot?: 'key'): BuildControl => ({
+    const row = (
+      id: string,
+      label: string,
+      v: { value: string; tag: Tag },
+      slot?: 'key',
+    ): BuildControl => ({
       kind: 'readout',
       slot,
       id,
@@ -323,7 +328,10 @@ export function RockStage({
         ...rockNotes(rock),
         {
           title: 'Filled in, not measured',
-          lines: [`Rock strength ${i.strength.value}: ${i.strength.why}.`, `Bulk density ${i.density.value}: ${i.density.why}.`],
+          lines: [
+            `Rock strength ${i.strength.value}: ${i.strength.why}.`,
+            `Bulk density ${i.density.value}: ${i.density.why}.`,
+          ],
         },
         ...(rock.mismatches.length
           ? [

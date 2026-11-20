@@ -58,9 +58,7 @@ describe('RefusalList', () => {
     expect(groups[0]!.querySelector('summary')!.textContent).toBe(
       '3 frames where the detector flagged the object’s centre as saturated or unusable. (show frame IDs)',
     );
-    expect(groups[2]!.querySelector('summary')!.textContent).toContain(
-      'for another reason',
-    );
+    expect(groups[2]!.querySelector('summary')!.textContent).toContain('for another reason');
     const notes = [...host.querySelectorAll('[data-testid="refusal-note"]')];
     expect(notes.map((n) => n.textContent)).toEqual([UNKNOWN_CODE_TEXT]);
     // The raw code is not shown, but stays in the DOM for debugging (Q-477).

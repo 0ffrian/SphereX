@@ -1,12 +1,29 @@
 // R13.10 lifecycle (§13), table-driven: every transition, every Fading trigger, R12 waiting, noSurface.
 import { describe, expect, it } from 'vitest';
-import { fadeDone, step, type AmbienceStatus, type GateInputs, type StepInput } from './ambienceState';
+import {
+  fadeDone,
+  step,
+  type AmbienceStatus,
+  type GateInputs,
+  type StepInput,
+} from './ambienceState';
 
 const ON: GateInputs = {
-  entered: true, paused: false, hidden: false, artistic: true, failed: false, soundOn: true, ambienceOn: true, audioRunning: true,
+  entered: true,
+  paused: false,
+  hidden: false,
+  artistic: true,
+  failed: false,
+  soundOn: true,
+  ambienceOn: true,
+  audioRunning: true,
 };
 const inp = (g: Partial<GateInputs> = {}, o: Partial<StepInput> = {}): StepInput => ({
-  gate: { ...ON, ...g }, placeReady: true, selected: 4, ready: 2, ...o,
+  gate: { ...ON, ...g },
+  placeReady: true,
+  selected: 4,
+  ready: 2,
+  ...o,
 });
 
 describe('ambience lifecycle reducer', () => {
@@ -40,7 +57,8 @@ describe('ambience lifecycle reducer', () => {
     ['context suspended', { audioRunning: false }],
     ['unmount', { entered: false }],
   ])('every Fading trigger fades: %s', (_, g) => {
-    for (const prev of ['baking', 'playing'] as const) expect(step(prev, inp(g))).toEqual({ status: 'fading', effects: ['fadeOut'] });
+    for (const prev of ['baking', 'playing'] as const)
+      expect(step(prev, inp(g))).toEqual({ status: 'fading', effects: ['fadeOut'] });
   });
 
   it('the fade timer ends Fading only', () => {

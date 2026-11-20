@@ -70,7 +70,13 @@ function PlayIcon({ playing }: { playing: boolean }) {
   );
 }
 
-function drawScope(cv: HTMLCanvasElement | null, cssHeight: number, active: boolean, gain: number, buf: Float32Array<ArrayBuffer> | null): void {
+function drawScope(
+  cv: HTMLCanvasElement | null,
+  cssHeight: number,
+  active: boolean,
+  gain: number,
+  buf: Float32Array<ArrayBuffer> | null,
+): void {
   if (!cv) return;
   const d = fit(cv, cssHeight);
   if (!d) return;
@@ -114,7 +120,8 @@ const SPEC_SCOPE_H = 44;
 const ATMO_H = 110;
 
 /** Q-430: how the spectrum sounds (long wavelength = low pitch, flux = loudness). */
-export const HEAR_SPEC_MAPPING = 'Short wavelengths sound high, long wavelengths low. Brighter is louder.';
+export const HEAR_SPEC_MAPPING =
+  'Short wavelengths sound high, long wavelengths low. Brighter is louder.';
 
 export function HearPanel({ active, name }: { active: boolean; name: string | undefined }) {
   const card = useAppStore((s) => s.card);
@@ -303,7 +310,9 @@ export function HearPanel({ active, name }: { active: boolean; name: string | un
     redrawIdle();
   }, [redrawIdle, pos, atmo.ok, curve]);
   useEffect(() => {
-    const els = [atmoCv.current, specCv.current, scopeCv.current].filter((e): e is HTMLCanvasElement => !!e);
+    const els = [atmoCv.current, specCv.current, scopeCv.current].filter(
+      (e): e is HTMLCanvasElement => !!e,
+    );
     if (typeof ResizeObserver === 'undefined') return;
     const ro = new ResizeObserver(() => redrawIdle());
     els.forEach((e) => ro.observe(e));
@@ -371,7 +380,8 @@ export function HearPanel({ active, name }: { active: boolean; name: string | un
 
   const label = displayName(name);
   const spectrumLoading =
-    !curve && (spectrum.status === 'idle' || spectrum.status === 'waiting' || spectrum.status === 'loading');
+    !curve &&
+    (spectrum.status === 'idle' || spectrum.status === 'waiting' || spectrum.status === 'loading');
 
   return (
     <>
@@ -380,14 +390,26 @@ export function HearPanel({ active, name }: { active: boolean; name: string | un
         <span>{label}</span>
       </div>
       <div className="sx-hr">
-        <ToggleGroup<Mode> label="Sound" hideLabel options={MODE_OPTIONS} value={mode} onChange={setMode} testId="hear-mode" />
+        <ToggleGroup<Mode>
+          label="Sound"
+          hideLabel
+          options={MODE_OPTIONS}
+          value={mode}
+          onChange={setMode}
+          testId="hear-mode"
+        />
 
         <div hidden={mode !== 'atmo'} className="sx-hr-pane" data-testid="hear-atmo">
           {atmo.ok ? (
             <>
               <div className="sx-hr-viz">
                 <span className="sx-hr-cap">Wind at the surface</span>
-                <canvas ref={atmoCv} role="img" aria-label="Live waveform of the wind sound" data-testid="hear-atmo-canvas" />
+                <canvas
+                  ref={atmoCv}
+                  role="img"
+                  aria-label="Live waveform of the wind sound"
+                  data-testid="hear-atmo-canvas"
+                />
               </div>
               <div className="sx-hr-player">
                 <button
@@ -413,7 +435,12 @@ export function HearPanel({ active, name }: { active: boolean; name: string | un
                   />
                 </div>
               </div>
-              <SwitchRow label="Ambience" checked={ambience} onChange={toggleAmbience} testId="hear-ambience" />
+              <SwitchRow
+                label="Ambience"
+                checked={ambience}
+                onChange={toggleAmbience}
+                testId="hear-ambience"
+              />
               {ambience && (
                 <p className="sx-hr-hint" data-testid="hear-ambience-note">
                   Keeps playing when this panel is closed
@@ -425,7 +452,9 @@ export function HearPanel({ active, name }: { active: boolean; name: string | un
                   <span>Pressure</span>
                   <b>{formatPressure(atmo.model.P)}</b>
                 </div>
-                <div title={`Dominant gas (${atmo.model.gasTag}); surface temperature (${atmo.model.tTag})`}>
+                <div
+                  title={`Dominant gas (${atmo.model.gasTag}); surface temperature (${atmo.model.tTag})`}
+                >
                   <span>Air</span>
                   <b>
                     {atmo.model.gasLabel}, {Math.round(atmo.model.T)} K
@@ -439,7 +468,10 @@ export function HearPanel({ active, name }: { active: boolean; name: string | un
               <div className="sx-hr-reach">
                 <div className="sx-hr-reach-h">
                   <span className="sx-eyebrow">Highest pitch that carries</span>
-                  <span className="sx-hr-imag" title="The sound is an artist's impression (artistic)">
+                  <span
+                    className="sx-hr-imag"
+                    title="The sound is an artist's impression (artistic)"
+                  >
                     Default
                   </span>
                 </div>
@@ -485,38 +517,43 @@ export function HearPanel({ active, name }: { active: boolean; name: string | un
                 {KIND_HINT[kind]}
               </p>
               {kind === 'chord' ? (
-                <ChordPlayer reply={reply} owner="hear" onBeforePlay={beforeChord} testId="hear-chord" />
-              ) : (
-              <>
-              <div className="sx-hr-player">
-                <button
-                  type="button"
-                  className="sx-hr-play"
-                  aria-pressed={playing === 'spec'}
-                  aria-label={playing === 'spec' ? 'Pause spectrum' : 'Play spectrum'}
-                  onClick={toggleSpec}
-                  data-testid="hear-spec-play"
-                >
-                  <PlayIcon playing={playing === 'spec'} />
-                </button>
-                <input
-                  type="range"
-                  min={0}
-                  max={1000}
-                  value={Math.round(pos * 1000)}
-                  onChange={(e) => scrub(Number(e.target.value))}
-                  aria-label="Position in the spectrum"
-                  data-testid="hear-spec-scrub"
+                <ChordPlayer
+                  reply={reply}
+                  owner="hear"
+                  onBeforePlay={beforeChord}
+                  testId="hear-chord"
                 />
-                <span className="sx-hr-t">{lamAt(pos).toFixed(2)} &micro;m</span>
-              </div>
-              <p className="sx-hr-hint" data-testid="hear-spec-mapping">
-                {HEAR_SPEC_MAPPING}
-              </p>
-              <div className="sx-hr-viz">
-                <canvas ref={scopeCv} aria-hidden="true" />
-              </div>
-              </>
+              ) : (
+                <>
+                  <div className="sx-hr-player">
+                    <button
+                      type="button"
+                      className="sx-hr-play"
+                      aria-pressed={playing === 'spec'}
+                      aria-label={playing === 'spec' ? 'Pause spectrum' : 'Play spectrum'}
+                      onClick={toggleSpec}
+                      data-testid="hear-spec-play"
+                    >
+                      <PlayIcon playing={playing === 'spec'} />
+                    </button>
+                    <input
+                      type="range"
+                      min={0}
+                      max={1000}
+                      value={Math.round(pos * 1000)}
+                      onChange={(e) => scrub(Number(e.target.value))}
+                      aria-label="Position in the spectrum"
+                      data-testid="hear-spec-scrub"
+                    />
+                    <span className="sx-hr-t">{lamAt(pos).toFixed(2)} &micro;m</span>
+                  </div>
+                  <p className="sx-hr-hint" data-testid="hear-spec-mapping">
+                    {HEAR_SPEC_MAPPING}
+                  </p>
+                  <div className="sx-hr-viz">
+                    <canvas ref={scopeCv} aria-hidden="true" />
+                  </div>
+                </>
               )}
             </>
           ) : (

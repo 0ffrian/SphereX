@@ -17,7 +17,14 @@ import type { AmbienceMixer, BufferSource, Timers } from './mixer';
 import { worldKeyOf } from './palette';
 import { samplePlace, type WorldEngineWithSpinup } from './place';
 import { selectBeds } from './sources';
-import { fadeDone, flyLive, soundGate, step, type AmbienceStatus, type GateInputs } from './ambienceState';
+import {
+  fadeDone,
+  flyLive,
+  soundGate,
+  step,
+  type AmbienceStatus,
+  type GateInputs,
+} from './ambienceState';
 import {
   CAPTION_MIN_S,
   FADE_S,
@@ -25,8 +32,23 @@ import {
   STOP_MARGIN_S,
   STRIKE_LOOKAHEAD_S,
 } from './tuning';
-import type { AirModel, BedSpec, MixFrame, Place, Refusal, SourceId, Strike, TaggedInput } from './types';
-import { lightningRate, lightningRule, StrikeScheduler, weatherVisualFrame, type LightningRule } from './weather';
+import type {
+  AirModel,
+  BedSpec,
+  MixFrame,
+  Place,
+  Refusal,
+  SourceId,
+  Strike,
+  TaggedInput,
+} from './types';
+import {
+  lightningRate,
+  lightningRule,
+  StrikeScheduler,
+  weatherVisualFrame,
+  type LightningRule,
+} from './weather';
 import type { WeatherSnapshot } from './weatherBus';
 import { windAt } from './wind';
 
@@ -55,7 +77,16 @@ export interface AmbienceUi {
 export const SOUND_UNAVAILABLE = 'Sound unavailable.';
 
 export const IDLE_UI: AmbienceUi = {
-  status: 'idle', live: false, caption: '', levelNote: null, heard: [], notHeard: [], airFacts: [], inputs: [], selected: 0, ready: 0,
+  status: 'idle',
+  live: false,
+  caption: '',
+  levelNote: null,
+  heard: [],
+  notHeard: [],
+  airFacts: [],
+  inputs: [],
+  selected: 0,
+  ready: 0,
 };
 
 export interface LoopDeps {
@@ -99,10 +130,20 @@ function physicsKey(e: WorldEngineWithSpinup): string {
   return [s.Ps, s.fluid, s.gas, s.locked, s.Tstar, s.orbit, s.co2].join('|');
 }
 
-export function createAmbienceLoop(deps: LoopDeps, initial: Partial<GateInputs> = {}): AmbienceLoop {
+export function createAmbienceLoop(
+  deps: LoopDeps,
+  initial: Partial<GateInputs> = {},
+): AmbienceLoop {
   const gate: GateInputs = {
-    entered: false, paused: false, hidden: false, artistic: false, failed: false, soundOn: false, ambienceOn: false,
-    audioRunning: false, ...initial,
+    entered: false,
+    paused: false,
+    hidden: false,
+    artistic: false,
+    failed: false,
+    soundOn: false,
+    ambienceOn: false,
+    audioRunning: false,
+    ...initial,
   };
   let status: AmbienceStatus = 'idle';
   let air: AirModel | null = null;
@@ -133,7 +174,8 @@ export function createAmbienceLoop(deps: LoopDeps, initial: Partial<GateInputs> 
   let uiDirty = false;
   let tickMs = 0;
   let disposed = false;
-  const sample = deps.sample ?? ((e: WorldEngineWithSpinup, a: AirModel) => samplePlace(e, a, windAt));
+  const sample =
+    deps.sample ?? ((e: WorldEngineWithSpinup, a: AirModel) => samplePlace(e, a, windAt));
   const build = deps.buildAir ?? buildAirModel;
 
   const log = (msg: string, err: unknown) => {
@@ -161,12 +203,15 @@ export function createAmbienceLoop(deps: LoopDeps, initial: Partial<GateInputs> 
       if (fx === 'fadeOut') {
         m?.fadeOut(FADE_S);
         if (fadeTimer !== null) deps.timers.clear(fadeTimer);
-        fadeTimer = deps.timers.set(() => {
-          fadeTimer = null;
-          const was = status;
-          status = fadeDone(status);
-          if (status !== was) onStatus();
-        }, (FADE_S + STOP_MARGIN_S) * 1000);
+        fadeTimer = deps.timers.set(
+          () => {
+            fadeTimer = null;
+            const was = status;
+            status = fadeDone(status);
+            if (status !== was) onStatus();
+          },
+          (FADE_S + STOP_MARGIN_S) * 1000,
+        );
       } else if (fx === 'fadeIn') {
         if (fadeTimer !== null) deps.timers.clear(fadeTimer);
         fadeTimer = null;
@@ -180,7 +225,9 @@ export function createAmbienceLoop(deps: LoopDeps, initial: Partial<GateInputs> 
 
   function onStatus() {
     // §13: beds stay cached for KEEP_ALIVE_MS after the soundscape goes idle (the holder owns that timer).
-    deps.idle?.(status === 'idle' || status === 'noSurface' || status === 'error' || status === 'waiting');
+    deps.idle?.(
+      status === 'idle' || status === 'noSurface' || status === 'error' || status === 'waiting',
+    );
     pushUi(true);
     // M1/B2: a status change pushed before this tick's mix frame existed; push once more, unthrottled, after the mix,
     // so the caption is never left blank or stale for CAPTION_MIN_S.
@@ -215,7 +262,10 @@ export function createAmbienceLoop(deps: LoopDeps, initial: Partial<GateInputs> 
       case 'baking':
         // Q-447: above the ceiling nothing would play, whatever is baked: say so (and how to hear it) at once.
         if (aboveCeiling()) return { caption: ceilingCaption(air!), levelNote: null };
-        return { caption: `Preparing sounds (${readyCount(deps.palette())} of ${specs.size})…`, levelNote: null };
+        return {
+          caption: `Preparing sounds (${readyCount(deps.palette())} of ${specs.size})…`,
+          levelNote: null,
+        };
       case 'playing': {
         if (!frame) return { caption: aboveCeiling() ? ceilingCaption(air!) : '', levelNote: null };
         const c = frame.caption;
@@ -250,7 +300,18 @@ export function createAmbienceLoop(deps: LoopDeps, initial: Partial<GateInputs> 
       ready: readyCount(deps.palette()),
     };
     const sig = (u: AmbienceUi) =>
-      JSON.stringify([u.status, u.live, u.caption, u.levelNote, u.heard, u.notHeard, u.airFacts.length, u.inputs.length, u.selected, u.ready]);
+      JSON.stringify([
+        u.status,
+        u.live,
+        u.caption,
+        u.levelNote,
+        u.heard,
+        u.notHeard,
+        u.airFacts.length,
+        u.inputs.length,
+        u.selected,
+        u.ready,
+      ]);
     uiAt = now;
     if (sig(next) === sig(ui)) return;
     ui = next;
@@ -264,7 +325,14 @@ export function createAmbienceLoop(deps: LoopDeps, initial: Partial<GateInputs> 
    */
   function formingSig(e: WorldEngineWithSpinup, key: string, w: CardToWorldOk): string {
     const cpu = e.cpuFields();
-    return [key, w.preset.id, JSON.stringify(w.overrides), e.spinup > 0, !!cpu?.climate?.stats, !!cpu?.hydro].join('#');
+    return [
+      key,
+      w.preset.id,
+      JSON.stringify(w.overrides),
+      e.spinup > 0,
+      !!cpu?.climate?.stats,
+      !!cpu?.hydro,
+    ].join('#');
   }
 
   /**
@@ -338,9 +406,16 @@ export function createAmbienceLoop(deps: LoopDeps, initial: Partial<GateInputs> 
       }
       const p = deps.palette();
       if (scheduler && p) {
-        scheduler.setVariants([...specs.values()].filter((s) => s.id === 'thunder' && p.get('thunder', s.variant)).map((s) => s.variant));
+        scheduler.setVariants(
+          [...specs.values()]
+            .filter((s) => s.id === 'thunder' && p.get('thunder', s.variant))
+            .map((s) => s.variant),
+        );
       }
-      strikes = scheduler && rule ? scheduler.next(now + STRIKE_LOOKAHEAD_S, lightningRate(a, place, rule), a, place) : [];
+      strikes =
+        scheduler && rule
+          ? scheduler.next(now + STRIKE_LOOKAHEAD_S, lightningRate(a, place, rule), a, place)
+          : [];
       const wf = weatherVisualFrame(a, place, strikes);
       const w = place.features.wind;
       published = true;
@@ -349,7 +424,11 @@ export function createAmbienceLoop(deps: LoopDeps, initial: Partial<GateInputs> 
         windDirDeg: w.dirDeg,
         U10: w.U10,
         head: place.head,
-        lightning: { allowed: rule?.allowed ?? false, tag: rule?.tag ?? null, reason: rule?.reason ?? null },
+        lightning: {
+          allowed: rule?.allowed ?? false,
+          tag: rule?.tag ?? null,
+          reason: rule?.reason ?? null,
+        },
         tS: now,
       });
       for (const s of strikes) deps.strike(s);
@@ -358,7 +437,10 @@ export function createAmbienceLoop(deps: LoopDeps, initial: Partial<GateInputs> 
       // this tick and retries on the next one. It never latches the soundscape off.
       if (!placeLogged && import.meta.env.DEV) {
         placeLogged = true;
-        (deps.log ?? ((m, e) => console.warn(m, e)))('Ambience: the place loop failed; skipping this tick.', err);
+        (deps.log ?? ((m, e) => console.warn(m, e)))(
+          'Ambience: the place loop failed; skipping this tick.',
+          err,
+        );
       }
       tickMs = (typeof performance !== 'undefined' ? performance.now() : 0) - t0;
       return;
@@ -373,21 +455,36 @@ export function createAmbienceLoop(deps: LoopDeps, initial: Partial<GateInputs> 
         requested = null;
       }
       // M16: bake as soon as the fly view is live and the ambience is wanted, before the unlock click.
-      if (p && worldKey && requested !== worldKey && gate.soundOn && gate.ambienceOn && !audioBroken) {
+      if (
+        p &&
+        worldKey &&
+        requested !== worldKey &&
+        gate.soundOn &&
+        gate.ambienceOn &&
+        !audioBroken
+      ) {
         p.request([...specs.values()], a);
         requested = worldKey;
       }
       evaluate();
-      if (!audioBroken && (status === 'baking' || status === 'playing') && soundGate(gate) && p && worldKey) {
+      if (
+        !audioBroken &&
+        (status === 'baking' || status === 'playing') &&
+        soundGate(gate) &&
+        p &&
+        worldKey
+      ) {
         const m = deps.mixer();
         if (m) {
           m.setWorld(worldKey);
           const baked = new Set<string>();
-          for (const [k, s] of specs) if (!isOneShot(s.id, s.variant) && p.get(s.id, s.variant)) baked.add(k);
+          for (const [k, s] of specs)
+            if (!isOneShot(s.id, s.variant) && p.get(s.id, s.variant)) baked.add(k);
           if (!frame) uiDirty = true; // the first frame of this world or status: caption it now (M1)
           frame = mixFrame(a, pl, baked, frame, specs);
           m.apply(frame, p);
-          for (const s of strikes) m.fire(s, a, p, { nowS: now, z_km: pl.features.z_km, head: pl.head });
+          for (const s of strikes)
+            m.fire(s, a, p, { nowS: now, z_km: pl.features.z_km, head: pl.head });
         }
       }
       const force = uiDirty;

@@ -7,8 +7,21 @@ import { destination } from './place';
 import type { Strike } from './types';
 import { rng32 } from './weather';
 import {
-  BOLT_BRANCHES, BOLT_JITTER, BOLT_LEVELS, DECK_MIN_KM, NEAR_KM, RAIN_LAYER_SHARE, RAIN_LEAN_MAX_RAD, RAIN_NEAR_M,
-  RAIN_PARALLAX, RAIN_STREAKS_MAX, SNOW_FLAKES_MAX, SNOW_SIZE_PX, SNOW_WOBBLE_PX, SNOW_WOBBLE_RAD_S, WCAG_REF_PX2,
+  BOLT_BRANCHES,
+  BOLT_JITTER,
+  BOLT_LEVELS,
+  DECK_MIN_KM,
+  NEAR_KM,
+  RAIN_LAYER_SHARE,
+  RAIN_LEAN_MAX_RAD,
+  RAIN_NEAR_M,
+  RAIN_PARALLAX,
+  RAIN_STREAKS_MAX,
+  SNOW_FLAKES_MAX,
+  SNOW_SIZE_PX,
+  SNOW_WOBBLE_PX,
+  SNOW_WOBBLE_RAD_S,
+  WCAG_REF_PX2,
   WCAG_SMALL_AREA_PX2,
 } from './tuning';
 
@@ -16,7 +29,13 @@ type V3 = readonly [number, number, number];
 
 /** The parts of WorldEngine.flyCameraBasis() the overlay uses (planet radii, body frame). */
 export interface Basis {
-  cam: V3; fwd: V3; rt: V3; up: V3; rkm: number; ex: number; fov: number;
+  cam: V3;
+  fwd: V3;
+  rt: V3;
+  up: V3;
+  rkm: number;
+  ex: number;
+  fov: number;
 }
 
 /** The engine's own cloud-base height when the model has none (core.js uCloudKm default). */
@@ -25,13 +44,16 @@ export const ENGINE_DECK_DEFAULT_KM = 3.5;
 const dot = (a: V3, b: V3): number => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 const sub = (a: V3, b: V3): [number, number, number] => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const lerp3 = (a: V3, b: V3, t: number): [number, number, number] => [
-  a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t,
+  a[0] + (b[0] - a[0]) * t,
+  a[1] + (b[1] - a[1]) * t,
+  a[2] + (b[2] - a[2]) * t,
 ];
 const fin = (...xs: number[]): boolean => xs.every(Number.isFinite);
 
 /** Red M1: a 0..1 engine colour as CSS rgba (0..255, rounded, clamped). */
 export function tintCss(rgb: readonly number[], a: number): string {
-  const c = (v: number | undefined) => Math.max(0, Math.min(255, Math.round((Number.isFinite(v) ? (v as number) : 0) * 255)));
+  const c = (v: number | undefined) =>
+    Math.max(0, Math.min(255, Math.round((Number.isFinite(v) ? (v as number) : 0) * 255)));
   const al = Number.isFinite(a) ? Math.max(0, Math.min(1, a)) : 0;
   return `rgba(${c(rgb[0])},${c(rgb[1])},${c(rgb[2])},${al.toFixed(3)})`;
 }
@@ -83,19 +105,32 @@ export function streakLengthPx(vt: number, fpx: number, layer: number): number {
  * Placement is seeded per frame bucket (floor(t * 60)) and layer (red L2: hash32, no xor collisions).
  */
 export function buildRain(
-  out: Float32Array, N: number, seed: number, bucket: number, W: number, H: number, fpx: number, vt: number, lean: number,
+  out: Float32Array,
+  N: number,
+  seed: number,
+  bucket: number,
+  W: number,
+  H: number,
+  fpx: number,
+  vt: number,
+  lean: number,
 ): [number, number, number] {
   const counts = layerCounts(Math.min(N, out.length >> 2));
-  const sx = Math.sin(lean), sy = Math.cos(lean);
+  const sx = Math.sin(lean),
+    sy = Math.cos(lean);
   let o = 0;
   for (let L = 0; L < 3; L++) {
     const rng = rng32(hash32(seed >>> 0, 'rain', bucket >>> 0, L));
     const len = streakLengthPx(vt, fpx, L);
-    const dx = sx * len, dy = sy * len;
+    const dx = sx * len,
+      dy = sy * len;
     for (let i = 0; i < counts[L]!; i++) {
       const x = rng() * (W + 2 * Math.abs(dx)) - Math.abs(dx);
       const y = rng() * (H + len) - len;
-      out[o++] = x; out[o++] = y; out[o++] = x + dx; out[o++] = y + dy;
+      out[o++] = x;
+      out[o++] = y;
+      out[o++] = x + dx;
+      out[o++] = y + dy;
     }
   }
   return counts;
@@ -106,7 +141,14 @@ export function buildRain(
  * fall at v (m/s) at the layer depth with a seeded lateral wobble.
  */
 export function buildSnow(
-  out: Float32Array, N: number, seed: number, t: number, W: number, H: number, fpx: number, v: number,
+  out: Float32Array,
+  N: number,
+  seed: number,
+  t: number,
+  W: number,
+  H: number,
+  fpx: number,
+  v: number,
 ): [number, number, number] {
   const counts = layerCounts(Math.min(N, Math.floor(out.length / 3)));
   let o = 0;
@@ -116,7 +158,9 @@ export function buildSnow(
     const D = RAIN_NEAR_M / par;
     const fall = (v * fpx) / (D * Math.max(H, 1));
     for (let i = 0; i < counts[L]!; i++) {
-      const x0 = rng(), y0 = rng(), ph = rng() * 2 * Math.PI;
+      const x0 = rng(),
+        y0 = rng(),
+        ph = rng() * 2 * Math.PI;
       const yy = y0 + fall * t;
       out[o++] = x0 * W + SNOW_WOBBLE_PX * par * Math.sin(SNOW_WOBBLE_RAD_S * t + ph);
       out[o++] = (yy - Math.floor(yy)) * H;
@@ -134,7 +178,8 @@ export function depthOf(b: Basis, p: V3): number {
 /** H2: clip segment a-b to camera depth >= NEAR_KM; null when it is wholly behind. */
 export function clipSegmentNear(b: Basis, a: V3, c: V3): [V3, V3] | null {
   const near = NEAR_KM / b.rkm;
-  const da = depthOf(b, a), dc = depthOf(b, c);
+  const da = depthOf(b, a),
+    dc = depthOf(b, c);
   if (!fin(da, dc)) return null;
   if (da < near && dc < near) return null;
   if (da >= near && dc >= near) return [a, c];
@@ -150,11 +195,12 @@ export function clipSegmentNear(b: Basis, a: V3, c: V3): [V3, V3] | null {
 export function projectPx(b: Basis, W: number, H: number, p: V3): [number, number] | null {
   const v = sub(p, b.cam);
   const a = dot(v, b.fwd);
-  if (!(a >= NEAR_KM / b.rkm * (1 - 1e-9))) return null;
+  if (!(a >= (NEAR_KM / b.rkm) * (1 - 1e-9))) return null;
   const aspect = W / H;
   const x = dot(v, b.rt) / (a * b.fov * aspect);
   const y = dot(v, b.up) / (a * b.fov);
-  const px = ((x + 1) / 2) * W, py = ((1 - y) / 2) * H;
+  const px = ((x + 1) / 2) * W,
+    py = ((1 - y) / 2) * H;
   return fin(px, py) ? [px, py] : null;
 }
 
@@ -162,7 +208,9 @@ export type StrikeClass = 'inView' | 'edge' | 'deck';
 
 export interface StrikeWorld {
   /** Body-frame points of the bolt: on the drawn deck, and on the drawn ground. */
-  top: V3; foot: V3; deck: V3;
+  top: V3;
+  foot: V3;
+  deck: V3;
   bearing: number;
 }
 
@@ -172,7 +220,13 @@ export interface StrikeWorld {
  * surface (ex * groundKm), the top on the drawn deck (H3).
  */
 export function strikeWorld(
-  s: Strike, lon: number, lat: number, altKm: number, b: Basis, zc_km: number | null, groundKm: ((lon: number, lat: number) => number) | null,
+  s: Strike,
+  lon: number,
+  lat: number,
+  altKm: number,
+  b: Basis,
+  zc_km: number | null,
+  groundKm: ((lon: number, lat: number) => number) | null,
 ): StrikeWorld | null {
   const z = Math.max(altKm, 0) * 1000;
   const s_km = Math.sqrt(Math.max(s.d_m * s.d_m - z * z, 0)) / 1000;
@@ -194,7 +248,12 @@ const inside = (p: [number, number] | null, W: number, H: number): boolean =>
  * otherwise it is in view when any point of the (near-clipped) bolt lands in the pane, else an edge glow.
  */
 export function classifyStrike(
-  b: Basis, W: number, H: number, w: StrikeWorld, aboveDeck: boolean, gas: boolean,
+  b: Basis,
+  W: number,
+  H: number,
+  w: StrikeWorld,
+  aboveDeck: boolean,
+  gas: boolean,
 ): StrikeClass {
   if (gas || aboveDeck) return 'deck';
   const seg = clipSegmentNear(b, w.top, w.foot);
@@ -214,17 +273,27 @@ export function edgeSide(bearing: number, head: number): 1 | -1 {
  * Blue 17: a seeded 2D bolt from (ax, ay) down to (bx, by), in screen space: midpoint displacement (BOLT_LEVELS levels,
  * 2^L + 1 vertices) plus 1 to 2 branches of 5 vertices. Each polyline is a Float32Array of x, y pairs.
  */
-export function boltPolyline(seed: number, ax: number, ay: number, bx: number, by: number): Float32Array[] {
+export function boltPolyline(
+  seed: number,
+  ax: number,
+  ay: number,
+  bx: number,
+  by: number,
+): Float32Array[] {
   const rng = rng32(hash32(seed >>> 0, 'bolt'));
   const len = Math.hypot(bx - ax, by - ay);
   if (!fin(ax, ay, bx, by) || !(len > 0)) return [];
-  const nx = -(by - ay) / len, ny = (bx - ax) / len;
+  const nx = -(by - ay) / len,
+    ny = (bx - ax) / len;
   let pts: number[] = [ax, ay, bx, by];
   for (let L = 0; L < BOLT_LEVELS; L++) {
     const next: number[] = [];
     const amp = (BOLT_JITTER * len) / 2 ** L;
     for (let i = 0; i + 2 < pts.length; i += 2) {
-      const x0 = pts[i]!, y0 = pts[i + 1]!, x1 = pts[i + 2]!, y1 = pts[i + 3]!;
+      const x0 = pts[i]!,
+        y0 = pts[i + 1]!,
+        x1 = pts[i + 2]!,
+        y1 = pts[i + 3]!;
       const o = (rng() * 2 - 1) * amp;
       next.push(x0, y0, (x0 + x1) / 2 + nx * o, (y0 + y1) / 2 + ny * o);
     }
@@ -236,11 +305,14 @@ export function boltPolyline(seed: number, ax: number, ay: number, bx: number, b
   const nv = pts.length / 2;
   for (let k = 0; k < nb; k++) {
     const i0 = 1 + Math.floor(rng() * Math.max(nv - 3, 1));
-    let x = pts[2 * i0]!, y = pts[2 * i0 + 1]!;
+    let x = pts[2 * i0]!,
+      y = pts[2 * i0 + 1]!;
     const side = rng() < 0.5 ? -1 : 1;
     const ang = side * (0.35 + rng() * 0.35);
-    const ux = (bx - ax) / len, uy = (by - ay) / len;
-    const dx = ux * Math.cos(ang) - uy * Math.sin(ang), dy = ux * Math.sin(ang) + uy * Math.cos(ang);
+    const ux = (bx - ax) / len,
+      uy = (by - ay) / len;
+    const dx = ux * Math.cos(ang) - uy * Math.sin(ang),
+      dy = ux * Math.sin(ang) + uy * Math.cos(ang);
     const step = (len * (0.25 + rng() * 0.15)) / 4;
     const br = [x, y];
     for (let j = 0; j < 4; j++) {
@@ -259,15 +331,24 @@ export function boltPolyline(seed: number, ax: number, ay: number, bx: number, b
  * point projects far above the pane keeps only the part that can be seen. Null when nothing is inside.
  */
 export function clipToRect(
-  ax: number, ay: number, bx: number, by: number, W: number, H: number, m: number,
+  ax: number,
+  ay: number,
+  bx: number,
+  by: number,
+  W: number,
+  H: number,
+  m: number,
 ): [number, number, number, number] | null {
   if (!fin(ax, ay, bx, by, W, H, m)) return null;
-  const dx = bx - ax, dy = by - ay;
-  let t0 = 0, t1 = 1;
+  const dx = bx - ax,
+    dy = by - ay;
+  let t0 = 0,
+    t1 = 1;
   const p = [-dx, dx, -dy, dy];
   const q = [ax + m, W + m - ax, ay + m, H + m - ay];
   for (let i = 0; i < 4; i++) {
-    const pi = p[i]!, qi = q[i]!;
+    const pi = p[i]!,
+      qi = q[i]!;
     if (pi === 0) {
       if (qi < 0) return null;
     } else {
@@ -287,7 +368,9 @@ export function clipToRect(
 /** Total length (px) of a set of polylines. */
 export function polylineLength(lines: readonly Float32Array[]): number {
   let s = 0;
-  for (const l of lines) for (let i = 0; i + 3 < l.length; i += 2) s += Math.hypot(l[i + 2]! - l[i]!, l[i + 3]! - l[i + 1]!);
+  for (const l of lines)
+    for (let i = 0; i + 3 < l.length; i += 2)
+      s += Math.hypot(l[i + 2]! - l[i]!, l[i + 3]! - l[i + 1]!);
   return s;
 }
 

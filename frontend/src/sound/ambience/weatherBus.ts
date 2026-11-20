@@ -88,14 +88,21 @@ export function weatherRows(s: WeatherSnapshot | null): WeatherRow[] {
       tag: 'model_dependent',
       text: `Rain: whether it falls, how hard, its fall speed (${r.vt.toFixed(1)} m/s) and its slant in the wind`,
     });
-    rows.push({ tag: 'artistic', text: 'Where each raindrop is drawn, and its colour (the liquid’s colour mixed towards grey)' });
+    rows.push({
+      tag: 'artistic',
+      text: 'Where each raindrop is drawn, and its colour (the liquid’s colour mixed towards grey)',
+    });
   } else if (r) {
     rows.push({ tag: 'model_dependent', text: 'Snow: whether it falls and how hard' });
     rows.push({ tag: 'artistic', text: 'Where each snowflake is drawn, and how it drifts' });
   }
   if (s.lightning.allowed) {
-    if (s.lightning.tag) rows.push({ tag: s.lightning.tag, text: 'Lightning happens on this kind of world' });
-    rows.push({ tag: 'artistic', text: 'When and where each strike falls, and the colour of the bolt (not from data)' });
+    if (s.lightning.tag)
+      rows.push({ tag: s.lightning.tag, text: 'Lightning happens on this kind of world' });
+    rows.push({
+      tag: 'artistic',
+      text: 'When and where each strike falls, and the colour of the bolt (not from data)',
+    });
   } else if (s.lightning.reason) {
     rows.push({ tag: 'model_dependent', text: s.lightning.reason });
   }

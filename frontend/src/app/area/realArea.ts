@@ -19,7 +19,14 @@ import { snapToArea } from '@/app/sky/area/snap';
 import type { SkySquare } from '@/app/sky/area/geometry';
 import { formatUtc } from '@/app/format';
 import { deltaRa, wrapRa } from '@/viewer/sky/skyMath';
-import { getSpectraApi, SPECTRA_NOT_RUN, SPECTRA_UNAVAILABLE, type AreaSpectra, type SpectraAnswer, type SpectraApi } from './spectraApi';
+import {
+  getSpectraApi,
+  SPECTRA_NOT_RUN,
+  SPECTRA_UNAVAILABLE,
+  type AreaSpectra,
+  type SpectraAnswer,
+  type SpectraApi,
+} from './spectraApi';
 
 /** The drawn rectangle as the snap reads it: its centre and its larger side. */
 export interface DrawnBox {
@@ -161,7 +168,12 @@ export async function loadDiscovery(
   const spectra = sp.kind === 'ok' && tracks ? sp.data : null;
   if (sp.kind === 'not_run') missing.push(SPECTRA_NOT_RUN);
   if (sp.kind === 'unavailable') missing.push(SPECTRA_UNAVAILABLE);
-  missing.push(...summary.data.missing, ...(dots?.missing ?? []), ...(tracks?.missing ?? []), ...(spectra?.missing ?? []));
+  missing.push(
+    ...summary.data.missing,
+    ...(dots?.missing ?? []),
+    ...(tracks?.missing ?? []),
+    ...(spectra?.missing ?? []),
+  );
   const unmatched = unmatchedDotIds(dots, tracks);
   if (unmatched.length > 0) missing.push(`area:unmatched_dots:${unmatched.length}`);
   return {
@@ -195,7 +207,9 @@ export async function loadKnown(
   ]);
   // The measured dots of the detected objects: only when there is one (a busy area has many dots).
   const found = (tracks?.tracks ?? []).some((t) => t.verdict === 'found_blind' && t.match !== null);
-  const dots = found ? await part(() => api.areaDots(entry.area_id, signal), 'area:dots_unavailable', missing) : null;
+  const dots = found
+    ? await part(() => api.areaDots(entry.area_id, signal), 'area:dots_unavailable', missing)
+    : null;
   return {
     entry,
     known: r.data,
@@ -234,7 +248,9 @@ export function precomputedNote(computedAt: string): string {
 export function matchName(m: { designation: string; number: number | null }): string {
   if (m.number === null) return m.designation;
   const n = String(m.number);
-  return m.designation === n || m.designation.startsWith(`${n} `) ? m.designation : `${n} ${m.designation}`;
+  return m.designation === n || m.designation.startsWith(`${n} `)
+    ? m.designation
+    : `${n} ${m.designation}`;
 }
 
 /** The on-sky label of a track (A18.2). Never "asteroid", "new" or "discover" (Q-205). */
@@ -280,7 +296,8 @@ export function missingText(code: string): string {
         const n = rest.slice('unmatched_dots:'.length);
         return `${n} track ${n === '1' ? 'point is' : 'points are'} not in the dots reply, so some tracks are drawn short.`;
       }
-      if (rest === 'visits') return 'Fewer than two visits cover this area, so there are no tracks.';
+      if (rest === 'visits')
+        return 'Fewer than two visits cover this area, so there are no tracks.';
       return 'Part of this area could not be loaded.';
     case 'cutout':
       return 'A frame could not be read, so its dots are not shown.';
@@ -307,7 +324,8 @@ export function missingText(code: string): string {
       return 'The checks were not run for this area.';
     case 'spectra':
       if (rest === 'not_run') return 'Spectrum check not run.';
-      if (rest === 'unavailable') return 'The spectrum check could not be loaded, so no colour verdicts are shown.';
+      if (rest === 'unavailable')
+        return 'The spectrum check could not be loaded, so no colour verdicts are shown.';
       if (rest === 'calibration_default')
         return 'Too few stars to measure the scatter in one visit and detector, so the spectrum check used the default.';
       return 'Part of the spectrum check could not be loaded.';

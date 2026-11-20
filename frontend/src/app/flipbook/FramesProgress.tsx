@@ -14,13 +14,7 @@ import { useAppStore } from '@/state/store';
 import { framesCounts } from './progressive';
 
 /** Black picture area while no frame is ready. Fills its (relative) parent. */
-export function FramesWait({
-  progress,
-  frames,
-}: {
-  progress: Progress;
-  frames: FramesResponse;
-}) {
+export function FramesWait({ progress, frames }: { progress: Progress; frames: FramesResponse }) {
   const stop = useAppStore((s) => s.skyStopFrames);
   const resume = useAppStore((s) => s.skyContinueFrames);
   const counts = framesCounts(frames);
@@ -38,7 +32,12 @@ export function FramesWait({
   const fetching = progress.phase === 'fetching';
   const pct = counts.found > 0 ? (100 * counts.ready) / counts.found : 0;
   return (
-    <div className="fb-wait" role="status" data-testid="frames-progress" data-phase={progress.phase}>
+    <div
+      className="fb-wait"
+      role="status"
+      data-testid="frames-progress"
+      data-phase={progress.phase}
+    >
       {fetching && (
         <span aria-hidden="true" className="contents">
           <GridLoader {...FETCHING_LOOK} className="flex-none" />
@@ -84,7 +83,12 @@ export function FramesTab({ progress, frames }: { progress: Progress; frames: Fr
   const fetching = progress.phase === 'fetching';
   const pct = counts.found > 0 ? (100 * counts.ready) / counts.found : 0;
   return (
-    <div className="fb-fetch" role="status" data-testid="frames-progress" data-phase={progress.phase}>
+    <div
+      className="fb-fetch"
+      role="status"
+      data-testid="frames-progress"
+      data-phase={progress.phase}
+    >
       <span data-testid="frames-progress-headline">
         {counts.ready} / {counts.found}
       </span>

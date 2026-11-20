@@ -181,7 +181,11 @@ function Control({ c }: { c: BuildControl }) {
           <ToggleGroup
             label={c.label}
             value={c.value}
-            options={c.options.map((o) => ({ value: o.value, label: o.label, disabled: c.disabled || o.disabled }))}
+            options={c.options.map((o) => ({
+              value: o.value,
+              label: o.label,
+              disabled: c.disabled || o.disabled,
+            }))}
             onChange={c.onChange}
             wrap={c.options.length > 3}
           />
@@ -225,7 +229,11 @@ function CompactControl({ c }: { c: BuildControl }) {
           label={c.label}
           hideLabel
           value={c.value}
-          options={c.options.map((o) => ({ value: o.value, label: o.label, disabled: c.disabled || o.disabled }))}
+          options={c.options.map((o) => ({
+            value: o.value,
+            label: o.label,
+            disabled: c.disabled || o.disabled,
+          }))}
           onChange={c.onChange}
         />
       );
@@ -245,8 +253,25 @@ function CompactControl({ c }: { c: BuildControl }) {
       );
     case 'button':
       return (
-        <button type="button" className="sx-act" aria-label={name} disabled={c.disabled} title={c.why} onClick={c.onClick}>
-          <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <button
+          type="button"
+          className="sx-act"
+          aria-label={name}
+          disabled={c.disabled}
+          title={c.why}
+          onClick={c.onClick}
+        >
+          <svg
+            aria-hidden="true"
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <path d="M13 2 4 14h7l-1 8 9-12h-7z" />
           </svg>
           {c.label}
@@ -269,7 +294,11 @@ function renderControls(controls: BuildControl[]): ReactNode[] {
     const run: BuildControl[] = [c];
     while (i + 1 < controls.length && controls[i + 1]!.group === c.group) run.push(controls[++i]!);
     out.push(
-      <div key={`g-${c.group}-${c.id}`} className="sx-flare-row" data-testid={`ctl-group-${c.group}`}>
+      <div
+        key={`g-${c.group}-${c.id}`}
+        className="sx-flare-row"
+        data-testid={`ctl-group-${c.group}`}
+      >
         {run.map((r) => (
           <CompactControl key={r.id} c={r} />
         ))}
@@ -282,7 +311,10 @@ function renderControls(controls: BuildControl[]): ReactNode[] {
 /** The region itself: the interactive controls, rendered by the build pane's Details panel; nothing shows until something registers. */
 export function BuildControls() {
   const specs = useBuildControlsStore((s) => s.specs);
-  const drawn = (o: string) => specs[o]!.controls.filter((c) => c.kind !== 'readout' && !(c.kind === 'choice' && c.slot === 'about'));
+  const drawn = (o: string) =>
+    specs[o]!.controls.filter(
+      (c) => c.kind !== 'readout' && !(c.kind === 'choice' && c.slot === 'about'),
+    );
   const owners = Object.keys(specs).filter((o) => drawn(o).length > 0);
   if (owners.length === 0) return null;
   return (
@@ -300,7 +332,9 @@ export function BuildControls() {
 }
 
 function readoutsOf(specs: Record<string, BuildControlsSpec>): ReadoutControl[] {
-  return Object.values(specs).flatMap((s) => s.controls.filter((c): c is ReadoutControl => c.kind === 'readout'));
+  return Object.values(specs).flatMap((s) =>
+    s.controls.filter((c): c is ReadoutControl => c.kind === 'readout'),
+  );
 }
 
 /** Notes that are explanations of method are not shown; the rest become "Assumed values" lines. */
@@ -315,14 +349,24 @@ export function BuildKeyNumbers({ fixture }: { fixture?: boolean }) {
   if (!latest && keys.length === 0) return null;
   const text = latest?.value ?? null;
   const cls = text?.match(/Class (\w+\.?\d*)/)?.[1] ?? null;
-  const outcome = text ? (/stays closed/.test(text) ? 'stayed closed' : /erupt/.test(text) ? 'erupted' : null) : null;
+  const outcome = text
+    ? /stays closed/.test(text)
+      ? 'stayed closed'
+      : /erupt/.test(text)
+        ? 'erupted'
+        : null
+    : null;
   return (
     <>
       {latest && (
         <div className="sx-flare" data-testid="latest-flare" aria-live="polite">
           {cls ? (
             <span>
-              Latest flare: <b>{cls}{outcome ? `, ${outcome}` : ''}</b>
+              Latest flare:{' '}
+              <b>
+                {cls}
+                {outcome ? `, ${outcome}` : ''}
+              </b>
             </span>
           ) : (
             <span>{text}</span>
@@ -393,7 +437,11 @@ export function BuildSummaryRows({
               key={c.id}
               label={c.label}
               value={c.value}
-              options={c.options.map((o) => ({ value: o.value, label: o.label, disabled: c.disabled || o.disabled }))}
+              options={c.options.map((o) => ({
+                value: o.value,
+                label: o.label,
+                disabled: c.disabled || o.disabled,
+              }))}
               onChange={c.onChange}
             />
           ))}
@@ -417,7 +465,10 @@ export function BuildSummaryRows({
       )}
       {lines.length > 0 && (
         <Row title="Assumed values" count={lines.length} testId="assumed-row">
-          <ul className="m-0 flex list-disc flex-col gap-1 pl-5 text-[13px]" style={{ color: 'var(--muted)' }}>
+          <ul
+            className="m-0 flex list-disc flex-col gap-1 pl-5 text-[13px]"
+            style={{ color: 'var(--muted)' }}
+          >
             {lines.map((l) => (
               <li key={l}>{l}</li>
             ))}

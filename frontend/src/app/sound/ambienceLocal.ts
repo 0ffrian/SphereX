@@ -19,10 +19,20 @@ export interface LocalSignals {
   note: string;
 }
 
-let cache: { terrain: unknown; climate: unknown; sampler: WorldFieldSampler; meanT: number | null } | null = null;
+let cache: {
+  terrain: unknown;
+  climate: unknown;
+  sampler: WorldFieldSampler;
+  meanT: number | null;
+} | null = null;
 
 function samplerFor(f: CpuFields) {
-  if (cache && cache.terrain === (f.terrain?.data ?? null) && cache.climate === (f.climate?.T ?? null)) return cache;
+  if (
+    cache &&
+    cache.terrain === (f.terrain?.data ?? null) &&
+    cache.climate === (f.climate?.T ?? null)
+  )
+    return cache;
   let meanT: number | null = null;
   if (f.climate) {
     let s = 0;
@@ -30,7 +40,12 @@ function samplerFor(f: CpuFields) {
     for (let i = 0; i < n; i++) s += f.climate.T[i]!;
     meanT = n > 0 ? s / n : null;
   }
-  cache = { terrain: f.terrain?.data ?? null, climate: f.climate?.T ?? null, sampler: new WorldFieldSampler(f), meanT };
+  cache = {
+    terrain: f.terrain?.data ?? null,
+    climate: f.climate?.T ?? null,
+    sampler: new WorldFieldSampler(f),
+    meanT,
+  };
   return cache;
 }
 

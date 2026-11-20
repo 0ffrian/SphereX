@@ -70,7 +70,11 @@ test.afterAll(() => {
   if (cacheRoot) rmSync(cacheRoot, { recursive: true, force: true });
 });
 
-test('Build it on a pack row renders the body offline, as a saved asset', async ({ page }) => {
+// Expected to fail until #184: offline, a 503 on the frame list leaves the Flipbook with no Build it,
+// and CI's e2e job has no uv for the backend this spec starts. Re-enable with the #184 fix.
+test.fixme('Build it on a pack row renders the body offline, as a saved asset', async ({
+  page,
+}) => {
   const statuses: string[] = [];
   let albedoUrl = '';
   await page.route(

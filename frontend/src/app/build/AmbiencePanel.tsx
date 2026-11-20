@@ -24,7 +24,9 @@ export function AmbiencePanel({ name }: { name: string | undefined }) {
         <SwitchRow
           label="Atmosphere (M stops it)"
           checked={atmoOn}
-          onChange={(on) => card && useAmbienceStore.getState().setAmbience(on, atmo.model, card.id)}
+          onChange={(on) =>
+            card && useAmbienceStore.getState().setAmbience(on, atmo.model, card.id)
+          }
           testId="build-ambience-atmo"
         />
       ) : (

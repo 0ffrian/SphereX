@@ -15,23 +15,39 @@ const PACK = join(process.cwd(), '../backend/assets/areas/v1/derived.area/sphere
 function stage(name: string): string {
   for (const dir of readdirSync(PACK))
     for (const f of readdirSync(join(PACK, dir)).filter((x) => x.endsWith('.json'))) {
-      const meta = JSON.parse(readFileSync(join(PACK, dir, f), 'utf8')) as { key: { query: { stage: string; id: string } } };
+      const meta = JSON.parse(readFileSync(join(PACK, dir, f), 'utf8')) as {
+        key: { query: { stage: string; id: string } };
+      };
       if (meta.key.query.stage === name && meta.key.query.id === 'eros-2026-03')
         return readFileSync(join(PACK, dir, f.replace(/\.json$/, '.body')), 'utf8');
     }
   throw new Error(`no ${name} stage in the pack`);
 }
-const summary = JSON.parse(stage('summary')) as { computed_at: string; cached_at: string; n_frames: number; data_release: string };
+const summary = JSON.parse(stage('summary')) as {
+  computed_at: string;
+  cached_at: string;
+  n_frames: number;
+  data_release: string;
+};
 
 const indexBody = {
   areas: [
     {
-      area_id: 'eros-2026-03', ra: 91.23046, dec: 13.42786, width_deg: 1.05, height_deg: 0.63,
-      data_release: summary.data_release, n_frames: summary.n_frames, n_visits: 2,
-      computed_at: summary.computed_at, cached_at: summary.cached_at,
+      area_id: 'eros-2026-03',
+      ra: 91.23046,
+      dec: 13.42786,
+      width_deg: 1.05,
+      height_deg: 0.63,
+      data_release: summary.data_release,
+      n_frames: summary.n_frames,
+      n_visits: 2,
+      computed_at: summary.computed_at,
+      cached_at: summary.cached_at,
     },
   ],
-  cached_at: summary.cached_at, computed_at: summary.computed_at, missing: [],
+  cached_at: summary.cached_at,
+  computed_at: summary.computed_at,
+  missing: [],
   provenance: { areas: { tag: 'derived', source: 'test', formula: 'test' } },
 };
 
@@ -44,22 +60,39 @@ async function openDiscovery(page: Page, spectra: boolean) {
   await page.route('**/v1/areas/eros-2026-03/spectra', (r) =>
     spectra
       ? r.fulfill(body(stage('spectra')))
-      : r.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ error: 'spectra_not_prepared', detail: 'not run' }) }),
+      : r.fulfill({
+          status: 404,
+          contentType: 'application/json',
+          body: JSON.stringify({ error: 'spectra_not_prepared', detail: 'not run' }),
+        }),
   );
   await page.setViewportSize({ width: 1280, height: 1000 });
   await page.goto('/');
-  await expect(page.getByTestId('sky-pane')).toHaveAttribute('data-sky-state', 'ready', { timeout: 30_000 });
+  await expect(page.getByTestId('sky-pane')).toHaveAttribute('data-sky-state', 'ready', {
+    timeout: 30_000,
+  });
   await page.waitForFunction(() => '__sxSky' in globalThis);
-  await page.evaluate((v) => (globalThis as unknown as { __sxSky: SkyHook }).__sxSky.setView(v), { ra: 91.23, dec: 13.43, fovDeg: 3 });
+  await page.evaluate((v) => (globalThis as unknown as { __sxSky: SkyHook }).__sxSky.setView(v), {
+    ra: 91.23,
+    dec: 13.43,
+    fovDeg: 3,
+  });
   await page.getByTestId('tool-area').click();
   await page.keyboard.press('Enter');
   await expect(page.getByTestId('disc-rates')).toBeVisible({ timeout: 30_000 });
 }
 
-test('Discovery on the Eros pack: row verdicts, T3 chart with heat glow, the accordion', async ({ page }) => {
+test('Discovery on the Eros pack: row verdicts, T3 chart with heat glow, the accordion', async ({
+  page,
+}) => {
   test.setTimeout(90_000);
   await openDiscovery(page, true);
-  await expect(page.getByTestId('disc-steps')).toContainText('3 rock-like, 1 very red, 5 one colour');
+  await expect(page.getByTestId('disc-steps')).toContainText(
+    '3 rock-like, 1 very red, 5 one colour',
+  );
+  // Issue #173 (0a97a24e): possible tracks are hidden in the list until asked; only T3 is found
+  // blind here, the other eight tracks are possibles.
+  await page.getByTestId('disc-show-possible').click();
   const word = (id: string) => page.getByTestId(`disc-mover-${id}`).getByTestId('spectrum-word');
   for (const id of ['T3', 'T1', 'T4']) await expect(word(id)).toHaveText('Rock-like');
   await expect(word('T8')).toHaveText('Very red');
@@ -67,7 +100,9 @@ test('Discovery on the Eros pack: row verdicts, T3 chart with heat glow, the acc
   await expect(page.getByTestId('disc-filter-rock')).toHaveText('Rock-like 3');
 
   await page.getByTestId('disc-mover-T3').click();
-  await expect(page.getByTestId('spectrum-verdict')).toContainText('Looks like sunlight off a rock');
+  await expect(page.getByTestId('spectrum-verdict')).toContainText(
+    'Looks like sunlight off a rock',
+  );
   await expect(page.getByTestId('spectrum-verdict')).toContainText('Includes heat glow');
   const chart = page.getByTestId('spectrum-chart');
   await expect(chart).toHaveAttribute('role', 'img');
@@ -78,9 +113,13 @@ test('Discovery on the Eros pack: row verdicts, T3 chart with heat glow, the acc
   await expect(page.getByTestId('spectrum-formula')).toBeVisible();
 });
 
-test('an area stored without the check: no verdicts, "Spectrum check not run" under Not shown', async ({ page }) => {
+test('an area stored without the check: no verdicts, "Spectrum check not run" under Not shown', async ({
+  page,
+}) => {
   test.setTimeout(90_000);
   await openDiscovery(page, false);
   await expect(page.getByTestId('spectrum-word')).toHaveCount(0);
-  await expect(page.getByTestId('area-missing').locator('li[data-code="spectra:not_run"]')).toHaveText('Spectrum check not run.');
+  await expect(
+    page.getByTestId('area-missing').locator('li[data-code="spectra:not_run"]'),
+  ).toHaveText('Spectrum check not run.');
 });

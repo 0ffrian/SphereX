@@ -10,8 +10,21 @@ import { useShellStore } from '@/app/shell/shellStore';
 import { useAppStore } from '@/state/store';
 import type { AreaIndexEntry } from '@/contract';
 import { knownRow, sortKnown, type KnownObject, type KnownObjectsResult } from './areaService';
-import { filterKnown, KnownList, NO_ID_NOTE, PAGE, PREDICTED_NOTE, rowLine, trackAround } from './KnownList';
-import { distinctTimes, KnownPositionsLayer, knownPositionsVisible, MEASURED_ONLY_NOTE } from './KnownPositionsLayer';
+import {
+  filterKnown,
+  KnownList,
+  NO_ID_NOTE,
+  PAGE,
+  PREDICTED_NOTE,
+  rowLine,
+  trackAround,
+} from './KnownList';
+import {
+  distinctTimes,
+  KnownPositionsLayer,
+  knownPositionsVisible,
+  MEASURED_ONLY_NOTE,
+} from './KnownPositionsLayer';
 
 declare global {
   var IS_REACT_ACT_ENVIRONMENT: boolean;
@@ -60,8 +73,19 @@ afterEach(async () => {
 });
 
 const row = (over: Partial<KnownObject>): KnownObject => ({
-  id: '7347', name: '1993 EW', kind: 'asteroid', frames: 14, visits: 2, designation: '7347 1993 EW',
-  objectId: 'sbdb-7347', trackAvailable: false, positions: [], number: 7347, vMag: 17.9, detection: null, ...over,
+  id: '7347',
+  name: '1993 EW',
+  kind: 'asteroid',
+  frames: 14,
+  visits: 2,
+  designation: '7347 1993 EW',
+  objectId: 'sbdb-7347',
+  trackAvailable: false,
+  positions: [],
+  number: 7347,
+  vMag: 17.9,
+  detection: null,
+  ...over,
 });
 
 describe('KnownList rows (A18.5, Q-466)', () => {
@@ -70,16 +94,30 @@ describe('KnownList rows (A18.5, Q-466)', () => {
     const rows = [...host.querySelectorAll<HTMLElement>('[data-testid="known-row"]')];
     expect(rows).toHaveLength(KNOWN.known.length);
     expect(rows[0]!.dataset.object).toBe('Synthetic fixture A1');
-    expect(rows[0]!.querySelector('[data-testid="known-chip"]')?.getAttribute('data-kind')).toBe('detected');
+    expect(rows[0]!.querySelector('[data-testid="known-chip"]')?.getAttribute('data-kind')).toBe(
+      'detected',
+    );
     expect(rows[0]!.textContent).toContain('0.42 px from predicted');
-    expect(rows[1]!.querySelector('[data-testid="known-chip"]')?.getAttribute('data-kind')).toBe('predicted');
-    expect(rows[1]!.textContent).toContain(`${KNOWN.known[1]!.n_frames} frames in ${KNOWN.known[1]!.n_visits} visit`);
-    expect(host.querySelector('[data-testid="known-predicted-note"]')?.textContent).toBe(PREDICTED_NOTE);
+    expect(rows[1]!.querySelector('[data-testid="known-chip"]')?.getAttribute('data-kind')).toBe(
+      'predicted',
+    );
+    expect(rows[1]!.textContent).toContain(
+      `${KNOWN.known[1]!.n_frames} frames in ${KNOWN.known[1]!.n_visits} visit`,
+    );
+    expect(host.querySelector('[data-testid="known-predicted-note"]')?.textContent).toBe(
+      PREDICTED_NOTE,
+    );
     expect(host.querySelector('[data-testid="demo-tag"]')).toBeNull();
     // SkyBoT answers per visit of the area, so the date is the card's, said once.
-    expect(host.querySelector('[data-testid="known-skybot"]')?.textContent).toContain('SkyBoT last answered');
-    expect(host.querySelector('[data-testid="area-precomputed"]')?.textContent).toMatch(/^Precomputed · /);
-    expect(host.querySelector('[data-testid="area-visits"]')?.textContent).toMatch(/^Visits .* · \d+ frames$/);
+    expect(host.querySelector('[data-testid="known-skybot"]')?.textContent).toContain(
+      'SkyBoT last answered',
+    );
+    expect(host.querySelector('[data-testid="area-precomputed"]')?.textContent).toMatch(
+      /^Precomputed · /,
+    );
+    expect(host.querySelector('[data-testid="area-visits"]')?.textContent).toMatch(
+      /^Visits .* · \d+ frames$/,
+    );
   });
   it('sorts detected first, then brighter first, unknown V last (sortKnown)', () => {
     const list = sortKnown([
@@ -92,21 +130,36 @@ describe('KnownList rows (A18.5, Q-466)', () => {
   });
   it('the filter works on a 144-row list, and long lists show PAGE rows until "Show all"', async () => {
     const objects = Array.from({ length: 144 }, (_, i) =>
-      row({ id: String(100000 + i), designation: `${100000 + i} X${i}`, vMag: 15 + i / 10, detection: i < 2 ? { trackId: `T${i + 1}`, sepPx: 0.3 } : null }),
+      row({
+        id: String(100000 + i),
+        designation: `${100000 + i} X${i}`,
+        vMag: 15 + i / 10,
+        detection: i < 2 ? { trackId: `T${i + 1}`, sepPx: 0.3 } : null,
+      }),
     );
     useAreaStore.setState({ known: { ...RESULT, objects: sortKnown(objects) } });
     await act(async () => root.render(<KnownList />));
     const count = () => host.querySelectorAll('[data-testid="known-row"]').length;
     expect(host.querySelector('[data-testid="known-filter-all"]')?.textContent).toBe('All 144');
-    expect(host.querySelector('[data-testid="known-filter-detected"]')?.textContent).toBe('Detected 2');
-    expect(host.querySelector('[data-testid="known-filter-predicted"]')?.textContent).toBe('Predicted 142');
+    expect(host.querySelector('[data-testid="known-filter-detected"]')?.textContent).toBe(
+      'Detected 2',
+    );
+    expect(host.querySelector('[data-testid="known-filter-predicted"]')?.textContent).toBe(
+      'Predicted 142',
+    );
     expect(count()).toBe(PAGE);
     await act(async () => host.querySelector<HTMLElement>('[data-testid="known-more"]')!.click());
     expect(count()).toBe(144);
-    await act(async () => host.querySelector<HTMLElement>('[data-testid="known-filter-detected"]')!.click());
+    await act(async () =>
+      host.querySelector<HTMLElement>('[data-testid="known-filter-detected"]')!.click(),
+    );
     expect(count()).toBe(2);
-    expect(host.querySelector('[data-testid="known-filter-detected"]')?.getAttribute('aria-pressed')).toBe('true');
-    await act(async () => host.querySelector<HTMLElement>('[data-testid="known-filter-predicted"]')!.click());
+    expect(
+      host.querySelector('[data-testid="known-filter-detected"]')?.getAttribute('aria-pressed'),
+    ).toBe('true');
+    await act(async () =>
+      host.querySelector<HTMLElement>('[data-testid="known-filter-predicted"]')!.click(),
+    );
     expect(count()).toBe(PAGE);
     expect(filterKnown(objects, 'predicted')).toHaveLength(142);
     // Held UI issue 3: the full number is in its own column, never cut ("10021…").
@@ -121,20 +174,38 @@ describe('KnownList rows (A18.5, Q-466)', () => {
     expect(host.querySelector('[data-testid="known-chip"]')).toBeNull();
   });
   it('rowLine: kind, V and the separation or the frames', () => {
-    expect(rowLine(row({ detection: { trackId: 'T1', sepPx: 0.24 }, vMag: 17.42 }))).toBe('asteroid · V 17.4 · 0.24 px from predicted');
+    expect(rowLine(row({ detection: { trackId: 'T1', sepPx: 0.24 }, vMag: 17.42 }))).toBe(
+      'asteroid · V 17.4 · 0.24 px from predicted',
+    );
     expect(rowLine(row({ vMag: null }))).toBe('asteroid · 14 frames in 2 visits');
   });
   it('Track it: the Track view at once when Track-available (and for 433 Eros)', async () => {
-    const eros = row({ id: '433', name: 'Eros', objectId: 'sbdb-20000433', designation: '433 Eros', trackAvailable: false });
-    const ready = row({ id: '9', name: 'Metis', objectId: 'sbdb-20000009', designation: '9 Metis', trackAvailable: true });
+    const eros = row({
+      id: '433',
+      name: 'Eros',
+      objectId: 'sbdb-20000433',
+      designation: '433 Eros',
+      trackAvailable: false,
+    });
+    const ready = row({
+      id: '9',
+      name: 'Metis',
+      objectId: 'sbdb-20000009',
+      designation: '9 Metis',
+      trackAvailable: true,
+    });
     useAreaStore.setState({ known: { ...RESULT, objects: [eros, ready] } });
     const open = vi.fn();
     useAreaStore.setState({ openEros: open });
     await act(async () => root.render(<KnownList />));
     const rows = [...host.querySelectorAll<HTMLElement>('[data-testid="known-row"]')];
     expect(rows.map((r) => r.dataset.track)).toEqual(['yes', 'yes']);
-    await act(async () => rows[0]!.querySelector<HTMLElement>('[data-testid="known-track"]')!.click());
-    await act(async () => rows[1]!.querySelector<HTMLElement>('[data-testid="known-track"]')!.click());
+    await act(async () =>
+      rows[0]!.querySelector<HTMLElement>('[data-testid="known-track"]')!.click(),
+    );
+    await act(async () =>
+      rows[1]!.querySelector<HTMLElement>('[data-testid="known-track"]')!.click(),
+    );
     expect(open.mock.calls).toEqual([[eros], [ready]]);
   });
   it('Track it computes the Track first (±3 days of its frame times), or is off with no JPL id', async () => {
@@ -150,7 +221,9 @@ describe('KnownList rows (A18.5, Q-466)', () => {
     const off = rows[1]!.querySelector<HTMLButtonElement>('[data-testid="known-track"]')!;
     expect(off.disabled).toBe(true);
     expect(off.title).toBe(NO_ID_NOTE);
-    await act(async () => rows[0]!.querySelector<HTMLElement>('[data-testid="known-track"]')!.click());
+    await act(async () =>
+      rows[0]!.querySelector<HTMLElement>('[data-testid="known-track"]')!.click(),
+    );
     expect(openTrack).toHaveBeenCalledWith(todo, '2026-06-27T05:39:00Z', 'qr2');
     expect(trackAround(row({ positions: [] }), RESULT.real)).not.toBeNull(); // from the area's visits
     expect(trackAround(row({ positions: [] }), null)).toBeNull();
@@ -161,25 +234,38 @@ describe('KnownList rows (A18.5, Q-466)', () => {
     const cancel = vi.spyOn(useShellStore.getState(), 'cancelCard');
     useShellStore.setState({ cancelCard: cancel });
     await act(async () => root.render(<KnownList />));
-    await act(async () => host.querySelectorAll<HTMLElement>('[data-testid="known-build"]')[1]!.click());
+    await act(async () =>
+      host.querySelectorAll<HTMLElement>('[data-testid="known-build"]')[1]!.click(),
+    );
     expect(cancel).toHaveBeenCalled();
-    expect(skySearch).toHaveBeenCalledWith({ q: KNOWN.known[1]!.designation, kind: 'name', origin: 'sky' });
+    expect(skySearch).toHaveBeenCalledWith({
+      q: KNOWN.known[1]!.designation,
+      kind: 'name',
+      origin: 'sky',
+    });
     expect(useShellStore.getState().build.open).toBe(false); // not before the name resolves
     await act(async () =>
-      useAppStore.setState((s) => ({ sky: { ...s.sky, resolved: { id: 'x', name: 'x', moving: true } as never } })),
+      useAppStore.setState((s) => ({
+        sky: { ...s.sky, resolved: { id: 'x', name: 'x', moving: true } as never },
+      })),
     );
     expect(useShellStore.getState().build.open).toBe(true);
     useShellStore.getState().closeBuild();
   });
   it('lists skybot and horizons codes of `missing` as plain lines', async () => {
-    useAreaStore.setState({ known: { ...RESULT, real: { ...RESULT.real!, missing: ['skybot:2', 'horizons:433 Eros'] } } });
+    useAreaStore.setState({
+      known: { ...RESULT, real: { ...RESULT.real!, missing: ['skybot:2', 'horizons:433 Eros'] } },
+    });
     await act(async () => root.render(<KnownList />));
     const notes = host.querySelector('[data-testid="area-missing"]')!;
     expect(notes.textContent).toContain('SkyBoT) has no answer for visit 2');
     expect(notes.textContent).toContain('No predicted path for 433 Eros');
   });
   it('a refusal replaces the list with a title, one line and Choose another region (held UI issue 6)', async () => {
-    useAreaStore.setState({ known: null, refusal: { code: 'area:not_prepared', message: 'No prepared data for this area yet.' } });
+    useAreaStore.setState({
+      known: null,
+      refusal: { code: 'area:not_prepared', message: 'No prepared data for this area yet.' },
+    });
     await act(async () => root.render(<KnownList />));
     const r = host.querySelector('[data-testid="area-refused"]')!;
     expect(r.getAttribute('data-code')).toBe('area:not_prepared');
@@ -190,7 +276,20 @@ describe('KnownList rows (A18.5, Q-466)', () => {
   });
   it('the fallback demo row wears the Demo tag', async () => {
     useAreaStore.setState({
-      known: { demo: true, real: null, objects: [{ id: '433', name: 'Eros', kind: 'asteroid', frames: 16, visits: 2, trackAvailable: true }] },
+      known: {
+        demo: true,
+        real: null,
+        objects: [
+          {
+            id: '433',
+            name: 'Eros',
+            kind: 'asteroid',
+            frames: 16,
+            visits: 2,
+            trackAvailable: true,
+          },
+        ],
+      },
     });
     await act(async () => root.render(<KnownList />));
     expect(host.querySelector('[data-testid="demo-tag"]')).not.toBeNull();
@@ -218,13 +317,18 @@ describe('Known positions on the sky (A18.2)', () => {
     const svg = host.querySelector('[data-testid="known-positions"]')!;
     expect(svg.getAttribute('data-tag')).toBe('model_dependent');
     const all = KNOWN.known.flatMap((k) => distinctTimes(k.positions));
-    expect(distinctTimes(KNOWN.known[0]!.positions).length).toBeLessThan(KNOWN.known[0]!.positions.length); // two detectors share a time
+    expect(distinctTimes(KNOWN.known[0]!.positions).length).toBeLessThan(
+      KNOWN.known[0]!.positions.length,
+    ); // two detectors share a time
     expect(host.querySelectorAll('[data-testid="known-position"]')).toHaveLength(all.length);
     expect(host.querySelector('[data-testid="known-positions-tag"]')).not.toBeNull();
   });
   it('predicted paths are dashed; a detected object is solid, with its measured dots and a label', async () => {
     useAppStore.setState({ honesty: 'derived' });
-    const det = { ...RESULT.objects[0]!, detection: { trackId: 'T1', sepPx: 0.4, points: [{ ra: 150.01, dec: 10.01 }] } };
+    const det = {
+      ...RESULT.objects[0]!,
+      detection: { trackId: 'T1', sepPx: 0.4, points: [{ ra: 150.01, dec: 10.01 }] },
+    };
     useAreaStore.setState({ known: { ...RESULT, objects: [det, RESULT.objects[1]!] } });
     await act(async () => root.render(<KnownPositionsLayer view={view} />));
     const g = host.querySelector('[data-detected="true"]')!;
@@ -234,12 +338,17 @@ describe('Known positions on the sky (A18.2)', () => {
   });
   it('is hidden in Measured only, with the note why; measured dots stay', async () => {
     useAppStore.setState({ honesty: 'measured' });
-    const det = { ...RESULT.objects[0]!, detection: { trackId: 'T1', sepPx: 0.4, points: [{ ra: 150.01, dec: 10.01 }] } };
+    const det = {
+      ...RESULT.objects[0]!,
+      detection: { trackId: 'T1', sepPx: 0.4, points: [{ ra: 150.01, dec: 10.01 }] },
+    };
     useAreaStore.setState({ known: { ...RESULT, objects: [det, RESULT.objects[1]!] } });
     await act(async () => root.render(<KnownPositionsLayer view={view} />));
     expect(host.querySelectorAll('[data-testid="known-position"]')).toHaveLength(0);
     expect(host.querySelectorAll('[data-testid="known-measured"]')).toHaveLength(1);
-    expect(host.querySelector('[data-testid="known-positions-note"]')?.textContent).toBe(MEASURED_ONLY_NOTE);
+    expect(host.querySelector('[data-testid="known-positions-note"]')?.textContent).toBe(
+      MEASURED_ONLY_NOTE,
+    );
   });
   it('draws nothing for a refused area or another flow', async () => {
     useAreaStore.setState({ refusal: { code: 'area:not_prepared', message: 'x' } });
