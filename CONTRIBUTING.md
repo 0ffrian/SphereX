@@ -1,6 +1,8 @@
 # Contributing
 
-Every change reaches `main` through a pull request. Nobody pushes, force-pushes or deletes `main`, admins included.
+**Work on `dev`.** `dev` is the development branch and the default branch: make your branch from `dev` and open your pull request against `dev`. `main` is frozen at the event build (decision D-42): nothing is merged into it.
+
+Every change reaches `dev` through a pull request. Nobody pushes, force-pushes or deletes `dev` or `main`, admins included.
 
 ## What a PR needs to merge
 
@@ -17,7 +19,7 @@ A new push after an approval dismisses it, so ask for a fresh review.
 
 ## Merging: the merge queue
 
-When the PR is approved and green, press **Merge when ready**. GitHub adds it to the merge queue, combines it with the latest `main` (and any PRs ahead of it), runs `ci-gate` again on that combined commit, and merges only if it passes. If it fails, the PR leaves the queue and stays open, and the PR page shows why. Two PRs that pass on their own can't break `main` together, and you never need to update your branch just to merge it.
+When the PR is approved and green, press **Merge when ready**. GitHub adds it to the merge queue, combines it with the latest `dev` (and any PRs ahead of it), runs `ci-gate` again on that combined commit, and merges only if it passes. If it fails, the PR leaves the queue and stays open, and the PR page shows why. Two PRs that pass on their own can't break `main` together, and you never need to update your branch just to merge it.
 
 ## Who owns what
 
@@ -45,7 +47,7 @@ The D-17 owners in [docs/decisions/scope-process.md](docs/decisions/scope-proces
 
 ## Rules
 
-- Work on a branch (`feat/…`, `fix/…`, `docs/…`, `chore/…`) and open a PR.
+- Make your branch from `dev` (`git switch -c feat/<slug> origin/dev`; also `fix/…`, `docs/…`, `chore/…`) and open the PR against `dev`. A PR against `main` is closed or retargeted.
 - Title every PR `Issue-<n>: <title>`, where `<n>` is the issue it closes, and put `Closes #<n>` in the body. No issue yet? Open one first.
 - Issues are drafted and approved by their author before they are created. Claude sessions follow this through `/sx-ticket` (see "Tickets" in [CLAUDE.md](CLAUDE.md)) and never create issues on their own.
 - One person, one GitHub account. Never approve your own work from a second account.
@@ -56,4 +58,4 @@ The D-17 owners in [docs/decisions/scope-process.md](docs/decisions/scope-proces
 
 Admins and maintainers (Atish, Moon, Kevin) can override the rules on a PR. The merge box shows **Merge without waiting for requirements to be met (bypass rules)**. It merges without the approvals, the code-owner review or a green `ci-gate`. Use it only when a fix can't wait, and **say why in the PR** before you merge. GitHub records every bypass on the PR and in the ruleset's insights.
 
-The override works only through a PR. Nobody can push straight to `main`, force-push it or delete it. Don't disable the ruleset to get round that.
+The override works only through a PR. Nobody can push straight to `dev` or `main`, force-push them or delete them. Don't disable the ruleset to get round that.

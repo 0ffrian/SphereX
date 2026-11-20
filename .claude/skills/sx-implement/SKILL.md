@@ -29,7 +29,7 @@ Implement `$ARGUMENTS` for Shift & Spectrum. Run the whole pipeline without aski
 
 5. **Verify.** Run the project's tests, type check and lint yourself (whatever is configured in `frontend/package.json` or `backend/pyproject.toml`). Report the real results.
 
-6. **Commit (only with `--commit`).** Create a branch `feat/<short-slug>` if you are on `main`, stage the changed files explicitly, and commit with a clear message. Never push.
+6. **Commit (only with `--commit`).** Create a branch `feat/<short-slug>` from `origin/dev` if you are on `dev` or `main` (D-42), stage the changed files explicitly, and commit with a clear message. Never push.
 
 ## Report to the user
 
