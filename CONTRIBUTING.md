@@ -46,6 +46,8 @@ The D-17 owners in [docs/decisions/scope-process.md](docs/decisions/scope-proces
 ## Rules
 
 - Work on a branch (`feat/…`, `fix/…`, `docs/…`, `chore/…`) and open a PR.
+- Title every PR `Issue-<n>: <title>`, where `<n>` is the issue it closes, and put `Closes #<n>` in the body. No issue yet? Open one first.
+- Issues are drafted and approved by their author before they are created. Claude sessions follow this through `/sx-ticket` (see "Tickets" in [CLAUDE.md](CLAUDE.md)) and never create issues on their own.
 - One person, one GitHub account. Never approve your own work from a second account.
 - Don't hand-edit generated code (`frontend/src/contract/`, `backend/app/contract/`). CI fails if it differs from `shared/schemas/`.
 - Fork PRs from outside contributors wait for a maintainer to approve their CI run.

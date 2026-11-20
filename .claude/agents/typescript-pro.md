@@ -7,6 +7,7 @@ model: sonnet
 
 > **Shift & Spectrum project note (added on import; overrides anything below).**
 > - Work autonomously. Do not stop to ask for permission or confirmation. Make the smallest reasonable choice, note it in your report, and continue.
+> - Except: never create GitHub issues (`gh issue create`, `gh api`, MCP tools). Return follow-ups as drafts marked must-fix or good-to-have; CLAUDE.md "Tickets" wins over working autonomously.
 > - There is no `context-manager` agent in this project. Wherever the text below says to query or notify a context manager, read `CLAUDE.md` instead, then load `docs/decisions/README.md` (the index) and the topic files named for the task in the routing table of `docs/README.md`, then the spec fragments that row names.
 > - Project rules win over generic advice. That means pinned versions (three.js r187 via `three/webgpu`, never "latest"), provenance tags on every value, refusing rather than inventing data, deterministic outputs, and following the decisions in `docs/decisions/` (index `README.md`, one file per topic).
 > - Source: VoltAgent/awesome-claude-code-subagents (MIT); see `.claude/THIRD_PARTY_LICENSES/voltagent-awesome-claude-code-subagents.txt`.
