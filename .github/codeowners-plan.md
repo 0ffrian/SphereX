@@ -1,6 +1,6 @@
 # Plan: code owners, required CI and `main` protection
 
-Status (18 Nov 2026): step 1 done (alt accounts removed; fork-PR CI approval set to `all_external_contributors`). Step 2 built on `chore/ci-gate`; steps 3–4 built on `chore/codeowners`. Neither pushed. **Step 5 done early** (ruleset `main`, id 27523962, active, no bypass, `ci-gate` pinned to app 15368, verified from a real check run): the `chore/ci-gate` PR reports `ci-gate` from its own run, so it can merge; other PRs report `ci-gate` only once `ci.yml` is on `main` and they are updated. Step 5b (merge queue) waits for the `chore/ci-gate` PR. Steps 6–7 not started.
+Status (18 Nov 2026): step 1 done (alt accounts removed; fork-PR CI approval set to `all_external_contributors`). Step 2 built on `chore/ci-gate`; steps 3–4 built on `chore/codeowners`. Neither pushed. **Step 5 done early** (ruleset `main`, id 27523962, active, PR-only bypass for admin and maintain roles since 20 Nov, `ci-gate` pinned to app 15368, verified from a real check run): the `chore/ci-gate` PR reports `ci-gate` from its own run, so it can merge; other PRs report `ci-gate` only once `ci.yml` is on `main` and they are updated. Step 5b (merge queue) waits for the `chore/ci-gate` PR. Steps 6–7 not started.
 Delete this file in the last PR (step 7); the lasting rules go into `CONTRIBUTING.md`.
 
 ## 0. Starting state (checked 18 Nov 2026)
@@ -19,7 +19,7 @@ Delete this file in the last PR (step 7); the lasting rules go into `CONTRIBUTIN
 ## 1. Target behaviour
 
 1. Nobody pushes, force-pushes or deletes `main`. Every change goes through a PR, admins included.
-2. Every owned area has a **lead** and **backups** (section 1a). A PR touching an owned path needs an approval from **one of that area's owners who is not the PR author and not the last pusher**. Backups exist so a lead's own PR can always be approved (GitHub blocks self-approval, and the ruleset has no bypass).
+2. Every owned area has a **lead** and **backups** (section 1a). A PR touching an owned path needs an approval from **one of that area's owners who is not the PR author and not the last pusher**. Backups exist so a lead's own PR can always be approved (GitHub blocks self-approval; the override in D-D is for emergencies only).
 3. **Open paths** have no code owner: `frontend/` (except Moon's UI-design files). A PR that touches *only* open paths can be approved by **any reviewer with write access**, code owner or not. That is how non-code-owners review each other's work there.
 
 ### 1a. Ownership map (agreed 18 Nov 2026)
@@ -62,7 +62,7 @@ Delete this file in the last PR (step 7); the lasting rules go into `CONTRIBUTIN
 | P10 | **Open PRs** (#182) won't have `ci-gate` until they get a new run. | After step 5, push or merge `main` into #182 (or re-run its checks). |
 | P11 | Public repo: **fork PRs** run Actions. | Keep `permissions: contents: read`, never `pull_request_target`, set fork-PR approval to "all outside collaborators". |
 | P12 | Ruleset "Evaluate" (dry-run) mode is **Enterprise-only**. | No dry run on free: enable directly, then run the test matrix (step 6) straight away; rollback is one toggle. |
-| P13 | With 3 owners and self-approval blocked, if two are away a PR stalls. | Accepted. Emergency path: an admin disables the ruleset, merges, re-enables (all in the audit log), and says so in the PR. |
+| P13 | With 3 owners and self-approval blocked, if two are away a PR stalls. | Accepted. Emergency path: an admin or maintainer merges with the PR-only bypass and says why in the PR (D-D). |
 
 ## 3. Decisions needed before building
 
@@ -71,7 +71,7 @@ Delete this file in the last PR (step 7); the lasting rules go into `CONTRIBUTIN
 | D-A | Which paths are **open** (no code owner)? | **Decided (Atish, 18 Nov 2026):** section 1a. Still open: (1) is "Moon's UI design" exactly `components/`, `index.css`, `components.json` and `design-language.md`? (2) keep `frontend/package*.json` owned? |
 | D-B | Alt accounts `atish-syntarengine`, `munazir-syntarengine`? | **Done (Atish, 18 Nov 2026):** both removed from the repo. Collaborators now: `JoottunAtish` admin, `MintHerbs` admin, `KevinYerkiah` maintain. P6 and test T2 no longer apply. |
 | D-C | Who are the **non-code-owner reviewers**, if any exist yet? | Add them with the `write` role when named (P7). None exist today besides the alt accounts. |
-| D-D | Bypass list on the ruleset? | **Empty** (no bypass, admins included). Emergencies follow P13. |
+| D-D | Bypass list on the ruleset? | **Admin and maintain roles, PR merges only** (changed by Atish, 20 Nov 2026; was empty). Direct push, force push and delete stay blocked. |
 | D-E | Require the branch to be up to date before merging? | **No**. It causes rebase churn; `ci-gate` already runs on the merge commit. |
 | D-F | Allowed merge methods? | Keep all three (history uses merge commits today). |
 
@@ -204,7 +204,10 @@ Create via `gh api -X POST repos/0ffrian/SphereX/rulesets --input ruleset.json`:
   "target": "branch",
   "enforcement": "active",
   "conditions": { "ref_name": { "include": ["~DEFAULT_BRANCH"], "exclude": [] } },
-  "bypass_actors": [],
+  "bypass_actors": [
+    { "actor_id": 5, "actor_type": "RepositoryRole", "bypass_mode": "pull_request" },
+    { "actor_id": 2, "actor_type": "RepositoryRole", "bypass_mode": "pull_request" }
+  ],
   "rules": [
     { "type": "deletion" },
     { "type": "non_fast_forward" },

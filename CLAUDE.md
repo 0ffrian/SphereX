@@ -34,7 +34,7 @@ If two docs disagree and `docs/decisions/` is silent, follow the precedence (dec
 - **All development happens on a branch** (`feat/…`, `fix/…`, `docs/…`) and reaches `main` through a pull request. Review it with `/sx-pr-review`.
 - **Never commit or push directly to `main`.** The only exceptions were the initial repo and frontend setup (4 Nov 2026), which the user approved explicitly.
 - Agents may create branches and commit locally. Pushing and opening PRs happen when the user asks.
-- **`main` is protected by a ruleset** (Q-484): a merge needs the `ci-gate` check, an approval from someone other than the author and last pusher, and a code-owner approval for owned paths. Owners and open paths: [CONTRIBUTING.md](CONTRIBUTING.md) and `.github/CODEOWNERS`. Agents never disable the ruleset or try to get around it; if a PR is blocked, report it.
+- **`main` is protected by a ruleset** (Q-484): a merge needs the `ci-gate` check, an approval from someone other than the author and last pusher, and a code-owner approval for owned paths. Owners and open paths: [CONTRIBUTING.md](CONTRIBUTING.md) and `.github/CODEOWNERS`. Admins and maintainers can override it on a PR merge (bypass checkbox, Q-484); agents never use that override, never disable the ruleset and never try to get around it. If a PR is blocked, report it.
 
 ## Agents and skills
 
