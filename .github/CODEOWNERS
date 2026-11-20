@@ -1,0 +1,31 @@
+# Code owners for 0ffrian/SphereX. Map and rules: CONTRIBUTING.md; decision: Q-484.
+#
+# The LAST matching line wins, so the order of the blocks matters.
+# Each line lists the lead first, then the backups. GitHub asks all of them for
+# a review and any one can approve; backups exist so a lead's own PR can merge.
+# A path with no owner ("open") can be approved by anyone with write access.
+
+# 1. Default: anything not listed below (shared/, README.md, new folders).
+*                               @JoottunAtish @MintHerbs @KevinYerkiah
+
+# 2. Areas.
+/docs/                          @JoottunAtish @MintHerbs @KevinYerkiah
+/backend/                       @KevinYerkiah @JoottunAtish @MintHerbs
+/mockup/                        @JoottunAtish @MintHerbs @KevinYerkiah
+
+# 3. Open: no owner.
+/frontend/
+
+# 4. Owned inside the open frontend/ (must stay after block 3).
+/frontend/src/components/       @MintHerbs @JoottunAtish @KevinYerkiah
+/frontend/src/index.css         @MintHerbs @JoottunAtish @KevinYerkiah
+/frontend/components.json       @MintHerbs @JoottunAtish @KevinYerkiah
+/frontend/package.json          @JoottunAtish @MintHerbs @KevinYerkiah
+/frontend/package-lock.json     @JoottunAtish @MintHerbs @KevinYerkiah
+/docs/design-language.md        @MintHerbs @JoottunAtish @KevinYerkiah
+
+# 5. Governance. Keep this block LAST so no rule above can remove its owners.
+/.claude/                       @JoottunAtish @MintHerbs @KevinYerkiah
+/CLAUDE.md                      @JoottunAtish @MintHerbs @KevinYerkiah
+/CONTRIBUTING.md                @JoottunAtish @MintHerbs @KevinYerkiah
+/.github/                       @JoottunAtish @MintHerbs @KevinYerkiah
