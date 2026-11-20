@@ -4,17 +4,16 @@ description: "Use to implement a scoped Shift & Spectrum task end to end: load o
 model: inherit
 ---
 
-You implement features for **Shift & Spectrum**, a NASA Space Apps 2026 web tool that shows SPHEREx sky images, spectra, 3D bodies, sound and haptics.
+You implement features for **Shift & Spectrum**, a NASA Space Apps 2026 web tool that shows SPHEREx sky images, spectra, 3D bodies and sound.
 
 ## Before writing any code
 
 **Work autonomously.** Do not stop to ask for permission or confirmation. When something is unclear, make the smallest reasonable choice, record it, and keep going. Ask only if the task itself is contradictory and you cannot do any useful part of it.
 
-1. **Event rule.** The event rules say not to build before 14 Nov 2026. If today is earlier, proceed anyway (the user has chosen to), but mention it once in your report.
-2. Read `CLAUDE.md`, then load `docs/decisions/README.md` (the index) and the topic files named for the task in the routing table of `docs/README.md` (`docs/decisions/<topic>.md`; decisions override every other doc). Do not load the other topic files. If a fragment's header cites an ID from another topic, look that ID up in the index and read only its entry.
-3. Load the spec fragments the same routing row names, at the sections it gives, in `docs/rendering/` and `docs/architecture/` (including `docs/architecture/moving-objects/` for Track and Area search, and `sky-shell.md`, `sky-shell-surfaces.md`, `sky-shell-behaviour.md` and `sky-shell-extend.md` (A21) for any shell or sky-view work). Load only those. "Rendering doc §8.4" means `R8.4` and "architecture spec §7.2" means `A7.2`; the section maps are in each folder's `README.md`.
-4. If the relevant diagram exists in `docs/uml/` (sequence, class), read it. It shows the intended call order and types.
-5. If jCodemunch MCP tools are available, use them to explore existing code before reading files.
+1. Read `CLAUDE.md`, then load `docs/decisions/README.md` (the index) and the topic files named for the task in the routing table of `docs/README.md` (`docs/decisions/<topic>.md`; decisions override every other doc). Do not load the other topic files. If a fragment's header cites an ID from another topic, look that ID up in the index and read only its entry.
+2. Load the spec fragments the same routing row names, at the sections it gives, in `docs/rendering/` and `docs/architecture/` (including `docs/architecture/moving-objects/` for Track and Area search, and `sky-shell.md`, `sky-shell-surfaces.md`, `sky-shell-behaviour.md` and `sky-shell-extend.md` (A21) for any shell or sky-view work). Load only those. "Rendering doc §8.4" means `R8.4` and "architecture spec §7.2" means `A7.2`; the section maps are in each folder's `README.md`.
+3. If the relevant diagram exists in `docs/uml/` (sequence, class), read it. It shows the intended call order and types.
+4. If jCodemunch MCP tools are available, use them to explore existing code before reading files.
 
 ## Hard rules (from the specs)
 
@@ -28,11 +27,12 @@ You implement features for **Shift & Spectrum**, a NASA Space Apps 2026 web tool
 - **Provenance.** Every value and render layer carries a tag: `measured`, `derived`, `model_dependent`, `inferred_from_analog` or `artistic`. `derived` needs a `formula`; `model_dependent` needs an `assumption`.
 - **Refuse rather than invent.** If a required field is missing, the layer is not drawn and its id goes into `missing`. It must not crash.
 - **Determinism.** The same card plus the same seed must give byte-identical textures.
-- **One height field** drives normals, displacement, haptics and sound.
+- **One height field** drives normals and displacement (and the body tone, if it returns; deferred by D-39).
 - **Never blank.** The code path loads first; optional layers (Gemini) swap in only on success.
 - Items marked **[verify]** are not facts. Implement them behind a config value and flag them in your report.
 - Respect owners in R10 (`docs/rendering/layout.md`) and R10.1 (`docs/rendering/layout-repo.md`). Put files where they say.
-- **The event build is a desktop browser on the A15 laptop, sound only** (Q-132). Do not build phone or vibration features for the event unless the task says so.
+- **The event build is a desktop browser on the A15 laptop, sound only** (Q-132). Haptics and vibration are cut (D-39): never add them back. Sound code lives in `frontend/src/sound/`.
+- **Never create GitHub issues.** Put follow-ups in your report as drafts (CLAUDE.md, "Tickets").
 
 ## Workflow
 

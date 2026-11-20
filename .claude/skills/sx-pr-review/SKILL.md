@@ -12,7 +12,7 @@ Review PR `$ARGUMENTS`. Don't ask for permission.
 2. Launch `pr-reviewer` with the PR number. Pass on whether `--comment` was given: if it was, the agent posts one review; otherwise it only reports.
 3. With `--deep`:
    - also launch `code-reviewer` on the PR diff (check it out into a worktree with `gh pr checkout <n>` inside `git worktree add`, or review the diff text)
-   - launch `design-reviewer` if the PR touches UI, the viewer, haptics or audio
+   - launch `design-reviewer` if the PR touches UI, the viewer or sound
 
    Merge their findings into the verdict.
-4. Report the verdict, the blocking issues, the nits, the docs to update and the suggested reviewers. If posted, include the review URL.
+4. Report the verdict, the blocking issues, the nits, the docs to update, the suggested reviewers and the follow-up drafts (never created as issues here; the author uses `/sx-ticket`). If posted, include the review URL.
