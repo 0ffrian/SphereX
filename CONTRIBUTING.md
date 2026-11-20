@@ -48,7 +48,7 @@ The D-17 owners in [docs/decisions/scope-process.md](docs/decisions/scope-proces
 - Work on a branch (`feat/…`, `fix/…`, `docs/…`, `chore/…`) and open a PR.
 - One person, one GitHub account. Never approve your own work from a second account.
 - Don't hand-edit generated code (`frontend/src/contract/`, `backend/app/contract/`). CI fails if it differs from `shared/schemas/`.
-- Fork PRs from first-time outside contributors wait for a maintainer to approve their CI run.
+- Fork PRs from outside contributors wait for a maintainer to approve their CI run.
 
 ## Emergencies
 

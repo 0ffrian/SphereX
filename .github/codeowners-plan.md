@@ -1,6 +1,6 @@
 # Plan: code owners, required CI and `main` protection
 
-Status (20 Nov 2026): steps 1, 2 (PR #183, merged 20 Nov), 3–4 (PR #186), 5 and 5b done. Ruleset `main` (id 27523962): active, PR-only bypass for the admin and maintain roles, `ci-gate` pinned to app 15368, merge queue on (MERGE, ALLGREEN, build up to 5, merge 1 to 5, 60 min check timeout). Next: step 6 (test matrix) after #186 merges, then step 7 (delete this plan).
+Status (20 Nov 2026): steps 1, 2 (PR #183, merged 20 Nov), 5 and 5b done; 3–4 are in PR #186, done when it merges. Ruleset `main` (id 27523962): active, PR-only bypass for the admin and maintain roles, `ci-gate` pinned to app 15368, merge queue on (MERGE, ALLGREEN, build up to 5, merge 1 to 5, 60 min check timeout). Next: step 6 (test matrix) after #186 merges, then step 7 (delete this plan).
 Delete this file in the last PR (step 7); the lasting rules go into `CONTRIBUTING.md`.
 
 ## 0. Starting state (checked 18 Nov 2026)
@@ -83,7 +83,7 @@ Delete this file in the last PR (step 7); the lasting rules go into `CONTRIBUTIN
 
 ### Step 2: PR `chore/ci-gate`: one always-on CI entry point
 - Turn `backend.yml` and `frontend.yml` into reusable workflows: replace their `on:` block with `on: workflow_call:`. Jobs and steps unchanged.
-- Add `.github/workflows/ci.yml`:
+- Add `.github/workflows/ci.yml`. The sketch below is the plan as written; the real file on `main` differs (it adds the `merge_group` trigger and pins actions by SHA), so read that file, not this one:
 
 ```yaml
 name: ci
@@ -153,7 +153,7 @@ jobs:
 - Accept when: on the PR, `ci-gate` is green, and a second test commit that only touches `docs/` shows `backend`/`frontend` **skipped** and `ci-gate` **green**.
 
 ### Step 3: PR `chore/codeowners`: the ownership file
-`.github/CODEOWNERS` (D-A applied):
+`.github/CODEOWNERS` (D-A applied). Sketch only; the real file in this PR also owns `/CONTRIBUTING.md`, so read that file, not this one:
 
 ```
 # Order matters: the LAST matching line wins.
@@ -268,7 +268,7 @@ Test T12: two approved PRs queued together both merge after one `ci-gate` run ea
 Record the result of each row (pass/fail + PR link) in the step 7 PR description.
 
 ### Step 7: wrap-up PR
-- Delete this plan file. Update memory (`project-ci-actions-exhausted` is now outdated: CI is free on a public repo). Remove the `.worktrees/codeowners` worktree after merge.
+- Delete this plan file.
 
 ## 5. Ownership of this plan
 Atish runs steps 1 and 5 (needs admin). Each PR needs Moon or Kevin to approve once step 5 is on.
