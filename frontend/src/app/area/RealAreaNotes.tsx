@@ -13,7 +13,8 @@ export const TEST_DATA_NOTE =
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const day = (d: Date) => `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
-const hm = (d: Date) => `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
+const hm = (d: Date) =>
+  `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
 
 /** "13 Nov 2026 07:28 UTC" (an unreadable time is given as it is). */
 export function whenUtc(iso: string): string {
@@ -29,7 +30,10 @@ export function visitsLine(summary: Pick<AreaSummary, 'frames' | 'n_frames'>): s
   if (starts.length === 1) return `Visit ${day(starts[0]!)}, ${hm(starts[0]!)} UTC · ${frames}`;
   if (starts.length === 2) {
     const [a, b] = starts as [Date, Date];
-    const times = day(a) === day(b) ? `${day(a)}, ${hm(a)} and ${hm(b)} UTC` : `${day(a)}, ${hm(a)} and ${day(b)}, ${hm(b)} UTC`;
+    const times =
+      day(a) === day(b)
+        ? `${day(a)}, ${hm(a)} and ${hm(b)} UTC`
+        : `${day(a)}, ${hm(a)} and ${day(b)}, ${hm(b)} UTC`;
     return `Visits ${times} · ${frames}`;
   }
   return `${starts.length} visits, ${day(starts[0]!)} to ${day(starts[starts.length - 1]!)} · ${frames}`;
@@ -59,7 +63,8 @@ export function RealAreaNotes({
     <>
       <div className="sx-area-prov" data-testid="area-prov">
         <span data-testid="area-precomputed" data-live={live || undefined}>
-          <b>{live ? 'Computed live' : 'Precomputed'}</b> · {whenUtc(computedAt)} · {releaseName(release)}
+          <b>{live ? 'Computed live' : 'Precomputed'}</b> · {whenUtc(computedAt)} ·{' '}
+          {releaseName(release)}
           {synthetic && (
             <span
               className="sx-tagbadge"

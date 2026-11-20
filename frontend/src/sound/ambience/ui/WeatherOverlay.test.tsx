@@ -6,15 +6,31 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useSoundSettings } from '@/sound/settings';
 import { FlashGate } from '../flashGate';
 import type { Strike, WeatherVisualFrame } from '../types';
-import { getWeather, publishStrike, publishWeather, resetWeatherBus, weatherRows, type WeatherSnapshot } from '../weatherBus';
+import {
+  getWeather,
+  publishStrike,
+  publishWeather,
+  resetWeatherBus,
+  weatherRows,
+  type WeatherSnapshot,
+} from '../weatherBus';
 import { alphaOf, makeBasis, recordingCtx, type Call } from '../weatherDraw.testutil';
-import { drawWeatherFrame, newDrawState, WEATHER_CAPTION, WeatherOverlay, type OverlayEngine } from './WeatherOverlay';
+import {
+  drawWeatherFrame,
+  newDrawState,
+  WEATHER_CAPTION,
+  WeatherOverlay,
+  type OverlayEngine,
+} from './WeatherOverlay';
 import { WeatherDrawnRows } from './WeatherDrawnRows';
 import { BOLT_CORE_PX, BOLT_GLOW_PX } from '../tuning';
 
-const W = 800, H = 500;
+const W = 800,
+  H = 500;
 
-function fakeEngine(o: { altKm?: number; head?: number; pitch?: number; gas?: boolean; clouds?: boolean } = {}): OverlayEngine {
+function fakeEngine(
+  o: { altKm?: number; head?: number; pitch?: number; gas?: boolean; clouds?: boolean } = {},
+): OverlayEngine {
   const basis = makeBasis({ altKm: o.altKm ?? 0.5, head: o.head ?? 0, pitch: o.pitch ?? 0 });
   return {
     fly: { lon: 0, lat: 0, alt: o.altKm ?? 0.5, head: o.head ?? 0 },
@@ -24,21 +40,41 @@ function fakeEngine(o: { altKm?: number; head?: number; pitch?: number; gas?: bo
   };
 }
 
-const rainFrame = (o: Partial<NonNullable<WeatherVisualFrame['rain']>> = {}, zc: number | null = 1.5): WeatherVisualFrame => ({
+const rainFrame = (
+  o: Partial<NonNullable<WeatherVisualFrame['rain']>> = {},
+  zc: number | null = 1.5,
+): WeatherVisualFrame => ({
   rain: { density: 0.5, vt: 9.2, slantRad: 0.3, tint: [0.4, 0.4, 0.42], snow: false, ...o },
   strikes: [],
   aboveClouds: false,
   zc_km: zc,
 });
 const snapOf = (frame: WeatherVisualFrame, tS: number): WeatherSnapshot => ({
-  frame, windDirDeg: 0, U10: 4, head: 0, lightning: { allowed: true, tag: 'measured', reason: null }, tS,
+  frame,
+  windDirDeg: 0,
+  U10: 4,
+  head: 0,
+  lightning: { allowed: true, tag: 'measured', reason: null },
+  tS,
 });
-const strike = (t0: number, bearing = 0, d_m = 8000, seed = 11): Strike => ({ t0, d_m, bearing, seed, variant: 2, flash: true });
+const strike = (t0: number, bearing = 0, d_m = 8000, seed = 11): Strike => ({
+  t0,
+  d_m,
+  bearing,
+  seed,
+  variant: 2,
+  flash: true,
+});
 
 const strokes = (calls: Call[]) => calls.filter((c) => c.op === 'stroke');
 
 describe('drawWeatherFrame', () => {
-  const frameAt = (engine: OverlayEngine, snap: WeatherSnapshot | null, gate = new FlashGate(), t = 10) => {
+  const frameAt = (
+    engine: OverlayEngine,
+    snap: WeatherSnapshot | null,
+    gate = new FlashGate(),
+    t = 10,
+  ) => {
     const { ctx, calls } = recordingCtx();
     const st = newDrawState();
     st.W = W;
@@ -61,7 +97,9 @@ describe('drawWeatherFrame', () => {
     expect(strokes(calls)).toHaveLength(0);
     expect(more).toBe(false);
     // ...and below it at 4 km.
-    expect(strokes(frameAt(fakeEngine({ altKm: 4 }), snapOf(rainFrame(), 10)).calls)).toHaveLength(3);
+    expect(strokes(frameAt(fakeEngine({ altKm: 4 }), snapOf(rainFrame(), 10)).calls)).toHaveLength(
+      3,
+    );
   });
 
   it('ruling 3: clouds on and zc null: the engine deck at 3.5 km x ex; above it no rain, below it rain', () => {
@@ -71,7 +109,9 @@ describe('drawWeatherFrame', () => {
     expect(strokes(frameAt(fakeEngine({ altKm: 12.5 }), snapOf(f, 10)).calls)).toHaveLength(0);
     expect(strokes(frameAt(fakeEngine({ altKm: 4 }), snapOf(f, 10)).calls)).toHaveLength(3);
     // clouds off: no deck drawn, the frame decides
-    expect(strokes(frameAt(fakeEngine({ altKm: 11, clouds: false }), snapOf(f, 10)).calls)).toHaveLength(3);
+    expect(
+      strokes(frameAt(fakeEngine({ altKm: 11, clouds: false }), snapOf(f, 10)).calls),
+    ).toHaveLength(3);
   });
 
   it('red 4: #116 cut the rain at the real cloud base (frame rain null): nothing drawn, even below the drawn deck', () => {
@@ -85,8 +125,18 @@ describe('drawWeatherFrame', () => {
       const st = newDrawState(seed);
       st.W = W;
       st.H = H;
-      drawWeatherFrame(ctx as never, st, fakeEngine({ altKm: 0.5 }), snapOf(rainFrame(), 10), new FlashGate(), 10, 1 / 30);
-      return JSON.stringify(calls.filter((c) => c.op === 'moveTo' || c.op === 'lineTo').map((c) => c.args));
+      drawWeatherFrame(
+        ctx as never,
+        st,
+        fakeEngine({ altKm: 0.5 }),
+        snapOf(rainFrame(), 10),
+        new FlashGate(),
+        10,
+        1 / 30,
+      );
+      return JSON.stringify(
+        calls.filter((c) => c.op === 'moveTo' || c.op === 'lineTo').map((c) => c.args),
+      );
     };
     expect(lines(101)).toBe(lines(101));
     expect(lines(101)).not.toBe(lines(202));
@@ -153,14 +203,24 @@ describe('drawWeatherFrame', () => {
     const r = boltTrace(10000);
     expect(r.big).toBe(false);
     expect(r.n).toBeGreaterThanOrEqual(2);
-    const dipThenRise = r.alphas.some((a, i) => a < 0.95 && r.alphas.slice(0, i).some((x) => x > 0.99) && r.alphas.slice(i).some((x) => x > 0.99));
+    const dipThenRise = r.alphas.some(
+      (a, i) =>
+        a < 0.95 &&
+        r.alphas.slice(0, i).some((x) => x > 0.99) &&
+        r.alphas.slice(i).some((x) => x > 0.99),
+    );
     expect(dipThenRise).toBe(true);
   });
 
   it('H4: a big bolt (narrow pane, so the limit is small) never restrikes: no dip then rise', () => {
     const r = boltTrace(1500, 300, 500);
     expect(r.big).toBe(true);
-    const dipThenRise = r.alphas.some((a, i) => a < 0.95 && r.alphas.slice(0, i).some((x) => x > 0.99) && r.alphas.slice(i).some((x) => x > 0.99));
+    const dipThenRise = r.alphas.some(
+      (a, i) =>
+        a < 0.95 &&
+        r.alphas.slice(0, i).some((x) => x > 0.99) &&
+        r.alphas.slice(i).some((x) => x > 0.99),
+    );
     expect(dipThenRise).toBe(false);
   });
 
@@ -194,7 +254,8 @@ describe('drawWeatherFrame', () => {
     for (let t = 10; t < 11.1; t += 1 / 30) {
       const { calls } = frameAt(fakeEngine(), null, gate, t);
       expect(strokes(calls)).toHaveLength(0);
-      for (const c of calls.filter((x) => x.op === 'stop')) expect(Number(alphaOf(c.args[1]))).toBeLessThanOrEqual(0.15 + 1e-9);
+      for (const c of calls.filter((x) => x.op === 'stop'))
+        expect(Number(alphaOf(c.args[1]))).toBeLessThanOrEqual(0.15 + 1e-9);
     }
   });
 
@@ -245,8 +306,14 @@ describe('WeatherOverlay component', () => {
     }));
     rec = recordingCtx();
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => rec.ctx as never);
-    Object.defineProperty(HTMLCanvasElement.prototype, 'clientWidth', { configurable: true, get: () => W });
-    Object.defineProperty(HTMLCanvasElement.prototype, 'clientHeight', { configurable: true, get: () => H });
+    Object.defineProperty(HTMLCanvasElement.prototype, 'clientWidth', {
+      configurable: true,
+      get: () => W,
+    });
+    Object.defineProperty(HTMLCanvasElement.prototype, 'clientHeight', {
+      configurable: true,
+      get: () => H,
+    });
     container = document.createElement('div');
     document.body.appendChild(container);
     root = createRoot(container);
@@ -261,7 +328,9 @@ describe('WeatherOverlay component', () => {
   });
 
   const mount = (engine: OverlayEngine | null = fakeEngine(), active = true, reduced = false) =>
-    act(() => root.render(<WeatherOverlay engine={engine} active={active} reduced={reduced} seed={101} />));
+    act(() =>
+      root.render(<WeatherOverlay engine={engine} active={active} reduced={reduced} seed={101} />),
+    );
 
   it('is aria-hidden and never catches pointer input', () => {
     mount();
@@ -345,8 +414,16 @@ describe('WeatherOverlay component', () => {
 
   it('What is drawn: the rows from weatherRows, the bolt colour tagged artistic', () => {
     act(() => publishWeather(snapOf(rainFrame(), now / 1000)));
-    act(() => root.render(<ul><WeatherDrawnRows /></ul>));
-    const rows = [...container.querySelectorAll('[data-testid="weather-row"]')].map((r) => r.textContent ?? '');
+    act(() =>
+      root.render(
+        <ul>
+          <WeatherDrawnRows />
+        </ul>,
+      ),
+    );
+    const rows = [...container.querySelectorAll('[data-testid="weather-row"]')].map(
+      (r) => r.textContent ?? '',
+    );
     expect(rows.some((r) => /not from data/.test(r))).toBe(true);
     expect(rows.some((r) => /Rain/.test(r))).toBe(true);
     // The bolt-colour row carries the artistic tag (weatherRows is #116's; the badge renders it).

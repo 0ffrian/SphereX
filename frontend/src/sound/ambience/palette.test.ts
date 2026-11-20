@@ -138,7 +138,12 @@ describe('Palette', () => {
     expect(p.get('S6', 0)).not.toBeNull();
     expect(p.get('S2', 0)).toBeNull();
     expect(p.unavailable()).toEqual([
-      { source: 'S2', reason: expect.stringMatching(/^The sound of grit hissing in the wind is unavailable: .*fHiss_Hz/) },
+      {
+        source: 'S2',
+        reason: expect.stringMatching(
+          /^The sound of grit hissing in the wind is unavailable: .*fHiss_Hz/,
+        ),
+      },
     ]);
   });
 

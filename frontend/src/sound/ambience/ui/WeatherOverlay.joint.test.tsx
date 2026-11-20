@@ -13,7 +13,13 @@ import { createAmbienceLoop, type AmbienceLoop } from '../ambienceLoop';
 import { EARTH_MODEL, makeFlyEngine, makeWorld } from '../fakeEngine.testutil';
 import type { WorldEngineWithSpinup } from '../place';
 import { BOLT_CORE_PX } from '../tuning';
-import { getWeather, onStrike, publishStrike, publishWeather, resetWeatherBus } from '../weatherBus';
+import {
+  getWeather,
+  onStrike,
+  publishStrike,
+  publishWeather,
+  resetWeatherBus,
+} from '../weatherBus';
 import { makeBasis, recordingCtx } from '../weatherDraw.testutil';
 import { WEATHER_CAPTION, WeatherOverlay, type OverlayEngine } from './WeatherOverlay';
 
@@ -38,7 +44,13 @@ function weatherEngine(o: { rain: number; storm: boolean }) {
     for (let k = 0; k < wf.NX * wf.NY; k++) wf.out[k * 4 + 3] = 1;
     fe.cpuFields().climate!.T.fill(305);
   }
-  const basis = makeBasis({ lon: fe.fly.lon, lat: fe.fly.lat, head: fe.fly.head, altKm: fe.fly.alt, groundKm: 0.2 });
+  const basis = makeBasis({
+    lon: fe.fly.lon,
+    lat: fe.fly.lat,
+    head: fe.fly.head,
+    altKm: fe.fly.alt,
+    groundKm: 0.2,
+  });
   const overlay: OverlayEngine = {
     fly: fe.fly,
     flyCameraBasis: () => basis,
@@ -71,11 +83,22 @@ describe('weather: the ambience loop publishes, the overlay draws (PR #125 revie
       return rafId;
     });
     vi.stubGlobal('cancelAnimationFrame', (id: number) => rafQ.delete(id));
-    vi.stubGlobal('matchMedia', (q: string) => ({ matches: false, media: q, addEventListener() {}, removeEventListener() {} }));
+    vi.stubGlobal('matchMedia', (q: string) => ({
+      matches: false,
+      media: q,
+      addEventListener() {},
+      removeEventListener() {},
+    }));
     rec = recordingCtx();
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => rec.ctx as never);
-    Object.defineProperty(HTMLCanvasElement.prototype, 'clientWidth', { configurable: true, get: () => W });
-    Object.defineProperty(HTMLCanvasElement.prototype, 'clientHeight', { configurable: true, get: () => H });
+    Object.defineProperty(HTMLCanvasElement.prototype, 'clientWidth', {
+      configurable: true,
+      get: () => W,
+    });
+    Object.defineProperty(HTMLCanvasElement.prototype, 'clientHeight', {
+      configurable: true,
+      get: () => H,
+    });
     container = document.createElement('div');
     document.body.appendChild(container);
     root = createRoot(container);
@@ -102,7 +125,10 @@ describe('weather: the ambience loop publishes, the overlay draws (PR #125 revie
         strike: publishStrike,
         onUi: () => {},
         clockS: () => performance.now() / 1000,
-        timers: { set: (fn, ms) => setTimeout(fn, ms), clear: (h) => clearTimeout(h as ReturnType<typeof setTimeout>) },
+        timers: {
+          set: (fn, ms) => setTimeout(fn, ms),
+          clear: (h) => clearTimeout(h as ReturnType<typeof setTimeout>),
+        },
       },
       { entered: true, artistic: true },
     );
@@ -182,6 +208,8 @@ describe('weather caption placement (PR #125 review B2)', () => {
     expect(cap.bottom).toBeDefined();
     expect(cap.top).toBeUndefined();
     expect(cap['pointer-events']).toBe('none');
-    expect(Number.parseInt(cap['z-index']!, 10)).toBeGreaterThanOrEqual(Number.parseInt(chip['z-index']!, 10));
+    expect(Number.parseInt(cap['z-index']!, 10)).toBeGreaterThanOrEqual(
+      Number.parseInt(chip['z-index']!, 10),
+    );
   });
 });

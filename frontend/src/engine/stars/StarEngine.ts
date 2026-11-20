@@ -209,7 +209,13 @@ interface Inside {
   setFlareZoom(z: number): void;
   setAuto(on: boolean): void;
   setForce(i: number): void;
-  cuInfo(): { active: boolean; near: number; nearAt: [number, number] | null; auto: boolean; flaring: boolean };
+  cuInfo(): {
+    active: boolean;
+    near: number;
+    nearAt: [number, number] | null;
+    auto: boolean;
+    flaring: boolean;
+  };
   at(): [number, number];
   lines(): boolean;
 }
@@ -440,11 +446,35 @@ export class StarEngine {
     // to the prototype) and are scoped per instance here; turning them into a module closure (as
     // engine/worlds/core.js's createCore does) would need a generated wrapper file and is left for later.
     const make = new Function(
-      '$', 'rng', 'lerp', 'smooth', 'clamp', 'reduced', 'console', 'document',
-      'requestAnimationFrame', 'addEventListener', 'MODE', 'LINES_BTN', 'HALF', 'FLARE_FILTER',
+      '$',
+      'rng',
+      'lerp',
+      'smooth',
+      'clamp',
+      'reduced',
+      'console',
+      'document',
+      'requestAnimationFrame',
+      'addEventListener',
+      'MODE',
+      'LINES_BTN',
+      'HALF',
+      'FLARE_FILTER',
       SRC + SUFFIX,
     ) as (...a: unknown[]) => Inside;
-    this.inside = make($, rng, lerp, smooth, clamp, reduced, quiet, doc, () => 0, () => {}, opts.mode, this.lines,
+    this.inside = make(
+      $,
+      rng,
+      lerp,
+      smooth,
+      clamp,
+      reduced,
+      quiet,
+      doc,
+      () => 0,
+      () => {},
+      opts.mode,
+      this.lines,
       (h: number) => this.effHalf(h),
       (f: number) => (this.mode === 'closeup' ? this.lightNow() : f),
     );
@@ -466,7 +496,8 @@ export class StarEngine {
     const view = (this.inside as Inside | undefined)?.ST.view;
     if (view === 'close') return h / this.zoomK;
     const c = this.canvases[0];
-    const W = c?.clientWidth ?? 0, H = c?.clientHeight ?? 0;
+    const W = c?.clientWidth ?? 0,
+      H = c?.clientHeight ?? 0;
     if (!W || !H) return h;
     return Math.max(h, H / (2 * (view === 'big' ? FRAME_BIG : FRAME_TRUE) * Math.min(W, H)));
   }

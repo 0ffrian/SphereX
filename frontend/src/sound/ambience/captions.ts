@@ -37,7 +37,8 @@ export const REFUSAL_TEXT = {
   /** New (R12): transient while the climate and rivers form; re-evaluated each tick. */
   waiting: 'Waiting for the world to form…',
   /** New: mirrors the engine's runaway readout. */
-  boiledAway: 'The ocean has boiled away (runaway greenhouse), so there are no waves, rain or rivers.',
+  boiledAway:
+    'The ocean has boiled away (runaway greenhouse), so there are no waves, rain or rivers.',
   /** New. */
   noRivers: 'No rivers flow here.',
 } as const;
@@ -70,7 +71,9 @@ export function sig2(x: number): string {
  */
 export function ceilingCaption(air: AirModel): string {
   const n = ceilingKm(air);
-  return n > 0 && Number.isFinite(n) ? `${CEILING_TEXT} Fly below about ${sig2(n)} km to hear it.` : CEILING_TEXT;
+  return n > 0 && Number.isFinite(n)
+    ? `${CEILING_TEXT} Fly below about ${sig2(n)} km to hear it.`
+    : CEILING_TEXT;
 }
 
 /** A plain name per source for refusal text (m5: never a raw id such as "S6" in front of the user). New. */
@@ -104,7 +107,16 @@ export const LAVA_GAP_TEXT = "The lava's roar does not carry through this thin a
 
 // ---------- shared helpers (here so no module needs to import levels or sources for text) ----------
 
-const COMPASS = ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west'] as const;
+const COMPASS = [
+  'north',
+  'north-east',
+  'east',
+  'south-east',
+  'south',
+  'south-west',
+  'west',
+  'north-west',
+] as const;
 /** 8-point compass name for a bearing in degrees. */
 export function compass8(deg: number): (typeof COMPASS)[number] {
   const i = Math.round((((deg % 360) + 360) % 360) / 45) % 8;
@@ -159,9 +171,17 @@ function windPhrase(place: Place): string {
     const seaBreeze = land.length > 0 && sea.length > 0 && mean(land) > mean(sea);
     const from = centroidBearing(seaBreeze ? sea : land);
     const kind = seaBreeze ? 'sea breeze' : 'land breeze';
-    return from === null ? `${strength} ${kind}${terrain}` : `${strength} ${kind} from the ${compass8(from)}${terrain}`;
+    return from === null
+      ? `${strength} ${kind}${terrain}`
+      : `${strength} ${kind} from the ${compass8(from)}${terrain}`;
   }
-  const kind = { trade: 'trade wind', westerly: 'westerly', polar: 'polar wind', terminator: 'terminator gale', jet: 'jet-stream wind' }[top];
+  const kind = {
+    trade: 'trade wind',
+    westerly: 'westerly',
+    polar: 'polar wind',
+    terminator: 'terminator gale',
+    jet: 'jet-stream wind',
+  }[top];
   return `${strength} ${kind} from the ${compass8(w.dirDeg)}${terrain}`;
 }
 
@@ -186,7 +206,8 @@ export function bedDirection(id: SourceId, place: Place): string {
   let sy = 0;
   let tot = 0;
   for (const s of place.samples) {
-    const w = (bedMembership(id, s, place.features.rainRate) * s.area_m2) / Math.max(s.d_m * s.d_m, 1);
+    const w =
+      (bedMembership(id, s, place.features.rainRate) * s.area_m2) / Math.max(s.d_m * s.d_m, 1);
     sx += w * Math.sin(s.bearing);
     sy += w * Math.cos(s.bearing);
     tot += w;
@@ -220,7 +241,9 @@ function bedPhrase(id: SourceId, place: Place): string {
     case 'S10':
       return 'blowing sand';
     case 'S12':
-      return f.stormNear > 0.3 ? 'the roar of the jet stream and its storms' : 'the roar of the jet stream';
+      return f.stormNear > 0.3
+        ? 'the roar of the jet stream and its storms'
+        : 'the roar of the jet stream';
     case 'thunder':
       return 'thunder';
   }
@@ -241,8 +264,14 @@ export function levelNote(quieterDb: number): { note: string | null; short: stri
   if (!(Math.abs(quieterDb) >= LEVEL_NOTE_MIN_DB)) return { note: null, short: null };
   const n = Math.max(5, Math.round(Math.abs(quieterDb) / 5) * 5);
   return quieterDb > 0
-    ? { note: `Real level: about ${n} dB quieter than on Earth (raised so you can hear it)`, short: `real level about ${n} dB quieter than Earth` }
-    : { note: `Real level: about ${n} dB louder than on Earth (lowered)`, short: `real level about ${n} dB louder than Earth` };
+    ? {
+        note: `Real level: about ${n} dB quieter than on Earth (raised so you can hear it)`,
+        short: `real level about ${n} dB quieter than Earth`,
+      }
+    : {
+        note: `Real level: about ${n} dB louder than on Earth (lowered)`,
+        short: `real level about ${n} dB louder than Earth`,
+      };
 }
 
 function capitalise(s: string): string {
@@ -258,30 +287,46 @@ export function caption(air: AirModel, place: Place, frame: MixFrame): CaptionMo
   const silentReason = all ? all.reason : frame.silent ? ceilingCaption(air) : null;
   if (silentReason) return { line: silentReason, heard: [], levelNote: null, silentReason };
 
-  const live = frame.beds.filter((b) => b.gainDb > SILENT_DB + 1).sort((a, b) => b.trueDb - a.trueDb);
+  const live = frame.beds
+    .filter((b) => b.gainDb > SILENT_DB + 1)
+    .sort((a, b) => b.trueDb - a.trueDb);
   const topBed = live[0];
-  const { note, short } = topBed ? levelNote(-bedWorldDb(air, place.features.z_km, topBed.id)) : { note: null, short: null };
+  const { note, short } = topBed
+    ? levelNote(-bedWorldDb(air, place.features.z_km, topBed.id))
+    : { note: null, short: null };
   const top = topBed?.trueDb ?? 0;
   const seen = new Set<string>();
   const heard: CaptionModel['heard'] = [];
   const hurricaneHeard = live.some((b) => b.id === 'S9');
   for (const b of live) {
     // Red L5: one wind, one phrase: when the hurricane bed plays, the rumble's own hurricane phrase is dropped.
-    if (hurricaneHeard && (b.id === 'S1_land' || b.id === 'S1_sea') && place.features.wind.parts[0]?.kind === 'hurricane') continue;
+    if (
+      hurricaneHeard &&
+      (b.id === 'S1_land' || b.id === 'S1_sea') &&
+      place.features.wind.parts[0]?.kind === 'hurricane'
+    )
+      continue;
     const phrase = bedPhrase(b.id, place);
     if (seen.has(phrase)) continue;
     seen.add(phrase);
     heard.push({ id: b.id, phrase, relDb: b.trueDb - top });
   }
   if (place.features.cyclone?.inEye && air.Vmax !== null) {
-    return { line: [EYE_TEXT, short].filter(Boolean).join(' · '), heard, levelNote: note, silentReason: null };
+    return {
+      line: [EYE_TEXT, short].filter(Boolean).join(' · '),
+      heard,
+      levelNote: note,
+      silentReason: null,
+    };
   }
   const lavaHere = air.lavaWorld && place.samples.some((s) => s.cls === 'lava');
   const lavaGap =
     lavaHere && frame.beds.some((b) => b.id === 'S8') && !heard.some((h) => h.id === 'S8')
       ? LAVA_GAP_TEXT.charAt(0).toLowerCase() + LAVA_GAP_TEXT.slice(1, -1)
       : null;
-  const parts = [heard[0]?.phrase, heard[1]?.phrase, weatherPhrase(place), lavaGap, short].filter((p): p is string => !!p);
+  const parts = [heard[0]?.phrase, heard[1]?.phrase, weatherPhrase(place), lavaGap, short].filter(
+    (p): p is string => !!p,
+  );
   return { line: capitalise(parts.join(' · ')), heard, levelNote: note, silentReason: null };
 }
 
@@ -293,12 +338,18 @@ export function airFacts(air: AirModel): { label: string; text: string }[] {
   const facts = [
     { label: 'Speed of sound', text: `${Math.round(air.c0)} m/s` },
     { label: 'Air density', text: `${air.rho0.toPrecision(3)} kg/m³` },
-    { label: 'True level against Earth', text: `${dB >= 0 ? '+' : ''}${dB.toFixed(0)} dB for the same ground sound` },
+    {
+      label: 'True level against Earth',
+      text: `${dB >= 0 ? '+' : ''}${dB.toFixed(0)} dB for the same ground sound`,
+    },
   ];
   const fr = Math.round((CO2_ABS.fr * air.P0) / CO2_ABS.pRef);
   // Red L8: the measured two-speed fact holds only at the thin (Mars) end of the CO2 model and inside the audible band.
   if (air.cls === 'CO2' && air.P0 <= CO2_ABS.pRef && fr >= 20 && fr <= 20000) {
-    facts.push({ label: 'Two speeds of sound', text: `Sound below about ${fr} Hz travels about 10 m/s slower than higher sounds` });
+    facts.push({
+      label: 'Two speeds of sound',
+      text: `Sound below about ${fr} Hz travels about 10 m/s slower than higher sounds`,
+    });
   }
   return facts;
 }

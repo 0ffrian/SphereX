@@ -1,11 +1,21 @@
 // The spectrum check in words and in chart geometry (A18.7, A17.13, Q-474; issue #162). Pure: the
 // numbers are the stored reply's (spectraApi.ts), only rounded and placed here, never computed anew.
-import type { AreaSpectra, SpectrumPair, SpectrumPoint, SpectrumStep, SpectrumVerdict, TrackSpectrum } from './spectraApi';
+import type {
+  AreaSpectra,
+  SpectrumPair,
+  SpectrumPoint,
+  SpectrumStep,
+  SpectrumVerdict,
+  TrackSpectrum,
+} from './spectraApi';
 
 export type VerdictTone = 'ok' | 'warn' | 'fail' | 'muted';
 
 /** A18.7's table: the row word, its dot, and the card title. */
-export const VERDICT_WORDS: Record<SpectrumVerdict, { word: string; tone: VerdictTone; title: string }> = {
+export const VERDICT_WORDS: Record<
+  SpectrumVerdict,
+  { word: string; tone: VerdictTone; title: string }
+> = {
   rock: { word: 'Rock-like', tone: 'ok', title: 'Looks like sunlight off a rock' },
   very_red: { word: 'Very red', tone: 'warn', title: 'Redder than sunlight off any rock' },
   too_red: { word: 'Too red', tone: 'warn', title: 'Too red for sunlight off a rock' },
@@ -34,7 +44,8 @@ const r2 = (x: number) => x.toFixed(2);
 export const pct = (x: number) => `${Math.round(Math.abs(x) * 100)}%`;
 
 /** The pairs that measure a colour (not a limit). */
-export const measuredPairs = (t: TrackSpectrum): SpectrumPair[] => t.pairs.filter((p) => p.limit === null);
+export const measuredPairs = (t: TrackSpectrum): SpectrumPair[] =>
+  t.pairs.filter((p) => p.limit === null);
 
 /** "1.5 to 3.3 times redder than the Sun." from the pairs' rho min and max (1 decimal), or null. */
 export function rangeLine(t: TrackSpectrum): string | null {
@@ -44,20 +55,26 @@ export function rangeLine(t: TrackSpectrum): string | null {
   const hi = one(Math.max(...rho));
   const span = lo === hi ? lo : `${lo} to ${hi}`;
   // A colour below the Sun's is not "redder": the range is then given as times the Sun's colour.
-  return Math.min(...rho) >= 1 ? `${span} times redder than the Sun.` : `${span} times the Sun's colour.`;
+  return Math.min(...rho) >= 1
+    ? `${span} times redder than the Sun.`
+    : `${span} times the Sun's colour.`;
 }
 
 /** "Includes heat glow, as expected 1.16 AU from the Sun." when the reply says the colour needs it. */
 export function heatGlowLine(t: TrackSpectrum): string | null {
-  return t.heat_glow === true && t.r_au !== null ? `Includes heat glow, as expected ${r2(t.r_au)} AU from the Sun.` : null;
+  return t.heat_glow === true && t.r_au !== null
+    ? `Includes heat glow, as expected ${r2(t.r_au)} AU from the Sun.`
+    : null;
 }
 
-const minutes = (a: string, b: string) => Math.max(1, Math.round((Date.parse(b) - Date.parse(a)) / 60_000));
+const minutes = (a: string, b: string) =>
+  Math.max(1, Math.round((Date.parse(b) - Date.parse(a)) / 60_000));
 
 /** The failed step with the largest change (the one the flicker line names), or null. */
 export function worstFailedStep(t: TrackSpectrum): SpectrumStep | null {
   let out: SpectrumStep | null = null;
-  for (const s of t.steps) if (!s.ok && (!out || Math.abs(s.change) > Math.abs(out.change))) out = s;
+  for (const s of t.steps)
+    if (!s.ok && (!out || Math.abs(s.change) > Math.abs(out.change))) out = s;
   return out;
 }
 
@@ -68,13 +85,17 @@ export function worstFailedStep(t: TrackSpectrum): SpectrumStep | null {
 export function verdictLine(t: TrackSpectrum, matched: boolean): string {
   switch (t.verdict) {
     case 'rock':
-      return [rangeLine(t), heatGlowLine(t), matched ? null : 'A lead worth following.'].filter(Boolean).join(' ');
+      return [rangeLine(t), heatGlowLine(t), matched ? null : 'A lead worth following.']
+        .filter(Boolean)
+        .join(' ');
     // These lines say what the light fits, never what the body is: a track that matched no known
     // object is never called an asteroid (A16.5, A17.13).
     case 'very_red':
       return 'Only a warm, dark rock close to the Sun would fit. Its distance is not known.';
     case 'too_red':
-      return t.r_au !== null ? `Even with heat glow at ${r2(t.r_au)} AU from the Sun.` : 'Even with heat glow.';
+      return t.r_au !== null
+        ? `Even with heat glow at ${r2(t.r_au)} AU from the Sun.`
+        : 'Even with heat glow.';
     case 'too_blue':
       return 'Probably a star, a blend or an artefact.';
     case 'flickers': {
@@ -95,7 +116,11 @@ export const shortDetector = (d: number) => d <= 3;
 
 /** The Steady row's step: the largest |change| on the short arm, else on the long arm; null if none. */
 export function largestStep(t: TrackSpectrum): SpectrumStep | null {
-  const pick = (xs: SpectrumStep[]) => xs.reduce<SpectrumStep | null>((m, s) => (!m || Math.abs(s.change) > Math.abs(m.change) ? s : m), null);
+  const pick = (xs: SpectrumStep[]) =>
+    xs.reduce<SpectrumStep | null>(
+      (m, s) => (!m || Math.abs(s.change) > Math.abs(m.change) ? s : m),
+      null,
+    );
   return pick(t.steps.filter((s) => shortDetector(s.detector))) ?? pick(t.steps);
 }
 
@@ -115,25 +140,33 @@ export function colourText(t: TrackSpectrum): string | null {
     const lim = low.length + up.length;
     return `${ex(n)}, both detectors at once` + (lim > 0 ? `; ${lim} more as limits` : '');
   }
-  if (low.length > 0) return `${ex(low.length)}; not seen below ${Math.ceil(Math.max(...low.map((p) => p.lambda_short_um)))} µm`;
+  if (low.length > 0)
+    return `${ex(low.length)}; not seen below ${Math.ceil(Math.max(...low.map((p) => p.lambda_short_um)))} µm`;
   if (up.length > 0) return `${ex(up.length)}; not seen above ${SPLIT_UM} µm`;
   return null;
 }
 
 /** "1.16 AU from the Sun, from its parallax", only for a distance from the track's parallax. */
 export function distanceText(t: TrackSpectrum): string | null {
-  return t.r_source === 'parallax' && t.r_au !== null ? `${r2(t.r_au)} AU from the Sun, from its parallax` : null;
+  return t.r_source === 'parallax' && t.r_au !== null
+    ? `${r2(t.r_au)} AU from the Sun, from its parallax`
+    : null;
 }
 
 /** "the Sun, and stars in the same frames"; "the Sun" alone when every calibration used the default. */
 export function comparedText(calibration: AreaSpectra['calibration']): string {
-  return calibration.some((c) => c.source === 'stars') ? 'the Sun, and stars in the same frames' : 'the Sun';
+  return calibration.some((c) => c.source === 'stars')
+    ? 'the Sun, and stars in the same frames'
+    : 'the Sun';
 }
 
 /** The star scatter for the accordion: the median measured floor, or null when none was measured. */
 export function starScatter(calibration: AreaSpectra['calibration']): number | null {
   // A zero floor is not a measurement (a synthetic fixture): treated as not measured.
-  const v = calibration.filter((c) => c.source === 'stars' && c.sigma_sys > 0).map((c) => c.sigma_sys).sort((a, b) => a - b);
+  const v = calibration
+    .filter((c) => c.source === 'stars' && c.sigma_sys > 0)
+    .map((c) => c.sigma_sys)
+    .sort((a, b) => a - b);
   if (v.length === 0) return null;
   const m = v.length >> 1;
   return v.length % 2 ? v[m]! : (v[m - 1]! + v[m]!) / 2;
@@ -196,7 +229,11 @@ const niceMax = (v: number) => {
  * from the short arm, the heat-glow allowance above R_max, lower limits. Under Measured only: the
  * raw `flux_uJy` of the points alone. Points with `used: false` (and dots below snr_min) are left out.
  */
-export function chartModel(t: TrackSpectrum, range: [number, number], measuredOnly: boolean): ChartModel {
+export function chartModel(
+  t: TrackSpectrum,
+  range: [number, number],
+  measuredOnly: boolean,
+): ChartModel {
   // A dot below snr_min (`point: false`) enters only as a limit (an arrow), never as a point.
   const used = t.points.filter((p) => p.used && p.point && (measuredOnly || p.rel !== null));
   const visitOrder: number[] = [];
@@ -209,11 +246,23 @@ export function chartModel(t: TrackSpectrum, range: [number, number], measuredOn
   visitOrder.sort((a, b) => a - b);
   const pt = (p: SpectrumPoint): ChartPoint => {
     const y = measuredOnly ? p.flux_uJy : (p.rel as number);
-    const err = measuredOnly ? p.flux_err : p.flux_uJy !== 0 ? Math.abs((p.rel as number) * (p.flux_err / p.flux_uJy)) : 0;
-    return { dotId: p.dot_id, x: p.lambda_um, y, err, visitIdx: Math.min(1, visitOrder.indexOf(p.visit)) };
+    const err = measuredOnly
+      ? p.flux_err
+      : p.flux_uJy !== 0
+        ? Math.abs((p.rel as number) * (p.flux_err / p.flux_uJy))
+        : 0;
+    return {
+      dotId: p.dot_id,
+      x: p.lambda_um,
+      y,
+      err,
+      visitIdx: Math.min(1, visitOrder.indexOf(p.visit)),
+    };
   };
   const points = used.map(pt);
-  const limits = measuredOnly ? [] : t.pairs.filter((p) => p.limit === 'lower').map((p) => ({ x: p.lambda_long_um, y: p.rho }));
+  const limits = measuredOnly
+    ? []
+    : t.pairs.filter((p) => p.limit === 'lower').map((p) => ({ x: p.lambda_long_um, y: p.rho }));
   const xs = [...points.map((p) => p.x), ...limits.map((l) => l.x)];
   const x0 = 0.7;
   const x1 = xs.some((x) => x > 3.8) ? 5.1 : 3.8;
@@ -224,7 +273,11 @@ export function chartModel(t: TrackSpectrum, range: [number, number], measuredOn
     yTicks = [0.25, 0.5, 0.75, 1].map((f) => f * y1);
   } else {
     // Room above the highest point or limit (the arrow is drawn above its value).
-    const top = Math.max(range[1], ...points.map((p) => p.y + p.err), ...limits.map((l) => l.y + 0.5));
+    const top = Math.max(
+      range[1],
+      ...points.map((p) => p.y + p.err),
+      ...limits.map((l) => l.y + 0.5),
+    );
     const n = Math.max(4, Math.ceil(top));
     y1 = n + 0.6;
     // 1× to 4×, more when needed; past 8 the ticks step so their labels never crowd.
@@ -293,7 +346,10 @@ export function chartLabel(trackId: string, m: ChartModel, verdict: SpectrumVerd
         (m.measuredOnly
           ? `${fmt(Math.min(...ys))} to ${fmt(Math.max(...ys))} microjanskys.`
           : `${fmt(Math.min(...ys))} to ${fmt(Math.max(...ys))} times the Sun's colour.`);
-  const lim = m.limits.length > 0 ? ` ${m.limits.length} lower limit${m.limits.length === 1 ? '' : 's'}.` : '';
+  const lim =
+    m.limits.length > 0
+      ? ` ${m.limits.length} lower limit${m.limits.length === 1 ? '' : 's'}.`
+      : '';
   const list = ' Every point is listed under Points used.';
   if (m.measuredOnly) return `${what} ${pts}${list}`;
   const hi = m.rangeHi;
@@ -308,6 +364,8 @@ export function chartLabel(trackId: string, m: ChartModel, verdict: SpectrumVerd
 }
 
 /** A dot's flags from the area's `/dots` (Points used); none when the dots did not load. */
-export function flagsFrom(dots: ReadonlyMap<string, readonly string[]>): (dotId: string) => readonly string[] {
+export function flagsFrom(
+  dots: ReadonlyMap<string, readonly string[]>,
+): (dotId: string) => readonly string[] {
   return (dotId) => dots.get(dotId) ?? [];
 }

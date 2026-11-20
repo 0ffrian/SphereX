@@ -34,11 +34,18 @@ export const SPEC_POINTS = 260;
 export const SPEC_SECONDS = 9;
 
 export const NO_STAR_LINE = 'A star has no surface to stand on, so there is no atmosphere sound.';
-export const NO_GIANT_LINE = 'A gas giant has no surface to stand on, so there is no atmosphere sound.';
+export const NO_GIANT_LINE =
+  'A gas giant has no surface to stand on, so there is no atmosphere sound.';
 export const NO_ATMO_LINE = 'No atmosphere data for this object, so there is no wind to hear.';
 export const NO_SPECTRUM_LINE = 'No spectrum for this object yet.';
 
-const STAR_TYPES = new Set<ObjectCard['type']>(['star', 'star_mira', 'star_ttauri', 'brown_dwarf', 'brown_dwarf_binary']);
+const STAR_TYPES = new Set<ObjectCard['type']>([
+  'star',
+  'star_mira',
+  'star_ttauri',
+  'brown_dwarf',
+  'brown_dwarf_binary',
+]);
 
 export interface AtmosphereModel {
   P: number; // surface pressure, bar
@@ -102,8 +109,10 @@ export function formatPressure(P: number): string {
  */
 export function atmosphereOf(card: ObjectCard | null): AtmosphereResult {
   if (!card) return { ok: false, reason: 'none', line: NO_ATMO_LINE, missing: ['card'] };
-  if (STAR_TYPES.has(card.type)) return { ok: false, reason: 'star', line: NO_STAR_LINE, missing: [] };
-  if (card.type === 'gas_giant') return { ok: false, reason: 'giant', line: NO_GIANT_LINE, missing: [] };
+  if (STAR_TYPES.has(card.type))
+    return { ok: false, reason: 'star', line: NO_STAR_LINE, missing: [] };
+  if (card.type === 'gas_giant')
+    return { ok: false, reason: 'giant', line: NO_GIANT_LINE, missing: [] };
   const P = card.surface_pressure_bar?.value ?? null;
   const T = card.surface_temperature_K?.value ?? null;
   const missing: string[] = [];
@@ -141,7 +150,9 @@ export interface SpectrumCurve {
 }
 
 /** Normalise the object's SPHEREx spectrum onto the panel's axis; null when nothing usable. */
-export function spectrumCurve(points: readonly SpectrumMappingPoint[] | null): SpectrumCurve | null {
+export function spectrumCurve(
+  points: readonly SpectrumMappingPoint[] | null,
+): SpectrumCurve | null {
   if (!points || points.length === 0) return null;
   const m = buildSpectrumMapping(points);
   if (m.empty) return null;

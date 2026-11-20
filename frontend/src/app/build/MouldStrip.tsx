@@ -45,7 +45,11 @@ export function MouldStrip({
     if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
     const a = animate(
       items,
-      { opacity: [1, 0], transform: ['translateY(0px) scale(1)', 'translateY(14px) scale(0.96)'], filter: ['blur(0px)', 'blur(6px)'] },
+      {
+        opacity: [1, 0],
+        transform: ['translateY(0px) scale(1)', 'translateY(14px) scale(0.96)'],
+        filter: ['blur(0px)', 'blur(6px)'],
+      },
       { ...EXPLORE_SPRING, delay: stagger(0.06, { startDelay: 0.25 }) },
     );
     return () => a.stop();

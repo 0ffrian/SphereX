@@ -38,11 +38,21 @@ beforeEach(() => {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   vi.useFakeTimers();
   const stub = stubGL();
-  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => stub.gl as unknown as RenderingContext);
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(
+    () => stub.gl as unknown as RenderingContext,
+  );
   vi.spyOn(console, 'warn').mockImplementation(() => {});
   vi.spyOn(WorldEngine.prototype, 'tick').mockImplementation(() => {});
   vi.spyOn(WorldEngine.prototype, 'spinup', 'get').mockReturnValue(0);
-  vi.spyOn(WorldEngine.prototype, 'view').mockReturnValue({ gx: 0, gw: 100, w: 100, h: 100, tilt: 0, spin: 0, frame: 1 });
+  vi.spyOn(WorldEngine.prototype, 'view').mockReturnValue({
+    gx: 0,
+    gw: 100,
+    w: 100,
+    h: 100,
+    tilt: 0,
+    spin: 0,
+    frame: 1,
+  });
   const w = cardToWorld(CARD);
   if (!w.ok) throw new Error('the test card must give a world');
   world = w;

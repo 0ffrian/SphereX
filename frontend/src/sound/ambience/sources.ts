@@ -7,24 +7,81 @@ import { hash32 } from './hash';
 import { bubbleFactor, dropPhysics } from './liquids';
 import type { AirModel, BedSpec, Place, Refusal, SourceId } from './types';
 import {
-  A_L, A_P, A_T, A_W, BED_N, BED_RATE, HISS_D_M, IU_LAND, IU_SEA, L_REF, PM_H, PM_T, RE_MIN,
-  ROSHKO_A, ROSHKO_B, ROSHKO_RE_MAX, SAND_A, SAND_CO2_COHESION, SAND_DP, SAND_RHO_ORGANIC, SAND_RHO_SILICATE,
-  SAND_U10_PER_USTAR, SPEEDUP, GAS_IU, ST_HIGH, SURF_DB_H04, SURF_DB_H2, THUNDER_VARIANT_D_M, U_E_REF, U_REF_MIN,
-  U_WAVE_METHANE, U_WAVE_WATER, WHISTLE_D_M, WHITECAP_A, WHITECAP_B, WHITECAP_MIN_U, WHITECAP_RATE0, WHITECAP_RATE_U,
+  A_L,
+  A_P,
+  A_T,
+  A_W,
+  BED_N,
+  BED_RATE,
+  HISS_D_M,
+  IU_LAND,
+  IU_SEA,
+  L_REF,
+  PM_H,
+  PM_T,
+  RE_MIN,
+  ROSHKO_A,
+  ROSHKO_B,
+  ROSHKO_RE_MAX,
+  SAND_A,
+  SAND_CO2_COHESION,
+  SAND_DP,
+  SAND_RHO_ORGANIC,
+  SAND_RHO_SILICATE,
+  SAND_U10_PER_USTAR,
+  SPEEDUP,
+  GAS_IU,
+  ST_HIGH,
+  SURF_DB_H04,
+  SURF_DB_H2,
+  THUNDER_VARIANT_D_M,
+  U_E_REF,
+  U_REF_MIN,
+  U_WAVE_METHANE,
+  U_WAVE_WATER,
+  WHISTLE_D_M,
+  WHITECAP_A,
+  WHITECAP_B,
+  WHITECAP_MIN_U,
+  WHITECAP_RATE0,
+  WHITECAP_RATE_U,
 } from './tuning';
 import { lightningRule, thunderParams } from './weather';
 
 export { bedMembership, SOURCE_TEXT };
 
 /** §9.4 bake priority. */
-export const PRIORITY: readonly SourceId[] = ['S1_land', 'S1_sea', 'S4', 'S5', 'S6', 'S12', 'S2', 'S3', 'S7', 'S8', 'S10', 'S9', 'thunder'];
+export const PRIORITY: readonly SourceId[] = [
+  'S1_land',
+  'S1_sea',
+  'S4',
+  'S5',
+  'S6',
+  'S12',
+  'S2',
+  'S3',
+  'S7',
+  'S8',
+  'S10',
+  'S9',
+  'thunder',
+];
 
 /** §9.2 sample-rate groups. Thunder is in the 29 kHz group so 2^20 samples (36.2 s) hold a 35 s roll. */
 export const BED_RATE_OF: Record<SourceId, number> = {
-  S1_land: BED_RATE.wind, S1_sea: BED_RATE.wind, S2: BED_RATE.wind, S3: BED_RATE.wind, S9: BED_RATE.wind,
-  S4: BED_RATE.sea, S5: BED_RATE.sea,
-  S6: BED_RATE.rain, S7: BED_RATE.rain,
-  S8: BED_RATE.low, S10: BED_RATE.low, S12: BED_RATE.low, thunder: BED_RATE.low,
+  S1_land: BED_RATE.wind,
+  S1_sea: BED_RATE.wind,
+  S2: BED_RATE.wind,
+  S3: BED_RATE.wind,
+  S9: BED_RATE.wind,
+  S4: BED_RATE.sea,
+  S5: BED_RATE.sea,
+  S6: BED_RATE.rain,
+  S7: BED_RATE.rain,
+  S8: BED_RATE.low,
+  S10: BED_RATE.low,
+  S12: BED_RATE.low,
+  thunder: BED_RATE.low,
 };
 
 /** BedSpec.params keys per source: the #113 plan §4 table (frozen, amendment 2). S3 needs at least one optional key. */
@@ -104,14 +161,22 @@ function refusedBy(air: AirModel, id: SourceId): boolean {
 }
 
 function seaOK(air: AirModel): boolean {
-  return air.airOK && !air.gas && !air.lavaWorld && !!air.liquid && !air.liquid.viscous && air.oceanF > 0;
+  return (
+    air.airOK && !air.gas && !air.lavaWorld && !!air.liquid && !air.liquid.viscous && air.oceanF > 0
+  );
 }
 
-export interface Gate { pass: boolean; reason: string | null }
+export interface Gate {
+  pass: boolean;
+  reason: string | null;
+}
 
 /** §7 gates at the bake wind Uref (m/s). A failed gate with reason null is simply not applicable (no caption). */
 export function gates(air: AirModel, Uref: number): Record<SourceId, Gate> {
-  const ok = (pass: boolean, reason: string | null = null): Gate => ({ pass, reason: pass ? null : reason });
+  const ok = (pass: boolean, reason: string | null = null): Gate => ({
+    pass,
+    reason: pass ? null : reason,
+  });
   const rocky = air.airOK && !air.gas;
   const hiss = rocky && aeolianHz(air, Uref, HISS_D_M) !== null;
   const whistle = rocky && WHISTLE_D_M.some((d) => aeolianHz(air, Uref, d) !== null);
@@ -127,8 +192,14 @@ export function gates(air: AirModel, Uref: number): Record<SourceId, Gate> {
     S1_sea: ok(seaOK(air) && !refusedBy(air, 'S1_sea')),
     S2: ok(hiss, allThin ? SOURCE_TEXT.whistle : null),
     S3: ok(whistle, allThin ? SOURCE_TEXT.whistle : null),
-    S4: ok(seaOK(air) && !refusedBy(air, 'S4') && Uref >= uWave(air), seaOK(air) ? SOURCE_TEXT.noWaves : null),
-    S5: ok(seaOK(air) && !refusedBy(air, 'S5') && Uref >= uWave(air), seaOK(air) ? SOURCE_TEXT.noWaves : null),
+    S4: ok(
+      seaOK(air) && !refusedBy(air, 'S4') && Uref >= uWave(air),
+      seaOK(air) ? SOURCE_TEXT.noWaves : null,
+    ),
+    S5: ok(
+      seaOK(air) && !refusedBy(air, 'S5') && Uref >= uWave(air),
+      seaOK(air) ? SOURCE_TEXT.noWaves : null,
+    ),
     S6: ok(surface && !refusedBy(air, 'S6')),
     S7: ok(surface && !refusedBy(air, 'S7')),
     S8: ok(air.airOK && air.lavaWorld),
@@ -221,7 +292,13 @@ export function bakeWind(air: AirModel, id: SourceId): number {
   return Math.max(air.Us, U_REF_MIN);
 }
 
-function paramsFor(id: SourceId, variant: number, air: AirModel, place: Place, Uref: number): Record<string, number> | null {
+function paramsFor(
+  id: SourceId,
+  variant: number,
+  air: AirModel,
+  place: Place,
+  Uref: number,
+): Record<string, number> | null {
   const mf = bubbleFactor(air);
   const absK2 = absorption(1000, air.P0, air.T0, air.cls) / 1e6;
   const centreSea = place.samples[0]?.cls === 'sea';
@@ -296,7 +373,8 @@ export function selectBeds(air: AirModel, place: Place): { beds: BedSpec[]; refu
     const Uref = bakeWind(air, id);
     const gate = id === 'S9' ? gates(air, Uref).S9 : g[id];
     if (!gate.pass) {
-      if (gate.reason) addRefusal({ source: id === 'thunder' ? 'lightning' : id, reason: gate.reason });
+      if (gate.reason)
+        addRefusal({ source: id === 'thunder' ? 'lightning' : id, reason: gate.reason });
       continue;
     }
     const variants = id === 'thunder' ? [0, 1, 2, 3] : id === 'S8' ? [0, 1] : [0];
@@ -304,8 +382,15 @@ export function selectBeds(air: AirModel, place: Place): { beds: BedSpec[]; refu
       const params = paramsFor(id, variant, air, place, Uref);
       if (!params) continue;
       beds.push({
-        id, variant, sampleRate: BED_RATE_OF[id], N: BED_N, seed: hash32(air.seed, id, variant),
-        Uref, bandCenterHz: bandCenterHz(id, air, Uref), LrefEarth_dB: lrefEarthDb(id), params,
+        id,
+        variant,
+        sampleRate: BED_RATE_OF[id],
+        N: BED_N,
+        seed: hash32(air.seed, id, variant),
+        Uref,
+        bandCenterHz: bandCenterHz(id, air, Uref),
+        LrefEarth_dB: lrefEarthDb(id),
+        params,
       });
     }
   }

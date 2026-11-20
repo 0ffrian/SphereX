@@ -42,7 +42,15 @@ const EROS: ErosDemo = {
   track: [],
   hops: [hop(1, 'D1'), hop(1, 'D4')],
 };
-const OBJ = { id: '433', name: 'Eros', kind: 'asteroid', frames: 2, visits: 1, objectId: 'sbdb-20000433', trackAvailable: true };
+const OBJ = {
+  id: '433',
+  name: 'Eros',
+  kind: 'asteroid',
+  frames: 2,
+  visits: 1,
+  objectId: 'sbdb-20000433',
+  trackAvailable: true,
+};
 
 let host: HTMLDivElement;
 let root: Root;
@@ -80,7 +88,14 @@ describe('Eros card honesty (D-21)', () => {
     expect(q('eros-path')?.textContent).toContain(MEASURED_ONLY_NOTE);
   });
   it('a real path: the Estimated badge is on the path line, not on the frame count', async () => {
-    useAreaStore.setState({ flow: 'known', screen: 'eros', eros: EROS, focus: OBJ, trackSource: 'real', trackPath: true });
+    useAreaStore.setState({
+      flow: 'known',
+      screen: 'eros',
+      eros: EROS,
+      focus: OBJ,
+      trackSource: 'real',
+      trackPath: true,
+    });
     await act(async () => root.render(<ErosCard />));
     expect(q('eros-real')?.textContent).toBe('2 frames from the backend');
     expect(q('eros-real')?.querySelector('[data-testid="provenance-badge"]')).toBeNull();
@@ -88,7 +103,14 @@ describe('Eros card honesty (D-21)', () => {
     expect(q('eros-path')?.querySelector('[data-testid="provenance-badge"]')).not.toBeNull();
   });
   it('no path: no Estimated badge; a path not ready yet says so', async () => {
-    useAreaStore.setState({ flow: 'known', screen: 'eros', eros: EROS, focus: OBJ, trackSource: 'real', trackPath: false });
+    useAreaStore.setState({
+      flow: 'known',
+      screen: 'eros',
+      eros: EROS,
+      focus: OBJ,
+      trackSource: 'real',
+      trackPath: false,
+    });
     await act(async () => root.render(<ErosCard />));
     expect(q('eros-path')?.textContent).toBe('No path for this object');
     expect(host.querySelector('.sx-kn-real [data-testid="provenance-badge"]')).toBeNull();
@@ -98,16 +120,32 @@ describe('Eros card honesty (D-21)', () => {
 });
 
 describe('demo labels follow the cutouts', () => {
-  const brightnessBadge = () => host.querySelector('.sx-kn-spec-t [data-testid="provenance-badge"]');
+  const brightnessBadge = () =>
+    host.querySelector('.sx-kn-spec-t [data-testid="provenance-badge"]');
   it('real frames with demo cutouts: the "Demo cutouts" tag and the demo-photometry badge show', async () => {
-    useAreaStore.setState({ flow: 'known', screen: 'eros', eros: EROS, focus: OBJ, trackSource: 'real' });
+    useAreaStore.setState({
+      flow: 'known',
+      screen: 'eros',
+      eros: EROS,
+      focus: OBJ,
+      trackSource: 'real',
+    });
     await act(async () => root.render(<ErosCard />));
     expect(q('demo-tag')?.textContent).toContain('Demo cutouts');
     expect(brightnessBadge()).not.toBeNull();
   });
   it('real frames with no cutout at all: neither the tag nor the badge is shown', async () => {
-    const bare: ErosDemo = { ...EROS, hops: EROS.hops.map((h) => ({ ...h, no_cutout: true, flux: Number.NaN })) };
-    useAreaStore.setState({ flow: 'known', screen: 'eros', eros: bare, focus: OBJ, trackSource: 'real' });
+    const bare: ErosDemo = {
+      ...EROS,
+      hops: EROS.hops.map((h) => ({ ...h, no_cutout: true, flux: Number.NaN })),
+    };
+    useAreaStore.setState({
+      flow: 'known',
+      screen: 'eros',
+      eros: bare,
+      focus: OBJ,
+      trackSource: 'real',
+    });
     await act(async () => root.render(<ErosCard />));
     expect(q('demo-tag')).toBeNull();
     expect(host.textContent).not.toContain('Demo cutouts');
@@ -142,7 +180,13 @@ describe('the track window path', () => {
     const eros: ErosDemo = { ...EROS, wide: { png: '', w: 400, h: 400 }, track };
     const { g, labels } = recordingContext();
     const rect = { x0: 0, y0: 0, x1: 400, y1: 400 };
-    drawTrackWindow(g, rect, eros, { mode: 'eros', now: 61119.5, step: 0, sel: -1, disc: null, name: 'Eros' }, () => {});
+    drawTrackWindow(
+      g,
+      rect,
+      eros,
+      { mode: 'eros', now: 61119.5, step: 0, sel: -1, disc: null, name: 'Eros' },
+      () => {},
+    );
     const marks = labels.filter((l) => /\d\dh$/.test(l));
     // 00h, 06h, 12h, 18h on 20 Mar and 00h, 06h, 12h on 21 Mar.
     expect(marks).toHaveLength(7);
@@ -159,7 +203,11 @@ describe('the track window path', () => {
     const st = { mode: 'eros' as const, now: 61119.2, step: 0, sel: -1, disc: null, name: 'Eros' };
     const shown = recordingContext();
     drawTrackWindow(shown.g, rect, trackShown(eros, false), st, () => {});
-    expect(shown.labels.filter((l) => /\d\dh$/.test(l))).toEqual(['20 Mar 00h', '20 Mar 06h', '20 Mar 12h']);
+    expect(shown.labels.filter((l) => /\d\dh$/.test(l))).toEqual([
+      '20 Mar 00h',
+      '20 Mar 06h',
+      '20 Mar 12h',
+    ]);
     expect(shown.labels.some((l) => l.startsWith('Eros ·'))).toBe(true);
     const hidden = recordingContext();
     drawTrackWindow(hidden.g, rect, trackShown(eros, true), st, () => {});

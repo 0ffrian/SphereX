@@ -1,12 +1,27 @@
 // §8.3 / §8.5 flash safety (issue #117): the rate limiter, reduced motion, strokes and late strikes.
 import { describe, expect, it } from 'vitest';
 import {
-  FlashGate, groupDuration, groupGlow, groupGlowMax, safeGlow, strokeCount, strokeEnv, strokeEnvMax, type FlashGroup,
+  FlashGate,
+  groupDuration,
+  groupGlow,
+  groupGlowMax,
+  safeGlow,
+  strokeCount,
+  strokeEnv,
+  strokeEnvMax,
+  type FlashGroup,
 } from './flashGate';
 import { FLASH_MIN_GAP_S, SAFE_GLOW_OPACITY } from './tuning';
 import type { Strike } from './types';
 
-const strike = (t0: number, seed = 7, flash = true): Strike => ({ t0, d_m: 3000, bearing: 0, seed, variant: 2, flash });
+const strike = (t0: number, seed = 7, flash = true): Strike => ({
+  t0,
+  d_m: 3000,
+  bearing: 0,
+  seed,
+  variant: 2,
+  flash,
+});
 
 /** Drive a gate at 30 fps for `dur` s, offering each strike 0.15 s before its t0; returns the large-area light trace. */
 function run(strikes: Strike[], dur: number, safe: boolean, lead = 0.15) {
@@ -23,7 +38,10 @@ function run(strikes: Strike[], dur: number, safe: boolean, lead = 0.15) {
     let light = 0;
     for (const g of gate.active(t)) {
       const tau = t - g.tv;
-      light = Math.max(light, g.safe ? safeGlow(tau) * SAFE_GLOW_OPACITY : groupGlowMax(tau - dt, tau, g.n));
+      light = Math.max(
+        light,
+        g.safe ? safeGlow(tau) * SAFE_GLOW_OPACITY : groupGlowMax(tau - dt, tau, g.n),
+      );
     }
     trace.push(light);
   }
@@ -40,8 +58,10 @@ describe('flash rate limiter (WCAG 2.3.1)', () => {
     }
     // Rises of the large-area light (0 -> above 0.1).
     const rises: number[] = [];
-    for (let i = 1; i < trace.length; i++) if (trace[i - 1]! <= 0.1 && trace[i]! > 0.1) rises.push(i * dt);
-    for (let i = 1; i < rises.length; i++) expect(rises[i]! - rises[i - 1]!).toBeGreaterThan(FLASH_MIN_GAP_S - 2 * dt);
+    for (let i = 1; i < trace.length; i++)
+      if (trace[i - 1]! <= 0.1 && trace[i]! > 0.1) rises.push(i * dt);
+    for (let i = 1; i < rises.length; i++)
+      expect(rises[i]! - rises[i - 1]!).toBeGreaterThan(FLASH_MIN_GAP_S - 2 * dt);
     for (const g of accepted) expect(g.n).toBeLessThanOrEqual(3);
   });
 
@@ -76,8 +96,10 @@ describe('reduced motion and Flashes off', () => {
     }
     expect(Math.max(...trace)).toBeLessThanOrEqual(SAFE_GLOW_OPACITY + 1e-9);
     expect(Math.max(...trace)).toBeGreaterThan(0.14);
-    for (let i = 1; i < trace.length; i++) expect(Math.abs(trace[i]! - trace[i - 1]!)).toBeLessThanOrEqual(0.016);
-    for (let i = 1; i < accepted.length; i++) expect(accepted[i]!.tv - accepted[i - 1]!.tv).toBeGreaterThanOrEqual(2 - 1e-9);
+    for (let i = 1; i < trace.length; i++)
+      expect(Math.abs(trace[i]! - trace[i - 1]!)).toBeLessThanOrEqual(0.016);
+    for (let i = 1; i < accepted.length; i++)
+      expect(accepted[i]!.tv - accepted[i - 1]!.tv).toBeGreaterThanOrEqual(2 - 1e-9);
   });
 
   it('turning safe mid-group switches the group to the glow (never back)', () => {

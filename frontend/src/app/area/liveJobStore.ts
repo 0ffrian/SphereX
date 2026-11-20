@@ -25,7 +25,14 @@ export const MAX_MISSED_POLLS = 30;
 export type LiveView =
   | { kind: 'offer'; box: AreaBox; flow: AreaFlow; plan: LivePlan }
   | { kind: 'job'; box: AreaBox; flow: AreaFlow }
-  | { kind: 'failed'; box: AreaBox; flow: AreaFlow; code: string; detail: string; fromJob?: boolean };
+  | {
+      kind: 'failed';
+      box: AreaBox;
+      flow: AreaFlow;
+      code: string;
+      detail: string;
+      fromJob?: boolean;
+    };
 
 export interface LiveJob {
   areaId: string;
@@ -42,7 +49,11 @@ export interface LiveJobStoreState {
   /** A request of the card is in flight (Compute, Stop, Try again): its buttons wait. */
   busy: boolean;
   /** The coverage check answered: show the offer, a stored area's results, or a failure. */
-  showPlan(box: AreaBox, flow: AreaFlow, answer: Exclude<PlanAnswer, { kind: 'unavailable' }>): void;
+  showPlan(
+    box: AreaBox,
+    flow: AreaFlow,
+    answer: Exclude<PlanAnswer, { kind: 'unavailable' }>,
+  ): void;
   /** Compute this area: start the job and follow it. */
   compute(): Promise<void>;
   /** The visit pair picker (issue #145): the coverage check again with that pair, then its offer. */
@@ -78,7 +89,13 @@ function stopPolling(): void {
 }
 
 export const useLiveJobStore = create<LiveJobStoreState>()((set, get) => {
-  const failView = (box: AreaBox, flow: AreaFlow, code: string, detail: string, fromJob = false): LiveView => ({
+  const failView = (
+    box: AreaBox,
+    flow: AreaFlow,
+    code: string,
+    detail: string,
+    fromJob = false,
+  ): LiveView => ({
     kind: 'failed',
     box,
     flow,
@@ -109,12 +126,23 @@ export const useLiveJobStore = create<LiveJobStoreState>()((set, get) => {
       }
       return;
     }
-    set({ job: null, view: showing ? failView(job.box, job.flow, err.code, err.detail, true) : get().view });
+    set({
+      job: null,
+      view: showing ? failView(job.box, job.flow, err.code, err.detail, true) : get().view,
+    });
   };
 
   let missed = 0;
   const lost = (job: LiveJob) =>
-    finish(job, { area_id: job.areaId, state: 'failed', step: null, steps: [], elapsed_s: 0, eta_s: null, error: { code: 'upstream_unavailable', detail: '' } });
+    finish(job, {
+      area_id: job.areaId,
+      state: 'failed',
+      step: null,
+      steps: [],
+      elapsed_s: 0,
+      eta_s: null,
+      error: { code: 'upstream_unavailable', detail: '' },
+    });
   const poll = (mine: number) => {
     const job = get().job;
     if (!job || mine !== jobToken) return;
@@ -192,7 +220,13 @@ export const useLiveJobStore = create<LiveJobStoreState>()((set, get) => {
       if (get().view !== view) return; // the card moved on meanwhile
       if (answer.kind === 'started') {
         set({ view: { kind: 'job', box: view.box, flow: view.flow } });
-        follow({ areaId: answer.areaId, box: view.box, flow: view.flow, plan: view.plan, status: null });
+        follow({
+          areaId: answer.areaId,
+          box: view.box,
+          flow: view.flow,
+          plan: view.plan,
+          status: null,
+        });
       } else if (answer.kind === 'stored') {
         set({ view: null });
         handoff?.(view.box, view.flow, { ifIdle: false });
@@ -211,7 +245,8 @@ export const useLiveJobStore = create<LiveJobStoreState>()((set, get) => {
         .catch(() => ({ kind: 'unavailable' as const }));
       set({ busy: false });
       if (get().view !== view) return;
-      if (answer.kind === 'unavailable') set({ view: failView(view.box, view.flow, 'upstream_unavailable', '') });
+      if (answer.kind === 'unavailable')
+        set({ view: failView(view.box, view.flow, 'upstream_unavailable', '') });
       else get().showPlan(view.box, view.flow, answer);
     },
     stop: async () => {
@@ -234,7 +269,8 @@ export const useLiveJobStore = create<LiveJobStoreState>()((set, get) => {
       set({ job: null });
       // Back to the offer, so the same area can be computed again or redrawn; with no offer (a job
       // joined while already running), back to aiming rather than an empty card.
-      if (get().view?.kind === 'job' && job.plan) set({ view: { kind: 'offer', box: job.box, flow: job.flow, plan: job.plan } });
+      if (get().view?.kind === 'job' && job.plan)
+        set({ view: { kind: 'offer', box: job.box, flow: job.flow, plan: job.plan } });
       else if (get().view?.kind === 'job') {
         set({ view: null });
         redraw?.();
@@ -249,7 +285,8 @@ export const useLiveJobStore = create<LiveJobStoreState>()((set, get) => {
         .catch(() => ({ kind: 'unavailable' as const }));
       set({ busy: false });
       if (get().view !== view) return;
-      if (answer.kind === 'unavailable') set({ view: failView(view.box, view.flow, 'upstream_unavailable', '') });
+      if (answer.kind === 'unavailable')
+        set({ view: failView(view.box, view.flow, 'upstream_unavailable', '') });
       else get().showPlan(view.box, view.flow, answer);
     },
     clearView: () => set({ view: null, busy: false }),
@@ -263,22 +300,49 @@ export function resetLiveJobs(): void {
 }
 
 /** A failure's dot title and one muted line (mock-up state 6). */
-export function failureText(code: string, fromJob = false): { title: string; line: string; retry: boolean } {
+export function failureText(
+  code: string,
+  fromJob = false,
+): { title: string; line: string; retry: boolean } {
   switch (code) {
     case 'area:no_visit_pair':
-      return { title: 'No two visits close in time', line: 'Nothing can be seen moving here. Try a nearby patch.', retry: false };
+      return {
+        title: 'No two visits close in time',
+        line: 'Nothing can be seen moving here. Try a nearby patch.',
+        retry: false,
+      };
     case 'upstream_unavailable':
-      return { title: 'Frame archive not reachable', line: 'Nothing was saved. Try again in a minute.', retry: true };
+      return {
+        title: 'Frame archive not reachable',
+        line: 'Nothing was saved. Try again in a minute.',
+        retry: true,
+      };
     case 'offline':
-      return { title: 'Not available offline', line: 'This server shows only areas computed before.', retry: false };
+      return {
+        title: 'Not available offline',
+        line: 'This server shows only areas computed before.',
+        retry: false,
+      };
     case 'queue_full':
-      return { title: 'Too many areas waiting', line: 'Nothing was saved. Try again in a few minutes.', retry: true };
+      return {
+        title: 'Too many areas waiting',
+        line: 'Nothing was saved. Try again in a few minutes.',
+        retry: true,
+      };
     default:
       // A refusal of the box itself (`area:…` from the coverage check) gives the same answer again:
       // no Try again. A job that failed on the way (frames incomplete, an archive hiccup) may work.
       if (code.startsWith('area:') && !fromJob)
-        return { title: 'Could not compute this area', line: 'Nothing was saved. Draw a different area.', retry: false };
-      return { title: 'Could not compute this area', line: 'Nothing was saved. Try again in a minute.', retry: true };
+        return {
+          title: 'Could not compute this area',
+          line: 'Nothing was saved. Draw a different area.',
+          retry: false,
+        };
+      return {
+        title: 'Could not compute this area',
+        line: 'Nothing was saved. Try again in a minute.',
+        retry: true,
+      };
   }
 }
 
@@ -290,7 +354,8 @@ export function releaseName(release: string): string {
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const day = (d: Date) => `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
-const hm = (d: Date) => `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
+const hm = (d: Date) =>
+  `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
 
 /** "12 Jun 2026, 11:11 and 12:49 UTC (1.6 h apart)", from the visits' start times. */
 export function visitsText(plan: Pick<LivePlan, 'visits'>): string {
@@ -298,7 +363,10 @@ export function visitsText(plan: Pick<LivePlan, 'visits'>): string {
   const b = new Date(plan.visits[1].start);
   const gapH = Math.abs(b.getTime() - a.getTime()) / 3_600_000;
   const gap = gapH < 1 ? `${Math.round(gapH * 60)} min apart` : `${gapH.toFixed(1)} h apart`;
-  const times = day(a) === day(b) ? `${day(a)}, ${hm(a)} and ${hm(b)} UTC` : `${day(a)}, ${hm(a)} and ${day(b)}, ${hm(b)} UTC`;
+  const times =
+    day(a) === day(b)
+      ? `${day(a)}, ${hm(a)} and ${hm(b)} UTC`
+      : `${day(a)}, ${hm(a)} and ${day(b)}, ${hm(b)} UTC`;
   return `${times} (${gap})`;
 }
 
@@ -322,7 +390,12 @@ export function stepCount(s: { id: string; state: string; done?: number; total?:
   if (s.total === undefined) return '';
   if (s.state === 'running') return `${s.done ?? 0} of ${s.total}`;
   if (s.state !== 'done') return '';
-  const unit = s.id === 'visits' || s.id === 'known' ? 'visits' : s.id === 'frames' || s.id === 'dots' ? 'frames' : '';
+  const unit =
+    s.id === 'visits' || s.id === 'known'
+      ? 'visits'
+      : s.id === 'frames' || s.id === 'dots'
+        ? 'frames'
+        : '';
   return unit ? `${s.total} ${unit}` : String(s.total);
 }
 
@@ -330,7 +403,10 @@ export function stepCount(s: { id: string; state: string; done?: number; total?:
  * The island pill while the live card is minimised: "Discovery · Step 2 of 6 · Download frames",
  * "Known objects · Ready to compute" for the offer, "Discovery · Could not compute" for a failure (#153).
  */
-export function liveMiniTitle(s: Pick<LiveJobStoreState, 'view' | 'job'>, flowLabel: string): string {
+export function liveMiniTitle(
+  s: Pick<LiveJobStoreState, 'view' | 'job'>,
+  flowLabel: string,
+): string {
   if (s.view?.kind === 'offer') return `${flowLabel} · Ready to compute`;
   if (s.view?.kind === 'failed') return `${flowLabel} · Could not compute`;
   if (s.view?.kind !== 'job') return flowLabel;

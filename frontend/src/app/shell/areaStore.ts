@@ -51,7 +51,8 @@ export interface PixelRect {
  * the live card (offer, computing, waiting, failure; issue #144), or a Track computed on demand
  * (issue #145, trackJobStore).
  */
-export type AreaScreen = 'draw' | 'search' | 'list' | 'eros' | 'disc' | 'mover' | 'live' | 'track' | 'scan';
+export type AreaScreen =
+  'draw' | 'search' | 'list' | 'eros' | 'disc' | 'mover' | 'live' | 'track' | 'scan';
 
 /** The checkboxes of the Eros card: which layers show on the cutout. */
 export interface ErosOverlays {
@@ -74,7 +75,10 @@ export interface AreaRefusal {
 }
 export function refusalOf(e: unknown): AreaRefusal {
   if (e instanceof AreaRefused) return { code: e.code, message: e.message };
-  const detail = e instanceof ApiError && e.kind === 'timeout' ? 'The area search timed out.' : 'The area search failed.';
+  const detail =
+    e instanceof ApiError && e.kind === 'timeout'
+      ? 'The area search timed out.'
+      : 'The area search failed.';
   return { code: 'area:failed', message: `${detail} Draw the area again.` };
 }
 
@@ -252,7 +256,9 @@ const FRESH = {
 /** Exposures shown: all of them, or those of one detector (D1..D6 is 0..5). */
 export function erosList(eros: ErosDemo | null, det: number | null): ErosHop[] {
   if (!eros) return [];
-  return det === null ? eros.hops : eros.hops.filter((h) => Number(h.detector.slice(1)) - 1 === det);
+  return det === null
+    ? eros.hops
+    : eros.hops.filter((h) => Number(h.detector.slice(1)) - 1 === det);
 }
 
 export const useAreaStore = create<AreaState>()((set, get) => {
@@ -263,34 +269,62 @@ export const useAreaStore = create<AreaState>()((set, get) => {
     // The demo file is 433 Eros only: another object never borrows its sky image, cutouts or title.
     const demoAll = await erosDemo();
     // The fallback row of an unreachable backend (no designation, no id) is the demo Eros too.
-    const isDemoEros = !obj || obj.objectId === DEMO_OBJECT_ID || (!obj.objectId && obj.designation === undefined);
+    const isDemoEros =
+      !obj || obj.objectId === DEMO_OBJECT_ID || (!obj.objectId && obj.designation === undefined);
     const demo = isDemoEros ? demoAll : null;
     if (ctl.signal.aborted) return demo;
     // A real object: its frames and path from the API (issue #130).
     if (obj?.objectId) {
       // Never blank (D-32): the demo Eros shows its demo frames at once (Demo tag), and the real
       // frames and path replace them when the API answers, so a slow backend never leaves "Loading…".
-      if (demo) set({ eros: demo, erosFailed: false, trackSource: 'demo', trackPath: false, pathPending: false });
+      if (demo)
+        set({
+          eros: demo,
+          erosFailed: false,
+          trackSource: 'demo',
+          trackPath: false,
+          pathPending: false,
+        });
       try {
         const real = await loadObjectTrack(obj.objectId, ctl.signal, obj.trackWindow);
         if (ctl.signal.aborted) return demo;
         const eros = mergeReal(demo, real.frames, real.path);
-        if (eros.hops.length === 0) throw new ApiError('bad_response', 'No frames for this object.');
+        if (eros.hops.length === 0)
+          throw new ApiError('bad_response', 'No frames for this object.');
         // A path reply with no points (`path:not_cached`) is no path: nothing is drawn or claimed.
         const hasPath = (real.path?.points.length ?? 0) > 0;
-        const pending = !hasPath && (real.path?.missing ?? []).some((c) => PATH_PENDING.includes(c));
-        set({ eros, erosFailed: false, trackSource: 'real', trackPath: hasPath, pathPending: pending });
+        const pending =
+          !hasPath && (real.path?.missing ?? []).some((c) => PATH_PENDING.includes(c));
+        set({
+          eros,
+          erosFailed: false,
+          trackSource: 'real',
+          trackPath: hasPath,
+          pathPending: pending,
+        });
         return eros;
       } catch (e) {
         if (ctl.signal.aborted || (e instanceof ApiError && e.kind === 'aborted')) return demo;
         // Never blank: 433 Eros falls back to the demo file (Demo tag); another object has no demo.
         if (obj.objectId !== DEMO_OBJECT_ID) {
-          set({ eros: null, erosFailed: true, trackSource: 'demo', trackPath: false, pathPending: false });
+          set({
+            eros: null,
+            erosFailed: true,
+            trackSource: 'demo',
+            trackPath: false,
+            pathPending: false,
+          });
           return null;
         }
       }
     }
-    set({ eros: demo, erosFailed: demo === null, trackSource: 'demo', trackPath: false, pathPending: false });
+    set({
+      eros: demo,
+      erosFailed: demo === null,
+      trackSource: 'demo',
+      trackPath: false,
+      pathPending: false,
+    });
     return demo;
   };
   const startRun = () => {
@@ -312,7 +346,15 @@ export const useAreaStore = create<AreaState>()((set, get) => {
     const mine = token;
     const ctl = new AbortController();
     knownAbort = ctl;
-    set({ ...FRESH, stage: 'set', box, last: box, screen: 'search', say: { kind: 'searching', text: 'Known objects in this area' }, fromScan: handoff && get().fromScan });
+    set({
+      ...FRESH,
+      stage: 'set',
+      box,
+      last: box,
+      screen: 'search',
+      say: { kind: 'searching', text: 'Known objects in this area' },
+      fromScan: handoff && get().fromScan,
+    });
     // Settled at once (a refusal must not sit unhandled while the island "searches"). No prepared
     // area: the coverage check runs inside the same search (issue #144).
     type Answer =
@@ -353,7 +395,9 @@ export const useAreaStore = create<AreaState>()((set, get) => {
             say: {
               kind: 'found',
               text:
-                (n === 0 ? 'No known objects in this area' : `${n} known object${n === 1 ? '' : 's'}: ${names}`) +
+                (n === 0
+                  ? 'No known objects in this area'
+                  : `${n} known object${n === 1 ? '' : 's'}: ${names}`) +
                 (res.demo ? ' (demo)' : ''),
             },
           });
@@ -363,7 +407,10 @@ export const useAreaStore = create<AreaState>()((set, get) => {
               set({ say: null, screen: 'list', known: res });
               const f = pendingFocus;
               pendingFocus = null;
-              const o = f && 'designation' in f ? res.objects.find((x) => (x.designation ?? x.id) === f.designation) : null;
+              const o =
+                f && 'designation' in f
+                  ? res.objects.find((x) => (x.designation ?? x.id) === f.designation)
+                  : null;
               // Track-available (or the demo): the Track view at once; else the row stays in view.
               if (o && (o.trackAvailable || o.objectId === DEMO_OBJECT_ID)) get().openEros(o);
             }, FOUND_MS),
@@ -382,7 +429,9 @@ export const useAreaStore = create<AreaState>()((set, get) => {
       ? {
           ...s.known,
           objects: s.known.objects.map((o) =>
-            (o.designation ?? o.id) === key ? { ...o, trackAvailable: true, trackWindow: obj.trackWindow } : o,
+            (o.designation ?? o.id) === key
+              ? { ...o, trackAvailable: true, trackWindow: obj.trackWindow }
+              : o,
           ),
         }
       : null;
@@ -391,7 +440,11 @@ export const useAreaStore = create<AreaState>()((set, get) => {
   });
 
   /** The live card for a box with no prepared area (issue #144). */
-  const openLive = (box: AreaBox, flow: AreaFlow, live: Exclude<PlanAnswer, { kind: 'unavailable' }>) => {
+  const openLive = (
+    box: AreaBox,
+    flow: AreaFlow,
+    live: Exclude<PlanAnswer, { kind: 'unavailable' }>,
+  ) => {
     set({ say: null, screen: 'live', minimised: false });
     useLiveJobStore.getState().showPlan(box, flow, live);
   };
@@ -429,7 +482,14 @@ export const useAreaStore = create<AreaState>()((set, get) => {
     const mine = token;
     const ctl = new AbortController();
     knownAbort = ctl;
-    set((s) => ({ screen: 'disc', minimised: false, step: -1, running: false, sel: -1, fitSeq: s.fitSeq + 1 }));
+    set((s) => ({
+      screen: 'disc',
+      minimised: false,
+      step: -1,
+      running: false,
+      sel: -1,
+      fitSeq: s.fitSeq + 1,
+    }));
     const box = get().box;
     if (!box) return;
     void Promise.all([discoverIn(box, ctl.signal), loadEros()]).then(
@@ -489,7 +549,14 @@ export const useAreaStore = create<AreaState>()((set, get) => {
       set((s) => ({
         screen: 'eros',
         // Back from the Track view: to the Discovery track it was opened from, else none (Known).
-        trackBack: s.screen === 'mover' ? 'mover' : s.screen === 'track' ? s.trackBack : s.screen === 'scan' ? 'scan' : 'list',
+        trackBack:
+          s.screen === 'mover'
+            ? 'mover'
+            : s.screen === 'track'
+              ? s.trackBack
+              : s.screen === 'scan'
+                ? 'scan'
+                : 'list',
         minimised: false,
         index: 0,
         det: null,
@@ -510,7 +577,13 @@ export const useAreaStore = create<AreaState>()((set, get) => {
     trackBack: 'list',
     openTrack: (obj, around, release) => {
       const from = get().screen;
-      set({ screen: 'track', minimised: false, focus: obj, trackBack: from === 'mover' ? 'mover' : from === 'scan' ? 'scan' : 'list', playing: false });
+      set({
+        screen: 'track',
+        minimised: false,
+        focus: obj,
+        trackBack: from === 'mover' ? 'mover' : from === 'scan' ? 'scan' : 'list',
+        playing: false,
+      });
       void useTrackJobStore.getState().start(obj, around, release);
     },
     openMover: (i) =>
@@ -544,7 +617,8 @@ export const useAreaStore = create<AreaState>()((set, get) => {
     },
     backToScan: () => set({ screen: 'scan', minimised: false, playing: false, focus: null }),
     setShowPossible: (showPossible) => set({ showPossible }),
-    backToPatch: () => set((s) => ({ minimised: true, playing: false, sel: -1, fitSeq: s.fitSeq + 1 })),
+    backToPatch: () =>
+      set((s) => ({ minimised: true, playing: false, sel: -1, fitSeq: s.fitSeq + 1 })),
     openSquare: (box, flow, focus = null) => {
       // clearTimers first: it bumps the token, so an older read never applies this new focus.
       clearTimers();

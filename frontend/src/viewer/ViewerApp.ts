@@ -1190,6 +1190,9 @@ export class ViewerApp {
 
   /** Resolves when no settle burst is pending and no shader compile is in flight. */
   async whenSettled(): Promise<void> {
+    // A D-37 engine owns the body: this viewer draws no frame, so no burst can finish. freezeClock and
+    // the build's whenLoaded asked for one and waited for ever (the build e2e hung 150 s in settledShot).
+    if (this.engineOwned) return;
     // A volume's noise cube is baked in slices after the build: wait for it and for the redraw it
     // asks for, so a settled frame always has its noise.
     if (noiseBakePending()) {

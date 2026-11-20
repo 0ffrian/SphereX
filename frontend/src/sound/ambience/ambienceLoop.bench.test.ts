@@ -26,13 +26,17 @@ describe.skipIf(!ON)('ambience tick bench (§14)', () => {
       unavailable: () => [],
     };
     let clock = 0;
-    const place = makePlace(0.05, ({ bearing }) => ({ cls: bearing > 1.6 && bearing < 4.7 ? 'sea' : 'land' }), {
-      wind: makeWind({ U10: 9, Uz: 9 }),
-      rainRate: 1,
-      precipPhase: 'rain',
-      cnv: 0.8,
-      cnvRing: 0.8,
-    });
+    const place = makePlace(
+      0.05,
+      ({ bearing }) => ({ cls: bearing > 1.6 && bearing < 4.7 ? 'sea' : 'land' }),
+      {
+        wind: makeWind({ U10: 9, Uz: 9 }),
+        rainRate: 1,
+        precipPhase: 'rain',
+        cnv: 0.8,
+        cnvRing: 0.8,
+      },
+    );
     const e = {
       spinup: 0,
       state: () => ({ Ps: 1, fluid: 'water', gas: false, locked: false }),
@@ -62,7 +66,9 @@ describe.skipIf(!ON)('ambience tick bench (§14)', () => {
     }
     t.sort((a, b) => a - b);
     const median = t[t.length >> 1]!;
-    console.log(`ambience tick median ${median.toFixed(3)} ms, p95 ${t[Math.floor(t.length * 0.95)]!.toFixed(3)} ms (+ samplePlace)`);
+    console.log(
+      `ambience tick median ${median.toFixed(3)} ms, p95 ${t[Math.floor(t.length * 0.95)]!.toFixed(3)} ms (+ samplePlace)`,
+    );
     expect(median).toBeLessThan(1.0);
   });
 

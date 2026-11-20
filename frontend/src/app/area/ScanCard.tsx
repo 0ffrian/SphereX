@@ -736,18 +736,12 @@ function ScanProvenance({ record, measured }: { record: RunRecord; measured: boo
   return (
     <div className="sx-scan-provtags" data-testid="scan-prov-tags">
       <span>
-        <ProvenanceBadge
-          tag={p.track_positions.tag}
-          tooltip={tip(p.track_positions)}
-        />
+        <ProvenanceBadge tag={p.track_positions.tag} tooltip={tip(p.track_positions)} />
         Track positions
       </span>
       {!measured && (
         <span>
-          <ProvenanceBadge
-            tag={p.known_positions.tag}
-            tooltip={tip(p.known_positions)}
-          />
+          <ProvenanceBadge tag={p.known_positions.tag} tooltip={tip(p.known_positions)} />
           Known positions
         </span>
       )}

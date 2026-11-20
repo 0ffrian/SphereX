@@ -18,7 +18,8 @@ export function Readout() {
   const index = useAppStore((s) => s.sky.index);
   const { shownIndex } = useFlipbookSession();
   const n = response?.frames.length ?? 0;
-  const shown = n > 0 ? (shownIndex !== null && shownIndex < n ? shownIndex : Math.min(index, n - 1)) : 0;
+  const shown =
+    n > 0 ? (shownIndex !== null && shownIndex < n ? shownIndex : Math.min(index, n - 1)) : 0;
   const frame = response?.frames[shown] ?? null;
   const when = frame ? formatUtc(frame.time) : null;
 
@@ -64,7 +65,7 @@ export function Readout() {
         </span>
       </p>
       {/* Moon (11 Nov 2026): no frame line under the readout; the player and the Flipbook picture show it. */}
-      {false as boolean && frame && (
+      {(false as boolean) && frame && (
         <p className="sx-coords-sub" data-testid="sky-readout-frame">
           {formatWavelength(frame.wavelength_um)}
           <br />

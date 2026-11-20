@@ -29,7 +29,11 @@ const X1 = 5;
 export const FNU_PEAK_UM_K = 5100;
 
 /** The card's `{value}` fields, or null; a card of another object is not used. */
-export function useObjectFacts(): { type: string | null; tempK: number | null; tempTag: string | null } {
+export function useObjectFacts(): {
+  type: string | null;
+  tempK: number | null;
+  tempTag: string | null;
+} {
   const card = useAppStore((s) => s.card);
   const id = useAppStore((s) => s.sky.resolved?.id);
   if (!card || !id || card.id !== id) return { type: null, tempK: null, tempTag: null };
@@ -63,7 +67,13 @@ function Chart({
   const wl = points.map((p) => p.wavelength_um);
   const label = `SPHEREx spectrum of ${name}: ${points.length} points from ${formatWavelength(Math.min(...wl))} to ${formatWavelength(Math.max(...wl))}, ${points.filter((p) => p.flagged).length} flagged.`;
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={label} className="fb-spec" data-testid="spectrum-chart">
+    <svg
+      viewBox={`0 0 ${W} ${H}`}
+      role="img"
+      aria-label={label}
+      className="fb-spec"
+      data-testid="spectrum-chart"
+    >
       {[1, 2, 3, 4, 5].map((l) => (
         <g key={l}>
           <line x1={X(l)} x2={X(l)} y1={T} y2={H - B} stroke="var(--line)" />
@@ -76,7 +86,14 @@ function Chart({
         µJy
       </text>
       {peak !== null && peak >= X0 && peak <= X1 && (
-        <line x1={X(peak)} x2={X(peak)} y1={H - B} y2={H - B - 6} stroke="var(--warn)" strokeWidth="1.5" />
+        <line
+          x1={X(peak)}
+          x2={X(peak)}
+          y1={H - B}
+          y2={H - B - 6}
+          stroke="var(--warn)"
+          strokeWidth="1.5"
+        />
       )}
       {points.map((p) => {
         const cx = X(p.wavelength_um);
@@ -94,7 +111,14 @@ function Chart({
               />
             )}
             {p.flagged ? (
-              <circle cx={cx} cy={Y(p.flux)} r="2" fill="none" stroke="var(--muted)" strokeOpacity=".6" />
+              <circle
+                cx={cx}
+                cy={Y(p.flux)}
+                r="2"
+                fill="none"
+                stroke="var(--muted)"
+                strokeOpacity=".6"
+              />
             ) : (
               <circle cx={cx} cy={Y(p.flux)} r="2" fill="var(--p-phys)" />
             )}
@@ -128,7 +152,12 @@ export function FlipbookSpectrum({ name }: { name: string }) {
     body = stopped ? (
       <p className="fb-muted">
         The spectrum waits for the frames.{' '}
-        <button type="button" className="fb-stop" onClick={() => void load()} data-testid="spectrum-measure-now">
+        <button
+          type="button"
+          className="fb-stop"
+          onClick={() => void load()}
+          data-testid="spectrum-measure-now"
+        >
           Measure the frames found so far
         </button>
       </p>
@@ -151,7 +180,11 @@ export function FlipbookSpectrum({ name }: { name: string }) {
       <>
         <Chart points={data.spectrum} name={name} tempK={facts.tempK} />
         {line.length > 0 && (
-          <div className="fb-meta" data-testid="spectrum-facts" title={facts.tempTag ? `Temperature: ${facts.tempTag}` : undefined}>
+          <div
+            className="fb-meta"
+            data-testid="spectrum-facts"
+            title={facts.tempTag ? `Temperature: ${facts.tempTag}` : undefined}
+          >
             {line.map((t, i) => (
               <span key={t} className="contents">
                 {i > 0 && <span aria-hidden="true">·</span>}
@@ -163,7 +196,9 @@ export function FlipbookSpectrum({ name }: { name: string }) {
         {/* D-02 badge for the measured points (Fixture on dev data) and the Q-23 caveat. */}
         <div className="fb-meta" data-testid="spectrum-provenance">
           {sky.fixture ? <DataBadge fixture /> : <ProvenanceBadge tag="measured" />}
-          <span data-testid="spectrum-caveat">Not absolute photometry: no aperture correction yet.</span>
+          <span data-testid="spectrum-caveat">
+            Not absolute photometry: no aperture correction yet.
+          </span>
         </div>
         {/* R13.12, A8 (Q-446): hear it as a sweep or as a 12-note chord. */}
         <SpectrumSound reply={data} />
