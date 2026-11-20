@@ -52,4 +52,6 @@ The D-17 owners in [docs/decisions/scope-process.md](docs/decisions/scope-proces
 
 ## Emergencies
 
-If a fix can't wait for a reviewer, an admin may disable the `main` ruleset (Settings → Rules → Rulesets), merge, and **re-enable it straight away**. Say so in the PR with the reason. GitHub's audit log records the change.
+Admins and maintainers (Atish, Moon, Kevin) can override the rules on a PR. The merge box shows **Merge without waiting for requirements to be met (bypass rules)**. It merges without the approvals, the code-owner review or a green `ci-gate`. Use it only when a fix can't wait, and **say why in the PR** before you merge. GitHub records every bypass on the PR and in the ruleset's insights.
+
+The override works only through a PR. Nobody can push straight to `main`, force-push it or delete it. Don't disable the ruleset to get round that.
