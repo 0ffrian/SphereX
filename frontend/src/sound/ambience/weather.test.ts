@@ -3,7 +3,13 @@ import { describe, expect, it } from 'vitest';
 import { earthAir, makeAir, makePlace, makeWind, titanAir, venusAir } from './fakeEngine.testutil';
 import { dropPhysics } from './liquids';
 import {
-  audibleRadiusM, LIGHTNING_TEXT, lightningRate, lightningRule, StrikeScheduler, thunderFm, thunderParams,
+  audibleRadiusM,
+  LIGHTNING_TEXT,
+  lightningRate,
+  lightningRule,
+  StrikeScheduler,
+  thunderFm,
+  thunderParams,
   weatherVisualFrame,
 } from './weather';
 import type { Strike } from './types';
@@ -12,12 +18,18 @@ describe('§8.2 lightning rule table', () => {
   it('observed worlds (earth, jup, sat and the card aliases) are allowed, measured', () => {
     for (const id of ['earth', 'jup', 'sat', 'ref-jupiter', 'ref-saturn']) {
       const gas = id !== 'earth';
-      const air = gas ? makeAir({ T0: 130, P0: 1e4, mu: 2.3, gas: true, regime: 'Methane-rich air, blue' }) : earthAir();
+      const air = gas
+        ? makeAir({ T0: 130, P0: 1e4, mu: 2.3, gas: true, regime: 'Methane-rich air, blue' })
+        : earthAir();
       expect(lightningRule(air, id)).toEqual({ allowed: true, tag: 'measured', reason: null });
     }
   });
   it('rocky water or ammonia-water exoplanet with liquid: allowed by analog', () => {
-    expect(lightningRule(earthAir(), 't1e')).toEqual({ allowed: true, tag: 'inferred_from_analog', reason: null });
+    expect(lightningRule(earthAir(), 't1e')).toEqual({
+      allowed: true,
+      tag: 'inferred_from_analog',
+      reason: null,
+    });
     expect(lightningRule(earthAir({ fluid: 'ammoniaWater' }), 'x').allowed).toBe(true);
     // keyed on the fluid, not the class: a mu-44 water world is not "Venus-like"
     expect(lightningRule(makeAir({ T0: 300, P0: 1e5, mu: 44 }), 'x').allowed).toBe(true);
@@ -26,7 +38,11 @@ describe('§8.2 lightning rule table', () => {
     const g = (regime: string) => makeAir({ T0: 300, P0: 1e4, mu: 2.3, gas: true, regime });
     expect(lightningRule(g('Water clouds'), 'hd').tag).toBe('inferred_from_analog');
     expect(lightningRule(g('Ammonia clouds'), 'hd').allowed).toBe(true);
-    expect(lightningRule(g('Cloudless, deep blue'), 'hd')).toEqual({ allowed: false, tag: null, reason: LIGHTNING_TEXT.other });
+    expect(lightningRule(g('Cloudless, deep blue'), 'hd')).toEqual({
+      allowed: false,
+      tag: null,
+      reason: LIGHTNING_TEXT.other,
+    });
   });
   it('methane, CO2 and the rest are refused with their strings', () => {
     expect(lightningRule(titanAir(), 'tit').reason).toBe(LIGHTNING_TEXT.titan);
@@ -39,11 +55,34 @@ describe('§8.2 lightning rule table', () => {
 describe('R11: observed worlds still need air and convection; a slid world is not the observed one', () => {
   it('Earth without convection has no lightning', () => {
     const e = earthAir();
-    expect(lightningRate(e, makePlace(1, () => ({}), { cnv: 0, cnvRing: 0 }), lightningRule(e, 'earth'))).toBe(0);
-    expect(lightningRate(e, makePlace(1, () => ({}), { cnv: 0.6, cnvRing: 0.5 }), lightningRule(e, 'earth'))).toBeCloseTo(3, 12);
+    expect(
+      lightningRate(
+        e,
+        makePlace(1, () => ({}), { cnv: 0, cnvRing: 0 }),
+        lightningRule(e, 'earth'),
+      ),
+    ).toBe(0);
+    expect(
+      lightningRate(
+        e,
+        makePlace(1, () => ({}), { cnv: 0.6, cnvRing: 0.5 }),
+        lightningRule(e, 'earth'),
+      ),
+    ).toBeCloseTo(3, 12);
   });
   it('Earth with the fluid slid to methane falls through to the Titan row', () => {
-    const slid = { ...titanAir(), inputs: [{ label: 'Surface liquid', value: 'methane', unit: '', tag: 'artistic' as const, source: 'slider' }] };
+    const slid = {
+      ...titanAir(),
+      inputs: [
+        {
+          label: 'Surface liquid',
+          value: 'methane',
+          unit: '',
+          tag: 'artistic' as const,
+          source: 'slider',
+        },
+      ],
+    };
     expect(lightningRule(slid, 'earth').reason).toBe(LIGHTNING_TEXT.titan);
   });
 });
@@ -52,8 +91,20 @@ describe('§8.3 rate', () => {
   it('rocky exoplanets need deep convection; Jupiter is quieter at low latitude', () => {
     const air = earthAir({ presetId: 't1e' });
     const rule = lightningRule(air, air.presetId);
-    expect(lightningRate(air, makePlace(1, () => ({}), { cnv: 0.2, cnvRing: 0.2 }), rule)).toBe(0);
-    expect(lightningRate(air, makePlace(1, () => ({}), { cnv: 0.5, cnvRing: 0.5 }), rule)).toBeCloseTo(3, 12);
+    expect(
+      lightningRate(
+        air,
+        makePlace(1, () => ({}), { cnv: 0.2, cnvRing: 0.2 }),
+        rule,
+      ),
+    ).toBe(0);
+    expect(
+      lightningRate(
+        air,
+        makePlace(1, () => ({}), { cnv: 0.5, cnvRing: 0.5 }),
+        rule,
+      ),
+    ).toBeCloseTo(3, 12);
     const jup = makeAir({ T0: 130, P0: 1e4, mu: 2.3, gas: true, presetId: 'jup' });
     const r = lightningRule(jup, 'jup');
     const eq = makePlace(60, () => ({}), { cnvRing: 1 });
@@ -118,9 +169,12 @@ describe('StrikeScheduler', () => {
   });
 
   it('never two flashes within 2 s, even at a high rate', () => {
-    const flashes = run(9, 600, 120, 0.05).filter((s) => s.flash).map((s) => s.t0);
+    const flashes = run(9, 600, 120, 0.05)
+      .filter((s) => s.flash)
+      .map((s) => s.t0);
     expect(flashes.length).toBeGreaterThan(10);
-    for (let i = 1; i < flashes.length; i++) expect(flashes[i]! - flashes[i - 1]!).toBeGreaterThanOrEqual(2);
+    for (let i = 1; i < flashes.length; i++)
+      expect(flashes[i]! - flashes[i - 1]!).toBeGreaterThanOrEqual(2);
   });
 
   it('chooses only baked variants; near/far split at the crack distance', () => {
@@ -140,7 +194,10 @@ describe('§8.4 thunder', () => {
     const e = earthAir();
     const t = titanAir();
     expect(thunderFm(e)).toBeCloseTo(200, 9);
-    expect(thunderFm(t) / thunderFm(e)).toBeCloseTo((t.c0 * Math.sqrt(t.P0)) / (e.c0 * Math.sqrt(e.P0)), 12);
+    expect(thunderFm(t) / thunderFm(e)).toBeCloseTo(
+      (t.c0 * Math.sqrt(t.P0)) / (e.c0 * Math.sqrt(e.P0)),
+      12,
+    );
   });
   it('R_aud is capped at 25 km on Earth and shorter in thick CO2', () => {
     expect(audibleRadiusM(earthAir(), 0)).toBe(25000);
@@ -160,19 +217,39 @@ describe('§8.5 overlay frame', () => {
   const air = earthAir({ zc_km: 2 });
   const rainy = { precipPhase: 'rain' as const, rainRate: 1, wind: makeWind({ U10: 9 }) };
   it('rain below the clouds, with the drop fall speed and a downwind slant', () => {
-    const f = weatherVisualFrame(air, makePlace(0.5, () => ({}), rainy), []);
+    const f = weatherVisualFrame(
+      air,
+      makePlace(0.5, () => ({}), rainy),
+      [],
+    );
     expect(f.rain?.vt).toBeCloseTo(dropPhysics(air)!.vt, 12);
     expect(f.rain?.slantRad).toBeCloseTo(Math.atan(9 / dropPhysics(air)!.vt), 12);
     expect(f.rain?.snow).toBe(false);
     expect(f.aboveClouds).toBe(false);
   });
   it('no rain drawn above the clouds or in the eye', () => {
-    expect(weatherVisualFrame(air, makePlace(3, () => ({}), rainy), []).rain).toBeNull();
+    expect(
+      weatherVisualFrame(
+        air,
+        makePlace(3, () => ({}), rainy),
+        [],
+      ).rain,
+    ).toBeNull();
     const eye = { ...rainy, cyclone: { delta: 0, r: 0.05, Rm: 0.0075, inEye: true } };
-    expect(weatherVisualFrame(air, makePlace(0.5, () => ({}), eye), []).rain).toBeNull();
+    expect(
+      weatherVisualFrame(
+        air,
+        makePlace(0.5, () => ({}), eye),
+        [],
+      ).rain,
+    ).toBeNull();
   });
   it('snow falls at 1 m/s x sqrt(g_E/g) (the spec rule)', () => {
-    const f = weatherVisualFrame(air, makePlace(0.5, () => ({}), { ...rainy, precipPhase: 'snow' }), []);
+    const f = weatherVisualFrame(
+      air,
+      makePlace(0.5, () => ({}), { ...rainy, precipPhase: 'snow' }),
+      [],
+    );
     expect(f.rain?.snow).toBe(true);
     expect(f.rain?.vt).toBeCloseTo(1, 9);
   });
@@ -187,7 +264,10 @@ describe('§8.5 overlay frame', () => {
 
 describe('review L4: lightning follows local liquid', () => {
   it('an eyeball world with open water (global state frozen) may have storms', () => {
-    const eyeball = { ...earthAir({ liquidState: false }), liquid: { name: 'water', rho: 998, sigma: 0.0728, viscous: false, tag: 'measured' as const } };
+    const eyeball = {
+      ...earthAir({ liquidState: false }),
+      liquid: { name: 'water', rho: 998, sigma: 0.0728, viscous: false, tag: 'measured' as const },
+    };
     expect(lightningRule(eyeball, 't1e').allowed).toBe(true);
   });
 });

@@ -867,7 +867,8 @@ export function parseAreaTracks(raw: unknown): AreaTracks {
 /** A whole number of `min` or more (counts, visit numbers, catalogue numbers). */
 function whole(o: Obj, key: string, path: string, min: number): number {
   const v = num(o, key, path);
-  if (!Number.isInteger(v) || v < min) fail(`${path}.${key}`, `expected a whole number of ${min} or more`);
+  if (!Number.isInteger(v) || v < min)
+    fail(`${path}.${key}`, `expected a whole number of ${min} or more`);
   return v;
 }
 
@@ -924,7 +925,8 @@ export function parseTrackPath(raw: unknown): TrackPath {
   const p = 'path';
   const o = obj(raw, p);
   str(o, 'id', p);
-  if (o.observer !== '500@-163182') fail(`${p}.observer`, 'expected the SPHEREx observer 500@-163182');
+  if (o.observer !== '500@-163182')
+    fail(`${p}.observer`, 'expected the SPHEREx observer 500@-163182');
   whole(o, 'step_min', p, 1);
   if (o.interp_error_arcsec !== null && num(o, 'interp_error_arcsec', p) < 0) {
     fail(`${p}.interp_error_arcsec`, 'expected 0 or more');
@@ -957,7 +959,8 @@ export function parseTrackPath(raw: unknown): TrackPath {
     time(w, 'end', q);
   });
   strList(o, 'missing', p).forEach((c, i) => {
-    if (!(PATH_CODES as readonly string[]).includes(c)) fail(`${p}.missing[${i}]`, 'expected a path refusal code');
+    if (!(PATH_CODES as readonly string[]).includes(c))
+      fail(`${p}.missing[${i}]`, 'expected a path refusal code');
   });
   return raw as TrackPath;
 }

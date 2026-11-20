@@ -35,10 +35,21 @@ const dayMonth = (iso: string | null) => {
 };
 
 /** The verdict under the card header: a status dot, the card title and one muted line. */
-export function SpectrumVerdictLine({ spectrum, matched }: { spectrum: TrackSpectrum; matched: boolean }) {
+export function SpectrumVerdictLine({
+  spectrum,
+  matched,
+}: {
+  spectrum: TrackSpectrum;
+  matched: boolean;
+}) {
   const w = VERDICT_WORDS[spectrum.verdict];
   return (
-    <div className="sx-sp-verdict" data-tone={w.tone} data-testid="spectrum-verdict" data-verdict={spectrum.verdict}>
+    <div
+      className="sx-sp-verdict"
+      data-tone={w.tone}
+      data-testid="spectrum-verdict"
+      data-verdict={spectrum.verdict}
+    >
       <b>{w.title}</b>
       <span>{verdictLine(spectrum, matched)}</span>
     </div>
@@ -49,7 +60,12 @@ export function SpectrumVerdictLine({ spectrum, matched }: { spectrum: TrackSpec
 export function SpectrumRowWord({ spectrum }: { spectrum: TrackSpectrum }) {
   const w = VERDICT_WORDS[spectrum.verdict];
   return (
-    <span className="sx-sp-word" data-tone={w.tone} data-testid="spectrum-word" data-verdict={spectrum.verdict}>
+    <span
+      className="sx-sp-word"
+      data-tone={w.tone}
+      data-testid="spectrum-word"
+      data-verdict={spectrum.verdict}
+    >
       {w.word}
     </span>
   );
@@ -69,11 +85,20 @@ function ticksLabel(m: ChartModel, y: number): string {
   return y >= 1000 ? `${(y / 1000).toFixed(y % 1000 === 0 ? 0 : 1)}k` : `${Math.round(y)}`;
 }
 
-export function SpectrumChart({ trackId, model, verdict }: { trackId: string; model: ChartModel; verdict: TrackSpectrum['verdict'] }) {
+export function SpectrumChart({
+  trackId,
+  model,
+  verdict,
+}: {
+  trackId: string;
+  model: ChartModel;
+  verdict: TrackSpectrum['verdict'];
+}) {
   const m = model;
   const sx = (x: number) => L + ((x - m.x0) / (m.x1 - m.x0)) * (W - L - R);
   const sy = (y: number) => T + (1 - (y - m.y0) / (m.y1 - m.y0)) * (H - T - B);
-  const poly = (pts: [number, number][]) => 'M' + pts.map(([x, y]) => `${sx(x).toFixed(1)},${sy(y).toFixed(1)}`).join('L') + 'Z';
+  const poly = (pts: [number, number][]) =>
+    'M' + pts.map(([x, y]) => `${sx(x).toFixed(1)},${sy(y).toFixed(1)}`).join('L') + 'Z';
   return (
     <svg
       className="sx-sp-chart"
@@ -111,7 +136,14 @@ export function SpectrumChart({ trackId, model, verdict }: { trackId: string; mo
       )}
       {!m.measuredOnly && (
         <>
-          <line className="sun" x1={L} x2={W - R} y1={sy(1)} y2={sy(1)} data-testid="spectrum-sun" />
+          <line
+            className="sun"
+            x1={L}
+            x2={W - R}
+            y1={sy(1)}
+            y2={sy(1)}
+            data-testid="spectrum-sun"
+          />
           <text x={sx(1.55)} y={sy(1) + 12}>
             Sun
           </text>
@@ -120,9 +152,22 @@ export function SpectrumChart({ trackId, model, verdict }: { trackId: string; mo
       {m.points.map((p) => (
         <g key={p.dotId}>
           {Math.abs(sy(p.y - p.err) - sy(p.y + p.err)) > 6 && (
-            <line className="eb" x1={sx(p.x)} x2={sx(p.x)} y1={sy(Math.max(p.y - p.err, m.y0))} y2={sy(Math.min(p.y + p.err, m.y1))} data-testid="spectrum-errbar" />
+            <line
+              className="eb"
+              x1={sx(p.x)}
+              x2={sx(p.x)}
+              y1={sy(Math.max(p.y - p.err, m.y0))}
+              y2={sy(Math.min(p.y + p.err, m.y1))}
+              data-testid="spectrum-errbar"
+            />
           )}
-          <circle className={p.visitIdx > 0 ? 'pt v2' : 'pt'} cx={sx(p.x)} cy={sy(Math.min(p.y, m.y1))} r={3.2} data-testid="spectrum-point" />
+          <circle
+            className={p.visitIdx > 0 ? 'pt v2' : 'pt'}
+            cx={sx(p.x)}
+            cy={sy(Math.min(p.y, m.y1))}
+            r={3.2}
+            data-testid="spectrum-point"
+          />
         </g>
       ))}
       {m.limits.map((l, k) => {
@@ -132,7 +177,10 @@ export function SpectrumChart({ trackId, model, verdict }: { trackId: string; mo
           <g key={`lim${k}`} data-testid="spectrum-limit">
             <line className="lim" x1={x} x2={x} y1={y} y2={y - 12} />
             <line className="lim" x1={x - 4} x2={x + 4} y1={y} y2={y} />
-            <path className="limh" d={`M${x - 3.5},${y - 10}L${x + 3.5},${y - 10}L${x},${y - 16}Z`} />
+            <path
+              className="limh"
+              d={`M${x - 3.5},${y - 10}L${x + 3.5},${y - 10}L${x},${y - 16}Z`}
+            />
           </g>
         );
       })}
@@ -188,13 +236,22 @@ export interface SpectrumBlockProps {
 }
 
 /** The Spectrum section (chart and key); none for `one_colour`, nothing to compare. */
-export function SpectrumSection({ spectrum: t, spectra, measuredOnly, fixture }: Omit<SpectrumBlockProps, 'flags'>) {
+export function SpectrumSection({
+  spectrum: t,
+  spectra,
+  measuredOnly,
+  fixture,
+}: Omit<SpectrumBlockProps, 'flags'>) {
   if (t.verdict === 'one_colour') return null;
   const model = chartModel(t, reflectedRange(spectra.method), measuredOnly);
   if (model.points.length === 0 && model.limits.length === 0) return null;
   const tag = measuredOnly ? spectra.provenance.points.tag : spectra.provenance.colour.tag;
   return (
-    <section className="sx-sp-sec" aria-labelledby={`sp-h-${t.track_id}`} data-testid="spectrum-section">
+    <section
+      className="sx-sp-sec"
+      aria-labelledby={`sp-h-${t.track_id}`}
+      data-testid="spectrum-section"
+    >
       <h3 id={`sp-h-${t.track_id}`}>
         Spectrum
         <ProvenanceBadge
@@ -215,7 +272,11 @@ export function SpectrumSection({ spectrum: t, spectra, measuredOnly, fixture }:
 }
 
 /** The rows under the chart, as `<dt>`/`<dd>` pairs for the card's facts list. */
-export function SpectrumFacts({ spectrum: t, spectra, measuredOnly }: Pick<SpectrumBlockProps, 'spectrum' | 'spectra' | 'measuredOnly'>) {
+export function SpectrumFacts({
+  spectrum: t,
+  spectra,
+  measuredOnly,
+}: Pick<SpectrumBlockProps, 'spectrum' | 'spectra' | 'measuredOnly'>) {
   const colour = colourText(t);
   const steady = measuredOnly ? null : steadyText(t);
   const distance = measuredOnly ? null : distanceText(t);
@@ -254,7 +315,11 @@ const RHO_LATEX = String.raw`\rho = \dfrac{F_{\mathrm{long}} / F_{\mathrm{short}
 const RHO_PLAIN = 'rho equals F long over F short, divided by F sun long over F sun short';
 
 /** "How this is checked" and "Points used n", the same on every track card. */
-export function SpectrumHow({ spectrum: t, spectra, flags }: Pick<SpectrumBlockProps, 'spectrum' | 'spectra' | 'flags'>) {
+export function SpectrumHow({
+  spectrum: t,
+  spectra,
+  flags,
+}: Pick<SpectrumBlockProps, 'spectrum' | 'spectra' | 'flags'>) {
   const scatter = starScatter(spectra.calibration);
   const fallback = spectra.method.settings.sigma_sys_default;
   const floor =
@@ -270,52 +335,58 @@ export function SpectrumHow({ spectrum: t, spectra, flags }: Pick<SpectrumBlockP
     .map((p) => ({ p, f: flags(p.dot_id) }));
   return (
     <div className="sx-sp-acc">
-    <Rows>
-      <Row title="How this is checked" testId="spectrum-how">
-        <ol className="sx-sp-rules">
-          <li>
-            <b>Two detectors at once.</b> Each exposure sees the mover at a short and a long wavelength at the same moment, so
-            spin and distance cancel out of their ratio.
-          </li>
-          <li>
-            <b>Compared with the Sun.</b> The ratio is divided by the Sun’s own ratio at the same two wavelengths:
-            <FormulaMath latex={RHO_LATEX} plain={RHO_PLAIN} testId="spectrum-formula" />
-            Grey rocks give about 1; red rocks up to about 3. A warm body adds heat glow at the long end, more the closer it is
-            to the Sun, so a track’s distance from its parallax sets how red it may be. Stars in the same frames check the
-            calibration.
-          </li>
-          <li>
-            <b>Steady between exposures.</b> Exposures are 2 minutes apart. Asteroids larger than about 200 m spin no faster
-            than once per 2.2 hours, so their brightness can change only about 10% in that time, {floor}.
-          </li>
-        </ol>
-        <p className="sx-sp-src">
-          Sources: Pravec and Harris 2000 (spin limit); Harris 1998 (heat glow model, NEATM).
-        </p>
-      </Row>
-      <Row title="Points used" count={t.points.filter((p) => p.used).length} testId="spectrum-points">
-        <ul className="sx-sp-points" data-testid="spectrum-points-list">
-          {rows.map(({ p, f }) => (
-            <li key={p.dot_id} data-used={p.used || undefined}>
-              <span>
-                {whenUtc(p.time)} · D{p.detector} · {p.lambda_um.toFixed(2)} µm
-              </span>
-              <span>
-                {Math.round(p.flux_uJy)} ± {Math.round(p.flux_err)} µJy · SNR {p.snr.toFixed(1)}
-                {f.length > 0 ? ` · ${f.join(', ')}` : ''}
-                {p.used
-                  ? p.point
-                    ? ''
-                    : ' · used as a limit only'
-                  : !p.point
-                    ? ` · not used: below SNR ${typeof snrMin === 'number' ? snrMin : 'the minimum'}`
-                    : ' · not used: no pair or step'}
-              </span>
+      <Rows>
+        <Row title="How this is checked" testId="spectrum-how">
+          <ol className="sx-sp-rules">
+            <li>
+              <b>Two detectors at once.</b> Each exposure sees the mover at a short and a long
+              wavelength at the same moment, so spin and distance cancel out of their ratio.
             </li>
-          ))}
-        </ul>
-      </Row>
-    </Rows>
+            <li>
+              <b>Compared with the Sun.</b> The ratio is divided by the Sun’s own ratio at the same
+              two wavelengths:
+              <FormulaMath latex={RHO_LATEX} plain={RHO_PLAIN} testId="spectrum-formula" />
+              Grey rocks give about 1; red rocks up to about 3. A warm body adds heat glow at the
+              long end, more the closer it is to the Sun, so a track’s distance from its parallax
+              sets how red it may be. Stars in the same frames check the calibration.
+            </li>
+            <li>
+              <b>Steady between exposures.</b> Exposures are 2 minutes apart. Asteroids larger than
+              about 200 m spin no faster than once per 2.2 hours, so their brightness can change
+              only about 10% in that time, {floor}.
+            </li>
+          </ol>
+          <p className="sx-sp-src">
+            Sources: Pravec and Harris 2000 (spin limit); Harris 1998 (heat glow model, NEATM).
+          </p>
+        </Row>
+        <Row
+          title="Points used"
+          count={t.points.filter((p) => p.used).length}
+          testId="spectrum-points"
+        >
+          <ul className="sx-sp-points" data-testid="spectrum-points-list">
+            {rows.map(({ p, f }) => (
+              <li key={p.dot_id} data-used={p.used || undefined}>
+                <span>
+                  {whenUtc(p.time)} · D{p.detector} · {p.lambda_um.toFixed(2)} µm
+                </span>
+                <span>
+                  {Math.round(p.flux_uJy)} ± {Math.round(p.flux_err)} µJy · SNR {p.snr.toFixed(1)}
+                  {f.length > 0 ? ` · ${f.join(', ')}` : ''}
+                  {p.used
+                    ? p.point
+                      ? ''
+                      : ' · used as a limit only'
+                    : !p.point
+                      ? ` · not used: below SNR ${typeof snrMin === 'number' ? snrMin : 'the minimum'}`
+                      : ' · not used: no pair or step'}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </Row>
+      </Rows>
     </div>
   );
 }

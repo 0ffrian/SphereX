@@ -21,8 +21,12 @@ export function psatWater(T: number): number {
   if (T < 273.16) return Math.exp(9.550426 - 5723.265 / T + 3.53068 * Math.log(T) - 0.00728332 * T);
   const t = Math.min(T, 373.15);
   const p = Math.exp(
-    54.842763 - 6763.22 / t - 4.21 * Math.log(t) + 0.000367 * t +
-      Math.tanh(0.0415 * (t - 218.8)) * (53.878 - 1331.22 / t - 9.44523 * Math.log(t) + 0.014025 * t),
+    54.842763 -
+      6763.22 / t -
+      4.21 * Math.log(t) +
+      0.000367 * t +
+      Math.tanh(0.0415 * (t - 218.8)) *
+        (53.878 - 1331.22 / t - 9.44523 * Math.log(t) + 0.014025 * t),
   );
   // FLUIDS.water.L = 40650 J/mol (the prototype's 373 K heat).
   return T > 373.15 ? p * Math.exp((40650 / 8.314) * (1 / 373.15 - 1 / T)) : p;
@@ -36,7 +40,9 @@ export function isWaiting(air: AirModel): boolean {
 /** The engine's "Strongest hurricane possible" (core.js worldUi), m/s. */
 export function hurricaneVmax(Tmax: number, Ps_bar: number): number {
   const qst = (0.622 * psatWater(Tmax)) / (Ps_bar * 1e5);
-  return Math.sqrt(((HURRICANE.eff * (Tmax - HURRICANE.To)) / HURRICANE.To) * HURRICANE.Lv * qst * HURRICANE.ck);
+  return Math.sqrt(
+    ((HURRICANE.eff * (Tmax - HURRICANE.To)) / HURRICANE.To) * HURRICANE.Lv * qst * HURRICANE.ck,
+  );
 }
 
 function num(v: unknown): number | null {
@@ -80,7 +86,15 @@ export function buildAirModel(world: CardToWorldOk, e: WorldEngineLike): AirMode
   const Ps = num(st.Ps);
   const refusals: Refusal[] = [];
   const inputs: TaggedInput[] = [];
-  const dataOK = Ts !== null && Ts > 0 && Hm !== null && Hm > 0 && gv !== null && gv > 0 && U !== null && (gas || Ps !== null);
+  const dataOK =
+    Ts !== null &&
+    Ts > 0 &&
+    Hm !== null &&
+    Hm > 0 &&
+    gv !== null &&
+    gv > 0 &&
+    U !== null &&
+    (gas || Ps !== null);
 
   // Provenance: a slider value differing from the card's is the user's choice (artistic), not the card's tag.
   const psSlid = !gas && Ps !== null && Ps !== preset.Ps;
@@ -114,10 +128,19 @@ export function buildAirModel(world: CardToWorldOk, e: WorldEngineLike): AirMode
   const statsOcean = num(climate?.stats?.ocean);
   const runaway = !!m.runaway;
   const canLiquid = m.canLiquid === true;
-  const localLiquid = !gas && !runaway && canLiquid && m.state !== 'liquid' && statsOcean !== null && statsOcean > 0 && openWater !== null && openWater > 0;
+  const localLiquid =
+    !gas &&
+    !runaway &&
+    canLiquid &&
+    m.state !== 'liquid' &&
+    statsOcean !== null &&
+    statsOcean > 0 &&
+    openWater !== null &&
+    openWater > 0;
   let liquid = null as AirModel['liquid'];
   if (lavaWorld) liquid = liquidFor(fluid, true);
-  else if (!gas && !runaway && canLiquid && (m.state === 'liquid' || localLiquid)) liquid = liquidFor(fluid, false);
+  else if (!gas && !runaway && canLiquid && (m.state === 'liquid' || localLiquid))
+    liquid = liquidFor(fluid, false);
 
   // Ocean share (coordinator ruling 1): engine climate statistics, else the preset, else 0.
   let oceanF = 0;
@@ -139,8 +162,16 @@ export function buildAirModel(world: CardToWorldOk, e: WorldEngineLike): AirMode
   const Tmax = num(climate?.stats?.max);
   const cyclones = e.weatherFields()?.cyclones?.length ?? 0;
   if (
-    airOK && !gas && !lavaWorld && fluid === 'water' && liquid?.name === 'water' && cyclones > 0 &&
-    Tmax !== null && Tmax > HURRICANE.Tmin && Ps !== null && Ps >= HURRICANE.PsMin
+    airOK &&
+    !gas &&
+    !lavaWorld &&
+    fluid === 'water' &&
+    liquid?.name === 'water' &&
+    cyclones > 0 &&
+    Tmax !== null &&
+    Tmax > HURRICANE.Tmin &&
+    Ps !== null &&
+    Ps >= HURRICANE.PsMin
   ) {
     const v = hurricaneVmax(Tmax, Ps);
     if (Number.isFinite(v) && v > 0) {
@@ -151,63 +182,203 @@ export function buildAirModel(world: CardToWorldOk, e: WorldEngineLike): AirMode
 
   // ---------- refusals ----------
   if (!dataOK) refusals.push({ source: 'all', reason: REFUSAL_TEXT.dataGap });
-  else if (!airOK) refusals.push({ source: 'all', reason: lavaWorld ? REFUSAL_TEXT.lavaNoAir : REFUSAL_TEXT.noAir });
+  else if (!airOK)
+    refusals.push({
+      source: 'all',
+      reason: lavaWorld ? REFUSAL_TEXT.lavaNoAir : REFUSAL_TEXT.noAir,
+    });
   else if (waiting) refusals.push({ source: 'all', reason: REFUSAL_TEXT.waiting });
   else if (!gas && !lavaWorld) {
     if (!liquid) {
       const why = runaway ? REFUSAL_TEXT.boiledAway : REFUSAL_TEXT.noLiquid;
-      for (const s of ['S1_sea', 'S4', 'S5', 'S6', 'S7'] as const) refusals.push({ source: s, reason: why });
+      for (const s of ['S1_sea', 'S4', 'S5', 'S6', 'S7'] as const)
+        refusals.push({ source: s, reason: why });
     } else {
       if (!(oceanF > 0)) {
-        for (const s of ['S1_sea', 'S4', 'S5'] as const) refusals.push({ source: s, reason: REFUSAL_TEXT.noSea });
+        for (const s of ['S1_sea', 'S4', 'S5'] as const)
+          refusals.push({ source: s, reason: REFUSAL_TEXT.noSea });
       }
-      if (typeof hydro?.n === 'number' && hydro.n === 0) refusals.push({ source: 'S7', reason: REFUSAL_TEXT.noRivers });
+      if (typeof hydro?.n === 'number' && hydro.n === 0)
+        refusals.push({ source: 'S7', reason: REFUSAL_TEXT.noRivers });
     }
   }
 
   // ---------- tagged inputs (§12.3 "What you hear") ----------
   const md: Tag = 'model_dependent';
-  if (!gas && Ps !== null) inputs.push({ label: 'Surface pressure', value: Ps, unit: 'bar', tag: psTag, source: psSlid ? 'slider' : 'card world' });
-  else if (gas) inputs.push({ label: 'Reference pressure', value: P0 / 1e5, unit: 'bar', tag: md, source: 'engine (gas giant cloud deck, Pref)' });
-  inputs.push({ label: 'Surface liquid', value: fluid, unit: '', tag: fluidTag, source: fluidSlid ? 'slider' : 'card world' });
-  inputs.push({ label: 'Molar mass', value: mu, unit: 'g/mol', tag: tags.mu ?? md, source: 'card world' });
-  if (Ts !== null) inputs.push({ label: 'Air temperature', value: Ts, unit: 'K', tag: md, source: 'engine model' });
-  if (gv !== null) inputs.push({ label: 'Gravity', value: gv, unit: 'm/s²', tag: md, source: 'engine model' });
-  if (Hm !== null) inputs.push({ label: 'Scale height', value: H_km, unit: 'km', tag: md, source: 'engine model' });
+  if (!gas && Ps !== null)
+    inputs.push({
+      label: 'Surface pressure',
+      value: Ps,
+      unit: 'bar',
+      tag: psTag,
+      source: psSlid ? 'slider' : 'card world',
+    });
+  else if (gas)
+    inputs.push({
+      label: 'Reference pressure',
+      value: P0 / 1e5,
+      unit: 'bar',
+      tag: md,
+      source: 'engine (gas giant cloud deck, Pref)',
+    });
+  inputs.push({
+    label: 'Surface liquid',
+    value: fluid,
+    unit: '',
+    tag: fluidTag,
+    source: fluidSlid ? 'slider' : 'card world',
+  });
+  inputs.push({
+    label: 'Molar mass',
+    value: mu,
+    unit: 'g/mol',
+    tag: tags.mu ?? md,
+    source: 'card world',
+  });
+  if (Ts !== null)
+    inputs.push({
+      label: 'Air temperature',
+      value: Ts,
+      unit: 'K',
+      tag: md,
+      source: 'engine model',
+    });
+  if (gv !== null)
+    inputs.push({ label: 'Gravity', value: gv, unit: 'm/s²', tag: md, source: 'engine model' });
+  if (Hm !== null)
+    inputs.push({
+      label: 'Scale height',
+      value: H_km,
+      unit: 'km',
+      tag: md,
+      source: 'engine model',
+    });
   if (U !== null) {
     const measuredWind = gas && tags.Umeas === 'measured';
-    inputs.push({ label: 'Wind scale', value: U, unit: 'm/s', tag: measuredWind ? 'measured' : md, source: measuredWind ? 'card (measured jets)' : 'engine model' });
+    inputs.push({
+      label: 'Wind scale',
+      value: U,
+      unit: 'm/s',
+      tag: measuredWind ? 'measured' : md,
+      source: measuredWind ? 'card (measured jets)' : 'engine model',
+    });
   }
-  inputs.push({ label: 'Air type', value: cls, unit: '', tag: 'inferred_from_analog', source: 'composition class from fluid and molar mass (§3.2)' });
-  inputs.push({ label: 'Ratio of specific heats', value: gamma, unit: '', tag: 'inferred_from_analog', source: 'class table (§4.2)' });
+  inputs.push({
+    label: 'Air type',
+    value: cls,
+    unit: '',
+    tag: 'inferred_from_analog',
+    source: 'composition class from fluid and molar mass (§3.2)',
+  });
+  inputs.push({
+    label: 'Ratio of specific heats',
+    value: gamma,
+    unit: '',
+    tag: 'inferred_from_analog',
+    source: 'class table (§4.2)',
+  });
   if (dataOK) {
-    inputs.push({ label: 'Speed of sound', value: c0, unit: 'm/s', tag: 'derived', source: 'c0 = √(γ R T0 / M)' });
-    inputs.push({ label: 'Air density', value: rho0, unit: 'kg/m³', tag: 'derived', source: 'ρ0 = P0 M / (R T0)' });
-    inputs.push({ label: 'Acoustic impedance', value: rho0 * c0, unit: 'kg m⁻² s⁻¹', tag: 'derived', source: 'Z0 = ρ0 c0' });
+    inputs.push({
+      label: 'Speed of sound',
+      value: c0,
+      unit: 'm/s',
+      tag: 'derived',
+      source: 'c0 = √(γ R T0 / M)',
+    });
+    inputs.push({
+      label: 'Air density',
+      value: rho0,
+      unit: 'kg/m³',
+      tag: 'derived',
+      source: 'ρ0 = P0 M / (R T0)',
+    });
+    inputs.push({
+      label: 'Acoustic impedance',
+      value: rho0 * c0,
+      unit: 'kg m⁻² s⁻¹',
+      tag: 'derived',
+      source: 'Z0 = ρ0 c0',
+    });
   }
-  if (cls === 'N2') inputs.push({ label: 'Humidity (for absorption)', value: RH_ASSUMED * 100, unit: '%', tag: 'inferred_from_analog', source: 'assumed 50 % (ISO 9613-1)' });
+  if (cls === 'N2')
+    inputs.push({
+      label: 'Humidity (for absorption)',
+      value: RH_ASSUMED * 100,
+      unit: '%',
+      tag: 'inferred_from_analog',
+      source: 'assumed 50 % (ISO 9613-1)',
+    });
   if (lavaWorld && airOK) {
     // R6: the lava world's thin rock-vapour air is assumed (cardToWorld ROCK_VAPOUR), so its sound carries that label.
-    inputs.push({ label: 'Atmosphere', value: 'thin rock vapour (assumed)', unit: '', tag: 'inferred_from_analog', source: 'assumed atmosphere (Schaefer & Fegley 2009 analog)' });
-    inputs.push({ label: 'Sound absorption', value: 'CO₂-like (rock vapour analog)', unit: '', tag: 'inferred_from_analog', source: 'CO₂ class absorption for mu 44 (§4.3)' });
+    inputs.push({
+      label: 'Atmosphere',
+      value: 'thin rock vapour (assumed)',
+      unit: '',
+      tag: 'inferred_from_analog',
+      source: 'assumed atmosphere (Schaefer & Fegley 2009 analog)',
+    });
+    inputs.push({
+      label: 'Sound absorption',
+      value: 'CO₂-like (rock vapour analog)',
+      unit: '',
+      tag: 'inferred_from_analog',
+      source: 'CO₂ class absorption for mu 44 (§4.3)',
+    });
   }
   if (localLiquid && openWater !== null) {
-    inputs.push({ label: 'Open water share', value: openWater, unit: '', tag: 'model_dependent', source: 'engine climate (stats.liquid)' });
+    inputs.push({
+      label: 'Open water share',
+      value: openWater,
+      unit: '',
+      tag: 'model_dependent',
+      source: 'engine climate (stats.liquid)',
+    });
   }
   if (Vmax !== null) {
-    inputs.push({ label: 'Strongest hurricane', value: Vmax, unit: 'm/s', tag: 'model_dependent', source: vmaxClamped ? 'engine formula, capped at 100 m/s' : 'engine formula' });
+    inputs.push({
+      label: 'Strongest hurricane',
+      value: Vmax,
+      unit: 'm/s',
+      tag: 'model_dependent',
+      source: vmaxClamped ? 'engine formula, capped at 100 m/s' : 'engine formula',
+    });
   }
-  if (!gas) inputs.push({ label: 'Ocean share', value: oceanF, unit: '', tag: oceanTag, source: oceanSrc });
+  if (!gas)
+    inputs.push({ label: 'Ocean share', value: oceanF, unit: '', tag: oceanTag, source: oceanSrc });
 
   return {
-    gas, cls, fluid, state: typeof m.state === 'string' ? m.state : '',
-    T0, P0, H_km, mu, gamma, gv: gv ?? 0, gamK: num(m.gamK) ?? 0,
-    c0, rho0, Z0: rho0 * c0,
-    airOK, liquid, lavaWorld,
-    Uscale: U ?? 0, Us: K_SURF * (U ?? 0), phiH: num(m.phiH) ?? 0, Om: num(m.Om) ?? 0,
-    locked: !!st.locked, res32: deriveRes32(world, gas),
-    R_km: preset.Rj * 71492, zc_km: num(m.zc), regime: typeof m.regime === 'string' ? m.regime : '',
-    seed, Vmax, seed3, oceanF, presetId: preset.id,
-    inputs, refusals,
+    gas,
+    cls,
+    fluid,
+    state: typeof m.state === 'string' ? m.state : '',
+    T0,
+    P0,
+    H_km,
+    mu,
+    gamma,
+    gv: gv ?? 0,
+    gamK: num(m.gamK) ?? 0,
+    c0,
+    rho0,
+    Z0: rho0 * c0,
+    airOK,
+    liquid,
+    lavaWorld,
+    Uscale: U ?? 0,
+    Us: K_SURF * (U ?? 0),
+    phiH: num(m.phiH) ?? 0,
+    Om: num(m.Om) ?? 0,
+    locked: !!st.locked,
+    res32: deriveRes32(world, gas),
+    R_km: preset.Rj * 71492,
+    zc_km: num(m.zc),
+    regime: typeof m.regime === 'string' ? m.regime : '',
+    seed,
+    Vmax,
+    seed3,
+    oceanF,
+    presetId: preset.id,
+    inputs,
+    refusals,
   };
 }

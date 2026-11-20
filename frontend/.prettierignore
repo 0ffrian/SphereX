@@ -11,3 +11,6 @@ src/engine/stars/protoStar*.js
 src/engine/worlds/__fixtures__/*.json
 # Spec R13 App. B: the ambience contract is copied verbatim from the spec.
 src/sound/ambience/types.ts
+# Recorded data, kept byte for byte as written by the tools that make it.
+e2e/fixtures/runs/*.json
+public/demo/eros/*.json

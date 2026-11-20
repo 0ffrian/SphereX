@@ -11,8 +11,17 @@
 import type { Strike } from './types';
 import { hash32 } from './hash';
 import {
-  BOLT_BRIGHT_S, BOLT_FADE_S, BOLT_LATE_S, BOLT_STROKE_GAP_S, BOLT_STROKES_MAX, BOLT_STROKES_MIN, FLASH_MIN_GAP_S,
-  GLOW_ATTACK_S, GLOW_FADE_S, SAFE_GLOW_S, STRIKE_STALE_S,
+  BOLT_BRIGHT_S,
+  BOLT_FADE_S,
+  BOLT_LATE_S,
+  BOLT_STROKE_GAP_S,
+  BOLT_STROKES_MAX,
+  BOLT_STROKES_MIN,
+  FLASH_MIN_GAP_S,
+  GLOW_ATTACK_S,
+  GLOW_FADE_S,
+  SAFE_GLOW_S,
+  STRIKE_STALE_S,
 } from './tuning';
 
 export interface FlashGroup {

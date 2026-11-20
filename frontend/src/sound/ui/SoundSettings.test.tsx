@@ -48,8 +48,7 @@ afterEach(async () => {
   vi.restoreAllMocks();
 });
 
-const q = <T extends HTMLElement>(id: string) =>
-  host.querySelector<T>(`[data-testid="${id}"]`)!;
+const q = <T extends HTMLElement>(id: string) => host.querySelector<T>(`[data-testid="${id}"]`)!;
 
 async function render() {
   await act(async () =>

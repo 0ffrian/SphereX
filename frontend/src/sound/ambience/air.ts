@@ -4,8 +4,25 @@
 import type { FluidKey } from '@/engine/worlds/types';
 import type { AirAt, AirModel, CompClass } from './types';
 import {
-  CO2_ABS, CO2_MU_MIN, DB_PER_NP, EARTH_REF, GAMMA, H2_MU_DEFAULT, H2_MU_MAX, H2_TRANSPORT, ISO, ISO_H_MAX,
-  LP_F_MAX, LP_F_MIN, LP_LOSS_NP, MU_WET_BELOW, P_FLOOR, RH_ASSUMED, R_GAS, SUTHERLAND, T_FLOOR_FRAC,
+  CO2_ABS,
+  CO2_MU_MIN,
+  DB_PER_NP,
+  EARTH_REF,
+  GAMMA,
+  H2_MU_DEFAULT,
+  H2_MU_MAX,
+  H2_TRANSPORT,
+  ISO,
+  ISO_H_MAX,
+  LP_F_MAX,
+  LP_F_MIN,
+  LP_LOSS_NP,
+  MU_WET_BELOW,
+  P_FLOOR,
+  RH_ASSUMED,
+  R_GAS,
+  SUTHERLAND,
+  T_FLOOR_FRAC,
 } from './tuning';
 
 /** §3.2 composition class: CO2 when the fluid is CO2 or mu >= 40; H2 when mu < 4; otherwise N2 (water-rich included). */
@@ -77,11 +94,13 @@ export function isoDbPerM(f: number, pa: number, T: number): number {
   // Molar concentration of water vapour in percent; capped (ASSUMPTION) where ISO's validity ends (steam worlds).
   const h = Math.min((RH_ASSUMED * 100 * psatRel) / prel, ISO_H_MAX * 100);
   const frO = prel * (24 + (4.04e4 * h * (0.02 + h)) / (0.391 + h));
-  const frN = prel * Math.pow(tr, -0.5) * (9 + 280 * h * Math.exp(-4.17 * (Math.pow(tr, -1 / 3) - 1)));
+  const frN =
+    prel * Math.pow(tr, -0.5) * (9 + 280 * h * Math.exp(-4.17 * (Math.pow(tr, -1 / 3) - 1)));
   const f2 = f * f;
   const relax =
     Math.pow(tr, -2.5) *
-    ((ISO.aO * Math.exp(-ISO.bO / T)) / (frO + f2 / frO) + (ISO.aN * Math.exp(-ISO.bN / T)) / (frN + f2 / frN));
+    ((ISO.aO * Math.exp(-ISO.bO / T)) / (frO + f2 / frO) +
+      (ISO.aN * Math.exp(-ISO.bN / T)) / (frN + f2 / frN));
   return 8.686 * f2 * (ISO.cl * (1 / prel) * Math.sqrt(tr) + relax);
 }
 
@@ -89,7 +108,10 @@ function co2Thin(f: number, P: number, T: number): number {
   const fr = CO2_ABS.fr * (P / CO2_ABS.pRef);
   const aInf = CO2_ABS.alphaInf * (P / CO2_ABS.pRef);
   const x = f / fr;
-  return CO2_ABS.aCl * f * f * (CO2_ABS.pRef / P) * Math.sqrt(T / CO2_ABS.tRef) + (aInf * x * x) / (1 + x * x);
+  return (
+    CO2_ABS.aCl * f * f * (CO2_ABS.pRef / P) * Math.sqrt(T / CO2_ABS.tRef) +
+    (aInf * x * x) / (1 + x * x)
+  );
 }
 
 function co2Thick(f: number): number {
@@ -104,7 +126,10 @@ function h2Classical(f: number, P: number, T: number): number {
   const t = T / H2_TRANSPORT.tRef;
   const muV = H2_TRANSPORT.mu0 * Math.pow(t, H2_TRANSPORT.muExp);
   const k = H2_TRANSPORT.k0 * Math.pow(t, H2_TRANSPORT.kExp);
-  return ((2 * Math.PI * Math.PI * f * f) / (rho * c * c * c)) * ((4 / 3) * muV + ((g - 1) * k) / H2_TRANSPORT.cp);
+  return (
+    ((2 * Math.PI * Math.PI * f * f) / (rho * c * c * c)) *
+    ((4 / 3) * muV + ((g - 1) * k) / H2_TRANSPORT.cp)
+  );
 }
 
 /**
@@ -112,14 +137,16 @@ function h2Classical(f: number, P: number, T: number): number {
  * Returns Infinity (silence) for non-physical inputs, never NaN.
  */
 export function absorption(fHz: number, P: number, T: number, cls: CompClass): number {
-  if (!(P > 0) || !(T > 0) || !(fHz > 0) || !Number.isFinite(P) || !Number.isFinite(T)) return Infinity;
+  if (!(P > 0) || !(T > 0) || !(fHz > 0) || !Number.isFinite(P) || !Number.isFinite(T))
+    return Infinity;
   let a: number;
   if (cls === 'N2') a = isoDbPerM(fHz, P, T) / DB_PER_NP;
   else if (cls === 'H2') a = h2Classical(fHz, P, T);
   else if (P <= CO2_ABS.pRef) a = co2Thin(fHz, P, T);
   else if (P >= CO2_ABS.venusP) a = co2Thick(fHz);
   else {
-    const t = (Math.log(P) - Math.log(CO2_ABS.pRef)) / (Math.log(CO2_ABS.venusP) - Math.log(CO2_ABS.pRef));
+    const t =
+      (Math.log(P) - Math.log(CO2_ABS.pRef)) / (Math.log(CO2_ABS.venusP) - Math.log(CO2_ABS.pRef));
     const lt = Math.log(co2Thin(fHz, CO2_ABS.pRef, T));
     const lk = Math.log(co2Thick(fHz));
     a = Math.exp(lt + (lk - lt) * t);
@@ -165,6 +192,7 @@ export function bedWorldDb(air: AirModel, z_km: number, id: string): number {
   const a = airAt(air, z_km);
   const e = earthRef();
   if (id === 'S2' || id === 'S3') return 20 * Math.log10(a.rho / a.c / (e.rho / e.c));
-  if (id === 'S1_land' || id === 'S1_sea' || id === 'S9' || id === 'S12') return 20 * Math.log10(a.rho / e.rho);
+  if (id === 'S1_land' || id === 'S1_sea' || id === 'S9' || id === 'S12')
+    return 20 * Math.log10(a.rho / e.rho);
   return 10 * Math.log10(a.Z / e.Z);
 }

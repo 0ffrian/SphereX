@@ -174,7 +174,9 @@ export function BuildPane() {
   // ambience on.
   const sound = useSound();
   const soundStatus = useSoundStatus();
-  const settings = useSoundSettings(useShallow((st) => ({ soundOn: st.soundOn, ambienceOn: st.ambienceOn })));
+  const settings = useSoundSettings(
+    useShallow((st) => ({ soundOn: st.soundOn, ambienceOn: st.ambienceOn })),
+  );
   const atmoOn = useAmbienceStore((s) => s.ambience && s.playing && s.key === (card?.id ?? ''));
   const audible = settings.soundOn && (atmoOn || (soundStatus.unlocked && settings.ambienceOn));
   const renderPop = (b: (typeof POP_BUTTONS)[number]) => (
@@ -199,7 +201,15 @@ export function BuildPane() {
   useEffect(() => {
     if (!ambienceOn) return;
     const onM = (e: globalThis.KeyboardEvent) => {
-      if (e.key.toLowerCase() !== 'm' || e.altKey || e.ctrlKey || e.metaKey || e.defaultPrevented || isEditableTarget(e.target)) return;
+      if (
+        e.key.toLowerCase() !== 'm' ||
+        e.altKey ||
+        e.ctrlKey ||
+        e.metaKey ||
+        e.defaultPrevented ||
+        isEditableTarget(e.target)
+      )
+        return;
       useAmbienceStore.getState().stop();
     };
     window.addEventListener('keydown', onM);

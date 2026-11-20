@@ -19,12 +19,15 @@ import { fitCamera, flyToView, enterInArea, safeRect } from '@/app/sky/areaDraw'
 import { formatAreaDims, useAreaStore } from './areaStore';
 import { useShellStore } from './shellStore';
 
-const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+const reducedMotion = () =>
+  window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
 
 /** Flies the sky to fit the whole area (and refits at once when the window is resized). */
 function useFitSquare(): void {
   const fitSeq = useAreaStore((s) => s.fitSeq);
-  const windowOn = useAreaStore((s) => s.screen === 'eros' || s.screen === 'disc' || s.screen === 'mover');
+  const windowOn = useAreaStore(
+    (s) => s.screen === 'eros' || s.screen === 'disc' || s.screen === 'mover',
+  );
   useEffect(() => {
     if (fitSeq === 0) return;
     // After the card is laid out, so its left edge is known.
@@ -76,7 +79,8 @@ function useReportAreaBox(): void {
     const el = find();
     if (el) {
       mo.observe(el, { childList: true, subtree: true, characterData: true, attributes: true });
-      if (el.parentElement) mo.observe(el.parentElement, { attributes: true, attributeFilter: ['style'] });
+      if (el.parentElement)
+        mo.observe(el.parentElement, { attributes: true, attributeFilter: ['style'] });
       el.addEventListener('load', soon, true);
     }
     window.addEventListener('resize', soon);
@@ -160,7 +164,15 @@ function DrawCard() {
       // Typing in a field keeps Enter; so does any button except the dock tool that started this
       // (focus is still on it right after the click, and Enter must work from there).
       const dockTool = !!t?.closest('[data-testid="tool-known"], [data-testid="tool-area"]');
-      if (t && !dockTool && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'BUTTON' || t.isContentEditable)) return;
+      if (
+        t &&
+        !dockTool &&
+        (t.tagName === 'INPUT' ||
+          t.tagName === 'TEXTAREA' ||
+          t.tagName === 'BUTTON' ||
+          t.isContentEditable)
+      )
+        return;
       if (dockTool) e.preventDefault(); // not a second click on the tool
       enterInArea();
     };
@@ -168,7 +180,8 @@ function DrawCard() {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
   // Issue #157 (mock-up state 1): the pointer is the region; a click or tap selects it.
-  const coarse = typeof window !== 'undefined' && (window.matchMedia?.('(pointer: coarse)').matches ?? false);
+  const coarse =
+    typeof window !== 'undefined' && (window.matchMedia?.('(pointer: coarse)').matches ?? false);
   const lead = `${coarse ? 'Tap' : 'Click'} a region to scan`;
   const rest = `${coarse ? 'pinch' : 'scroll'} to resize · drag to turn the sky`;
   return (

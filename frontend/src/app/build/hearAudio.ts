@@ -9,7 +9,15 @@ import { getBus as getSoundBus, holdDuck, type DuckHold } from '@/sound/audioGra
 import { getSoundSettings, useSoundSettings, type SoundSettingsValues } from '@/sound/settings';
 import { claimSpectrumSound, type SpectrumClaim } from '@/sound/spectrumExclusive';
 import { DUCK_SAFETY_S } from '@/sound/tuning';
-import { cutoffHz, freqAt, howlHz, loudness, SPEC_POINTS, SPEC_SECONDS, type AtmosphereModel } from './hearModel';
+import {
+  cutoffHz,
+  freqAt,
+  howlHz,
+  loudness,
+  SPEC_POINTS,
+  SPEC_SECONDS,
+  type AtmosphereModel,
+} from './hearModel';
 
 export const MASTER_GAIN = 0.9;
 
@@ -146,7 +154,10 @@ export function startAtmosphere(m: AtmosphereModel): AtmosphereHandle | null {
     tick: (t, p) => {
       if (!alive) return;
       const { P, c, s } = p;
-      let g = 0.5 + 0.5 * Math.sin(t * 0.0007 * (0.6 + s)) * Math.sin(t * 0.00031 + 1.3) + 0.25 * Math.sin(t * 0.0021 * s);
+      let g =
+        0.5 +
+        0.5 * Math.sin(t * 0.0007 * (0.6 + s)) * Math.sin(t * 0.00031 + 1.3) +
+        0.25 * Math.sin(t * 0.0021 * s);
       g = Math.max(0.05, Math.min(1, 0.25 + g * s));
       const base = loudness(P) * (0.25 + 0.75 * s);
       const now = ctx.currentTime;
@@ -183,7 +194,10 @@ export interface SpectrumHandle {
  * 0.75 µm down to 220 Hz at 5 µm, as the chord and the Listen sweep), over the rest of SPEC_SECONDS;
  * gain from flux. It takes the one spectrum-sound slot (Q-446): the chord or the Listen sweep stops.
  */
-export function startSpectrum(values: readonly (number | null)[], from: number): SpectrumHandle | null {
+export function startSpectrum(
+  values: readonly (number | null)[],
+  from: number,
+): SpectrumHandle | null {
   const b = getBus();
   if (!b) return null;
   // Q-446: one spectrum sound at a time. Claimed before anything is scheduled, so the chord or the

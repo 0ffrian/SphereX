@@ -6,9 +6,26 @@ import { describe, expect, it } from 'vitest';
 
 const dir = join(process.cwd(), 'src', 'sound', 'ambience');
 // Red M3: only #112's physics modules (#113's dsp.ts times its bakes and has its own imports).
-const MODULES = ['types', 'tuning', 'air', 'liquids', 'airModel', 'wind', 'sources', 'weather', 'levels', 'captions'];
+const MODULES = [
+  'types',
+  'tuning',
+  'air',
+  'liquids',
+  'airModel',
+  'wind',
+  'sources',
+  'weather',
+  'levels',
+  'captions',
+];
 const files = readdirSync(dir).filter((f) => MODULES.includes(f.replace(/\.ts$/, '')));
-const ALLOWED = [/^\.\//, /^@\/contract$/, /^@\/engine\/worlds\/types$/, /^@\/engine\/worlds\/cardToWorld$/, /^@\/engine\/worlds\/presets\.js$/];
+const ALLOWED = [
+  /^\.\//,
+  /^@\/contract$/,
+  /^@\/engine\/worlds\/types$/,
+  /^@\/engine\/worlds\/cardToWorld$/,
+  /^@\/engine\/worlds\/presets\.js$/,
+];
 
 describe('ambience core purity', () => {
   it('scans every listed module', () => expect(files.length).toBe(MODULES.length));

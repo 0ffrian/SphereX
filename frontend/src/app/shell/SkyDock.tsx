@@ -35,7 +35,9 @@ const TOOLS: { id: 'known' | 'area'; flow: AreaFlow; label: string; hint: string
 ];
 
 /** The icons do not animate when the user asks for reduced motion. */
-const prefersStill = () => typeof window !== 'undefined' && (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false);
+const prefersStill = () =>
+  typeof window !== 'undefined' &&
+  (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false);
 
 export function SkyDock() {
   const still = prefersStill();
@@ -106,9 +108,21 @@ export function SkyDock() {
                   >
                     {/* Hugeicons from Animate UI (mock-up section 0): orbit and view, animated on hover. */}
                     {t.id === 'known' ? (
-                      <OrbitIcon size={20} strokeWidth={1.8} animateOnHover={!still} className="sx-ico size-5" aria-hidden="true" />
+                      <OrbitIcon
+                        size={20}
+                        strokeWidth={1.8}
+                        animateOnHover={!still}
+                        className="sx-ico size-5"
+                        aria-hidden="true"
+                      />
                     ) : (
-                      <ViewIcon size={20} strokeWidth={1.8} animateOnHover={!still} className="sx-ico size-5" aria-hidden="true" />
+                      <ViewIcon
+                        size={20}
+                        strokeWidth={1.8}
+                        animateOnHover={!still}
+                        className="sx-ico size-5"
+                        aria-hidden="true"
+                      />
                     )}
                     <span className="sx-tool-tip" aria-hidden="true">
                       {t.label}

@@ -33,7 +33,10 @@ export const NO_ORBIT_NOTE = 'Orbit not known: a Track follows a known object’
 const tip = (p: AreaProvenanceEntry) => p.formula ?? p.assumption ?? p.source ?? '';
 
 /** The track's dots' frame times (dot ids are `<frame_id>:<n>`), from the summary's frames. Pure. */
-export function trackTimes(t: Pick<AreaTrack, 'tracklets'>, summary: Pick<AreaSummary, 'frames'> | null): string[] {
+export function trackTimes(
+  t: Pick<AreaTrack, 'tracklets'>,
+  summary: Pick<AreaSummary, 'frames'> | null,
+): string[] {
   if (!summary) return [];
   const byFrame = new Map(summary.frames.map((f) => [f.frame_id, f.time]));
   const out: string[] = [];
@@ -117,7 +120,9 @@ export function RealTrackCard({
       testId="area-card"
     >
       <div className="sx-live" data-testid="real-track-card">
-        {spectrum && !spectrum.measuredOnly && <SpectrumVerdictLine spectrum={spectrum.track} matched={obj !== null} />}
+        {spectrum && !spectrum.measuredOnly && (
+          <SpectrumVerdictLine spectrum={spectrum.track} matched={obj !== null} />
+        )}
         {spectrum && (
           <SpectrumSection
             spectrum={spectrum.track}
@@ -129,7 +134,11 @@ export function RealTrackCard({
         {/* #173: three facts up top (colour, visits, steadiness); the rest folds away. */}
         <dl className="sx-tr">
           {spectrum && (
-            <SpectrumFacts spectrum={spectrum.track} spectra={spectrum.spectra} measuredOnly={spectrum.measuredOnly} />
+            <SpectrumFacts
+              spectrum={spectrum.track}
+              spectra={spectrum.spectra}
+              measuredOnly={spectrum.measuredOnly}
+            />
           )}
           <dt>Visits</dt>
           <dd>
@@ -137,23 +146,39 @@ export function RealTrackCard({
           </dd>
         </dl>
         <div className="sx-tags">
-          <ProvenanceBadge tag={provenance.tracks.tag} tooltip={tip(provenance.tracks)} fixture={synthetic} />
+          <ProvenanceBadge
+            tag={provenance.tracks.tag}
+            tooltip={tip(provenance.tracks)}
+            fixture={synthetic}
+          />
           {t.match ? (
-            <ProvenanceBadge tag={provenance.match.tag} tooltip={tip(provenance.match)} fixture={synthetic} />
+            <ProvenanceBadge
+              tag={provenance.match.tag}
+              tooltip={tip(provenance.match)}
+              fixture={synthetic}
+            />
           ) : (
-            <span className="sx-chip sx-chip-dot" style={{ ['--dot' as string]: 'var(--p-asm)' }} data-testid="track-no-orbit">
+            <span
+              className="sx-chip sx-chip-dot"
+              style={{ ['--dot' as string]: 'var(--p-asm)' }}
+              data-testid="track-no-orbit"
+            >
               Orbit not known
             </span>
           )}
         </div>
-        {obj && !obj.objectId && <Alert tone="warn" title="No JPL id" line="Its Track cannot be computed here." />}
+        {obj && !obj.objectId && (
+          <Alert tone="warn" title="No JPL id" line="Its Track cannot be computed here." />
+        )}
         <div className="sx-live-btns">
           <button
             type="button"
             className="sx-btn-outline sx-live-primary"
             disabled={!track_}
             onClick={track_ ?? undefined}
-            title={track_ ? undefined : obj ? 'No JPL id or visit time for this object' : NO_ORBIT_NOTE}
+            title={
+              track_ ? undefined : obj ? 'No JPL id or visit time for this object' : NO_ORBIT_NOTE
+            }
             data-testid="track-track"
           >
             <RouteIcon />
@@ -197,7 +222,13 @@ export function RealTrackCard({
             </Row>
           </Rows>
         </div>
-        {spectrum && <SpectrumHow spectrum={spectrum.track} spectra={spectrum.spectra} flags={spectrum.flags} />}
+        {spectrum && (
+          <SpectrumHow
+            spectrum={spectrum.track}
+            spectra={spectrum.spectra}
+            flags={spectrum.flags}
+          />
+        )}
       </div>
     </PanelCard>
   );

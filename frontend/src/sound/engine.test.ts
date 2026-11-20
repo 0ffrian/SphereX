@@ -3,11 +3,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { HapticEvent } from '@/contract';
 import { FakeAudioContext, type FakeSource } from '@/test/fakeAudio';
-import {
-  FakeClock,
-  FakeDriver,
-  PlainDriver,
-} from '@/test/fakeSound';
+import { FakeClock, FakeDriver, PlainDriver } from '@/test/fakeSound';
 import { setAudioContextFactory } from './audioContext';
 import { AudioDriver } from './voices';
 import {

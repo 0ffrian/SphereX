@@ -3,14 +3,35 @@ import { describe, expect, it } from 'vitest';
 import { projectFly } from '@/engine/worlds/WorldEngine';
 import type { Strike } from './types';
 import {
-  boltPolyline, buildRain, buildSnow, classifyStrike, clipSegmentNear, deckRadius, depthOf, edgeSide, particleCount,
-  projectPx, rainLean, smallAreaLimitPx2, streakLengthPx, strikeWorld, tintCss,
+  boltPolyline,
+  buildRain,
+  buildSnow,
+  classifyStrike,
+  clipSegmentNear,
+  deckRadius,
+  depthOf,
+  edgeSide,
+  particleCount,
+  projectPx,
+  rainLean,
+  smallAreaLimitPx2,
+  streakLengthPx,
+  strikeWorld,
+  tintCss,
 } from './weatherDraw';
 import { makeBasis } from './weatherDraw.testutil';
 import { NEAR_KM } from './tuning';
 
-const W = 800, H = 500;
-const strike = (bearing: number, d_m: number, seed = 9): Strike => ({ t0: 1, d_m, bearing, seed, variant: 2, flash: true });
+const W = 800,
+  H = 500;
+const strike = (bearing: number, d_m: number, seed = 9): Strike => ({
+  t0: 1,
+  d_m,
+  bearing,
+  seed,
+  variant: 2,
+  flash: true,
+});
 
 describe('counts and determinism', () => {
   it('N = round(max * density), capped at 600 rain and 400 snow', () => {
@@ -22,13 +43,16 @@ describe('counts and determinism', () => {
   });
 
   it('same seed and frame bucket give byte-identical rain; another bucket differs', () => {
-    const a = new Float32Array(2400), b = new Float32Array(2400), c = new Float32Array(2400);
+    const a = new Float32Array(2400),
+      b = new Float32Array(2400),
+      c = new Float32Array(2400);
     buildRain(a, 600, 42, 1000, W, H, 400, 9.2, 0.1);
     buildRain(b, 600, 42, 1000, W, H, 400, 9.2, 0.1);
     buildRain(c, 600, 42, 1001, W, H, 400, 9.2, 0.1);
     expect(Buffer.from(a.buffer).equals(Buffer.from(b.buffer))).toBe(true);
     expect(Buffer.from(a.buffer).equals(Buffer.from(c.buffer))).toBe(false);
-    const s1 = new Float32Array(1200), s2 = new Float32Array(1200);
+    const s1 = new Float32Array(1200),
+      s2 = new Float32Array(1200);
     expect(buildSnow(s1, 400, 3, 2.5, W, H, 400, 1)).toEqual([100, 140, 160]);
     buildSnow(s2, 400, 3, 2.5, W, H, 400, 1);
     expect(Buffer.from(s1.buffer).equals(Buffer.from(s2.buffer))).toBe(true);
@@ -69,9 +93,17 @@ describe('rain look', () => {
 describe('projection and the near plane (H2)', () => {
   it('projectPx matches WorldEngine.projectFly', () => {
     const b = makeBasis({ head: 0.3, pitch: -0.2, altKm: 2 });
-    const p: [number, number, number] = [b.cam[0] + b.fwd[0] * 0.002 + b.rt[0] * 0.0005, b.cam[1] + b.fwd[1] * 0.002 + b.rt[1] * 0.0005, b.cam[2] + b.fwd[2] * 0.002 + b.rt[2] * 0.0005];
+    const p: [number, number, number] = [
+      b.cam[0] + b.fwd[0] * 0.002 + b.rt[0] * 0.0005,
+      b.cam[1] + b.fwd[1] * 0.002 + b.rt[1] * 0.0005,
+      b.cam[2] + b.fwd[2] * 0.002 + b.rt[2] * 0.0005,
+    ];
     const m = (v: readonly number[]) => [v[0]!, v[1]!, v[2]!] as [number, number, number];
-    const f = projectFly({ cam: m(b.cam), fwd: m(b.fwd), rt: m(b.rt), up: m(b.up), fov: b.fov }, W / H, p);
+    const f = projectFly(
+      { cam: m(b.cam), fwd: m(b.fwd), rt: m(b.rt), up: m(b.up), fov: b.fov },
+      W / H,
+      p,
+    );
     const px = projectPx(b, W, H, p)!;
     expect(px[0]).toBeCloseTo(((f.x + 1) / 2) * W, 6);
     expect(px[1]).toBeCloseTo(((1 - f.y) / 2) * H, 6);
@@ -79,10 +111,22 @@ describe('projection and the near plane (H2)', () => {
 
   it('points behind and just in front of the camera: clipped, never NaN', () => {
     const b = makeBasis({ altKm: 1 });
-    const behind: [number, number, number] = [b.cam[0] - b.fwd[0] * 0.01, b.cam[1] - b.fwd[1] * 0.01, b.cam[2] - b.fwd[2] * 0.01];
-    const front: [number, number, number] = [b.cam[0] + b.fwd[0] * 0.01, b.cam[1] + b.fwd[1] * 0.01, b.cam[2] + b.fwd[2] * 0.01];
+    const behind: [number, number, number] = [
+      b.cam[0] - b.fwd[0] * 0.01,
+      b.cam[1] - b.fwd[1] * 0.01,
+      b.cam[2] - b.fwd[2] * 0.01,
+    ];
+    const front: [number, number, number] = [
+      b.cam[0] + b.fwd[0] * 0.01,
+      b.cam[1] + b.fwd[1] * 0.01,
+      b.cam[2] + b.fwd[2] * 0.01,
+    ];
     const eps = (NEAR_KM / b.rkm) * 0.5;
-    const justIn: [number, number, number] = [b.cam[0] + b.fwd[0] * eps, b.cam[1] + b.fwd[1] * eps, b.cam[2] + b.fwd[2] * eps];
+    const justIn: [number, number, number] = [
+      b.cam[0] + b.fwd[0] * eps,
+      b.cam[1] + b.fwd[1] * eps,
+      b.cam[2] + b.fwd[2] * eps,
+    ];
     expect(projectPx(b, W, H, behind)).toBeNull();
     expect(projectPx(b, W, H, justIn)).toBeNull();
     expect(clipSegmentNear(b, behind, justIn)).toBeNull();
@@ -99,10 +143,11 @@ describe('projection and the near plane (H2)', () => {
     const cls = classifyStrike(b, W, H, w, false, false);
     expect(['inView', 'edge']).toContain(cls);
     const seg = clipSegmentNear(b, w.top, w.foot);
-    if (seg) for (const q of seg) {
-      const p = projectPx(b, W, H, q);
-      if (p) expect(p.every(Number.isFinite)).toBe(true);
-    }
+    if (seg)
+      for (const q of seg) {
+        const p = projectPx(b, W, H, q);
+        if (p) expect(p.every(Number.isFinite)).toBe(true);
+      }
   });
 });
 
@@ -117,7 +162,8 @@ describe('the drawn deck (H3) and strike classes', () => {
     const b = makeBasis({ head: 0, altKm: 0.5 });
     const ahead = strikeWorld(strike(0, 8000), 0, 0, 0.5, b, 1.5, () => 0)!;
     expect(classifyStrike(b, W, H, ahead, false, false)).toBe('inView');
-    const top = projectPx(b, W, H, ahead.top)!, foot = projectPx(b, W, H, ahead.foot)!;
+    const top = projectPx(b, W, H, ahead.top)!,
+      foot = projectPx(b, W, H, ahead.foot)!;
     expect(top[1]).toBeLessThan(foot[1]);
     const right = strikeWorld(strike(2.2, 8000), 0, 0, 0.5, b, 1.5, () => 0)!;
     expect(classifyStrike(b, W, H, right, false, false)).toBe('edge');

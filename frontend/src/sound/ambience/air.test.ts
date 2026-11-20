@@ -1,10 +1,22 @@
 // §16 test 1: air physics anchors (R5 for Mars).
 import { describe, expect, it } from 'vitest';
-import { absorption, airAt, ceilingKm, classify, density, earthRef, gammaFor, isoDbPerM, lowpassHz, soundSpeed } from './air';
+import {
+  absorption,
+  airAt,
+  ceilingKm,
+  classify,
+  density,
+  earthRef,
+  gammaFor,
+  isoDbPerM,
+  lowpassHz,
+  soundSpeed,
+} from './air';
 import { earthAir, makeAir, marsAir } from './fakeEngine.testutil';
 import type { CompClass } from './types';
 
-const within = (v: number, target: number, frac: number) => expect(Math.abs(v - target)).toBeLessThanOrEqual(Math.abs(target) * frac);
+const within = (v: number, target: number, frac: number) =>
+  expect(Math.abs(v - target)).toBeLessThanOrEqual(Math.abs(target) * frac);
 
 describe('air: sound speed, density, impedance', () => {
   it('Earth reference air: c 340 m/s ±1 %, rho ≈ 1.2', () => {
@@ -60,7 +72,11 @@ describe('air: absorption anchors (§4.3)', () => {
 
   it('CO2 interpolation is continuous at both ends and monotone (falling) in P at 1 kHz, as classical and relaxation loss both fall with P', () => {
     within(absorption(1000, 600 * 1.0001, 210, 'CO2'), absorption(1000, 600, 210, 'CO2'), 0.001);
-    within(absorption(1000, 9.2e6 * 0.9999, 210, 'CO2'), absorption(1000, 9.2e6, 210, 'CO2'), 0.001);
+    within(
+      absorption(1000, 9.2e6 * 0.9999, 210, 'CO2'),
+      absorption(1000, 9.2e6, 210, 'CO2'),
+      0.001,
+    );
     let last = Infinity;
     for (const P of [600, 2e3, 1e4, 1e5, 1e6, 9.2e6]) {
       const a = absorption(1000, P, 210, 'CO2');

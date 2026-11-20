@@ -4,7 +4,16 @@ import { earthAir, makeAir } from './fakeEngine.testutil';
 import { compass8, fromDeg, localBasis, rankineV, substellar, windAt, type WindCtx } from './wind';
 
 const ctx = (o: Partial<WindCtx> = {}): WindCtx => ({
-  exposure: 0, relief: 0, z_km: 0.01, cyclone: null, landT: null, seaT: null, sCoast_km: null, overSea: false, jetU: null, ...o,
+  exposure: 0,
+  relief: 0,
+  z_km: 0.01,
+  cyclone: null,
+  landT: null,
+  seaT: null,
+  sCoast_km: null,
+  overSea: false,
+  jetU: null,
+  ...o,
 });
 
 describe('local frame (amendment 3)', () => {
@@ -125,7 +134,8 @@ describe('§6.5 item 6: the order of worlds', () => {
     const S = substellar();
     const lonS = Math.atan2(S[2], S[0]);
     const latS = Math.asin(S[1]);
-    expect(windAt(locked, lonS + Math.PI / 2, 0, ctx()).U10).toBeGreaterThan(windAt(locked, lonS, latS, ctx()).U10);
+    expect(windAt(locked, lonS + Math.PI / 2, 0, ctx()).U10).toBeGreaterThan(
+      windAt(locked, lonS, latS, ctx()).U10,
+    );
   });
 });
-

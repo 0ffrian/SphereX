@@ -66,7 +66,10 @@ describe('Hear it on the shared sound engine', () => {
     a.stop();
     expect(duckHolds(ctx.asAudioContext())).toBe(0);
     startSpectrum(values, 0);
-    const osc = ctx.sources().filter((s: FakeSource) => s.type === 'triangle').at(-1)!;
+    const osc = ctx
+      .sources()
+      .filter((s: FakeSource) => s.type === 'triangle')
+      .at(-1)!;
     osc.end();
     expect(duckHolds(ctx.asAudioContext())).toBe(0);
     const wind = startAtmosphere(model)!;

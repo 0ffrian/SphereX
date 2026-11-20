@@ -16,4 +16,7 @@ interface Store {
   chart: StarChartState | null;
   set(c: StarChartState | null): void;
 }
-export const useStarChart = create<Store>((set) => ({ chart: null, set: (chart) => set({ chart }) }));
+export const useStarChart = create<Store>((set) => ({
+  chart: null,
+  set: (chart) => set({ chart }),
+}));

@@ -135,7 +135,11 @@ export function Transport() {
               gap={1}
               rounded
               color={
-                wavelengthUm !== null ? (monochrome && !demo ? '#a1a1aa' : wavelengthColor(wavelengthUm)) : '#a1a1aa'
+                wavelengthUm !== null
+                  ? monochrome && !demo
+                    ? '#a1a1aa'
+                    : wavelengthColor(wavelengthUm)
+                  : '#a1a1aa'
               }
               {...(playing
                 ? {
@@ -143,7 +147,11 @@ export function Transport() {
                     sequence: ['wave-lr', 'ripple-out', 'wave-rl', 'ripple-in'],
                     speed: 'fast' as const,
                   }
-                : { mode: 'pulse' as const, pattern: 'plus-hollow' as const, speed: 'slow' as const })}
+                : {
+                    mode: 'pulse' as const,
+                    pattern: 'plus-hollow' as const,
+                    speed: 'slow' as const,
+                  })}
             />
           </span>
           <span>
