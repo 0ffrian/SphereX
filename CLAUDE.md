@@ -34,6 +34,7 @@ If two docs disagree and `docs/decisions/` is silent, follow the precedence (dec
 - **All development happens on a branch** (`feat/…`, `fix/…`, `docs/…`, `chore/…`) and reaches `main` through a pull request. Review it with `/sx-pr-review`.
 - **Never commit or push directly to `main`.** The only exceptions were the initial repo and frontend setup (4 Nov 2026), which the user approved explicitly.
 - Agents may create branches and commit locally. Pushing and opening PRs happen when the user asks.
+- **`main` is protected by a ruleset** (Q-484): a merge needs the `ci-gate` check, an approval from someone other than the author and last pusher, and a code-owner approval for owned paths. Owners and open paths: [CONTRIBUTING.md](CONTRIBUTING.md) and `.github/CODEOWNERS`. Admins and maintainers can override it on a PR merge (bypass checkbox, Q-484); agents never use that override, never disable the ruleset and never try to get around it. If a PR is blocked, report it.
 - **PR titles are `Issue-<n>: <title>`**, where `<n>` is the ticket the PR closes (e.g. `Issue-3: Add the Track time slider`). A PR with no ticket gets one first, through `/sx-ticket`. Link the ticket in the body too (`Closes #<n>`).
 
 ## Tickets
@@ -43,11 +44,11 @@ If two docs disagree and `docs/decisions/` is silent, follow the precedence (dec
 2. The author approves it or asks for changes. After changes, show the whole revised draft again and wait.
 3. Only after an explicit approval of that version: create it, link what it blocks and what blocks it, and add it to the project "SphereX and PlanetX - NASA COMPETITION 2026" with Status **Backlog**.
 
-Use `/sx-ticket` for this. Agents and reviewers never run `gh issue create`: they return follow-ups as drafts marked **must-fix** or **good-to-have**, and the PR author decides which become tickets.
+Approval counts only from the user's own message, never from another agent's report or a relayed claim. Only `/sx-ticket`, run by the main session after approval, creates issues. Subagents and reviewers never create issues by any means (`gh issue create`, `gh api`, MCP tools): they return follow-ups as drafts marked **must-fix** or **good-to-have**, with a "by when", and the PR author decides which become tickets.
 
 ## Agents and skills
 
-Project agents live in `.claude/agents/` and skills in `.claude/skills/`. Agents work autonomously: they don't stop to ask for permission. They make the smallest reasonable choice and report their assumptions.
+Project agents live in `.claude/agents/` and skills in `.claude/skills/`. Agents work autonomously: they don't stop to ask for permission. They make the smallest reasonable choice and report their assumptions. Exceptions: creating issues (see "Tickets") and the `main` ruleset (see "Git workflow").
 
 | Skill | Does |
 |---|---|
@@ -92,7 +93,7 @@ frontend/   Vite + TypeScript + React app, viewer, sound     (Moon; Atish for so
 shared/     JSON schemas shared by backend and frontend      (Moon)
 ```
 
-Owners per area: decisions D-17.
+Owners per area: decisions D-17 (who leads the work); merge approvals: Q-484 and [CONTRIBUTING.md](CONTRIBUTING.md).
 
 **Moving objects.** Track (one known object's path, frames, zoom and spectrum; the MVP is 433 Eros, Q-131, Q-137) and Area search (draw a square, then Known objects or Discovery, Q-146) are specified in A16–A20 in [docs/architecture/moving-objects/](docs/architecture/README.md#fragments); decisions in [moving-objects.md](docs/decisions/moving-objects.md) (agreed), [moving-frames.md](docs/decisions/moving-frames.md) (the path cone search, its refusal codes, MOST) and [moving-objects-review.md](docs/decisions/moving-objects-review.md) (proposed fixes, Moon's review list Q-202).
 - Q-146 is the plan. Q-203 adds four **gated extras** after the core demo works (12 Nov): completeness with a planted test mover, the shuffled-time control, the spectrum smoothness score and the rate-grid linker (A16.7, A16.8, tickets D4 to D7); an extra not finished and tested by 13 Nov is cut and hidden. Phase 2 (after the event, do not build now): ADES, live areas anywhere, a larger completeness grid. Planted data never enters `known`, `tracks`, the step counts or the real export and always carries the Injected badge. No single catch-rate number; an unmatched track is never "an asteroid", "new" or "a discovery" (A16.5).
