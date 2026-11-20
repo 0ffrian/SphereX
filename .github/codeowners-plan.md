@@ -1,6 +1,6 @@
 # Plan: code owners, required CI and `main` protection
 
-Status (18 Nov 2026): step 1 done (alt accounts removed; fork-PR CI approval set to `all_external_contributors`). Step 2 built on `chore/ci-gate`; steps 3–4 built on `chore/codeowners`. Neither pushed. **Step 5 done early** (ruleset `main`, id 27523962, active, PR-only bypass for admin and maintain roles since 20 Nov, `ci-gate` pinned to app 15368, verified from a real check run): the `chore/ci-gate` PR reports `ci-gate` from its own run, so it can merge; other PRs report `ci-gate` only once `ci.yml` is on `main` and they are updated. Step 5b (merge queue) waits for the `chore/ci-gate` PR. Steps 6–7 not started.
+Status (20 Nov 2026): steps 1, 2 (PR #183, merged 20 Nov), 3–4 (PR #186), 5 and 5b done. Ruleset `main` (id 27523962): active, PR-only bypass for the admin and maintain roles, `ci-gate` pinned to app 15368, merge queue on (MERGE, ALLGREEN, build up to 5, merge 1 to 5, 60 min check timeout). Next: step 6 (test matrix) after #186 merges, then step 7 (delete this plan).
 Delete this file in the last PR (step 7); the lasting rules go into `CONTRIBUTING.md`.
 
 ## 0. Starting state (checked 18 Nov 2026)
