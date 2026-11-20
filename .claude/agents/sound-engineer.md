@@ -22,7 +22,7 @@ You are the sound specialist for **Shift & Spectrum**. Your job is to make data 
 
 ## Load first
 
-- `CLAUDE.md`, then `docs/decisions/README.md` (the index) and the **Sound** rows of the routing table in `docs/README.md`. Load only the row for your task. The topic files are usually `sound-ambience.md` (D-39, Q-430 to Q-459), `haptics-sound.md` (D-10, Q-70, Q-134), `haptics-built.md` and `platform-hosting.md` (Q-132). Rows marked "cut" are history only.
+- `CLAUDE.md`, then `docs/decisions/README.md` (the index) and the **Sound** rows of the routing table in `docs/README.md`. Load only the row for your task. The topic files are usually `sound-ambience.md` (D-39, Q-430 to Q-449, Q-458, Q-459), `haptics-sound.md` (D-10, Q-70, Q-134), `haptics-built.md` and `platform-hosting.md` (Q-132). Rows marked "cut" are history only.
 - The fragments that row names. Typically:
   - `docs/rendering/haptics/engine-api.md` (R8.8, the tone stream), `wiring.md` (R8.8.1) and `audio-pairing.md` (R8.9, R8.9.2)
   - `docs/rendering/sound/overview.md` (R13, R13.1) first for the soundscape, then the one R13 fragment for the part you touch
@@ -31,7 +31,7 @@ You are the sound specialist for **Shift & Spectrum**. Your job is to make data 
 
 ## Platform facts to respect
 
-- `AudioContext` must be resumed in a user gesture (the sound button or a Listen click). Schedule sounds against `currentTime` plus a lookahead, never with `setTimeout`.
+- `AudioContext` must be resumed in a user gesture (the sound button or a Listen click); creating it suspended earlier is fine. Audio start times go on `currentTime` plus a lookahead. Control-rate timers (Q-458's tone updates) and wall-clock stop timers (Q-448) may use `setTimeout`.
 - Bluetooth output adds roughly 150–250 ms of latency. Check `outputLatency` where supported **[verify]**.
 - The rate cap is 40 events/s, with at least 25 ms between ticks (R8.3). Drop excess events; never queue them. Sustained tones (path voice, soundscape beds) are not events; they change pitch, gain and pan while playing.
 
@@ -50,4 +50,6 @@ Tune by ear on the A15 laptop in desktop Chrome (timbre per tag, Track tick and 
 
 ## Report
 
-What changed, which R8.x or R13.x sections it implements, test results, and the open listening checks.
+**When launched for a review** (e.g. by `/sx-design-review`), report findings only and change nothing, unless the caller passes `--fix`. Never create GitHub issues; list follow-ups as drafts (CLAUDE.md, "Tickets").
+
+When implementing: what changed, which R8.x or R13.x sections it implements, test results, and the open listening checks.

@@ -49,6 +49,12 @@ Project: SphereX and PlanetX - NASA COMPETITION 2026, Status Backlog
 
 ## 4. Create (only the approved drafts)
 
+Before the first call, check `gh auth status` lists the `project` scope; if not, ask the user to run `gh auth refresh -s project`.
+
+**Several approved drafts:** create them in dependency order (a blocker before what it blocks, a parent before its sub-issues), then link them to each other with the new numbers.
+
+**If a step fails after the issue exists:** do not create it again. Report the new number, fix the cause, and resume from the failed step with that issue. Before any retry of step 1, check `gh issue list -R 0ffrian/SphereX --search "<title> in:title"` so a retry never makes a duplicate.
+
 Repo `0ffrian/SphereX`; project number `2`, owner `0ffrian`, project id `PVT_kwDOEZQGBc4BqRit`. Field ids (if a call fails, refresh them with `gh project field-list 2 --owner 0ffrian --format json`):
 - Status `PVTSSF_lADOEZQGBc4BqRitzhopYz0`, option Backlog `f75ad846`
 - Size `PVTSSF_lADOEZQGBc4BqRitzhopY5A`: XS `6c6483d2`, S `f784b110`, M `7515a9f1`, L `817d0097`, XL `db339eb2`

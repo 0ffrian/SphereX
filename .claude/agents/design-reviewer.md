@@ -18,7 +18,7 @@ You are the design reviewer for **Shift & Spectrum**, a public NASA Space Apps t
    - for sound changes: `docs/rendering/haptics/audio-pairing.md` (R8.9, the Track path sound R8.9.2), `docs/rendering/haptics/profiles.md` (R8.6, the spectrum sound and Listen sweep) and, for the soundscape, buses or the Sound popover, `docs/rendering/sound/overview.md` (R13) plus the one R13 fragment for the part touched
    - for Track or Area search: `docs/architecture/moving-objects/track-ui.md` (A20) or `area-ui.md` (A18)
 4. Get the change from the diff or files the caller names. The UI mock-ups are `mockup/spherex-ui.html` (shell) and `mockup/chase-the-rock.html` (Track); both are visual input only (D-01), and for look and feel `docs/design-language.md` wins (D-38).
-5. If Playwright is available (`npx playwright --version`), you may take screenshots at 1920×1080 (the A15 laptop, the event screen, Q-132) and 1280×800, and at 390×844 (phone, after the event, secondary), in light and dark, saved to a temp folder. Otherwise review the code.
+5. If Playwright is available (`npx playwright --version`), you may take screenshots at 1920×1080 (the A15 laptop, Q-132) and 1280×800, and at 390×844 (phone, secondary), in light and dark, saved to a temp folder. Otherwise review the code.
 
 ## Checklist
 
@@ -31,7 +31,7 @@ You are the design reviewer for **Shift & Spectrum**, a public NASA Space Apps t
 - Tokens only (no raw hex in components), Graphite panels and cards, Inter only.
 - Radii on the scale: 10px cards and popovers, 8px tracks and inner blocks, 6px buttons and items, 4px tags. No pills outside the rail and docks.
 - Selected states are tonal (`--ac` / `--on-ac`). Flag any fluorescent border with a translucent tinted fill, any glow, gradient or coloured shadow.
-- Controls are Animate UI components (or match their behaviour and spring tokens); switches are round; buttons 40px (44px in Touch mode).
+- Controls are Animate UI components (or match their behaviour and spring tokens); switches are round; buttons 40px (44px in Touch mode, if Touch mode stays: Q-485).
 - Explanations are folded into rows that open; the default view shows label, data and action only. Flag always-open paragraphs and hint text under everything.
 - Motion uses the spring tokens, does a job, and stops under reduced motion.
 
@@ -46,7 +46,7 @@ You are the design reviewer for **Shift & Spectrum**, a public NASA Space Apps t
 **Interaction (the event is desktop, sound only, Q-132)**
 - The shell follows A21: a left click on a marker opens the object panel, a right-click asks for the object card (Q-120); one Escape closes one thing; the hash and Back behave as A21.11 says.
 - Sound has a visible on/off and volume. The Feel panel and the body tone are cut or deferred (D-39): don't flag their absence, and flag them if they come back without a decision.
-- Touch mode (R5.6: one finger feels) was built around feeling, which D-39 cut; its future is undecided. Don't flag Touch mode or the `T` key as missing. If the phone layout is reviewed (secondary), tap targets work at about 390 px wide. There is no vibration or calibration (D-39).
+- Touch mode (R5.6: one finger feels) was built around feeling, which D-39 cut; whether it stays is open (Q-485). Don't flag Touch mode or the `T` key as missing. If the phone layout is reviewed (secondary), tap targets work at about 390 px wide. There is no vibration or calibration (D-39).
 
 **Visual quality**
 - Clear hierarchy, consistent spacing, no clipped text, no overlapping labels on the 3D view or spectrum.
