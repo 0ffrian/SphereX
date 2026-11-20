@@ -63,13 +63,21 @@ export function filterKnown(objects: readonly KnownObject[], f: KnownFilter): Kn
 export function rowLine(o: KnownObject): string {
   const parts = [o.kind];
   if (o.vMag !== undefined && o.vMag !== null) parts.push(`V ${o.vMag.toFixed(1)}`);
-  if (o.detection && o.detection.sepPx !== null) parts.push(`${o.detection.sepPx.toFixed(2)} px from predicted`);
-  else parts.push(`${o.frames} frame${o.frames === 1 ? '' : 's'} in ${o.visits} visit${o.visits === 1 ? '' : 's'}`);
+  if (o.detection && o.detection.sepPx !== null)
+    parts.push(`${o.detection.sepPx.toFixed(2)} px from predicted`);
+  else
+    parts.push(
+      `${o.frames} frame${o.frames === 1 ? '' : 's'} in ${o.visits} visit${o.visits === 1 ? '' : 's'}`,
+    );
   return parts.join(' · ');
 }
 
 /** Track it: the Track view at once, or the Track computed first; null when it cannot be. */
-export function trackAction(o: KnownObject, real: RealKnown | null, release: string): (() => void) | null {
+export function trackAction(
+  o: KnownObject,
+  real: RealKnown | null,
+  release: string,
+): (() => void) | null {
   if (canTrack(o)) return () => useAreaStore.getState().openEros(o);
   const around = o.objectId ? trackAround(o, real) : null;
   if (!o.objectId || !around) return null;
@@ -79,11 +87,23 @@ export function trackAction(o: KnownObject, real: RealKnown | null, release: str
 function Chip({ o }: { o: KnownObject }) {
   if (o.detection === undefined) return <span />;
   return o.detection ? (
-    <span className="sx-chip sx-chip-dot" style={{ ['--dot' as string]: 'var(--p-meas)' }} title={`Measured: Discovery found it blind (${o.detection.trackId})`} data-testid="known-chip" data-kind="detected">
+    <span
+      className="sx-chip sx-chip-dot"
+      style={{ ['--dot' as string]: 'var(--p-meas)' }}
+      title={`Measured: Discovery found it blind (${o.detection.trackId})`}
+      data-testid="known-chip"
+      data-kind="detected"
+    >
       Detected
     </span>
   ) : (
-    <span className="sx-chip sx-chip-dot" style={{ ['--dot' as string]: 'var(--p-phys)' }} title={ESTIMATED_NOTE} data-testid="known-chip" data-kind="predicted">
+    <span
+      className="sx-chip sx-chip-dot"
+      style={{ ['--dot' as string]: 'var(--p-phys)' }}
+      title={ESTIMATED_NOTE}
+      data-testid="known-chip"
+      data-kind="predicted"
+    >
       Predicted
     </span>
   );
@@ -93,7 +113,12 @@ function Row({ o, real, release }: { o: KnownObject; real: RealKnown | null; rel
   const track = trackAction(o, real, release);
   const name = [o.id, o.name].filter(Boolean).join(' ');
   return (
-    <div className="sx-kr" data-testid="known-row" data-track={canTrack(o) ? 'yes' : track ? 'compute' : 'no'} data-object={o.designation ?? o.id}>
+    <div
+      className="sx-kr"
+      data-testid="known-row"
+      data-track={canTrack(o) ? 'yes' : track ? 'compute' : 'no'}
+      data-object={o.designation ?? o.id}
+    >
       <b className="sx-kr-num">{o.name ? o.id : ''}</b>
       <span className="sx-kr-nm">
         <span>{o.name || o.id}</span>
@@ -107,7 +132,13 @@ function Row({ o, real, release }: { o: KnownObject; real: RealKnown | null; rel
           disabled={!track}
           onClick={track ?? undefined}
           aria-label={`Track it: ${name}`}
-          title={track ? (canTrack(o) ? undefined : 'Computes its Track first: a few minutes') : NO_ID_NOTE}
+          title={
+            track
+              ? canTrack(o)
+                ? undefined
+                : 'Computes its Track first: a few minutes'
+              : NO_ID_NOTE
+          }
           data-testid="known-track"
         >
           <RouteIcon />
@@ -138,7 +169,9 @@ export function KnownList() {
   useEffect(() => {
     if (!cameFrom) return;
     const key = CSS.escape(cameFrom.designation ?? cameFrom.id);
-    const row = document.querySelector<HTMLElement>(`[data-testid="known-row"][data-object="${key}"]`);
+    const row = document.querySelector<HTMLElement>(
+      `[data-testid="known-row"][data-object="${key}"]`,
+    );
     row?.scrollIntoView({ block: 'nearest' });
     row?.querySelector<HTMLElement>('button')?.focus({ preventScroll: true });
     // Only on arrival.
@@ -167,82 +200,89 @@ export function KnownList() {
       testId="area-card"
     >
       <div className="sx-live sx-results" data-testid="known-card">
-      {refusal ? (
-        <AreaAlert refusal={refusal} />
-      ) : real ? (
-        <RealAreaNotes
-          areaId={real.entry.area_id}
-          release={real.entry.data_release}
-          computedAt={real.known.computed_at}
-          summary={real.summary}
-          synthetic={real.synthetic}
-          missing={real.missing}
-        >
-          <span data-testid="known-skybot">
-            {skybotAt ? `SkyBoT last answered ${dateOf(skybotAt)}` : 'No SkyBoT answer for this area'}
-          </span>
-        </RealAreaNotes>
-      ) : known?.demo ? (
-        <div className="sx-kn-foot">
-          <DemoTag />
+        {refusal ? (
+          <AreaAlert refusal={refusal} />
+        ) : real ? (
+          <RealAreaNotes
+            areaId={real.entry.area_id}
+            release={real.entry.data_release}
+            computedAt={real.known.computed_at}
+            summary={real.summary}
+            synthetic={real.synthetic}
+            missing={real.missing}
+          >
+            <span data-testid="known-skybot">
+              {skybotAt
+                ? `SkyBoT last answered ${dateOf(skybotAt)}`
+                : 'No SkyBoT answer for this area'}
+            </span>
+          </RealAreaNotes>
+        ) : known?.demo ? (
+          <div className="sx-kn-foot">
+            <DemoTag />
+          </div>
+        ) : null}
+        {!refusal && known && marked && objects.length > 0 && (
+          <div className="sx-seg" role="group" aria-label="Show" data-testid="known-filter">
+            {(
+              [
+                ['all', 'All', objects.length],
+                ['detected', 'Detected', nDet],
+                ['predicted', 'Predicted', objects.length - nDet],
+              ] as const
+            ).map(([id, label, n]) => (
+              <button
+                key={id}
+                type="button"
+                aria-pressed={filter === id}
+                onClick={() => {
+                  setFilter(id);
+                  setAll(false);
+                }}
+                data-testid={`known-filter-${id}`}
+              >
+                {label} {n}
+              </button>
+            ))}
+          </div>
+        )}
+        {!refusal && known && (
+          <div className="sx-kr-list" data-testid="known-list">
+            {rows.map((o) => (
+              <Row key={o.designation ?? o.id} o={o} real={real} release={release} />
+            ))}
+          </div>
+        )}
+        {!refusal && known && rows.length < shown.length && (
+          <button
+            type="button"
+            className="sx-btn-outline"
+            onClick={() => setAll(true)}
+            data-testid="known-more"
+          >
+            Show all {shown.length}
+          </button>
+        )}
+        {!refusal && known && objects.length === 0 && (
+          <p className="fb-muted" role="status" data-testid="known-none">
+            No known objects crossed this area.
+          </p>
+        )}
+        {!refusal && marked && objects.length > nDet && (
+          <p className="fb-muted" data-testid="known-predicted-note">
+            {PREDICTED_NOTE}
+          </p>
+        )}
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            className="sx-btn-outline"
+            data-testid="area-redraw"
+            onClick={() => useAreaStore.getState().redraw()}
+          >
+            Choose another region
+          </button>
         </div>
-      ) : null}
-      {!refusal && known && marked && objects.length > 0 && (
-        <div className="sx-seg" role="group" aria-label="Show" data-testid="known-filter">
-          {(
-            [
-              ['all', 'All', objects.length],
-              ['detected', 'Detected', nDet],
-              ['predicted', 'Predicted', objects.length - nDet],
-            ] as const
-          ).map(([id, label, n]) => (
-            <button
-              key={id}
-              type="button"
-              aria-pressed={filter === id}
-              onClick={() => {
-                setFilter(id);
-                setAll(false);
-              }}
-              data-testid={`known-filter-${id}`}
-            >
-              {label} {n}
-            </button>
-          ))}
-        </div>
-      )}
-      {!refusal && known && (
-        <div className="sx-kr-list" data-testid="known-list">
-          {rows.map((o) => (
-            <Row key={o.designation ?? o.id} o={o} real={real} release={release} />
-          ))}
-        </div>
-      )}
-      {!refusal && known && rows.length < shown.length && (
-        <button type="button" className="sx-btn-outline" onClick={() => setAll(true)} data-testid="known-more">
-          Show all {shown.length}
-        </button>
-      )}
-      {!refusal && known && objects.length === 0 && (
-        <p className="fb-muted" role="status" data-testid="known-none">
-          No known objects crossed this area.
-        </p>
-      )}
-      {!refusal && marked && objects.length > nDet && (
-        <p className="fb-muted" data-testid="known-predicted-note">
-          {PREDICTED_NOTE}
-        </p>
-      )}
-      <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          className="sx-btn-outline"
-          data-testid="area-redraw"
-          onClick={() => useAreaStore.getState().redraw()}
-        >
-          Choose another region
-        </button>
-      </div>
       </div>
     </PanelCard>
   );

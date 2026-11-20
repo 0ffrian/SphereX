@@ -26,7 +26,10 @@ export function ExploreIcon({ on, className = 'size-4' }: { on: boolean; classNa
         variants={{
           off: { rotate: 0, transition: reduced ? { duration: 0 } : EXPLORE_SPRING },
           on: { rotate: 180, transition: reduced ? { duration: 0 } : EXPLORE_SPRING },
-          hover: { rotate: [base, base - 25, base + 15, base - 8, base], transition: { duration: 0.6, ease: 'easeInOut' } },
+          hover: {
+            rotate: [base, base - 25, base + 15, base - 8, base],
+            transition: { duration: 0.6, ease: 'easeInOut' },
+          },
         }}
       />
     </motion.svg>

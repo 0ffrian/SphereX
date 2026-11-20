@@ -8,7 +8,8 @@ import { animate } from 'motion';
 /** animate-ui's default spring feel: quick, a little soft, no visible overshoot. UI pacing, not physics. */
 export const EXPLORE_SPRING = { type: 'spring', stiffness: 170, damping: 26, mass: 1 } as const;
 
-const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+const reducedMotion = () =>
+  window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
 
 /**
  * FLIP for the build pane: when its width changes (full view <-> right half), the new width is set at
@@ -30,7 +31,11 @@ export function useSpringResize(ref: RefObject<HTMLElement | null>, key: string)
     const dx = was.centre + inFlight.current - centre;
     inFlight.current = 0;
     if (Math.abs(dx) < 1) return;
-    const a = animate(el, { transform: [`translateX(${dx}px)`, 'translateX(0px)'] }, EXPLORE_SPRING);
+    const a = animate(
+      el,
+      { transform: [`translateX(${dx}px)`, 'translateX(0px)'] },
+      EXPLORE_SPRING,
+    );
     const settle = () => el.style.removeProperty('transform');
     void a.finished.then(settle, () => {});
     return () => {
@@ -126,7 +131,8 @@ export function flyIsland(
       if (stopped) return;
       done?.();
       // Going in: keep the pane at its end values until React has hidden it, so it never flashes back.
-      if (dir === 'in') requestAnimationFrame(() => requestAnimationFrame(() => !stopped && settle()));
+      if (dir === 'in')
+        requestAnimationFrame(() => requestAnimationFrame(() => !stopped && settle()));
       else settle();
     },
     () => {},

@@ -5,8 +5,25 @@ import type { Tag } from '@/contract';
 import { compass8 } from './captions';
 import type { AirModel, PlaceFeatures, WindResult } from './types';
 import {
-  A_L, A_P, A_T, A_W, COAST_FADE_KM, GAS_IU, CYCLONE_REACH, H_BL, H_EARTH_KM, I_U_MIN, K_BR, POLAR_EDGE_MAX, RELIEF_SAT_KM,
-  SHELTER, SPEEDUP, U_MIN, Z0_LAND, Z0_SEA, Z_JET_EARTH,
+  A_L,
+  A_P,
+  A_T,
+  A_W,
+  COAST_FADE_KM,
+  GAS_IU,
+  CYCLONE_REACH,
+  H_BL,
+  H_EARTH_KM,
+  I_U_MIN,
+  K_BR,
+  POLAR_EDGE_MAX,
+  RELIEF_SAT_KM,
+  SHELTER,
+  SPEEDUP,
+  U_MIN,
+  Z0_LAND,
+  Z0_SEA,
+  Z_JET_EARTH,
 } from './tuning';
 
 export { compass8 };
@@ -64,7 +81,12 @@ export function fromDeg(ve: number, vn: number): number {
   return (((to + 180) % 360) + 360) % 360;
 }
 
-interface Pattern { pat: number; ve: number; vn: number; kind: Kind }
+interface Pattern {
+  pat: number;
+  ve: number;
+  vn: number;
+  kind: Kind;
+}
 
 /** §6.5 item 2: the planetary circulation pattern (0..~1.2) and its flow-to direction in the local frame. */
 export function circulation(air: AirModel, lon: number, lat: number): Pattern {
@@ -87,8 +109,15 @@ export function circulation(air: AirModel, lon: number, lat: number): Pattern {
   // ASSUMPTION: one outer edge phi0 = min(2 phiH, 1.45) ends the westerlies and starts the polar cell (the spec's
   // pi/2 - 2 phiH is negative for phiH > pi/4). The westerlies may end at a non-zero value when phi0 = 1.45 (noted).
   const phi0 = Math.min(2 * phiH, POLAR_EDGE_MAX);
-  if (phi < phiH) return { pat: A_T * Math.sin((Math.PI * phi) / phiH), ve: -r2, vn: -hemi * r2, kind: 'trade' };
-  if (phi < phi0) return { pat: A_W * Math.sin((Math.PI * (phi - phiH)) / phiH), ve: r2, vn: hemi * r2, kind: 'westerly' };
+  if (phi < phiH)
+    return { pat: A_T * Math.sin((Math.PI * phi) / phiH), ve: -r2, vn: -hemi * r2, kind: 'trade' };
+  if (phi < phi0)
+    return {
+      pat: A_W * Math.sin((Math.PI * (phi - phiH)) / phiH),
+      ve: r2,
+      vn: hemi * r2,
+      kind: 'westerly',
+    };
   const span = Math.PI / 2 - phi0;
   const u = span > 1e-9 ? Math.max(0, Math.min(1, (phi - phi0) / span)) : 0;
   // ASSUMPTION: polar easterlies blow from the east and equatorward, like the trades (direction not given in §6.5).
@@ -100,7 +129,12 @@ function windTag(air: AirModel): Tag {
   return air.gas && w?.tag === 'measured' ? 'measured' : 'model_dependent';
 }
 
-function heightProfile(air: AirModel, U10: number, z_km: number, overSea: boolean): { Uz: number; Iu: number } {
+function heightProfile(
+  air: AirModel,
+  U10: number,
+  z_km: number,
+  overSea: boolean,
+): { Uz: number; Iu: number } {
   const z0 = overSea ? Z0_SEA : Z0_LAND;
   const zm = Math.max(z_km * 1000, 1);
   const logU = (h: number) => (U10 * Math.log(Math.max(h, z0 * 1.0001) / z0)) / Math.log(10 / z0);
@@ -124,9 +158,17 @@ export function windAt(air: AirModel, lon: number, lat: number, ctx: WindCtx): W
 
   if (air.gas) {
     // §6.6: jetU is already m/s (m.U x the normalised profile), filled by place.ts. Missing -> no wind (never guessed).
-    if (ctx.jetU === null || !Number.isFinite(ctx.jetU)) return { U10: 0, Uz: 0, Iu: I_U_MIN, dirDeg: 0, parts: [], tag };
+    if (ctx.jetU === null || !Number.isFinite(ctx.jetU))
+      return { U10: 0, Uz: 0, Iu: I_U_MIN, dirDeg: 0, parts: [], tag };
     const U = Math.abs(ctx.jetU);
-    return { U10: U, Uz: U, Iu: GAS_IU, dirDeg: ctx.jetU >= 0 ? 270 : 90, parts: [{ kind: 'jet', U }], tag };
+    return {
+      U10: U,
+      Uz: U,
+      Iu: GAS_IU,
+      dirDeg: ctx.jetU >= 0 ? 270 : 90,
+      parts: [{ kind: 'jet', U }],
+      tag,
+    };
   }
 
   const p = circulation(air, lon, lat);
@@ -137,7 +179,12 @@ export function windAt(air: AirModel, lon: number, lat: number, ctx: WindCtx): W
 
   // Item 3: sea/land breeze, a gravity current (Simpson 1994 [verify]).
   let Ubr = 0;
-  if (ctx.landT !== null && ctx.seaT !== null && Number.isFinite(ctx.landT) && Number.isFinite(ctx.seaT)) {
+  if (
+    ctx.landT !== null &&
+    ctx.seaT !== null &&
+    Number.isFinite(ctx.landT) &&
+    Number.isFinite(ctx.seaT)
+  ) {
     const Tm = (ctx.landT + ctx.seaT) / 2; // ASSUMPTION: the spec's Tloc is not in ctx; the mean of the two sides.
     const dT = Math.abs(ctx.landT - ctx.seaT);
     const fade = Math.exp(-Math.max(ctx.sCoast_km ?? 0, 0) / COAST_FADE_KM);
@@ -148,7 +195,10 @@ export function windAt(air: AirModel, lon: number, lat: number, ctx: WindCtx): W
   let U10 = Math.max(Math.sqrt(ve * ve + vn * vn + Ubr * Ubr), U_MIN);
 
   // Item 5: terrain speed-up and shelter.
-  U10 *= 1 + SPEEDUP * Math.max(ctx.exposure, 0) * Math.min(ctx.relief / RELIEF_SAT_KM, 1) - SHELTER * Math.max(-ctx.exposure, 0);
+  U10 *=
+    1 +
+    SPEEDUP * Math.max(ctx.exposure, 0) * Math.min(ctx.relief / RELIEF_SAT_KM, 1) -
+    SHELTER * Math.max(-ctx.exposure, 0);
   U10 = Math.max(U10, U_MIN);
 
   // Item 7: cyclone (modified Rankine); the eye is calm.

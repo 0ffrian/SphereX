@@ -380,7 +380,10 @@ export interface LabelWanted {
  * left), kept in the safe rectangle; one that fits nowhere is not drawn (its track still is, and it
  * keeps its name in the card's list). The selected track's label is always drawn. Pure.
  */
-export function placeLabels(wanted: readonly LabelWanted[], safe: Rect): { id: string; x: number; y: number }[] {
+export function placeLabels(
+  wanted: readonly LabelWanted[],
+  safe: Rect,
+): { id: string; x: number; y: number }[] {
   const order = wanted.map((w, k) => ({ w, k })).sort((a, b) => a.w.rank - b.w.rank || a.k - b.k);
   const boxes: { x0: number; y0: number; x1: number; y1: number }[] = [];
   const out: { id: string; x: number; y: number }[] = [];
@@ -404,7 +407,12 @@ export function placeLabels(wanted: readonly LabelWanted[], safe: Rect): { id: s
     }
     if (!chosen && w.rank === 0) {
       chosen = clampLabel(spots[0]![0], spots[0]![1], w.w, w.h, safe);
-      boxes.push({ x0: chosen.x - PAD, y0: chosen.y - w.h - PAD, x1: chosen.x + w.w + PAD, y1: chosen.y + PAD });
+      boxes.push({
+        x0: chosen.x - PAD,
+        y0: chosen.y - w.h - PAD,
+        x1: chosen.x + w.w + PAD,
+        y1: chosen.y + PAD,
+      });
     }
     if (chosen) out.push({ id: w.id, ...chosen });
   }

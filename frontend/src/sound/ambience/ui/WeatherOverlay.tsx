@@ -7,19 +7,51 @@ import { useEffect, useRef, useState } from 'react';
 import { useSoundSettings } from '@/sound/settings';
 import { FlashGate, groupGlowMax, safeGlow, strokeEnvMax, type FlashGroup } from '../flashGate';
 import {
-  BOLT_CLIP_MARGIN, BOLT_CORE_PX, BOLT_GLOW_PX, BOLT_MIN_PX, BOLT_RGB, CLOUD_GLOW_OPACITY, CLOUD_GLOW_R, DECK_GLOW_R, EDGE_GLOW_W,
-  FLASH_OPACITY, OVERLAY_DPR_CAP, OVERLAY_MAX_FPS, OVERLAY_SNAPSHOT_STALE_S, RAIN_ALPHA, RAIN_STREAKS_MAX, RAIN_WIDTH_PX,
-  SAFE_GLOW_OPACITY, SNOW_FLAKES_MAX,
+  BOLT_CLIP_MARGIN,
+  BOLT_CORE_PX,
+  BOLT_GLOW_PX,
+  BOLT_MIN_PX,
+  BOLT_RGB,
+  CLOUD_GLOW_OPACITY,
+  CLOUD_GLOW_R,
+  DECK_GLOW_R,
+  EDGE_GLOW_W,
+  FLASH_OPACITY,
+  OVERLAY_DPR_CAP,
+  OVERLAY_MAX_FPS,
+  OVERLAY_SNAPSHOT_STALE_S,
+  RAIN_ALPHA,
+  RAIN_STREAKS_MAX,
+  RAIN_WIDTH_PX,
+  SAFE_GLOW_OPACITY,
+  SNOW_FLAKES_MAX,
 } from '../tuning';
 import type { WeatherSnapshot } from '../weatherBus';
 import { getWeather, onStrike, subscribeWeather } from '../weatherBus';
 import {
-  boltPolyline, buildRain, clipToRect, buildSnow, classifyStrike, clipSegmentNear, deckRadius, edgeSide, focalPx, particleCount,
-  polylineLength, projectPx, rainLean, smallAreaLimitPx2, strikeWorld, tintCss, type Basis, type StrikeWorld,
+  boltPolyline,
+  buildRain,
+  clipToRect,
+  buildSnow,
+  classifyStrike,
+  clipSegmentNear,
+  deckRadius,
+  edgeSide,
+  focalPx,
+  particleCount,
+  polylineLength,
+  projectPx,
+  rainLean,
+  smallAreaLimitPx2,
+  strikeWorld,
+  tintCss,
+  type Basis,
+  type StrikeWorld,
 } from '../weatherDraw';
 
 /** The on-screen label while weather is drawn (§8.5 honesty; colour and placement are artistic). */
-export const WEATHER_CAPTION = 'Weather: artist’s impression from the simulated climate · colour not from data';
+export const WEATHER_CAPTION =
+  'Weather: artist’s impression from the simulated climate · colour not from data';
 
 /** The engine surface the overlay reads (WorldEngine implements it; tests fake it). */
 export interface OverlayEngine {
@@ -32,14 +64,34 @@ export interface OverlayEngine {
 /** The canvas calls the overlay makes (a CanvasRenderingContext2D satisfies it; tests record it). */
 export type Ctx2D = Pick<
   CanvasRenderingContext2D,
-  | 'clearRect' | 'beginPath' | 'moveTo' | 'lineTo' | 'stroke' | 'fill' | 'rect' | 'fillRect' | 'setTransform'
-  | 'createRadialGradient' | 'createLinearGradient' | 'strokeStyle' | 'fillStyle' | 'lineWidth' | 'lineCap'
+  | 'clearRect'
+  | 'beginPath'
+  | 'moveTo'
+  | 'lineTo'
+  | 'stroke'
+  | 'fill'
+  | 'rect'
+  | 'fillRect'
+  | 'setTransform'
+  | 'createRadialGradient'
+  | 'createLinearGradient'
+  | 'strokeStyle'
+  | 'fillStyle'
+  | 'lineWidth'
+  | 'lineCap'
 >;
 
 const fin = (...xs: number[]): boolean => xs.every(Number.isFinite);
 
 /** H2: every gradient is built from finite numbers only, so one bad value never throws out of the frame. */
-function radial(ctx: Ctx2D, x: number, y: number, r: number, rgb: readonly number[], a: number): void {
+function radial(
+  ctx: Ctx2D,
+  x: number,
+  y: number,
+  r: number,
+  rgb: readonly number[],
+  a: number,
+): void {
   if (!fin(x, y, r, a) || !(r > 0) || !(a > 0)) return;
   const g = ctx.createRadialGradient(x, y, 0, x, y, r);
   g.addColorStop(0, tintCss(rgb, a));
@@ -48,7 +100,14 @@ function radial(ctx: Ctx2D, x: number, y: number, r: number, rgb: readonly numbe
   ctx.fillRect(x - r, y - r, 2 * r, 2 * r);
 }
 
-function edge(ctx: Ctx2D, side: 1 | -1, W: number, H: number, rgb: readonly number[], a: number): void {
+function edge(
+  ctx: Ctx2D,
+  side: 1 | -1,
+  W: number,
+  H: number,
+  rgb: readonly number[],
+  a: number,
+): void {
   const w = EDGE_GLOW_W * W;
   if (!fin(w, W, H, a) || !(w > 0) || !(a > 0)) return;
   const x0 = side > 0 ? W : 0;
@@ -82,7 +141,13 @@ export interface DrawState {
 
 export function newDrawState(seed = 0): DrawState {
   return {
-    seed: seed >>> 0, W: 0, H: 0, rain: new Float32Array(RAIN_STREAKS_MAX * 4), snow: new Float32Array(SNOW_FLAKES_MAX * 3), worlds: new Map(), bolts: new Map(),
+    seed: seed >>> 0,
+    W: 0,
+    H: 0,
+    rain: new Float32Array(RAIN_STREAKS_MAX * 4),
+    snow: new Float32Array(SNOW_FLAKES_MAX * 3),
+    worlds: new Map(),
+    bolts: new Map(),
   };
 }
 
@@ -91,7 +156,13 @@ export function newDrawState(seed = 0): DrawState {
  * something is drawn or waiting (rain, snow, a group not yet ended), so the loop keeps running.
  */
 export function drawWeatherFrame(
-  ctx: Ctx2D, st: DrawState, engine: OverlayEngine, snap: WeatherSnapshot | null, gate: FlashGate, t: number, dt: number,
+  ctx: Ctx2D,
+  st: DrawState,
+  engine: OverlayEngine,
+  snap: WeatherSnapshot | null,
+  gate: FlashGate,
+  t: number,
+  dt: number,
 ): boolean {
   const { W, H } = st;
   ctx.clearRect(0, 0, W, H);
@@ -101,7 +172,8 @@ export function drawWeatherFrame(
   const b = engine.flyCameraBasis();
   if (!b || !(W > 0) || !(H > 0)) return groups.length > 0;
   const es = engine.state();
-  const fresh = !!snap && t - snap.tS <= OVERLAY_SNAPSHOT_STALE_S && t - snap.tS >= -OVERLAY_SNAPSHOT_STALE_S;
+  const fresh =
+    !!snap && t - snap.tS <= OVERLAY_SNAPSHOT_STALE_S && t - snap.tS >= -OVERLAY_SNAPSHOT_STALE_S;
   const frame = fresh ? snap.frame : null;
   const zc = snap ? snap.frame.zc_km : null;
   const camR = Math.hypot(b.cam[0], b.cam[1], b.cam[2]);
@@ -154,10 +226,19 @@ export function drawWeatherFrame(
     if (tau < -dt) continue; // not started yet
     let w = st.worlds.get(g);
     if (w === undefined) {
-      w = strikeWorld(g.strike, lon, lat, alt, b, zc, es.gas ? null : (a, c) => engine.groundKm(a, c));
+      w = strikeWorld(
+        g.strike,
+        lon,
+        lat,
+        alt,
+        b,
+        zc,
+        es.gas ? null : (a, c) => engine.groundKm(a, c),
+      );
       st.worlds.set(g, w);
     }
-    const lo = tau - dt, hi = tau;
+    const lo = tau - dt,
+      hi = tau;
     const glow = g.safe ? safeGlow(tau) * SAFE_GLOW_OPACITY : groupGlowMax(lo, hi, g.n);
     if (!(glow > 0)) continue;
     const cls = w ? classifyStrike(b, W, H, w, aboveDeck, es.gas) : 'edge';
@@ -170,7 +251,14 @@ export function drawWeatherFrame(
       const p = w ? projectPx(b, W, H, w.deck) : null;
       // Red 9: the glow in the deck under the listener; off screen, at the bottom centre.
       const on = p && p[0] >= 0 && p[0] <= W && p[1] >= 0 && p[1] <= H;
-      radial(ctx, on ? p[0] : W / 2, on ? p[1] : H, DECK_GLOW_R * H, BOLT_RGB, g.safe ? glow : glow * FLASH_OPACITY);
+      radial(
+        ctx,
+        on ? p[0] : W / 2,
+        on ? p[1] : H,
+        DECK_GLOW_R * H,
+        BOLT_RGB,
+        g.safe ? glow : glow * FLASH_OPACITY,
+      );
       continue;
     }
     // In view: clip the bolt at the near plane, then project its two ends (H2).
@@ -183,7 +271,14 @@ export function drawWeatherFrame(
       edge(ctx, side, W, H, BOLT_RGB, g.safe ? glow : glow * FLASH_OPACITY);
       continue;
     }
-    radial(ctx, cs[0], cs[1], CLOUD_GLOW_R * H, BOLT_RGB, g.safe ? glow : glow * CLOUD_GLOW_OPACITY);
+    radial(
+      ctx,
+      cs[0],
+      cs[1],
+      CLOUD_GLOW_R * H,
+      BOLT_RGB,
+      g.safe ? glow : glow * CLOUD_GLOW_OPACITY,
+    );
     if (g.safe || g.n === 0 || Math.hypot(cs[2] - cs[0], cs[3] - cs[1]) < BOLT_MIN_PX) continue;
     // Blue 12: one polyline per group while its ends stay on the same whole pixels.
     const key = cs.map(Math.round).join(',');
@@ -195,7 +290,8 @@ export function drawWeatherFrame(
     const lines = cached.lines;
     // H4: a bolt at or above the small-area limit never restrikes; it follows the one group pulse.
     const area = polylineLength(lines) * (BOLT_CORE_PX + BOLT_GLOW_PX);
-    const a = area < smallAreaLimitPx2(W, H) ? strokeEnvMax(lo, hi, g.n) : groupGlowMax(lo, hi, g.n);
+    const a =
+      area < smallAreaLimitPx2(W, H) ? strokeEnvMax(lo, hi, g.n) : groupGlowMax(lo, hi, g.n);
     if (!(a > 0)) continue;
     polyline(ctx, lines);
     ctx.lineCap = 'round';
@@ -272,13 +368,18 @@ export function WeatherOverlay({
     }
     const gate = (gateRef.current ??= new FlashGate());
     const mq = prefersReducedMotion();
-    const isSafe = () => reducedRef.current || !!mq?.matches || !useSoundSettings.getState().flashesOn;
+    const isSafe = () =>
+      reducedRef.current || !!mq?.matches || !useSoundSettings.getState().flashesOn;
     const onSafe = () => {
       if (isSafe()) gate.makeSafe();
     };
     const resize = () => {
-      const w = cv.clientWidth, h = cv.clientHeight;
-      const dpr = Math.min(typeof devicePixelRatio === 'number' && devicePixelRatio > 0 ? devicePixelRatio : 1, OVERLAY_DPR_CAP);
+      const w = cv.clientWidth,
+        h = cv.clientHeight;
+      const dpr = Math.min(
+        typeof devicePixelRatio === 'number' && devicePixelRatio > 0 ? devicePixelRatio : 1,
+        OVERLAY_DPR_CAP,
+      );
       st.W = w;
       st.H = h;
       cv.width = Math.max(1, Math.round(w * dpr));

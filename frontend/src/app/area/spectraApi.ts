@@ -68,7 +68,8 @@ const arr = (o: Obj, k: string, p: string): unknown[] => {
 };
 const num = (o: Obj, k: string, p: string): void => {
   const v = o[k];
-  if (typeof v !== 'number' || !Number.isFinite(v)) throw new BadSpectra(`${p}.${k}`, 'expected a number');
+  if (typeof v !== 'number' || !Number.isFinite(v))
+    throw new BadSpectra(`${p}.${k}`, 'expected a number');
 };
 const numOrNull = (o: Obj, k: string, p: string): void => {
   if (o[k] !== null) num(o, k, p);
@@ -78,7 +79,8 @@ const str = (o: Obj, k: string, p: string): void => {
 };
 const oneOf = (o: Obj, k: string, p: string, allowed: readonly string[]): void => {
   const v = o[k];
-  if (typeof v !== 'string' || !allowed.includes(v)) throw new BadSpectra(`${p}.${k}`, `expected one of ${allowed.join(', ')}`);
+  if (typeof v !== 'string' || !allowed.includes(v))
+    throw new BadSpectra(`${p}.${k}`, `expected one of ${allowed.join(', ')}`);
 };
 const bool = (o: Obj, k: string, p: string): void => {
   if (typeof o[k] !== 'boolean') throw new BadSpectra(`${p}.${k}`, 'expected true or false');
@@ -99,7 +101,8 @@ export function parseAreaSpectra(raw: unknown): AreaSpectra {
   });
   const pv = obj(o.provenance, `${p}.provenance`);
   // The Spectrum section's tag reads these two entries (SpectrumCard.tsx).
-  for (const k of ['points', 'colour']) oneOf(obj(pv[k], `${p}.provenance.${k}`), 'tag', `${p}.provenance.${k}`, AREA_TAGS);
+  for (const k of ['points', 'colour'])
+    oneOf(obj(pv[k], `${p}.provenance.${k}`), 'tag', `${p}.provenance.${k}`, AREA_TAGS);
   const m = obj(o.method, `${p}.method`);
   str(m, 'spectrum_version', `${p}.method`);
   obj(m.settings, `${p}.method.settings`);
@@ -121,7 +124,8 @@ export function parseAreaSpectra(raw: unknown): AreaSpectra {
     arr(to, 'pairs', tp).forEach((x, j) => {
       const xp = `${tp}.pairs[${j}]`;
       const xo = obj(x, xp);
-      for (const k of ['visit', 'exposure', 'lambda_short_um', 'lambda_long_um', 'rho', 'rho_max']) num(xo, k, xp);
+      for (const k of ['visit', 'exposure', 'lambda_short_um', 'lambda_long_um', 'rho', 'rho_max'])
+        num(xo, k, xp);
       numOrNull(xo, 'rho_err', xp);
       str(xo, 'time', xp);
       if (xo.limit !== null) oneOf(xo, 'limit', xp, ['lower', 'upper']);
@@ -139,7 +143,8 @@ export function parseAreaSpectra(raw: unknown): AreaSpectra {
       const xo = obj(x, xp);
       str(xo, 'dot_id', xp);
       str(xo, 'time', xp);
-      for (const k of ['visit', 'detector', 'lambda_um', 'flux_uJy', 'flux_err', 'snr']) num(xo, k, xp);
+      for (const k of ['visit', 'detector', 'lambda_um', 'flux_uJy', 'flux_err', 'snr'])
+        num(xo, k, xp);
       oneOf(xo, 'arm', xp, ['short', 'long']);
       numOrNull(xo, 'rel', xp);
       bool(xo, 'point', xp);
@@ -171,7 +176,8 @@ export function httpSpectraApi(
         });
         const type = res.headers.get('content-type') ?? '';
         const body: unknown = type.includes('json') ? await res.json().catch(() => null) : null;
-        if (res.status === 404 && isObj(body) && body.error === 'spectra_not_prepared') return { kind: 'not_run' };
+        if (res.status === 404 && isObj(body) && body.error === 'spectra_not_prepared')
+          return { kind: 'not_run' };
         if (!res.ok) return { kind: 'unavailable' };
         const data = parseAreaSpectra(body);
         // Never show another area's verdicts on this one.

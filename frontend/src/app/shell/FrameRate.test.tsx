@@ -44,7 +44,9 @@ describe('FrameRate', () => {
     const btn = q('frame-rate-button')!;
     await act(async () => btn.click());
     const menu = q('frame-rate-menu')!;
-    await act(async () => menu.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+    await act(async () =>
+      menu.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })),
+    );
     expect(btn.getAttribute('aria-expanded')).toBe('false');
     expect(document.activeElement).toBe(btn);
   });

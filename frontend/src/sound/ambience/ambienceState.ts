@@ -8,7 +8,8 @@
 // A world or physics change is a worldKey change inside baking/playing: the mixer crossfades its groups (C5), so it
 // needs no state of its own (blue 11, 12). Nothing in "waiting" is a refusal (R12).
 
-export type AmbienceStatus = 'idle' | 'waiting' | 'baking' | 'playing' | 'fading' | 'noSurface' | 'error';
+export type AmbienceStatus =
+  'idle' | 'waiting' | 'baking' | 'playing' | 'fading' | 'noSurface' | 'error';
 
 export interface GateInputs {
   /** The fly view was entered (WorldFlyStage). */
@@ -50,7 +51,10 @@ export function soundGate(g: GateInputs): boolean {
 
 const audible = (s: AmbienceStatus) => s === 'baking' || s === 'playing';
 
-export function step(prev: AmbienceStatus, i: StepInput): { status: AmbienceStatus; effects: Effect[] } {
+export function step(
+  prev: AmbienceStatus,
+  i: StepInput,
+): { status: AmbienceStatus; effects: Effect[] } {
   if (prev === 'error') return { status: 'error', effects: [] };
   const fade: Effect[] = audible(prev) ? ['fadeOut'] : [];
   if (i.gate.failed) return { status: 'noSurface', effects: fade };

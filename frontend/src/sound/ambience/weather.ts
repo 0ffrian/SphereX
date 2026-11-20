@@ -8,16 +8,43 @@ import { LIGHTNING_TEXT } from './captions';
 import { dropPhysics } from './liquids';
 import type { AirModel, Place, Strike, WeatherVisualFrame } from './types';
 import {
-  CLOUD_BASE_DEFAULT_KM, DB_PER_NP, EARTH_REF, FLASH_MIN_GAP_S, JUPITER_IDS, JUPITER_LAT_DEG, JUPITER_LOW_LAT_FACTOR,
-  LIGHTNING_CNV_MIN, LIGHTNING_MAX_PER_MIN, LIGHTNING_OBSERVED, LIGHTNING_SEED_XOR, RAIN_CNV_BOOST, RAIN_VIS_FULL,
-  RAIN_VIS_MIN, SNOW_FALL_MS, STRIKE_STALE_S, THUNDER_BASE_S, THUNDER_CRACK_M, THUNDER_FEW_K, THUNDER_FM_EARTH,
-  THUNDER_L1KM_DB, THUNDER_LOSS_NP, THUNDER_MAX_S, THUNDER_RANGE_CAP_KM, THUNDER_ROLL_K, THUNDER_VARIANT_D_M,
-  TINT_GREY, TINT_MIX,
+  CLOUD_BASE_DEFAULT_KM,
+  DB_PER_NP,
+  EARTH_REF,
+  FLASH_MIN_GAP_S,
+  JUPITER_IDS,
+  JUPITER_LAT_DEG,
+  JUPITER_LOW_LAT_FACTOR,
+  LIGHTNING_CNV_MIN,
+  LIGHTNING_MAX_PER_MIN,
+  LIGHTNING_OBSERVED,
+  LIGHTNING_SEED_XOR,
+  RAIN_CNV_BOOST,
+  RAIN_VIS_FULL,
+  RAIN_VIS_MIN,
+  SNOW_FALL_MS,
+  STRIKE_STALE_S,
+  THUNDER_BASE_S,
+  THUNDER_CRACK_M,
+  THUNDER_FEW_K,
+  THUNDER_FM_EARTH,
+  THUNDER_L1KM_DB,
+  THUNDER_LOSS_NP,
+  THUNDER_MAX_S,
+  THUNDER_RANGE_CAP_KM,
+  THUNDER_ROLL_K,
+  THUNDER_VARIANT_D_M,
+  TINT_GREY,
+  TINT_MIX,
 } from './tuning';
 
 export { LIGHTNING_TEXT };
 
-export interface LightningRule { allowed: boolean; tag: Tag | null; reason: string | null }
+export interface LightningRule {
+  allowed: boolean;
+  tag: Tag | null;
+  reason: string | null;
+}
 
 /** §8.2 lightning rule table, in order. Keyed on the fluid, not the composition class (a mu-44 water world is not "Venus-like"). */
 export function lightningRule(air: AirModel, presetId: string): LightningRule {
@@ -27,7 +54,8 @@ export function lightningRule(air: AirModel, presetId: string): LightningRule {
   // "slider") falls through to the exoplanet rows. 'measured' is the fact that lightning is observed there; strike
   // timing and placement stay artistic.
   const slid = air.inputs.some((i) => i.source === 'slider');
-  if (!slid && (LIGHTNING_OBSERVED as readonly string[]).includes(presetId)) return { allowed: true, tag: 'measured', reason: null };
+  if (!slid && (LIGHTNING_OBSERVED as readonly string[]).includes(presetId))
+    return { allowed: true, tag: 'measured', reason: null };
   if (air.gas) {
     return air.regime === 'Water clouds' || air.regime === 'Ammonia clouds'
       ? { allowed: true, tag: 'inferred_from_analog', reason: null }
@@ -36,7 +64,11 @@ export function lightningRule(air: AirModel, presetId: string): LightningRule {
   if (air.fluid === 'methane') return refuse(LIGHTNING_TEXT.titan);
   if (air.fluid === 'co2') return refuse(LIGHTNING_TEXT.co2);
   // Review L4: liquid is local (R7), so an eyeball world that rains can have storms.
-  if ((air.fluid === 'water' || air.fluid === 'ammoniaWater') && !!air.liquid && !air.liquid.viscous) {
+  if (
+    (air.fluid === 'water' || air.fluid === 'ammoniaWater') &&
+    !!air.liquid &&
+    !air.liquid.viscous
+  ) {
     return { allowed: true, tag: 'inferred_from_analog', reason: null };
   }
   return refuse(LIGHTNING_TEXT.other);
@@ -80,7 +112,14 @@ export function audibleRadiusM(air: AirModel, z_km: number): number {
 }
 
 export interface ThunderParams {
-  delay_s: number; fm_Hz: number; dur_s: number; crack: 0 | 1; level_dB: number; lowpassHz: number; absK2: number; tag: Tag;
+  delay_s: number;
+  fm_Hz: number;
+  dur_s: number;
+  crack: 0 | 1;
+  level_dB: number;
+  lowpassHz: number;
+  absK2: number;
+  tag: Tag;
 }
 
 /** §8.4 thunder at slant distance d (m), listener at z km. Delay uses c at mid-path height. */
@@ -98,7 +137,11 @@ export function thunderParams(air: AirModel, d_m: number, z_km = 0): ThunderPara
     dur_s: Math.min(THUNDER_BASE_S + d / (THUNDER_ROLL_K * air.c0), THUNDER_MAX_S),
     crack: d < THUNDER_CRACK_M ? 1 : 0,
     // Review L10: the listener-height impedance, as for the ground beds (§11.3).
-    level_dB: THUNDER_L1KM_DB - 20 * Math.log10(d / 1000) - lossDb + 10 * Math.log10(airAt(air, z_km).Z / Zr),
+    level_dB:
+      THUNDER_L1KM_DB -
+      20 * Math.log10(d / 1000) -
+      lossDb +
+      10 * Math.log10(airAt(air, z_km).Z / Zr),
     lowpassHz: lowpassHz((f) => absorption(f, P, T, air.cls), d),
     absK2: absorption(1000, air.P0, air.T0, air.cls) / 1e6,
     tag: 'derived',
@@ -148,12 +191,19 @@ export class StrikeScheduler {
 
   private pickVariant(d: number, u: number): number {
     const near = d < THUNDER_CRACK_M;
-    const group = this.variants.filter((v) => (THUNDER_VARIANT_D_M[v] as number) < THUNDER_CRACK_M === near);
-    if (group.length) return group[Math.min(group.length - 1, Math.floor(u * group.length))] as number;
+    const group = this.variants.filter(
+      (v) => (THUNDER_VARIANT_D_M[v] as number) < THUNDER_CRACK_M === near,
+    );
+    if (group.length)
+      return group[Math.min(group.length - 1, Math.floor(u * group.length))] as number;
     if (!this.variants.length) return near ? 0 : 2;
     let best = this.variants[0] as number;
     for (const v of this.variants) {
-      if (Math.abs((THUNDER_VARIANT_D_M[v] as number) - d) < Math.abs((THUNDER_VARIANT_D_M[best] as number) - d)) best = v;
+      if (
+        Math.abs((THUNDER_VARIANT_D_M[v] as number) - d) <
+        Math.abs((THUNDER_VARIANT_D_M[best] as number) - d)
+      )
+        best = v;
     }
     return best;
   }
@@ -199,7 +249,11 @@ function mix3(a: readonly number[], b: readonly number[], t: number): [number, n
  * §8.5 the overlay's frame. `rain.density` is the share (0..1) of the overlay's own maximum count (600 streaks for rain,
  * 400 flakes for snow). Snow falls at SNOW_FALL_MS x sqrt(g_E/g) as the spec states (a Q- proposal questions the sign).
  */
-export function weatherVisualFrame(air: AirModel, place: Place, strikes: Strike[]): WeatherVisualFrame {
+export function weatherVisualFrame(
+  air: AirModel,
+  place: Place,
+  strikes: Strike[],
+): WeatherVisualFrame {
   const f = place.features;
   const base = air.zc_km ?? CLOUD_BASE_DEFAULT_KM;
   const aboveClouds = f.z_km >= base;
@@ -208,11 +262,20 @@ export function weatherVisualFrame(air: AirModel, place: Place, strikes: Strike[
   if (air.airOK && !air.gas && falling && !aboveClouds) {
     const snow = f.precipPhase === 'snow';
     const drop = dropPhysics(air);
-    const vt = snow ? SNOW_FALL_MS * Math.sqrt(EARTH_REF.g / air.gv) : drop?.vt ?? null;
+    const vt = snow ? SNOW_FALL_MS * Math.sqrt(EARTH_REF.g / air.gv) : (drop?.vt ?? null);
     if (vt !== null && vt > 0) {
-      const density = Math.min(Math.max(0, Math.min(1, f.rainRate / RAIN_VIS_FULL)) * (1 + RAIN_CNV_BOOST * f.cnv), 1);
+      const density = Math.min(
+        Math.max(0, Math.min(1, f.rainRate / RAIN_VIS_FULL)) * (1 + RAIN_CNV_BOOST * f.cnv),
+        1,
+      );
       const liq = (FLUIDS[air.fluid]?.liq as number[] | undefined) ?? TINT_GREY;
-      rain = { density, vt, slantRad: Math.atan(f.wind.U10 / vt), tint: mix3(liq, TINT_GREY, TINT_MIX), snow };
+      rain = {
+        density,
+        vt,
+        slantRad: Math.atan(f.wind.U10 / vt),
+        tint: mix3(liq, TINT_GREY, TINT_MIX),
+        snow,
+      };
     }
   }
   return { rain, strikes, aboveClouds, zc_km: air.zc_km };

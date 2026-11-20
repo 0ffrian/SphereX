@@ -4,7 +4,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { expect, test } from '@playwright/test';
-import { openViewer, viewerCanvas } from './viewer';
+import { openViewer, overlayMasks, viewerCanvas } from './viewer';
 
 // Honesty: the D-21 default (+ Estimated) hides artistic layers, so the render tests ask for
 // "+ Artistic". They draw through the panel's own path (planRender -> showPlan, window.__sxShow).
@@ -108,14 +108,23 @@ for (const view of VIEWS) {
     // A gas giant's surface is five layers (issue #62), every other kind has one.
     expect(result!.drawn.length).toBe(kind === 'gas_giant' ? 5 : 1);
     // The field comes from the Web Worker (D-12, N8). A worker that was created but failed would
-    // fall back to the main thread, so count what actually served. The nebula and the nova are
-    // volumes with no field, no points and no haptics (Q-103), so nothing is served for them.
-    const stats = await page.evaluate(
-      () =>
-        (globalThis as unknown as { __sxFieldStats?: { worker: number; main: number } })
-          .__sxFieldStats,
-    );
-    expect(stats, 'field stats hook (fixtures mode)').toBeDefined();
+    // fall back to the main thread, so count what actually served. A rocky or water world is not a
+    // field any more: since stream D of #71 (feddcba8, RockyWorld) the world worker solves it, and it
+    // has its own counter (worldStats). The nebula and the nova are volumes with no field, no points
+    // and no haptics (Q-103), so nothing is served for them.
+    const stats = await page.evaluate(() => {
+      const g = globalThis as unknown as {
+        __sxFieldStats?: { worker: number; main: number };
+        __sxWorldStats?: { worker: number; main: number };
+      };
+      return g.__sxFieldStats && g.__sxWorldStats
+        ? {
+            worker: g.__sxFieldStats.worker + g.__sxWorldStats.worker,
+            main: g.__sxFieldStats.main + g.__sxWorldStats.main,
+          }
+        : undefined;
+    });
+    expect(stats, 'field and world stats hooks (fixtures mode)').toBeDefined();
     expect(stats!.main, 'served on the main thread (worker fallback)').toBe(0);
     if (kind === 'nebula' || kind === 'nova')
       expect(stats!.worker, `${kind} needs no worker`).toBe(0);
@@ -138,10 +147,10 @@ for (const view of VIEWS) {
     // SwiftShader (software WebGL2) is stable on one machine; the tolerance absorbs rasteriser
     // rounding between versions. Update with `npx playwright test shaderKinds --update-snapshots`
     // after a deliberate look change and review the diff.
-    // NF-7: the DOM name label sits on the canvas box, so it is masked; the body is compared
+    // NF-7: the DOM name label and the build pane's title sit on the canvas box, so they are masked; the body is compared
     // tightly enough that a changed storm count, band warp, seed, sea level or ice extent shows.
     await expect(canvas).toHaveScreenshot(`${name}.png`, {
-      mask: [page.getByTestId('viewer-label')],
+      mask: overlayMasks(page),
       maxDiffPixelRatio: 0.002,
       threshold: view.threshold ?? 0.05,
     });

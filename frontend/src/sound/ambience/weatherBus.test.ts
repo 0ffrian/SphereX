@@ -15,7 +15,14 @@ import {
   type WeatherSnapshot,
 } from './weatherBus';
 
-const strike = (t0: number): Strike => ({ t0, d_m: 3000, bearing: 1, seed: 7, variant: 2, flash: true });
+const strike = (t0: number): Strike => ({
+  t0,
+  d_m: 3000,
+  bearing: 1,
+  seed: 7,
+  variant: 2,
+  flash: true,
+});
 const snap = (strikes: Strike[] = [], tS = 1): WeatherSnapshot => ({
   frame: { rain: null, strikes, aboveClouds: false, zc_km: 1.5 },
   windDirDeg: 270,
@@ -71,7 +78,11 @@ describe('weatherBus (#117 contract, C8)', () => {
     expect(rows.map((r) => r.tag)).toEqual(['model_dependent', 'artistic', 'measured', 'artistic']);
     expect(rows[0]!.text).toContain('9.2 m/s');
     const no = snap();
-    no.lightning = { allowed: false, tag: null, reason: 'No lightning has ever been detected on Titan, so there is no thunder here.' };
+    no.lightning = {
+      allowed: false,
+      tag: null,
+      reason: 'No lightning has ever been detected on Titan, so there is no thunder here.',
+    };
     expect(weatherRows(no).at(-1)!.text).toMatch(/Titan/);
   });
 

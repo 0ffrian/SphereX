@@ -7,7 +7,8 @@ const PATHS = {
   spectrum: 'M2 12h2 M6 8v8 M10 4v16 M14 7v10 M18 10v4 M22 12h-2',
   viewer: 'M12 3 20 7.5v9L12 21l-8-4.5v-9L12 3Z M12 12l8-4.5 M12 12v9 M12 12 4 7.5',
   // A page with lines (lucide file-text): the build view's "Read paper" (Q-457).
-  paper: 'M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z M14 2v4a2 2 0 0 0 2 2h4 M10 9H8 M16 13H8 M16 17H8',
+  paper:
+    'M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z M14 2v4a2 2 0 0 0 2 2h4 M10 9H8 M16 13H8 M16 17H8',
   info: 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Z M12 16v-4 M12 8h.01',
   close: 'M18 6 6 18M6 6l12 12',
   // The area cards' tabs: a back chevron and the minimise dash (mock-up `knBack`, `knMin`).
@@ -25,7 +26,8 @@ const PATHS = {
   shuffle: 'M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5',
   // Issue #71 stream U: the build view's header and zoom bar, the mock-up's shapes (`#bpAcc`,
   // `#bpHear`, `#zOut`, `#zIn`, the dock's area tool); `details` is lucide's sliders.
-  accuracy: 'M3.3 17a10 10 0 1 1 17.4 0 M12 14l4-5 M12 12.8a1.2 1.2 0 1 0 0 2.4 1.2 1.2 0 0 0 0-2.4Z',
+  accuracy:
+    'M3.3 17a10 10 0 1 1 17.4 0 M12 14l4-5 M12 12.8a1.2 1.2 0 1 0 0 2.4 1.2 1.2 0 0 0 0-2.4Z',
   // lucide `wind`: the build view's Atmosphere (ambience) toggle.
   wind: 'M12.8 19.6A2 2 0 1 0 14 16H2 M17.5 8a2.5 2.5 0 1 1 2 4H2 M9.8 4.4A2 2 0 1 1 11 8H2',
   // lucide `columns-2`: the build view's split view toggle (close-up on the left).

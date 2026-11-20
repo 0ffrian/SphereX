@@ -12,6 +12,9 @@ export const worldCache = new ResultCache<WorldData | null>(2);
 
 /** How many requests each path served (the e2e reads it, like the field worker's counter). */
 export const worldStats = { worker: 0, main: 0 };
+if (import.meta.env.MODE === 'fixtures') {
+  (globalThis as { __sxWorldStats?: typeof worldStats }).__sxWorldStats = worldStats;
+}
 
 let worker: Worker | null = null;
 let nextId = 1;

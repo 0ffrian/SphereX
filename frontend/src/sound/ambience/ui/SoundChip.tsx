@@ -77,7 +77,12 @@ export function SoundChip() {
   }
 
   return (
-    <div className="sx-amb" role="group" aria-label="Sound of this place" data-testid="world-fly-sound">
+    <div
+      className="sx-amb"
+      role="group"
+      aria-label="Sound of this place"
+      data-testid="world-fly-sound"
+    >
       <div className="sx-amb-row">
         <span className="sx-amb-title">{CHIP_TEXT.title}</span>
         <ProvenanceBadge tag="artistic" />
@@ -98,7 +103,12 @@ export function SoundChip() {
           {caption}
         </p>
       )}
-      <div className="sr-only" aria-live="polite" aria-atomic="true" data-testid="world-fly-caption-live">
+      <div
+        className="sr-only"
+        aria-live="polite"
+        aria-atomic="true"
+        data-testid="world-fly-caption-live"
+      >
         {readCaptions ? caption : ''}
       </div>
       {open && (

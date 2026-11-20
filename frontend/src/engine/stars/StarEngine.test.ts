@@ -95,11 +95,16 @@ describe('cardToStar', () => {
 
 // The close-up draws its flare onto a 2D canvas, which jsdom does not have: give it a context that takes any call.
 const noop2d = (): unknown => {
-  const f: unknown = new Proxy(() => f, { get: (_t, k) => (k === Symbol.toPrimitive ? () => 0 : f), set: () => true, apply: () => f });
+  const f: unknown = new Proxy(() => f, {
+    get: (_t, k) => (k === Symbol.toPrimitive ? () => 0 : f),
+    set: () => true,
+    apply: () => f,
+  });
   return f;
 };
 beforeEach(() => {
-  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(((kind: string) => (kind === '2d' ? noop2d() : null)) as never);
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(((kind: string) =>
+    kind === '2d' ? noop2d() : null) as never);
 });
 afterEach(() => vi.restoreAllMocks());
 

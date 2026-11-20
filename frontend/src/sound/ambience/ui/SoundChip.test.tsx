@@ -35,7 +35,8 @@ const render = async () => {
   await act(async () => root.render(<SoundChip />));
 };
 const button = (name: string) =>
-  [...container.querySelectorAll('button')].find((b) => b.textContent === name) as HTMLButtonElement | undefined;
+  [...container.querySelectorAll('button')].find((b) => b.textContent === name) as
+    HTMLButtonElement | undefined;
 
 beforeEach(() => {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
@@ -72,7 +73,9 @@ describe('SoundChip', () => {
     });
     const mute = button(CHIP_TEXT.mute)!;
     expect(mute.getAttribute('aria-pressed')).toBe('false');
-    expect(container.querySelector('[data-testid="world-fly-caption"]')!.textContent).toBe(UI.caption);
+    expect(container.querySelector('[data-testid="world-fly-caption"]')!.textContent).toBe(
+      UI.caption,
+    );
     await act(async () => mute.click());
     expect(useSoundSettings.getState().ambienceOn).toBe(false);
     expect(button(CHIP_TEXT.mute)!.getAttribute('aria-pressed')).toBe('true');
@@ -93,7 +96,9 @@ describe('SoundChip', () => {
     const live = container.querySelector('[data-testid="world-fly-caption-live"]')!;
     expect(live.getAttribute('aria-live')).toBe('polite');
     expect(live.textContent).toBe('');
-    expect(container.querySelector('[data-testid="world-fly-caption"]')!.hasAttribute('aria-live')).toBe(false);
+    expect(
+      container.querySelector('[data-testid="world-fly-caption"]')!.hasAttribute('aria-live'),
+    ).toBe(false);
     await act(async () => useSoundSettings.getState().update({ readCaptions: true }));
     expect(live.textContent).toBe(UI.caption);
   });
@@ -132,7 +137,15 @@ describe('SoundChip', () => {
   });
 
   it('while waiting nothing is listed as not heard (R12)', async () => {
-    useAmbienceStore.setState({ ui: { ...UI, status: 'waiting', notHeard: [], heard: [], caption: 'Waiting for the world to form…' } });
+    useAmbienceStore.setState({
+      ui: {
+        ...UI,
+        status: 'waiting',
+        notHeard: [],
+        heard: [],
+        caption: 'Waiting for the world to form…',
+      },
+    });
     await render();
     await act(async () => button(CHIP_TEXT.what)!.click());
     expect(container.textContent).not.toContain('Not heard here');

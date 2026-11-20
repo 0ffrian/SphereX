@@ -74,7 +74,10 @@ export function reopenScan(flow: 'known' | 'discovery'): boolean {
   // A finished scan comes back from its own tool only; one still going, from either tool.
   if (v.flow !== flow && !runningScan(v)) return false;
   useAreaStore.getState().openScan(v.flow, regionBox(region));
-  flyToView({ ra: region.ra, dec: region.dec, fovDeg: clampFov(region.height_deg) }, reducedMotion());
+  flyToView(
+    { ra: region.ra, dec: region.dec, fovDeg: clampFov(region.height_deg) },
+    reducedMotion(),
+  );
   return true;
 }
 
@@ -88,7 +91,10 @@ export function patchClickAt(x: number, y: number): boolean {
   const r = boxToPixels(s.box);
   if (!r) return false;
   const inside =
-    x >= Math.min(r.x0, r.x1) && x <= Math.max(r.x0, r.x1) && y >= Math.min(r.y0, r.y1) && y <= Math.max(r.y0, r.y1);
+    x >= Math.min(r.x0, r.x1) &&
+    x <= Math.max(r.x0, r.x1) &&
+    y >= Math.min(r.y0, r.y1) &&
+    y <= Math.max(r.y0, r.y1);
   if (!inside) return false;
   s.setMinimised(false);
   return true;
@@ -238,7 +244,10 @@ export function fitCamera(box: AreaBox, safe: SafeRect): SkyCamera | null {
 
 /** True when the user asks for reduced motion: flights are then instant. */
 export function reducedMotion(): boolean {
-  return typeof window !== 'undefined' && (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false);
+  return (
+    typeof window !== 'undefined' &&
+    (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false)
+  );
 }
 
 /** Sets the view at once, or flies there in about a second (ease in and out). */

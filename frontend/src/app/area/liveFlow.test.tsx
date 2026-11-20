@@ -10,7 +10,14 @@ import { useShellStore } from '@/app/shell/shellStore';
 import { setSkyApi } from '@/state/store';
 import { LiveAreaCard } from './LiveAreaCard';
 import { resetRuns, useRunsStore } from './runsStore';
-import { httpLiveAreaApi, LiveJobGone, mockLiveAreaApi, mockStatusAt, setLiveAreaApi, type LivePlan } from './liveAreaApi';
+import {
+  httpLiveAreaApi,
+  LiveJobGone,
+  mockLiveAreaApi,
+  mockStatusAt,
+  setLiveAreaApi,
+  type LivePlan,
+} from './liveAreaApi';
 import {
   aboutMinutes,
   clock,
@@ -29,11 +36,33 @@ declare global {
   var IS_REACT_ACT_ENVIRONMENT: boolean;
 }
 
-const box: AreaBox = { a: { ra: 30, dec: 10.4 }, b: { ra: 31, dec: 9.8 }, widthDeg: 0.98, heightDeg: 0.61 };
-const ENTRY = { area_id: 'live-dr1-30.50-10.10', ra: 30.5, dec: 10.1, width_deg: 1, height_deg: 0.6, data_release: 'spherex_dr1' };
+const box: AreaBox = {
+  a: { ra: 30, dec: 10.4 },
+  b: { ra: 31, dec: 9.8 },
+  widthDeg: 0.98,
+  heightDeg: 0.61,
+};
+const ENTRY = {
+  area_id: 'live-dr1-30.50-10.10',
+  ra: 30.5,
+  dec: 10.1,
+  width_deg: 1,
+  height_deg: 0.6,
+  data_release: 'spherex_dr1',
+};
 const KNOWN = {
   known: [
-    { designation: '9532 Abramenko', number: 9532, object_id: null, kind: 'asteroid', v_mag: 17.4, n_frames: 14, n_visits: 2, positions: [], track_available: false },
+    {
+      designation: '9532 Abramenko',
+      number: 9532,
+      object_id: null,
+      kind: 'asteroid',
+      v_mag: 17.4,
+      n_frames: 14,
+      n_visits: 2,
+      positions: [],
+      track_available: false,
+    },
   ],
   skybot: [{ visit: 1, fetched_at: '2026-11-13T07:28:00Z' }],
   missing: [],
@@ -94,8 +123,13 @@ describe('no prepared area: the offer (state 3)', () => {
     expect(useAreaStore.getState().screen).toBe('live');
     expect(useLiveJobStore.getState().view).toMatchObject({ kind: 'offer', flow: 'discovery' });
   });
-  it('a backend with no live areas keeps today\'s refusal (nothing is made up)', async () => {
-    setLiveAreaApi(httpLiveAreaApi('/v1', (async () => new Response('', { status: 404 })) as unknown as typeof fetch));
+  it("a backend with no live areas keeps today's refusal (nothing is made up)", async () => {
+    setLiveAreaApi(
+      httpLiveAreaApi(
+        '/v1',
+        (async () => new Response('', { status: 404 })) as unknown as typeof fetch,
+      ),
+    );
     await draw('known');
     await vi.advanceTimersByTimeAsync(1100);
     expect(useAreaStore.getState().screen).toBe('list');
@@ -105,7 +139,10 @@ describe('no prepared area: the offer (state 3)', () => {
   it('a prepared area goes to the existing results, with no coverage check', async () => {
     stored = true;
     const plan = vi.fn();
-    setLiveAreaApi({ ...mockLiveAreaApi('ok'), plan: async () => (plan(), { kind: 'unavailable' }) });
+    setLiveAreaApi({
+      ...mockLiveAreaApi('ok'),
+      plan: async () => (plan(), { kind: 'unavailable' }),
+    });
     await draw('known');
     await vi.advanceTimersByTimeAsync(1100);
     expect(plan).not.toHaveBeenCalled();
@@ -156,7 +193,10 @@ describe('computing (state 4) and the hand-off', () => {
   it('Compute names its tool, so the server records the run for the Runs list (Q-471 (2))', async () => {
     const kinds: unknown[] = [];
     const api = mockLiveAreaApi('ok');
-    setLiveAreaApi({ ...api, start: async (b, s, v, kind) => (kinds.push(kind), api.start(b, s, v, kind)) });
+    setLiveAreaApi({
+      ...api,
+      start: async (b, s, v, kind) => (kinds.push(kind), api.start(b, s, v, kind)),
+    });
     await draw('discovery');
     await useLiveJobStore.getState().compute();
     expect(kinds).toEqual(['discovery']);
@@ -193,7 +233,10 @@ describe('computing (state 4) and the hand-off', () => {
     await draw('known');
     await useLiveJobStore.getState().compute();
     await vi.advanceTimersByTimeAsync(2000);
-    expect(useLiveJobStore.getState().view).toMatchObject({ kind: 'failed', code: 'upstream_unavailable' });
+    expect(useLiveJobStore.getState().view).toMatchObject({
+      kind: 'failed',
+      code: 'upstream_unavailable',
+    });
   });
   it('a stored area (plan says done) opens at once', async () => {
     stored = true;
@@ -222,7 +265,9 @@ describe('an area already being computed', () => {
       ...api,
       plan: async (b) => {
         const started = await api.start(b);
-        return started.kind === 'started' ? { kind: 'running', areaId: started.areaId, state: 'running' } : { kind: 'unavailable' };
+        return started.kind === 'started'
+          ? { kind: 'running', areaId: started.areaId, state: 'running' }
+          : { kind: 'unavailable' };
       },
     });
     await draw('discovery');
@@ -240,21 +285,38 @@ describe('a job that cannot be followed (review of PR #148)', () => {
     await useLiveJobStore.getState().compute();
     await vi.advanceTimersByTimeAsync(10);
     expect(useLiveJobStore.getState().job).toBeNull();
-    expect(useLiveJobStore.getState().view).toMatchObject({ kind: 'failed', code: 'upstream_unavailable', fromJob: true });
+    expect(useLiveJobStore.getState().view).toMatchObject({
+      kind: 'failed',
+      code: 'upstream_unavailable',
+      fromJob: true,
+    });
   });
   it('no reply for MAX_MISSED_POLLS polls in a row: given up as unreachable', async () => {
     const api = mockLiveAreaApi('ok');
-    setLiveAreaApi({ ...api, status: async () => Promise.reject(new TypeError('Failed to fetch')) });
+    setLiveAreaApi({
+      ...api,
+      status: async () => Promise.reject(new TypeError('Failed to fetch')),
+    });
     await draw('known');
     await useLiveJobStore.getState().compute();
     await vi.advanceTimersByTimeAsync((MAX_MISSED_POLLS - 2) * POLL_MS);
     expect(useLiveJobStore.getState().view?.kind).toBe('job');
     await vi.advanceTimersByTimeAsync(3 * POLL_MS);
-    expect(useLiveJobStore.getState().view).toMatchObject({ kind: 'failed', code: 'upstream_unavailable' });
+    expect(useLiveJobStore.getState().view).toMatchObject({
+      kind: 'failed',
+      code: 'upstream_unavailable',
+    });
   });
   it('a job that ends as cancelled (Stop, then Compute at once) goes back to the offer, not a failure', async () => {
     const api = mockLiveAreaApi('ok');
-    setLiveAreaApi({ ...api, status: async (id) => ({ ...(await api.status(id)), state: 'failed', error: { code: 'cancelled', detail: '' } }) });
+    setLiveAreaApi({
+      ...api,
+      status: async (id) => ({
+        ...(await api.status(id)),
+        state: 'failed',
+        error: { code: 'cancelled', detail: '' },
+      }),
+    });
     await draw('discovery');
     await useLiveJobStore.getState().compute();
     await vi.advanceTimersByTimeAsync(10);
@@ -263,7 +325,7 @@ describe('a job that cannot be followed (review of PR #148)', () => {
 });
 
 describe('self-review fixes', () => {
-  it('a job finishing with its card closed never replaces another box\'s live card', async () => {
+  it("a job finishing with its card closed never replaces another box's live card", async () => {
     setLiveAreaApi(mockLiveAreaApi('ok', { durationMs: 3000 }));
     await draw('known');
     await useLiveJobStore.getState().compute();
@@ -294,7 +356,9 @@ describe('self-review fixes', () => {
       ...api,
       plan: async (b) => {
         const st = await api.start(b);
-        return st.kind === 'started' ? { kind: 'running', areaId: st.areaId, state: 'running' } : { kind: 'unavailable' };
+        return st.kind === 'started'
+          ? { kind: 'running', areaId: st.areaId, state: 'running' }
+          : { kind: 'unavailable' };
       },
     });
     await draw('discovery');
@@ -315,7 +379,9 @@ describe('waiting (state 5)', () => {
     const st = useLiveJobStore.getState().job?.status;
     expect(st?.state).toBe('queued');
     expect(st?.queue_position).toBe(1);
-    expect(liveMiniTitle(useLiveJobStore.getState(), 'Known objects')).toBe('Known objects · Waiting');
+    expect(liveMiniTitle(useLiveJobStore.getState(), 'Known objects')).toBe(
+      'Known objects · Waiting',
+    );
     await useLiveJobStore.getState().stop();
     expect(useLiveJobStore.getState().view?.kind).toBe('offer');
   });
@@ -327,10 +393,18 @@ describe('the minimised pill names the offer and a failure (#153)', () => {
     setLiveAreaApi(mockLiveAreaApi('ok'));
     await draw('known');
     expect(useLiveJobStore.getState().view?.kind).toBe('offer');
-    expect(liveMiniTitle(useLiveJobStore.getState(), 'Known objects')).toBe('Known objects · Ready to compute');
+    expect(liveMiniTitle(useLiveJobStore.getState(), 'Known objects')).toBe(
+      'Known objects · Ready to compute',
+    );
   });
   it('a failure says Could not compute', () => {
-    const view = { kind: 'failed' as const, box, flow: 'discovery' as const, code: 'offline', detail: '' };
+    const view = {
+      kind: 'failed' as const,
+      box,
+      flow: 'discovery' as const,
+      code: 'offline',
+      detail: '',
+    };
     expect(liveMiniTitle({ view, job: null }, 'Discovery')).toBe('Discovery · Could not compute');
   });
   it('no card is just the flow', () => {
@@ -350,18 +424,30 @@ describe('failures (state 6)', () => {
     expect(failureText(code).retry).toBe(retry);
   });
   it('a refusal of the box (area:too_large) says to draw another area; a job failure may be retried', () => {
-    expect(failureText('area:too_large')).toEqual({ title: 'Could not compute this area', line: 'Nothing was saved. Draw a different area.', retry: false });
-    expect(failureText('area:frames_incomplete', true)).toMatchObject({ line: 'Nothing was saved. Try again in a minute.', retry: true });
+    expect(failureText('area:too_large')).toEqual({
+      title: 'Could not compute this area',
+      line: 'Nothing was saved. Draw a different area.',
+      retry: false,
+    });
+    expect(failureText('area:frames_incomplete', true)).toMatchObject({
+      line: 'Nothing was saved. Try again in a minute.',
+      retry: true,
+    });
   });
   it('429 queue_full: too many areas waiting, Try again', () => {
-    expect(failureText('queue_full')).toEqual({ title: 'Too many areas waiting', line: 'Nothing was saved. Try again in a few minutes.', retry: true });
+    expect(failureText('queue_full')).toEqual({
+      title: 'Too many areas waiting',
+      line: 'Nothing was saved. Try again in a few minutes.',
+      retry: true,
+    });
   });
   it('Try again runs the coverage check again', async () => {
     let fail = true;
     const ok = mockLiveAreaApi('ok');
     setLiveAreaApi({
       ...ok,
-      plan: async (b) => (fail ? { kind: 'error', code: 'upstream_unavailable', detail: '' } : ok.plan(b)),
+      plan: async (b) =>
+        fail ? { kind: 'error', code: 'upstream_unavailable', detail: '' } : ok.plan(b),
     });
     await draw('known');
     expect(useLiveJobStore.getState().view?.kind).toBe('failed');
@@ -438,12 +524,22 @@ describe('LiveAreaCard', () => {
     expect(host.querySelector('[aria-label="Minimise Known objects"]')).not.toBeNull();
     expect(host.querySelector('[aria-label="Close Known objects"]')).not.toBeNull();
   });
-  it('computing: check marks, the current step\'s count and bar, elapsed and remaining', async () => {
+  it("computing: check marks, the current step's count and bar, elapsed and remaining", async () => {
     const status = mockStatusAt('a', 0.34, plan);
-    useLiveJobStore.setState({ view: { kind: 'job', box, flow: 'discovery' }, job: { areaId: 'a', box, flow: 'discovery', plan, status } });
+    useLiveJobStore.setState({
+      view: { kind: 'job', box, flow: 'discovery' },
+      job: { areaId: 'a', box, flow: 'discovery', plan, status },
+    });
     await act(async () => root.render(<LiveAreaCard />));
     const rows = [...host.querySelectorAll<HTMLElement>('[data-testid="live-steps"] li')];
-    expect(rows.map((r) => r.dataset.state)).toEqual(['done', 'running', 'todo', 'todo', 'todo', 'todo']);
+    expect(rows.map((r) => r.dataset.state)).toEqual([
+      'done',
+      'running',
+      'todo',
+      'todo',
+      'todo',
+      'todo',
+    ]);
     expect(rows[1]!.getAttribute('aria-current')).toBe('step');
     expect(rows[1]!.textContent).toContain('9 of 14');
     expect(rows[1]!.querySelector('[role="progressbar"]')?.getAttribute('aria-valuenow')).toBe('9');
@@ -452,17 +548,29 @@ describe('LiveAreaCard', () => {
     expect(q('live-announce')?.textContent).toBe('Step 2 of 6: Download frames.');
   });
   it('waiting: starts next, the wait and the run; Cancel', async () => {
-    const status = { ...mockStatusAt('a', 0, plan), state: 'queued' as const, eta_s: 240 + 540, queue_position: 1 };
-    useLiveJobStore.setState({ view: { kind: 'job', box, flow: 'known' }, job: { areaId: 'a', box, flow: 'known', plan, status } });
+    const status = {
+      ...mockStatusAt('a', 0, plan),
+      state: 'queued' as const,
+      eta_s: 240 + 540,
+      queue_position: 1,
+    };
+    useLiveJobStore.setState({
+      view: { kind: 'job', box, flow: 'known' },
+      job: { areaId: 'a', box, flow: 'known', plan, status },
+    });
     await act(async () => root.render(<LiveAreaCard />));
     expect(q('live-waiting')?.textContent).toBe('Another area is computing. Yours starts next.');
     expect(q('live-time')?.textContent).toBe('Starts in about 4 minthen about 9 min');
     expect(q('live-stop')?.textContent).toBe('Cancel');
   });
   it('failure: dot, title, one muted line; no Try again where it cannot help', async () => {
-    useLiveJobStore.setState({ view: { kind: 'failed', box, flow: 'discovery', code: 'area:no_visit_pair', detail: '' } });
+    useLiveJobStore.setState({
+      view: { kind: 'failed', box, flow: 'discovery', code: 'area:no_visit_pair', detail: '' },
+    });
     await act(async () => root.render(<LiveAreaCard />));
-    expect(q('live-failed')?.textContent).toBe('No two visits close in timeNothing can be seen moving here. Try a nearby patch.');
+    expect(q('live-failed')?.textContent).toBe(
+      'No two visits close in timeNothing can be seen moving here. Try a nearby patch.',
+    );
     expect(q('live-retry')).toBeNull();
     expect(host.querySelector('.sx-panel-head p')?.textContent).toBe('Area · 0.98° × 0.61°');
   });
@@ -471,12 +579,17 @@ describe('LiveAreaCard', () => {
     await act(async () => root.render(<LiveAreaCard />));
     q('live-compute')!.focus();
     await act(async () => {
-      useLiveJobStore.setState({ view: { kind: 'job', box, flow: 'known' }, job: { areaId: 'a', box, flow: 'known', plan, status: mockStatusAt('a', 0.2, plan) } });
+      useLiveJobStore.setState({
+        view: { kind: 'job', box, flow: 'known' },
+        job: { areaId: 'a', box, flow: 'known', plan, status: mockStatusAt('a', 0.2, plan) },
+      });
     });
     expect(document.activeElement?.tagName).toBe('H2');
   });
   it('Choose another region goes back to aiming and closes the card', async () => {
-    useLiveJobStore.setState({ view: { kind: 'failed', box, flow: 'known', code: 'upstream_unavailable', detail: '' } });
+    useLiveJobStore.setState({
+      view: { kind: 'failed', box, flow: 'known', code: 'upstream_unavailable', detail: '' },
+    });
     await act(async () => root.render(<LiveAreaCard />));
     expect(q('live-retry')).not.toBeNull();
     await act(async () => q('live-draw-again')!.click());

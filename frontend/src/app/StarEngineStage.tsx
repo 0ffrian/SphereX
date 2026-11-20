@@ -16,7 +16,12 @@ import { nudge, projectSurface, globeRot, GLOBE_TILT } from '@/engine/stars/star
 import { placeText, useStarTarget } from './starTargetStore';
 import { useStarChart } from './starChartStore';
 import { useStarView } from './starViewStore';
-import { useBuildControls, type BuildControl, type BuildControlsSpec, type BuildNote } from './build/BuildControls';
+import {
+  useBuildControls,
+  type BuildControl,
+  type BuildControlsSpec,
+  type BuildNote,
+} from './build/BuildControls';
 import { cardToStar, type StarFromCard } from '@/engine/stars/cardToStar';
 import { FrameCap } from '@/viewer/render/quality';
 import { readyOrTimeout, STAR_READY_TIMEOUT_MS } from './engineWatchdog';
@@ -273,7 +278,11 @@ export function StarPreparing() {
 }
 
 /** The left close-up's zoom: wheel and two-finger pinch on the stage, and registration for the zoom bar. */
-function useCloseUpZoom(host: React.RefObject<HTMLDivElement | null>, engine: StarEngine | null, bump: () => void) {
+function useCloseUpZoom(
+  host: React.RefObject<HTMLDivElement | null>,
+  engine: StarEngine | null,
+  bump: () => void,
+) {
   useEffect(() => {
     if (!engine) return;
     useStarView.getState().setCloseUp(engine);
@@ -356,7 +365,10 @@ export function StarGlobeStage({ star, onFail }: { star: StarFromCard; onFail?: 
         kind: 'choice',
         label: 'Light',
         value: String(engine.light),
-        options: ([0, 2, 3] as StarLight[]).map((l) => ({ value: String(l), label: LIGHT_LABEL[l] })),
+        options: ([0, 2, 3] as StarLight[]).map((l) => ({
+          value: String(l),
+          label: LIGHT_LABEL[l],
+        })),
         onChange: (v) => useStarView.getState().setLight(Number(v) as StarLight),
       },
       {
@@ -388,7 +400,9 @@ export function StarGlobeStage({ star, onFail }: { star: StarFromCard; onFail?: 
         group: 'flare-actions',
         label: 'Fire a big flare',
         disabled: !flares,
-        why: flares ? undefined : 'This star has no spot groups, so it has no sunspot-driven flares.',
+        why: flares
+          ? undefined
+          : 'This star has no spot groups, so it has no sunspot-driven flares.',
         onClick: () => {
           // The flare starts at the spot group the close-up is looking at (or the nearest one: a quiet place cannot flare).
           const cu = useStarView.getState().closeUp;
@@ -412,9 +426,30 @@ export function StarGlobeStage({ star, onFail }: { star: StarFromCard; onFail?: 
             } as BuildControl,
           ]
         : []),
-      { id: 'latest', kind: 'readout', slot: 'latest', label: 'Latest flare on this star', value: engine.latestFlare(), tag: 'inferred_from_analog' },
-      { id: 'k-teff', kind: 'readout', slot: 'key', label: 'Surface temperature', value: `${Math.round(star.teff.value).toLocaleString('en')} K`, tag: star.teff.tag },
-      { id: 'k-size', kind: 'readout', slot: 'key', label: 'Size', value: sizeText(star.radius.value), tag: star.radius.tag },
+      {
+        id: 'latest',
+        kind: 'readout',
+        slot: 'latest',
+        label: 'Latest flare on this star',
+        value: engine.latestFlare(),
+        tag: 'inferred_from_analog',
+      },
+      {
+        id: 'k-teff',
+        kind: 'readout',
+        slot: 'key',
+        label: 'Surface temperature',
+        value: `${Math.round(star.teff.value).toLocaleString('en')} K`,
+        tag: star.teff.tag,
+      },
+      {
+        id: 'k-size',
+        kind: 'readout',
+        slot: 'key',
+        label: 'Size',
+        value: sizeText(star.radius.value),
+        tag: star.radius.tag,
+      },
       {
         id: 'k-rot',
         kind: 'readout',
@@ -423,16 +458,17 @@ export function StarGlobeStage({ star, onFail }: { star: StarFromCard; onFail?: 
         value: rot.text,
         tag: star.rotation.tag,
       },
-      ...engine.readouts().filter((r) => r.label !== 'Surface temperature').map(
-        (r): BuildControl => ({
+      ...engine
+        .readouts()
+        .filter((r) => r.label !== 'Surface temperature')
+        .map((r): BuildControl => ({
           id: `r-${r.label}`,
           kind: 'readout',
           slot: r.label === 'Average magnetic field' ? 'key' : undefined,
           label: r.label,
           value: r.value,
           tag: READOUT_TAG[r.label],
-        }),
-      ),
+        })),
     ];
     // Key numbers come in a fixed order: the engine's own temperature and field rows are placed among ours.
     const order = ['Surface temperature', 'Size', 'Rotation period', 'Average magnetic field'];
@@ -464,7 +500,7 @@ export function StarGlobeStage({ star, onFail }: { star: StarFromCard; onFail?: 
     const b = e.currentTarget.getBoundingClientRect();
     const discPx = b.height / (2 * engine.globeHalf()); // pixels per star radius
     // Dragging right brings the surface to the right: the facing longitude (rot) goes down.
-    st.time = d.time - ((e.clientX - d.x) / discPx) / 0.012;
+    st.time = d.time - (e.clientX - d.x) / discPx / 0.012;
     engine.draw();
   };
   const onUp = (e: React.PointerEvent<HTMLDivElement>) => {
