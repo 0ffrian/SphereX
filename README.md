@@ -6,6 +6,51 @@ A public web tool: enter coordinates or a name, watch real SPHEREx frames of tha
 
 Read the [technical paper on how the engine works](https://drive.google.com/file/d/17-vdnUqvNrglVh3bVlsuxJ6PKWRMTTpe/view?usp=drive_link).
 
+## See it
+
+<table>
+  <tr>
+    <td width="66%"><img src="docs/screenshots/readme/sky-search.gif" alt="Searching for Barnard's Star: the sky flies to it and its SPHEREx frames play" width="100%"></td>
+    <td width="34%"><img src="docs/screenshots/readme/flipbook.gif" alt="The flipbook card playing frames above a measured spectrum" width="100%"></td>
+  </tr>
+  <tr>
+    <td><b>Search the sky.</b> Type a name and the sky flies there. The flipbook plays the real SPHEREx frames of that patch (Barnard's Star, 240 frames).</td>
+    <td><b>Flipbook and spectrum.</b> Each frame is a different wavelength. The spectrum is measured from the frames (the light at TRAPPIST-1 e's position, which is its star's).</td>
+  </tr>
+  <tr>
+    <td colspan="2"><img src="docs/screenshots/readme/eros-track.gif" alt="433 Eros moving along its predicted path across SPHEREx frames, its spectrum building hop by hop" width="100%"></td>
+  </tr>
+  <tr>
+    <td colspan="2"><b>Track a moving asteroid.</b> 433 Eros crosses SPHEREx frames on 20–21 March 2026. The card follows it frame by frame and builds its spectrum one hop at a time. The app tags this view as demo data and the brightness as estimated.</td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/readme/build-star.gif" alt="Barnard's Star built in steps: mould, surface, spots, colour" width="100%"></td>
+    <td><img src="docs/screenshots/readme/star-flare.gif" alt="A flare rising from the surface of Barnard's Star" width="100%"></td>
+  </tr>
+  <tr>
+    <td><b>Build it.</b> Barnard's Star is built in steps: mould, surface, spots, colour.</td>
+    <td><b>Explore a star.</b> A flare at the edge of Barnard's Star.</td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/readme/build-planet.gif" alt="TRAPPIST-1 e forming from a grey mould through a molten globe to continents" width="100%"></td>
+    <td><img src="docs/screenshots/readme/planets.gif" alt="Jupiter, Saturn, K2-18 b and Kepler-186 f turned by hand" width="100%"></td>
+  </tr>
+  <tr>
+    <td><b>Build a planet.</b> TRAPPIST-1 e forms from a molten globe into continents.</td>
+    <td><b>Turn it in your hand.</b> Jupiter, Saturn, K2-18 b and Kepler-186 f.</td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/readme/flyover.gif" alt="Flying low over the surface of Kepler-186 f towards a coast" width="100%"></td>
+    <td><img src="docs/screenshots/readme/eros-build.gif" alt="433 Eros morphing from a sphere into its shape model, then tumbling" width="100%"></td>
+  </tr>
+  <tr>
+    <td><b>Fly over it.</b> Kepler-186 f from low altitude. In the app, the flyover has its own soundscape.</td>
+    <td><b>A real shape.</b> 433 Eros is built from its shape model, then tumbles.</td>
+  </tr>
+</table>
+
+The planets' and stars' surfaces are artist's impressions, and the app labels them so ("Showing artist's impression so the whole body can be built"). The clips were recorded from the app running on real cached SPHEREx data (20 Nov 2026) and have no sound.
+
 ## Repo map
 
 | Path | What |
