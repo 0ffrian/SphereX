@@ -34,6 +34,16 @@ If two docs disagree and `docs/decisions/` is silent, follow the precedence (dec
 - **All development happens on a branch** (`feat/…`, `fix/…`, `docs/…`) and reaches `main` through a pull request. Review it with `/sx-pr-review`.
 - **Never commit or push directly to `main`.** The only exceptions were the initial repo and frontend setup (4 Nov 2026), which the user approved explicitly.
 - Agents may create branches and commit locally. Pushing and opening PRs happen when the user asks.
+- **PR titles are `Issue-<n>: <title>`**, where `<n>` is the ticket the PR closes (e.g. `Issue-3: Add the Track time slider`). A PR with no ticket gets one first, through `/sx-ticket`. Link the ticket in the body too (`Closes #<n>`).
+
+## Tickets
+
+**Never create a GitHub issue without the author's approval of the exact draft.** This overrides "agents work autonomously".
+1. Draft the ticket and show it in full. Don't create it.
+2. The author approves it or asks for changes. After changes, show the whole revised draft again and wait.
+3. Only after an explicit approval of that version: create it, link what it blocks and what blocks it, and add it to the project "SphereX and PlanetX - NASA COMPETITION 2026" with Status **Backlog**.
+
+Use `/sx-ticket` for this. Agents and reviewers never run `gh issue create`: they return follow-ups as drafts marked **must-fix** or **good-to-have**, and the PR author decides which become tickets.
 
 ## Agents and skills
 
@@ -45,13 +55,14 @@ Project agents live in `.claude/agents/` and skills in `.claude/skills/`. Agents
 | `/sx-code-review [paths] [--fix] [--deep]` | code-reviewer; `--deep` adds security, performance and accessibility passes |
 | `/sx-pr-review <n> [--comment] [--deep]` | pr-reviewer on a GitHub PR; `--comment` posts the review |
 | `/sx-design-language` | loads the design language (D-38) before any UI work: tokens, type, radii, controls, motion, checks |
-| `/sx-design-review [target] [--fix]` | design-reviewer, accessibility-tester and ux-microcopy-reviewer (plus haptics-audio-engineer, now the sound engineer, when relevant) |
+| `/sx-design-review [target] [--fix]` | design-reviewer, accessibility-tester and ux-microcopy-reviewer (plus sound-engineer when sound changed) |
 | `/sx-spec-sync [change]` | spec-keeper: section maps, links, UML, decisions |
 | `/sx-verify [item\|all] [--apply]` | astro-verifier resolves **[verify]** items with citations |
+| `/sx-ticket <what>` | drafts a GitHub issue, waits for the author's approval, then creates it with its blocking links and adds it to the project Backlog |
 
 **Project agents:**
 - `auto-implementer`, `code-reviewer`, `pr-reviewer`, `design-reviewer`
-- `spec-keeper`, `astro-verifier`, `haptics-audio-engineer`
+- `spec-keeper`, `astro-verifier`, `sound-engineer` (was `haptics-audio-engineer`; haptics cut, D-39)
 
 **Imported from VoltAgent (MIT, with a project note added):**
 - Core: `api-designer`, `backend-developer`, `frontend-developer`, `ui-designer`
