@@ -69,6 +69,18 @@
 - **Dependencies:** M1–M4 have no hard dependency on each other (D-29). Three soft links run across milestones: texture haptics (#11, M3) read the shared CPU field from #8 (M2); the Gemini layer (#14, M4) repaints the albedo from the baker's height map (#6, M2, D-07); physics sliders (#13, M4) need the viewer (#7, M2) to be seen. Each can be built against fixtures first. M5 depends on all of them. The map is in architecture spec §13.
 - **Amended by:** Q-132 (M3 is renamed "Sound"; its owner is unchanged). Track tickets: Q-187.
 
+## D-42 `dev` is the development branch; `main` is frozen
+
+- **Decision (Atish, 20 Nov 2026):**
+  - **`main` is frozen** at `b7b4a1d6` (the merge of PR #182, 20 Nov 2026): the project as built for the event plus the Discovery hunts spec (A22). Nothing is merged into `main`, pushed to it or rebased onto it. Its ruleset (Q-484) stays on.
+  - **`dev`** is made from that commit. All new work branches off `dev` (`feat/…`, `fix/…`, `docs/…`, `chore/…`) and returns to `dev` through a pull request. Open PRs that still target `main` are retargeted to `dev`.
+  - **`dev` gets the protection `main` had** (Q-484): no direct push, force push or delete; `ci-gate` required; one approval from someone who is not the author and did not push last; code-owner review; threads resolved; the merge queue.
+  - **`dev` is the default branch**, so new PRs target it, new contributors land on it, and `Closes #<n>` closes the issue when the PR merges into `dev`.
+  - **Merging `dev` into `main`** (a release) needs a new decision.
+- **Why:** `main` keeps a known-good snapshot of the event build while the Discovery hunts work (A22) starts and new contributors join.
+- **GitHub settings (an admin, once):** create `dev` from `b7b4a1d6`; copy the `main` ruleset (id 27523962) to a `dev` ruleset; make `dev` the default branch; retarget open PRs.
+- **Relates to:** Q-484 (code owners and the merge gate), D-17 (owners).
+
 ## Post-event backlog
 
 | ID | Item | From |
