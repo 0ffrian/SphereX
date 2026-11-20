@@ -2,15 +2,15 @@ name: ci
 
 # The only CI entry point. Every PR gets one required check, `ci-gate`, which
 # always reports, even when no checks were needed (docs-only PRs), and runs
-# again in the merge queue on the PR combined with the latest main. backend.yml
+# again in the merge queue on the PR combined with the latest dev (D-42). backend.yml
 # and frontend.yml run only when their paths change. Documented in docs/architecture/testing.md (A12).
 
 on:
   pull_request:
-  # The merge queue tests each PR on top of the latest main before merging it.
+  # The merge queue tests each PR on top of the latest dev before merging it.
   merge_group:
   push:
-    branches: [main]
+    branches: [dev, main]
   # Manual run of every check on any branch (Actions tab).
   workflow_dispatch:
 

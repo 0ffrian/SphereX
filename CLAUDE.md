@@ -31,10 +31,11 @@ If two docs disagree and `docs/decisions/` is silent, follow the precedence (dec
 
 ## Git workflow
 
-- **All development happens on a branch** (`feat/…`, `fix/…`, `docs/…`, `chore/…`) and reaches `main` through a pull request. Review it with `/sx-pr-review`.
-- **Never commit or push directly to `main`.** The only exceptions were the initial repo and frontend setup (4 Nov 2026), which the user approved explicitly.
+- **`dev` is the development branch; `main` is frozen** (D-42). Make every branch from `dev` (`git switch -c feat/<slug> origin/dev`) and open every PR against `dev`. Never commit to, push to or open a PR against `main`: nothing merges into it without a new decision.
+- **All development happens on a branch** (`feat/…`, `fix/…`, `docs/…`, `chore/…`) and reaches `dev` through a pull request. Review it with `/sx-pr-review`.
+- **Never commit or push directly to `dev` or `main`.** The only exceptions were the initial repo and frontend setup (4 Nov 2026), which the user approved explicitly.
 - Agents may create branches and commit locally. Pushing and opening PRs happen when the user asks.
-- **`main` is protected by a ruleset** (Q-484): a merge needs the `ci-gate` check, an approval from someone other than the author and last pusher, and a code-owner approval for owned paths. Owners and open paths: [CONTRIBUTING.md](CONTRIBUTING.md) and `.github/CODEOWNERS`. Admins and maintainers can override it on a PR merge (bypass checkbox, Q-484); agents never use that override, never disable the ruleset and never try to get around it. If a PR is blocked, report it.
+- **`dev` and `main` are protected by rulesets** (Q-484, D-42): a merge needs the `ci-gate` check, an approval from someone other than the author and last pusher, and a code-owner approval for owned paths. Owners and open paths: [CONTRIBUTING.md](CONTRIBUTING.md) and `.github/CODEOWNERS`. Admins and maintainers can override it on a PR merge (bypass checkbox, Q-484); agents never use that override, never disable the ruleset and never try to get around it. If a PR is blocked, report it.
 - **PR titles are `Issue-<n>: <title>`**, where `<n>` is the ticket the PR closes (e.g. `Issue-3: Add the Track time slider`). A PR with no ticket gets one first, through `/sx-ticket`. Link the ticket in the body too (`Closes #<n>`).
 
 ## Tickets
