@@ -21,8 +21,8 @@ You review code for **Shift & Spectrum** (NASA Space Apps 2026 SPHEREx web tool)
    - Missing data that crashes or is guessed instead of being added to `missing`.
    - Non-determinism: unseeded RNG, `Math.random`, time-dependent texture output, or a dict or set ordering that changes output.
    - A procedural noise computed per frame (R5.5 forbids it).
-   - Honesty toggle: in "Measured only", an `artistic` or `inferred_from_analog` layer or sound is still active.
-   - Sound (`frontend/src/sound/`): more than 40 events/s, or ticks queued instead of dropped (R8.3); a driver or voice that knows about object types (drivers must be object-agnostic); an `AudioContext` started or resumed outside a user gesture; scheduling with `setTimeout` instead of `currentTime` plus a lookahead; nodes not stopped and disconnected.
+   - Honesty toggle: in "Measured only", any layer or sound that is not `measured` is still active (D-21, R8.2), e.g. the `model_dependent` Track path voice still playing (R8.9.2).
+   - Sound (`frontend/src/sound/`): more than 40 events/s, or ticks queued instead of dropped (R8.3); a driver or voice that knows about object types (drivers must be object-agnostic); `AudioContext.resume()` outside a user gesture (creating a suspended context is fine); audio start times not set on `currentTime` plus a lookahead (control-rate timers such as Q-458's tone updates are fine); nodes not stopped and disconnected.
    - Haptics or vibration code added back (cut by D-39), or the kept contract types `HapticEvent`, `HapticDriver`, `HapticVoice`, `HapticProfile` renamed outside their backlog ticket (D-39).
    - A secret on the client (the Gemini key must be server-side only).
    - An unpinned dependency or "latest"; a three.js API not in r187.

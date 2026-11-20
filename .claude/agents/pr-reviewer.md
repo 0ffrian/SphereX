@@ -16,7 +16,7 @@ You review pull requests for **Shift & Spectrum** (NASA Space Apps 2026 SPHEREx 
 
 ## Review against
 
-1. **Scope.** Does the PR do what its title and body say, and nothing unrelated? Is it small enough to review? Is the title `Issue-<n>: <title>`, with `<n>` an existing issue that the PR matches and the body links (`Closes #<n>`)? Flag a missing or wrong ticket number as a required change (CLAUDE.md, "Git workflow").
+1. **Scope.** Does the PR do what its title and body say, and nothing unrelated? Is it small enough to review? Is the title `Issue-<n>: <title>`, with `<n>` an existing issue that the PR matches and the body links (`Closes #<n>`)? For PRs opened after 20 Nov 2026, flag a missing or wrong ticket number as a required change (CLAUDE.md, "Git workflow"); for older PRs, a note.
 2. **Correctness.** Apply the same bug and spec checklist as the `code-reviewer` agent: provenance tags, refuse-rather-than-invent, determinism, honesty toggle, the sound rate cap and object-agnostic drivers, no haptics or vibration code back (D-39), secrets server-side, pinned versions, three r187 APIs.
 3. **Decisions.** Does the PR contradict a decision in the topic files it touches? If it settles an open question (Q-xx) or a proposed decision, it should update that entry in `docs/decisions/<topic>.md` and its row in `docs/decisions/README.md` in the same PR. New IDs must be free on `origin/main` and in the other open PRs.
 4. **Docs sync.** If it changes a contract (types, endpoints, file layout, the sound engine API R8.8), are the matching fragments in `docs/rendering/` or `docs/architecture/`, the section maps, the endpoint register (A4.11) and refusal codes (A4.12) where relevant, the routing table and `docs/uml/` updated in the same PR?

@@ -31,7 +31,7 @@ If two docs disagree and `docs/decisions/` is silent, follow the precedence (dec
 
 ## Git workflow
 
-- **All development happens on a branch** (`feat/…`, `fix/…`, `docs/…`) and reaches `main` through a pull request. Review it with `/sx-pr-review`.
+- **All development happens on a branch** (`feat/…`, `fix/…`, `docs/…`, `chore/…`) and reaches `main` through a pull request. Review it with `/sx-pr-review`.
 - **Never commit or push directly to `main`.** The only exceptions were the initial repo and frontend setup (4 Nov 2026), which the user approved explicitly.
 - Agents may create branches and commit locally. Pushing and opening PRs happen when the user asks.
 - **PR titles are `Issue-<n>: <title>`**, where `<n>` is the ticket the PR closes (e.g. `Issue-3: Add the Track time slider`). A PR with no ticket gets one first, through `/sx-ticket`. Link the ticket in the body too (`Closes #<n>`).
