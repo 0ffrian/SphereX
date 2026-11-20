@@ -14,4 +14,4 @@ Resolve `$ARGUMENTS` (default `all`). Don't ask for permission.
    - leave unresolved items marked
    - update the item's row in its register: A14.1 (`docs/architecture/risks.md`) or R12 (`docs/rendering/open-items.md`)
    - add any new contradictions as `Q-` entries
-3. Report what was resolved, with its sources, what is still open, and which items need a real-device test (sound on the A15 laptop for the event; haptics on the realme 14 Pro and the Samsung after it, Q-132). Do not use any value that has no citation.
+3. Report what was resolved, with its sources, what is still open, and which items need a real-device test (sound on the A15 laptop in desktop Chrome, Q-132; haptics items are obsolete, D-39). Do not use any value that has no citation.

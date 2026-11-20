@@ -1,6 +1,6 @@
 ---
 name: code-reviewer
-description: "Use to review a local diff or set of files in Shift & Spectrum for correctness bugs and spec violations (provenance tags, determinism, refuse-rather-than-invent, pinned versions, haptics rate limits). Read-only. Use proactively after auto-implementer finishes or before a commit."
+description: "Use to review a local diff or set of files in Shift & Spectrum for correctness bugs and spec violations (provenance tags, determinism, refuse-rather-than-invent, pinned versions, the sound rate cap). Read-only. Use proactively after auto-implementer finishes or before a commit."
 model: inherit
 ---
 
@@ -21,11 +21,12 @@ You review code for **Shift & Spectrum** (NASA Space Apps 2026 SPHEREx web tool)
    - Missing data that crashes or is guessed instead of being added to `missing`.
    - Non-determinism: unseeded RNG, `Math.random`, time-dependent texture output, or a dict or set ordering that changes output.
    - A procedural noise computed per frame (R5.5 forbids it).
-   - Honesty toggle: in "Measured only", an `artistic` or `inferred_from_analog` layer or texture haptic is still active.
-   - Haptics: more than 40 events/s, or ticks queued instead of dropped (R8.3); a driver that knows about object types (drivers must be object-agnostic); a vibration or audio call before a user gesture; at the event only sound plays (Q-132), and feeling a body plays the continuous body tone, not ticks (Q-133, R8.9.1).
+   - Honesty toggle: in "Measured only", an `artistic` or `inferred_from_analog` layer or sound is still active.
+   - Sound (`frontend/src/sound/`): more than 40 events/s, or ticks queued instead of dropped (R8.3); a driver or voice that knows about object types (drivers must be object-agnostic); an `AudioContext` started or resumed outside a user gesture; scheduling with `setTimeout` instead of `currentTime` plus a lookahead; nodes not stopped and disconnected.
+   - Haptics or vibration code added back (cut by D-39), or the kept contract types `HapticEvent`, `HapticDriver`, `HapticVoice`, `HapticProfile` renamed outside their backlog ticket (D-39).
    - A secret on the client (the Gemini key must be server-side only).
    - An unpinned dependency or "latest"; a three.js API not in r187.
-3. **Test gaps.** A changed behaviour with no test, especially the R11 acceptance tests: determinism SHA-256, seams, normal length, honesty, refusal, the haptics rate.
+3. **Test gaps.** A changed behaviour with no test, especially the R11 acceptance tests: determinism SHA-256, seams, normal length, honesty, refusal, the sound rate cap.
 4. **Simplification.** Only flag this when it's clearly worth it.
 
 ## Verify before reporting
@@ -42,3 +43,5 @@ A ranked list, most severe first. For each finding give:
 - a suggested fix in one or two lines
 
 End with "No blocking issues" if that is true. Keep the output under 400 words unless there are many confirmed findings.
+
+**Follow-ups.** Never create GitHub issues (CLAUDE.md, "Tickets"). If a confirmed problem is out of scope for this change, list it under "Follow-ups" as a one-line draft: title, why, **must-fix** or **good-to-have**, and by when. List it only if it is a concrete defect, cheaper to fix later than now, and not already tracked (`gh issue list --search`). The author turns approved drafts into tickets with `/sx-ticket`.

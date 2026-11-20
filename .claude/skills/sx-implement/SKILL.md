@@ -1,6 +1,6 @@
 ---
 name: sx-implement
-description: Auto-implement a Shift & Spectrum task end to end. Runs auto-implementer (with a specialist when one fits), then code-reviewer with fixes, design-reviewer for UI/haptics changes, and spec-keeper for doc/UML sync. Use when the user asks to build, add or implement a feature.
+description: Auto-implement a Shift & Spectrum task end to end. Runs auto-implementer (with a specialist when one fits), then code-reviewer with fixes, design-reviewer for UI/sound changes, and spec-keeper for doc/UML sync. Use when the user asks to build, add or implement a feature.
 argument-hint: "<task description> [--commit] [--no-review]"
 ---
 
@@ -13,7 +13,7 @@ Implement `$ARGUMENTS` for Shift & Spectrum. Run the whole pipeline without aski
 1. **Scope.** Restate the task in one line. Pick the decision topic files and the spec fragments from the task's row in the routing table of `docs/README.md` (after the decisions index `docs/decisions/README.md`). If the task is large, split it into independent sub-tasks.
 
 2. **Implement.** Launch the `auto-implementer` agent with the task, the fragment list and any user constraints. Add a specialist agent alongside it when one clearly fits:
-   - haptics or sound: `haptics-audio-engineer`
+   - sound: `sound-engineer`
    - three.js or WebGL rendering: `game-developer`
    - React UI: `react-specialist`
    - Python pipeline or baker: `python-pro`
@@ -23,7 +23,7 @@ Implement `$ARGUMENTS` for Shift & Spectrum. Run the whole pipeline without aski
 
 3. **Review and fix.** Unless `--no-review` was passed, launch `code-reviewer` with "review the current diff and fix confirmed issues (--fix)".
 
-   If the change touches `frontend/` UI, the viewer, haptics or audio, also launch `design-reviewer` with `--fix`. Run the two reviewers in parallel.
+   If the change touches `frontend/` UI, the viewer or sound, also launch `design-reviewer` with `--fix`. Run the two reviewers in parallel.
 
 4. **Docs.** If any contract, type, endpoint, file layout or decision changed, launch `spec-keeper` to update the fragments, section maps and `docs/uml/` diagrams, and to validate the links.
 
@@ -38,5 +38,6 @@ Implement `$ARGUMENTS` for Shift & Spectrum. Run the whole pipeline without aski
 - Review findings: fixed, and left open.
 - Assumptions and **[verify]** items.
 - The doc and diagram updates.
+- Follow-ups as ticket drafts (must-fix or good-to-have). Never create them here; the author uses `/sx-ticket`.
 
 Keep it short.
