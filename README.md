@@ -1,10 +1,16 @@
 # Odysseus
 
+> [!NOTE]
+> **Odysseus did not end with the hackathon.** In real NASA SPHEREx images it found the known asteroid 2253 Espinette without being told where to look, and one of our two technical papers measures how often the method is wrong. We are still building it to contribute to real science, and working towards open-sourcing it so amateur astronomers and physicists can fork and adapt it. Development happens on [`dev`](../../tree/dev). `main` is frozen apart from CI and documentation updates.
+
 NASA Space Apps 2026, Port Louis. Challenge: **Planet X and SPHEREx**.
 
 A public web tool: enter coordinates or a name, watch real SPHEREx frames of that patch play as a series, click any object to see its spectrum, then explore it as a 3D body you can rotate and listen to.
 
-Read the [technical paper on how the engine works](https://drive.google.com/file/d/17-vdnUqvNrglVh3bVlsuxJ6PKWRMTTpe/view?usp=drive_link).
+**Technical papers**
+
+- [How Odysseus finds moving objects](https://drive.google.com/file/d/17wB2XQj5ycqjVY2EQRC9wzoT0OSNApVN/view?usp=drive_link) in NASA's SPHEREx images, how we test it against known asteroids, and the nine unexplained tracks it flagged for follow-up.
+- [How Odysseus builds planets, stars and asteroids in 3D](https://drive.google.com/file/d/17-vdnUqvNrglVh3bVlsuxJ6PKWRMTTpe/view?usp=drive_link) from real measurements: ESA's Gaia telescope, the NASA Exoplanet Archive, and spacecraft visits to the asteroids Eros and Bennu.
 
 ## See it
 
