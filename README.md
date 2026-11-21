@@ -8,48 +8,99 @@ Read the [technical paper on how the engine works](https://drive.google.com/file
 
 ## See it
 
+Recorded from the app running on real cached SPHEREx data (20 Nov 2026). The clips have no sound.
+
+### Discovery: find what no catalogue explains
+
 <table>
   <tr>
-    <td width="66%"><img src="docs/screenshots/readme/sky-search.gif" alt="Searching for Barnard's Star: the sky flies to it and its SPHEREx frames play" width="100%"></td>
-    <td width="34%"><img src="docs/screenshots/readme/flipbook.gif" alt="The flipbook card playing frames above a measured spectrum" width="100%"></td>
+    <td><img src="docs/screenshots/readme/discovery-scan.webp" alt="The Discovery eye is clicked, a 28-square region over the Milky Way is selected and scanned square by square" width="100%"></td>
   </tr>
   <tr>
-    <td><b>Search the sky.</b> Type a name and the sky flies there. The flipbook plays the real SPHEREx frames of that patch (Barnard's Star, 240 frames).</td>
-    <td><b>Flipbook and spectrum.</b> Each frame is a different wavelength. The spectrum is measured from the frames (the light at TRAPPIST-1 e's position, which is its star's).</td>
+    <td><b>Start a scan.</b> Click the eye, pick a patch of sky, and it is scanned square by square. Green circles are known objects, amber ones unexplained. <i>This clip uses test data, not a real scan.</i></td>
   </tr>
   <tr>
-    <td colspan="2"><img src="docs/screenshots/readme/eros-track.gif" alt="433 Eros moving along its predicted path across SPHEREx frames, its spectrum building hop by hop" width="100%"></td>
+    <td><img src="docs/screenshots/readme/scan-replay.webp" alt="Our 14 November scan is replayed at speed, then square 2 is opened and the unexplained track T485 shows its spectrum" width="100%"></td>
   </tr>
   <tr>
-    <td colspan="2"><b>Track a moving asteroid.</b> 433 Eros crosses SPHEREx frames on 20–21 March 2026. The card follows it frame by frame and builds its spectrum one hop at a time. The app tags this view as demo data and the brightness as estimated.</td>
+    <td><b>Replay a real scan.</b> Our 14 Nov scan of 4 squares, replayed in seconds. Open a square and pick an unexplained track to see its spectrum.</td>
   </tr>
   <tr>
-    <td><img src="docs/screenshots/readme/build-star.gif" alt="Barnard's Star built in steps: mould, surface, spots, colour" width="100%"></td>
-    <td><img src="docs/screenshots/readme/star-flare.gif" alt="A flare rising from the surface of Barnard's Star" width="100%"></td>
+    <td><img src="docs/screenshots/readme/square-object.webp" alt="Square 1 opens alone with all its plot points; the unexplained track T23 is selected and its graph points are traced, then the list of points used opens" width="100%"></td>
   </tr>
   <tr>
-    <td><b>Build it.</b> Barnard's Star is built in steps: mould, surface, spots, colour.</td>
-    <td><b>Explore a star.</b> A flare at the edge of Barnard's Star.</td>
-  </tr>
-  <tr>
-    <td><img src="docs/screenshots/readme/build-planet.gif" alt="TRAPPIST-1 e forming from a grey mould through a molten globe to continents" width="100%"></td>
-    <td><img src="docs/screenshots/readme/planets.gif" alt="Jupiter, Saturn, K2-18 b and Kepler-186 f turned by hand" width="100%"></td>
-  </tr>
-  <tr>
-    <td><b>Build a planet.</b> TRAPPIST-1 e forms from a molten globe into continents.</td>
-    <td><b>Turn it in your hand.</b> Jupiter, Saturn, K2-18 b and Kepler-186 f.</td>
-  </tr>
-  <tr>
-    <td><img src="docs/screenshots/readme/flyover.gif" alt="Flying low over the surface of Kepler-186 f towards a coast" width="100%"></td>
-    <td><img src="docs/screenshots/readme/eros-build.gif" alt="433 Eros morphing from a sphere into its shape model, then tumbling" width="100%"></td>
-  </tr>
-  <tr>
-    <td><b>Fly over it.</b> Kepler-186 f from low altitude. In the app, the flyover has its own soundscape.</td>
-    <td><b>A real shape.</b> 433 Eros is built from its shape model, then tumbles.</td>
+    <td><b>One square, one unknown.</b> Square 1 with all its plot points. T23 is unexplained; its graph compares each measurement with the Sun's colour.</td>
   </tr>
 </table>
 
-The planets' and stars' surfaces are artist's impressions, and the app labels them so ("Showing artist's impression so the whole body can be built"). The clips were recorded from the app running on real cached SPHEREx data (20 Nov 2026) and have no sound.
+### Barnard's Star: from the sky to 3D
+
+<table>
+  <tr>
+    <td colspan="2"><img src="docs/screenshots/readme/barnard-star.webp" alt="Barnard's Star is searched, its SPHEREx frames play, it is built in 3D, explored up close, then switched from true colour to the ultraviolet Observatory view" width="100%"></td>
+  </tr>
+  <tr>
+    <td colspan="2"><b>Search, play, build.</b> Find Barnard's Star, play its SPHEREx frames, build it in 3D, explore the surface, then switch from true colour to ultraviolet.</td>
+  </tr>
+  <tr>
+    <td colspan="2"><img src="docs/screenshots/readme/sky-search.webp" alt="Searching for Barnard's Star: the sky flies to it and its SPHEREx frames play" width="100%"></td>
+  </tr>
+  <tr>
+    <td colspan="2"><b>Search the sky.</b> Type a name and the sky flies there. The flipbook plays the real SPHEREx frames of that patch.</td>
+  </tr>
+  <tr>
+    <td width="57%"><img src="docs/screenshots/readme/build-star.webp" alt="Barnard's Star built in steps: mould, surface, spots, colour" width="100%"></td>
+    <td width="43%"><img src="docs/screenshots/readme/star-flare.webp" alt="A flare rising from the surface of Barnard's Star" width="100%"></td>
+  </tr>
+  <tr>
+    <td><b>Build it.</b> Mould, surface, spots, colour.</td>
+    <td><b>Explore a star.</b> A flare at the edge of Barnard's Star.</td>
+  </tr>
+</table>
+
+### More of the app
+
+<table>
+  <tr>
+    <td colspan="2"><img src="docs/screenshots/readme/eros-track.webp" alt="433 Eros moving along its predicted path across SPHEREx frames, its spectrum building hop by hop" width="100%"></td>
+  </tr>
+  <tr>
+    <td colspan="2"><b>Track a moving asteroid.</b> 433 Eros across SPHEREx frames, its spectrum built hop by hop. <i>The app tags this view as demo data.</i></td>
+  </tr>
+  <tr>
+    <td width="36%"><img src="docs/screenshots/readme/flipbook.webp" alt="The flipbook card playing frames above a measured spectrum" width="100%"></td>
+    <td width="64%"><img src="docs/screenshots/readme/planets.webp" alt="Jupiter, Saturn, K2-18 b and Kepler-186 f turned by hand" width="100%"></td>
+  </tr>
+  <tr>
+    <td><b>Flipbook and spectrum.</b> Each frame is a different wavelength; the spectrum is measured from them.</td>
+    <td><b>Turn it in your hand.</b> Jupiter, Saturn, K2-18 b and Kepler-186 f.</td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/readme/build-planet.webp" alt="TRAPPIST-1 e forming from a grey mould through a molten globe to continents" width="100%"></td>
+    <td width="50%"><img src="docs/screenshots/readme/eros-build.webp" alt="433 Eros morphing from a sphere into its shape model, then tumbling" width="100%"></td>
+  </tr>
+  <tr>
+    <td><b>Build a planet.</b> TRAPPIST-1 e from molten globe to continents.</td>
+    <td><b>A real shape.</b> 433 Eros built from its shape model.</td>
+  </tr>
+</table>
+
+### Fly over it
+
+<table>
+  <tr>
+    <td width="33%"><img src="docs/screenshots/readme/flyover-rocky.webp" alt="Flying low over 55 Cancri e: dark crust cracked by glowing lava and a river of molten rock" width="100%"></td>
+    <td width="33%"><img src="docs/screenshots/readme/flyover-water.webp" alt="Flying out over the sea of TRAPPIST-1 f, past its coastline and islands" width="100%"></td>
+    <td width="33%"><img src="docs/screenshots/readme/flyover-gas.webp" alt="Rising over Jupiter's cloud tops: a pale zone with a turbulent edge onto a brown belt" width="100%"></td>
+  </tr>
+  <tr>
+    <td><b>A rocky world.</b> 55 Cancri e, cracked crust and rivers of lava.</td>
+    <td><b>A water world.</b> TRAPPIST-1 f, out over its sea.</td>
+    <td><b>A gas giant.</b> Jupiter's cloud tops, zone and belt.</td>
+  </tr>
+</table>
+
+Planet and star surfaces are artist's impressions, and the app labels them so. Spectra, frames and tracks are measured from SPHEREx data unless the caption says otherwise.
 
 ## Repo map
 
