@@ -1,0 +1,238 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it using the metadata in this file."
+type: software
+title: "Odysseus"
+# Everyone with direct access to the repository, as listed by Atish on PR #211 (24 Nov 2026).
+authors:
+  - family-names: "Joottun"
+    given-names: "Atish"
+  - family-names: "Ramjhun"
+    given-names: "Munazir"
+    alias: "Moon"
+  - family-names: "Yerkiah"
+    given-names: "Kevin"
+  - family-names: "Osman"
+    given-names: "Zakiyyah"
+  - family-names: "Bhantoo"
+    given-names: "Dhruv"
+  - family-names: "Burtony"
+    given-names: "Raghav"
+  - family-names: "Sahajoo"
+    given-names: "Ronitesh"
+# Code (and mock-ups) BSD-3-Clause; documentation CC-BY-4.0 (D-41, NOTICE.md).
+license:
+  - BSD-3-Clause
+  - CC-BY-4.0
+repository-code: "https://github.com/0ffrian/SphereX"
+# The main data sources the software uses. Licences, terms and acknowledgement texts are in NOTICE.md.
+# Every entry with a DOI was checked against its DOI record (Crossref or DataCite) on 24 Nov 2026.
+# SkyBoT and Horizons have no DOI: they are cited as each service asks on its own page (checked the same day).
+# "et al." marks an author list cut short; the full lists are in the DOI records.
+references:
+  - type: data
+    title: "SPHEREx Quick Release Spectral Images - QR2"
+    authors:
+      - name: "SPHEREx Team"
+    publisher:
+      name: "IPAC"
+    year: 2025
+    doi: "10.26131/IRSA652"
+  - type: article
+    title: "The Gaia mission"
+    authors:
+      - name: "Gaia Collaboration"
+      - family-names: "Prusti"
+        given-names: "T."
+      - family-names: "de Bruijne"
+        given-names: "J. H. J."
+      - name: "et al."
+    journal: "Astronomy & Astrophysics"
+    volume: 595
+    start: "A1"
+    year: 2016
+    doi: "10.1051/0004-6361/201629272"
+  - type: article
+    title: "Gaia Data Release 3: Summary of the content and survey properties"
+    authors:
+      - name: "Gaia Collaboration"
+      - family-names: "Vallenari"
+        given-names: "A."
+      - family-names: "Brown"
+        given-names: "A. G. A."
+      - family-names: "Prusti"
+        given-names: "T."
+      - name: "et al."
+    journal: "Astronomy & Astrophysics"
+    volume: 674
+    start: "A1"
+    year: 2023
+    doi: "10.1051/0004-6361/202243940"
+  - type: article
+    title: "The Two Micron All Sky Survey (2MASS)"
+    authors:
+      - family-names: "Skrutskie"
+        given-names: "M. F."
+      - family-names: "Cutri"
+        given-names: "R. M."
+      - family-names: "Stiening"
+        given-names: "R."
+      - name: "et al."
+    journal: "The Astronomical Journal"
+    volume: 131
+    issue: "2"
+    start: "1163"
+    end: "1183"
+    year: 2006
+    doi: "10.1086/498708"
+  - type: article
+    title: "The Wide-field Infrared Survey Explorer (WISE): Mission Description and Initial On-orbit Performance"
+    authors:
+      - family-names: "Wright"
+        given-names: "Edward L."
+      - family-names: "Eisenhardt"
+        given-names: "Peter R. M."
+      - family-names: "Mainzer"
+        given-names: "Amy K."
+      - name: "et al."
+    journal: "The Astronomical Journal"
+    volume: 140
+    issue: "6"
+    start: "1868"
+    end: "1881"
+    year: 2010
+    doi: "10.1088/0004-6256/140/6/1868"
+  - type: article
+    title: "The CatWISE2020 Catalog"
+    authors:
+      - family-names: "Marocco"
+        given-names: "Federico"
+      - family-names: "Eisenhardt"
+        given-names: "Peter R. M."
+      - family-names: "Fowler"
+        given-names: "John W."
+      - name: "et al."
+    journal: "The Astrophysical Journal Supplement Series"
+    volume: 253
+    issue: "1"
+    start: "8"
+    year: 2021
+    doi: "10.3847/1538-4365/abd805"
+  - type: article
+    title: "The SIMBAD astronomical database"
+    authors:
+      - family-names: "Wenger"
+        given-names: "M."
+      - family-names: "Ochsenbein"
+        given-names: "F."
+      - family-names: "Egret"
+        given-names: "D."
+      - name: "et al."
+    journal: "Astronomy and Astrophysics Supplement Series"
+    volume: 143
+    start: "9"
+    end: "22"
+    year: 2000
+    doi: "10.1051/aas:2000332"
+  - type: conference-paper
+    title: "SkyBoT, a new VO service to identify Solar System objects"
+    authors:
+      - family-names: "Berthier"
+        given-names: "J."
+      - family-names: "Vachier"
+        given-names: "F."
+      - family-names: "Thuillot"
+        given-names: "W."
+      - family-names: "Fernique"
+        given-names: "P."
+      - family-names: "Ochsenbein"
+        given-names: "F."
+      - family-names: "Genova"
+        given-names: "F."
+      - family-names: "Lainey"
+        given-names: "V."
+      - family-names: "Arlot"
+        given-names: "J.-E."
+    collection-title: "Astronomical Data Analysis Software and Systems XV (ASP Conference Series)"
+    volume: 351
+    start: "367"
+    year: 2006
+  - type: article
+    title: "JPL's On-Line Solar System Data Service"
+    authors:
+      - family-names: "Giorgini"
+        given-names: "J. D."
+      - family-names: "Yeomans"
+        given-names: "D. K."
+      - family-names: "Chamberlin"
+        given-names: "A. B."
+      - family-names: "Chodas"
+        given-names: "P. W."
+      - family-names: "Jacobson"
+        given-names: "R. A."
+      - family-names: "Keesey"
+        given-names: "M. S."
+      - family-names: "Lieske"
+        given-names: "J. H."
+      - family-names: "Ostro"
+        given-names: "S. J."
+      - family-names: "Standish"
+        given-names: "E. M."
+      - family-names: "Wimberly"
+        given-names: "R. N."
+    journal: "Bulletin of the American Astronomical Society"
+    volume: 28
+    issue: "3"
+    start: "1158"
+    year: 1996
+  - type: article
+    title: "The NASA Exoplanet Archive and Exoplanet Follow-up Observing Program: Data, Tools, and Usage"
+    authors:
+      - family-names: "Christiansen"
+        given-names: "J. L."
+      - family-names: "McElroy"
+        given-names: "D. L."
+      - family-names: "Harbut"
+        given-names: "M."
+      - name: "et al."
+    journal: "The Planetary Science Journal"
+    volume: 6
+    issue: "8"
+    start: "186"
+    year: 2025
+    doi: "10.3847/PSJ/ade3c2"
+  - type: data
+    title: "Gaskell Eros Shape Model V1.1"
+    authors:
+      - family-names: "Gaskell"
+        given-names: "R."
+    publisher:
+      name: "NASA Planetary Data System"
+    year: 2021
+    doi: "10.26033/d0gq-9427"
+  - type: data
+    title: "Origins, Spectral Interpretation, Resource Identification, Security, Regolith Explorer (OSIRIS-REx): Altimetry Working Group Shape Model Bundle V1.0"
+    authors:
+      - family-names: "Daly"
+        given-names: "M."
+      - family-names: "Barnouin"
+        given-names: "O."
+      - family-names: "Espiritu"
+        given-names: "R."
+      - family-names: "Lauretta"
+        given-names: "D."
+    publisher:
+      name: "NASA Planetary Data System"
+    year: 2026
+    doi: "10.26033/pzcf-qs69"
+  - type: data
+    title: "Collected Shape Models of Comet 67P/Churyumov-Gerasimenko Produced by the Rosetta Mission"
+    authors:
+      - family-names: "Barnes"
+      - family-names: "Farnham"
+      - family-names: "Jorda"
+      - family-names: "Gaskell"
+      - name: "et al."
+    publisher:
+      name: "NASA Planetary Data System"
+    year: 2017
+    doi: "10.26007/34vg-8s07"
