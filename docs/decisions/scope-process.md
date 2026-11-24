@@ -71,10 +71,10 @@
 
 ## D-41 Project licence
 
-- **Decision (Atish; Kevin and Moon to confirm on the PR of issue #204):**
-  - **Code** (`backend/`, `frontend/`, `shared/`, scripts) is **BSD-3-Clause**: [LICENSE](../../LICENSE).
+- **Decision (Proposed; Atish's choice per A22 HN-0, Kevin and Moon to confirm on the PR of issue #204):**
+  - **Code** (`backend/`, `frontend/`, `shared/`) is **BSD-3-Clause**: [LICENSE](../../LICENSE). So is everything not listed below.
   - **Documentation and mock-ups** (`docs/`, `mockup/`, the README files) are **CC-BY-4.0**.
-  - **Data, fixtures and third-party parts keep the terms of their source.** The project licence does not relicense them.
+  - **Data, fixtures, images derived from archive data and third-party parts keep the terms of their source.** The project licence does not relicense them. The agent definitions imported from VoltAgent stay MIT.
   - **GPL code is only ever an optional plugin the user installs**, never part of the code licensed here (the orbit fitter, R-37 in A22).
   - Each contributor keeps the copyright in their own commits.
   - [NOTICE.md](../../NOTICE.md) lists which part falls under which terms.

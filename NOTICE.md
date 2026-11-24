@@ -4,12 +4,13 @@ The project licence is decided in [D-41](docs/decisions/scope-process.md#d-41-pr
 
 | Part | Licence |
 |---|---|
-| Source code (`backend/`, `frontend/`, `shared/`, scripts) | BSD-3-Clause ([LICENSE](LICENSE)) |
+| Source code (`backend/`, `frontend/`, `shared/`) | BSD-3-Clause ([LICENSE](LICENSE)) |
 | Documentation (`docs/`, the README files) | CC-BY-4.0 |
 | Mock-ups (`mockup/`) | CC-BY-4.0 |
-| Data, fixtures and cached archive replies (for example under `backend/tests/fixtures/` and `backend/assets/`) | **Keep the terms of their source.** The licence above does not relicense them. Each source's own terms and acknowledgement text apply. |
+| Data, fixtures and cached archive replies (for example under `backend/tests/fixtures/` and `backend/assets/`), and images derived from archive data | **Keep the terms of their source.** The licence above does not relicense them. Each source's own terms and acknowledgement text apply. |
 | Third-party libraries and code copied from other projects | **Keep their own licences.** |
-| Agent definitions imported from VoltAgent (`.claude/agents/`) | MIT, as imported. |
+| The 26 agent definitions in `.claude/agents/` imported from VoltAgent (the files that name it as their source) | MIT, as imported. The licence text is in [.claude/THIRD_PARTY_LICENSES/voltagent-awesome-claude-code-subagents.txt](.claude/THIRD_PARTY_LICENSES/voltagent-awesome-claude-code-subagents.txt). |
+| Everything else in the repository (the project's own agents and skills in `.claude/`, `.github/`, root configuration files) | BSD-3-Clause ([LICENSE](LICENSE)) |
 
 ## GPL code
 
