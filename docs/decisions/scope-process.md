@@ -69,6 +69,19 @@
 - **Dependencies:** M1–M4 have no hard dependency on each other (D-29). Three soft links run across milestones: texture haptics (#11, M3) read the shared CPU field from #8 (M2); the Gemini layer (#14, M4) repaints the albedo from the baker's height map (#6, M2, D-07); physics sliders (#13, M4) need the viewer (#7, M2) to be seen. Each can be built against fixtures first. M5 depends on all of them. The map is in architecture spec §13.
 - **Amended by:** Q-132 (M3 is renamed "Sound"; its owner is unchanged). Track tickets: Q-187.
 
+## D-41 Project licence
+
+- **Decision (Atish; Kevin and Moon to confirm on the PR of issue #204):**
+  - **Code** (`backend/`, `frontend/`, `shared/`, scripts) is **BSD-3-Clause**: [LICENSE](../../LICENSE).
+  - **Documentation and mock-ups** (`docs/`, `mockup/`, the README files) are **CC-BY-4.0**.
+  - **Data, fixtures and third-party parts keep the terms of their source.** The project licence does not relicense them.
+  - **GPL code is only ever an optional plugin the user installs**, never part of the code licensed here (the orbit fitter, R-37 in A22).
+  - Each contributor keeps the copyright in their own commits.
+  - [NOTICE.md](../../NOTICE.md) lists which part falls under which terms.
+- **Why:** the repository is public with no licence, so nobody else may legally reuse it or contribute to it. BSD-3-Clause is permissive and matches heliolinx (BSD-3), the linking route chosen in R-37. R-40's `CITATION.cff` needs the licence first.
+- **[verify]:** the NASA Space Apps 2026 participant terms on intellectual property are not checked yet. Check and cite them here before the PR merges (issue #204).
+- **Relates to:** R-37 and R-40 in [A22](../architecture/discovery-hunts.md), V35, issue #200 (`CITATION.cff`).
+
 ## D-42 `dev` is the development branch; `main` is frozen
 
 - **Decision (Atish, 20 Nov 2026):**
