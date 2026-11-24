@@ -206,6 +206,10 @@ npm run dev:phone          # HTTPS (self-signed) for phones on the same Wi-Fi, s
 
 `SX_OFFLINE=1` makes the backend never touch the network (the demo runs this way); set it before `npm run backend:dev`. The cache lives outside the repo; details in [backend/README.md](backend/README.md). Other root scripts (`build`, `preview`, `test`, `test:e2e`, `lint`, `typecheck`, `format`) forward to `frontend/`.
 
+## Contributing
+
+Want to help? Read [CONTRIBUTING.md](CONTRIBUTING.md). Its "Your first PR" section takes you from a `good first issue` to a merged pull request.
+
 ## Status
 
 Under active development for NASA Space Apps 2026.

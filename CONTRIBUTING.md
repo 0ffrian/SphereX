@@ -4,6 +4,20 @@
 
 Every change reaches `dev` through a pull request. Nobody pushes, force-pushes or deletes `dev` or `main`, admins included.
 
+## Your first PR
+
+New here? Start from an issue labelled `good first issue`. Each one lists what to read first and who mentors it.
+
+1. **Ask first.** Comment on the issue that you'd like to take it, then wait for Atish (`JoottunAtish`) to assign it to you. Don't start before it is assigned: someone else may already have it.
+2. **Get the code.** If you have write access, clone `https://github.com/0ffrian/SphereX.git`. If you don't, fork it on GitHub and clone your fork. Then follow the install steps in the [README](README.md#install-and-run-step-by-step).
+3. **Branch from `dev`**, never from `main`: `git switch -c docs/<n>-<slug> origin/dev`. Use `feat/`, `fix/`, `docs/` or `chore/` as the prefix. In a fork, add this repo as `upstream` and branch from `upstream/dev`.
+4. **Make the change** and keep to the issue's Scope. If something is listed under Out of scope, leave it for another issue.
+5. **Run the checks** for the part you changed (see "Other commands" in the [README](README.md#other-commands-for-developers)): `npm run check` for `frontend/`, `npm run backend:check` for `backend/`. Docs-only changes need neither.
+6. **Open the PR against `dev`.** Title it `Issue-<n>: <title>` and put `Closes #<n>` in the body, where `<n>` is the issue number. For example: `Issue-206: Add a "Your first PR" section`.
+7. **Wait for CI and review.** If you opened the PR from a fork, a maintainer must approve your CI run before it starts. Then the merge rules below apply.
+
+Stuck at any step? Ask in the issue. That is what the Mentor is for.
+
 ## What a PR needs to merge
 
 1. **`ci-gate` is green.** It is the only required check and runs on every PR. The backend and frontend checks run only when their files change; when they are skipped, `ci-gate` still reports.
