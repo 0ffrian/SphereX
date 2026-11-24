@@ -13,7 +13,10 @@ const CLAIMS: readonly { label: string; pattern: RegExp }[] = [
   { label: 'found a ...', pattern: /\bfound\s+an?\b/gi },
 ];
 
-/** Every claim in `text`, in reading order, as it is written there (e.g. ["New", "found a"]). */
+/**
+ * Every claim in `text`, in reading order. Each hit is the matched text with its original case and
+ * spacing, not the rule's label (e.g. ["New", "found  A"]), so it can be printed as written.
+ */
 export function claimWordsIn(text: string): string[] {
   const hits: { at: number; word: string }[] = [];
   for (const { pattern } of CLAIMS)

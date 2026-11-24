@@ -13,6 +13,9 @@ describe('expectNoClaimWords (A22.3.6)', () => {
     'Found a mover in square 4',
     'found an eclipsing pair',
     'We FOUND  A binary',
+    'found\na binary',
+    'A brand-new target',
+    'A new-found target',
   ])('fails on %j', (text) => {
     expect(() => expectNoClaimWords(text)).toThrow(/A22\.3\.6/);
   });
@@ -27,6 +30,8 @@ describe('expectNoClaimWords (A22.3.6)', () => {
     'A recovery of 433 Eros',
     'Type: contact eclipsing pair (suggested, p = 0.81)',
     'found 24 tracks',
+    'found 1 candidate',
+    'found at 2026-03-20',
     'Square 3: not covered',
     '',
   ])('passes %j', (text) => {
@@ -40,6 +45,10 @@ describe('expectNoClaimWords (A22.3.6)', () => {
       'discovered',
       'confirmed',
     ]);
+  });
+
+  it('returns the matched text with its original case and spacing', () => {
+    expect(claimWordsIn('We FOUND  A binary')).toEqual(['FOUND  A']);
   });
 
   it('gives the same answer on repeated calls (the patterns hold no state)', () => {
