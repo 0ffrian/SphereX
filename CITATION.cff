@@ -9,7 +9,9 @@ authors:
 license: BSD-3-Clause
 repository-code: "https://github.com/0ffrian/SphereX"
 # The main data sources the software uses. Licences, terms and acknowledgement texts are in NOTICE.md.
-# Every entry was checked against its DOI record (Crossref or DataCite) on 24 Nov 2026.
+# Every entry with a DOI was checked against its DOI record (Crossref or DataCite) on 24 Nov 2026.
+# SkyBoT and Horizons have no DOI: they are cited as each service asks on its own page (checked the same day).
+# "et al." marks an author list cut short; the full lists are in the DOI records.
 references:
   - type: data
     title: "SPHEREx Quick Release Spectral Images - QR2"
@@ -27,6 +29,7 @@ references:
         given-names: "T."
       - family-names: "de Bruijne"
         given-names: "J. H. J."
+      - name: "et al."
     journal: "Astronomy & Astrophysics"
     volume: 595
     start: "A1"
@@ -42,6 +45,7 @@ references:
         given-names: "A. G. A."
       - family-names: "Prusti"
         given-names: "T."
+      - name: "et al."
     journal: "Astronomy & Astrophysics"
     volume: 674
     start: "A1"
@@ -56,6 +60,7 @@ references:
         given-names: "R. M."
       - family-names: "Stiening"
         given-names: "R."
+      - name: "et al."
     journal: "The Astronomical Journal"
     volume: 131
     issue: "2"
@@ -72,6 +77,7 @@ references:
         given-names: "Peter R. M."
       - family-names: "Mainzer"
         given-names: "Amy K."
+      - name: "et al."
     journal: "The Astronomical Journal"
     volume: 140
     issue: "6"
@@ -88,6 +94,7 @@ references:
         given-names: "Peter R. M."
       - family-names: "Fowler"
         given-names: "John W."
+      - name: "et al."
     journal: "The Astrophysical Journal Supplement Series"
     volume: 253
     issue: "1"
@@ -103,6 +110,7 @@ references:
         given-names: "F."
       - family-names: "Egret"
         given-names: "D."
+      - name: "et al."
     journal: "Astronomy and Astrophysics Supplement Series"
     volume: 143
     start: "9"
@@ -169,6 +177,7 @@ references:
         given-names: "D. L."
       - family-names: "Harbut"
         given-names: "M."
+      - name: "et al."
     journal: "The Planetary Science Journal"
     volume: 6
     issue: "8"
@@ -206,7 +215,8 @@ references:
       - family-names: "Farnham"
       - family-names: "Jorda"
       - family-names: "Gaskell"
+      - name: "et al."
     publisher:
-      name: "Planetary Data System"
+      name: "NASA Planetary Data System"
     year: 2017
     doi: "10.26007/34vg-8s07"
