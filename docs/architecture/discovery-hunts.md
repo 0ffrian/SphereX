@@ -1197,7 +1197,7 @@ The first draft's research (17 Nov 2026) was at the level of search results and 
 |---|---|---|
 | V1 | SPHEREx single-frame, per-channel limit for a moving point source; time-stamp keywords; astrometric accuracy | Open: measure from VARIANCE layers and the 38 rocks (HN-5). Atish infers about 0.75 mag shallower than the 4-observation depth. |
 | V2 | SPHEREx revisit pattern per epoch | Partly resolved: hundreds of observations over about two weeks per epoch (Lisse et al. 2024; Bock et al.). Per-patch pattern to measure. |
-| V3 | SPHEREx release facts | Open: DR1 DOI and contents on IRSA |
+| V3 | SPHEREx release facts | Resolved (checked 24 Nov 2026); see [A3.1](data-sources.md#a31-spherex-irsa) |
 | V4 | ZTF sizes and limits | Partly resolved: DR24 on 22 Jan 2026, HATS copy on 26 May 2026; API cones at most 10′, HATS above about 1,000 light curves. Patch sizes to measure. |
 | V5 | TESS per-patch sizes; FFI cadence for H11 | Open: real MAST calls |
 | V6 | IRSA table and column names for CatWISE2020, AllWISE, 2MASS | Open (Disk Detective's flag names are now cited) |

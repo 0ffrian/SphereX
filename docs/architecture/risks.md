@@ -14,7 +14,7 @@ As of 9 Nov 2026. Status: **Open** (no mitigation in place), **Mitigated** (a mi
 | Mover rule built (issue #72) | Q-139 (OUTLIER as a flag) is built (Q-460): 14 of 16 Eros frames give a point. Q-138 (SPHEREx-centred positions) is built for the frame search (issue #26); SkyBoT is still geocentric (next row) | None for Q-139; run the Eros pre-fetch (#73) after the `measure-2` bump ([A4.2](pipeline.md#a42-stage-2-measure-brightness-and-spectrum)) | Moon (Q-139) | Built |
 | SkyBoT positions are geocentric | Known objects and the Discovery match could be off by the LEO parallax | Proposed Q-180: SkyBoT lists candidates, positions come from Horizons seen from SPHEREx ([A3.5](data-sources.md#a35-imcce-skybot), A17.5); built for Area search in issue #108 ([Q-420](../decisions/moving-objects.md) (7)) | Kevin | Open |
 | Area search Day 0 gate | Discovery may not find Eros blind | Gate of A16.7: keep Known objects and Track, show the five steps with real counts and no tracks. Passed offline on the recorded-fixture Eros area (issue #108, [A16.6](moving-objects/area-search.md#a166-open-items-and-measured-facts)); the live area run (D3) is still to do | Kevin | Open |
-| DR1 expected on 12 Nov **[verify]** | DR1 renames collections and flag keywords | Freeze on QR2 with the local cache; no switch before the event (Q-137) | Kevin | Mitigated |
+| DR1 released in November 2026 (month only; [A3.1](data-sources.md#a31-spherex-irsa)) | DR1 renames collections and flag keywords | Freeze on QR2 with the local cache; no switch before the event (Q-137) | Kevin | Mitigated |
 | JPL Horizons terms | One request at a time with a User-Agent; over-limit replies are HTTP 200 text | Never cache such a reply; pre-fetch every path before the event; offline at the event (Q-141, [A3.4](data-sources.md#a34-jpl-horizons)) | Kevin | Open |
 | CDS permission for high-resolution imagery | An offline partial copy of Pan-STARRS or Legacy Surveys needs CDS agreement | Ask CDS; until then use 2MASS around the path (Q-136) | Atish | Open |
 | Hosting on the A15 not built | `main.py` serves no frontend; the only full cache is on Atish's PC, not on the A15 | #15; interim run with `vite preview` (Proposed Q-198, [A10.2](frontend-platform.md#a102-running-the-event-build)); copy the zipped cache to the A15 | Kevin | Open |
@@ -49,7 +49,7 @@ Every **[verify]** marker in the architecture fragments, with an owner, the tick
 | HiPS credit line per provider | A3.11, A11 | Atish | D-35, #15 | 13 Nov |
 | A15 laptop GPU, browser and WebGPU (WebGL2 fallback on a real GPU) | A10, A10.1 | Atish | #16 | 13 Nov |
 | A15 laptop sky depth (tile sizes per order) | A3.11 | Atish | Q-88 | 12 Nov |
-| DR1 release date | A3.1 | Kevin | Q-137 | none (frozen on QR2) |
+| DR1 release date (verified, month only: November 2026) | A3.1 | Kevin | Q-137 | none (frozen on QR2) |
 | MOST positions SPHEREx-centred or geocentric | A4.1 | Kevin | Q-140, Track | before Track uses MOST |
 | SkyBoT largest cone radius and terms of use | A3.5 | Kevin | D1 | before D1 uses SkyBoT |
 | CDS permission for a partial high-resolution copy | A3.11 | Atish | Q-136 | before any copy |
