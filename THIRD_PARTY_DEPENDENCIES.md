@@ -6,13 +6,13 @@ Generated on 24 Nov 2026 from the lockfiles for issue #200. It lists every npm a
 
 - npm: `npm ci` in `frontend/` (npm 11.19.1, Node 24.22.1), then `npx license-checker-rseidelsohn@5.0.1 --json --excludePrivatePackages` for all packages, and the same with `--production` for the packages shipped in the app.
 - Python: `uv sync --locked` in `backend/` (uv 0.12.23, the version CI pins), then `uv run --with pip-licenses==5.5.5 pip-licenses --format=json --with-urls`. Runtime packages are those in `uv export --locked --no-dev`.
-- "OSI-approved" means the declared licence is on the Open Source Initiative list. Anything else is flagged in the last column.
+- "OSI-approved" means the declared licence is approved by the Open Source Initiative, according to the SPDX licence list 3.29.0 (16 Sep 2026). Anything else is flagged in the last column.
 
 ## npm (`frontend/`): 263 packages, 17 shipped in the app
 
 | Package | Licence | Scope | OSI |
 |---|---|---|---|
-| `@animate-ui/react@2.4.3` | Custom: LICENSE.md | app | **Not OSI-approved:** MIT + Commons Clause (see NOTICE.md) |
+| `@animate-ui/react@2.4.3` | Custom: LICENSE.md | app | **Not OSI-approved:** MIT + Commons Clause (see NOTICE.md, Q-486) |
 | `@apidevtools/json-schema-ref-parser@11.9.3` | MIT | dev | OSI-approved |
 | `@asamuzakjp/css-color@7.1.9` | MIT | dev | OSI-approved |
 | `@asamuzakjp/dom-selector@10.0.5` | MIT | dev | OSI-approved |
@@ -112,7 +112,7 @@ Generated on 24 Nov 2026 from the lockfiles for issue #200. It lists every npm a
 | `ajv@6.15.0` | MIT | dev | OSI-approved |
 | `ajv@8.20.0` | MIT | dev | OSI-approved |
 | `argparse@2.0.1` | Python-2.0 | dev | OSI-approved |
-| `argparse@3.0.4` | PSF-2.0 | dev | OSI status [verify] (Python Software Foundation licence) |
+| `argparse@3.0.4` | PSF-2.0 | dev | **Not OSI-approved** (SPDX); permissive Python Software Foundation licence |
 | `assertion-error@2.0.1` | MIT | dev | OSI-approved |
 | `balanced-match@4.0.4` | MIT | dev | OSI-approved |
 | `baseline-browser-mapping@2.11.35` | Apache-2.0 | dev | OSI-approved |
@@ -314,7 +314,7 @@ Generated on 24 Nov 2026 from the lockfiles for issue #200. It lists every npm a
 | `opentelemetry-api` | 1.45.2 | Apache-2.0 | runtime | OSI-approved |
 | `packaging` | 26.3 | Apache-2.0 OR BSD-2-Clause | runtime | OSI-approved |
 | `pathspec` | 1.1.1 | Mozilla Public License 2.0 (MPL 2.0) | dev | OSI-approved |
-| `pillow` | 13.0.0 | MIT-CMU | runtime | OSI status [verify] |
+| `pillow` | 13.0.0 | MIT-CMU | runtime | **Not OSI-approved** (SPDX); permissive |
 | `platformdirs` | 4.14.5 | MIT | dev | OSI-approved |
 | `pluggy` | 1.7.0 | MIT License | dev | OSI-approved |
 | `pydantic` | 2.14.1 | MIT | runtime | OSI-approved |
@@ -332,5 +332,5 @@ Generated on 24 Nov 2026 from the lockfiles for issue #200. It lists every npm a
 | `starlette` | 1.10.0 | BSD-3-Clause | runtime | OSI-approved |
 | `typeguard` | 4.6.0 | MIT | dev | OSI-approved |
 | `typing-inspection` | 0.4.5 | MIT | runtime | OSI-approved |
-| `typing_extensions` | 4.16.0 | PSF-2.0 | runtime | OSI status [verify] (Python Software Foundation licence) |
+| `typing_extensions` | 4.16.0 | PSF-2.0 | runtime | **Not OSI-approved** (SPDX); permissive Python Software Foundation licence |
 | `uvicorn` | 0.54.0 | BSD-3-Clause | runtime | OSI-approved |

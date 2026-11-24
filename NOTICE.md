@@ -62,11 +62,15 @@ These files hold reviewed values, each with its source named inside the file: `b
 
 ### Flagged: licences that are not OSI-approved
 
+OSI status is taken from the SPDX licence list 3.29.0 (16 Sep 2026), which records whether OSI has approved each licence. Data licences are listed too, because OSI approves only software licences.
+
 - **Animate UI** (`@animate-ui/react` 2.4.3, shipped in the app, and the three icon components in `frontend/src/components/animate-ui/`): **MIT + Commons Clause**. The Commons Clause forbids selling or redistributing the components "in their original form", so this is not an OSI licence and not "without restriction". D-38 makes Animate UI the project's control library. **Needs a decision: Q-486.**
 - **Gaia DR3 data:** CC BY-NC 3.0 IGO (non-commercial). Exempt as ESA data, but not open for commercial use.
 - **`caniuse-lite`** (CC-BY-4.0): a build-tool database, not shipped in the app.
 - **CC0-1.0** (`mdn-data`, a dev package; parts of `numpy`): a public-domain dedication, so no restriction, but not an OSI licence.
-- **OSI status [verify]:** `pillow` (MIT-CMU), `typing_extensions` and `argparse` 3.0.4 (PSF-2.0).
+- **MIT-CMU** (`pillow`, runtime) and **PSF-2.0** (`typing_extensions`, runtime; `argparse` 3.0.4, dev): permissive licences, but not OSI-approved according to SPDX.
+- **SIMBAD and the 2MASS Color HiPS (both CDS):** ODbL-1.0, an open data licence, not an OSI licence. Not agency data, so the exemption does not apply.
+- **SkyBoT (IMCCE):** no licence stated (see the table). Not agency data.
 
 ### Acknowledgement texts
 

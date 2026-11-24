@@ -2,11 +2,27 @@ cff-version: 1.2.0
 message: "If you use this software, please cite it using the metadata in this file."
 type: software
 title: "Odysseus"
-# TODO: replace with the real author list (full names and ORCIDs, if any) once Atish confirms it on issue #200.
+# Everyone with direct access to the repository, as listed by Atish on PR #211 (24 Nov 2026).
 authors:
-  - family-names: "TODO"
-    given-names: "TODO"
-license: BSD-3-Clause
+  - family-names: "Joottun"
+    given-names: "Atish"
+  - family-names: "Ramjhun"
+    given-names: "Munazir"
+    alias: "Moon"
+  - family-names: "Yerkiah"
+    given-names: "Kevin"
+  - family-names: "Osman"
+    given-names: "Zakiyyah"
+  - family-names: "Bhantoo"
+    given-names: "Dhruv"
+  - family-names: "Burtony"
+    given-names: "Raghav"
+  - family-names: "Sahajoo"
+    given-names: "Ronitesh"
+# Code (and mock-ups) BSD-3-Clause; documentation CC-BY-4.0 (D-41, NOTICE.md).
+license:
+  - BSD-3-Clause
+  - CC-BY-4.0
 repository-code: "https://github.com/0ffrian/SphereX"
 # The main data sources the software uses. Licences, terms and acknowledgement texts are in NOTICE.md.
 # Every entry with a DOI was checked against its DOI record (Crossref or DataCite) on 24 Nov 2026.
