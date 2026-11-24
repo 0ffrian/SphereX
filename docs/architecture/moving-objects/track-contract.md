@@ -87,7 +87,7 @@ Milestone M4 Extras, priority P1 because Track is the MVP demo (**Proposed (Q-18
 | Item | Owner | Status |
 |---|---|---|
 | MOST against the cone search; MOST's observer | Kevin | Q-126 (Q-140 asks the same) **[verify]** |
-| DR1 release date | Atish | **[verify]** (Q-137) |
+| DR1 release date | Atish | Verified, month only: November 2026 (24 Nov 2026; [A3.1](../data-sources.md#a31-spherex-irsa)) (Q-137) |
 | CDS permission for an order-11 copy | Atish | Open (Q-136) |
 | Mask radius formula (G and W1 zero points, 2 to 10 px), `W1 < 16.5`, the 8 px near-track distance, the 3″ de-dupe radius | Atish (Q-404) | **[verify]** on the Eros frames: radial profiles of isolated stars per magnitude bin; W1 depth against SPHEREx QR2 point-source depth (Q-403) |
 | `MAX_LIVE_VISIT_CONES` = 8 per catalogue per request | Atish | Assumption (Q-403 (6)) |

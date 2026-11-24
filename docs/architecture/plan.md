@@ -27,7 +27,7 @@ Status board as of **9 Nov 2026**, from GitHub (issues and merged PRs). Dates ar
 |---|---|
 | 9 to 10 Nov | M2 closes (the rest of #68; PR #69 merged). PR #53 merged (10 Nov). Day 0 count (D1). Track build starts on the PR #53 fixtures. Agree the Area JSON shapes (A17.8, A17.9) so D1 and D2 run in parallel. |
 | 11 Nov | M3 Sound: body tone (Q-133), path sound (Q-134). Track zoom, masks and spectrum. D1 and D2 against fixtures. |
-| 12 Nov | M4: Track complete on Eros; Area search D1, D2. DR1 may appear this day **[verify]**: do not switch (Q-137). Pre-fetch and back up the cache. |
+| 12 Nov | M4: Track complete on Eros; Area search D1, D2. DR1 may appear this day (it was released in November 2026, month only, see [A3.1](data-sources.md#a31-spherex-irsa)): do not switch (Q-137). Pre-fetch and back up the cache. |
 | 13 Nov | M5: host on the A15 (#15), run [A10.2](frontend-platform.md#a102-running-the-event-build) end to end offline, measure frame times on the A15 (#16), D3 integration, record the backup video (#17). |
 | 14 to 15 Nov | Event. Morning checklist: [A10.2](frontend-platform.md#a102-running-the-event-build) steps 2 to 5. |
 

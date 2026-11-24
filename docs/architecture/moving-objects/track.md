@@ -12,7 +12,7 @@ Track follows **one known solar-system object** across the SPHEREx frames that c
 
 - Known objects only: ids with `moving = true` (solar-system bodies, Q-22). No blind search and no discovery claims (Q-131); Discovery is Area search ([A16](area-search.md)).
 - **MVP demo:** 433 Eros on its 20 to 21 Mar 2026 frames (Q-137). 3I/ATLAS is a stretch goal (A19.8).
-- The demo is frozen on QR2 with a local cache on the A15; no switch to DR1 before the event (DR1 expected 12 Nov 2026 **[verify]**, Q-137).
+- The demo is frozen on QR2 with a local cache on the A15; no switch to DR1 before the event (DR1 was released in November 2026, month only, see [A3.1](../data-sources.md#a31-spherex-irsa); Q-137).
 - Desktop browser only (Q-132). Sound is specified in R8.9.2 ([audio-pairing.md](../../rendering/haptics/audio-pairing.md)).
 
 ### A19.2 Entry points
