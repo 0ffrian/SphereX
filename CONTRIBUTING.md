@@ -9,12 +9,14 @@ Every change reaches `dev` through a pull request. Nobody pushes, force-pushes o
 New here? Start from an issue labelled `good first issue`. Each one lists what to read first and who mentors it.
 
 1. **Ask first.** Comment on the issue that you'd like to take it, then wait for Atish (`JoottunAtish`) to assign it to you. Don't start before it is assigned: someone else may already have it.
-2. **Get the code.** If you have write access, clone `https://github.com/0ffrian/SphereX.git`. If you don't, fork it on GitHub and clone your fork. Then follow the install steps in the [README](README.md#install-and-run-step-by-step).
-3. **Branch from `dev`**, never from `main`: `git switch -c docs/<n>-<slug> origin/dev`. Use `feat/`, `fix/`, `docs/` or `chore/` as the prefix. In a fork, add this repo as `upstream` and branch from `upstream/dev`.
+2. **Get the code.** If you have write access, clone `https://github.com/0ffrian/SphereX.git`. If you don't, fork it on GitHub and clone your fork. Then follow the install steps in the [README](README.md#install-and-run-step-by-step). If you forked, use your fork's URL in README Step 2 instead of the main repo's, or you will get a 403 when you push.
+3. **Branch from `dev`**, never from `main` (see [Rules](#rules)). Use `feat/`, `fix/`, `docs/` or `chore/` as the `<type>` prefix.
+   - With write access: `git switch -c <type>/<n>-<slug> origin/dev`.
+   - From a fork: `git remote add upstream https://github.com/0ffrian/SphereX.git`, then `git fetch upstream`, then `git switch -c <type>/<n>-<slug> upstream/dev`. Push to `origin` (your fork).
 4. **Make the change** and keep to the issue's Scope. If something is listed under Out of scope, leave it for another issue.
-5. **Run the checks** for the part you changed (see "Other commands" in the [README](README.md#other-commands-for-developers)): `npm run check` for `frontend/`, `npm run backend:check` for `backend/`. Docs-only changes need neither.
-6. **Open the PR against `dev`.** Title it `Issue-<n>: <title>` and put `Closes #<n>` in the body, where `<n>` is the issue number. For example: `Issue-206: Add a "Your first PR" section`.
-7. **Wait for CI and review.** If you opened the PR from a fork, a maintainer must approve your CI run before it starts. Then the merge rules below apply.
+5. **Run the checks** for the part you changed (see "Other commands" in the [README](README.md#other-commands-for-developers)): `npm run check` for `frontend/`, `npm run backend:check` for `backend/`. If you changed `shared/schemas/`, run `npm run contract:gen` and commit the generated files; `npm run contract:check` must pass. Docs-only changes need none of these.
+6. **Open the PR against `dev`.** Title and body follow [Rules](#rules): `Issue-<n>: <title>` and `Closes #<n>`, where `<n>` is the issue number. For example: `Issue-206: Add a "Your first PR" section`.
+7. **Wait for CI and review.** Fork PRs wait for a maintainer to approve the CI run (see [Rules](#rules)). Then the merge rules below apply.
 
 Stuck at any step? Ask in the issue. That is what the Mentor is for.
 
@@ -61,7 +63,7 @@ The D-17 owners in [docs/decisions/scope-process.md](docs/decisions/scope-proces
 
 ## Rules
 
-- Make your branch from `dev` (`git switch -c feat/<slug> origin/dev`; also `fix/…`, `docs/…`, `chore/…`) and open the PR against `dev`. A PR against `main` is closed or retargeted.
+- Make your branch from `dev` (`git switch -c <type>/<n>-<slug> origin/dev`, where `<type>` is `feat`, `fix`, `docs` or `chore`) and open the PR against `dev`. A PR against `main` is closed or retargeted.
 - Title every PR `Issue-<n>: <title>`, where `<n>` is the issue it closes, and put `Closes #<n>` in the body. No issue yet? Open one first.
 - Issues are drafted and approved by their author before they are created. Claude sessions follow this through `/sx-ticket` (see "Tickets" in [CLAUDE.md](CLAUDE.md)) and never create issues on their own.
 - One person, one GitHub account. Never approve your own work from a second account.

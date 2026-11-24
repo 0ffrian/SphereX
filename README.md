@@ -141,6 +141,13 @@ git clone https://github.com/0ffrian/SphereX.git
 cd SphereX
 ```
 
+If you forked the project to contribute (see [CONTRIBUTING.md](CONTRIBUTING.md#your-first-pr)), clone your fork instead, so you can push to it:
+
+```bash
+git clone https://github.com/<your-github-username>/SphereX.git
+cd SphereX
+```
+
 ### Step 3. Install the project's parts (one time only)
 
 ```bash

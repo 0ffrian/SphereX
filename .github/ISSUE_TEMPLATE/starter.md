@@ -20,31 +20,31 @@ New issues here are drafted and approved by their author before they are created
 
 <!-- What to change, as a short list. Name the files or folders. -->
 
--
+- <file or folder to change>
 
 ## Out of scope
 
 <!-- What this issue must not touch, so the PR stays small. -->
 
--
+- <what not to touch>
 
 ## Done when
 
 <!-- Checks the author or reviewer can tick. -->
 
-- [ ]
+- [ ] <check>
 
 ## Read first
 
 <!-- The few docs or files needed to do this, as links. Nothing more. -->
 
--
+- <link to a doc or file>
 
 ## Mentor
 
 <!-- Who to ask when stuck (GitHub handle). They answer in this issue. -->
 
-@
+@<github-handle>
 
 ---
 
