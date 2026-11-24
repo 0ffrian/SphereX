@@ -1,6 +1,6 @@
 # Notice: what is licensed under what
 
-The project licence is decided in [D-41](docs/decisions/scope-process.md#d-41-project-licence). This file says which part of the repository falls under which terms. The full text of the code licence is in [LICENSE](LICENSE).
+The project licence is recorded in [D-41](docs/decisions/scope-process.md#d-41-project-licence). This file says which part of the repository falls under which terms. The full text of the code licence is in [LICENSE](LICENSE).
 
 | Part | Licence |
 |---|---|

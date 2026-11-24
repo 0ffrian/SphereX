@@ -10,7 +10,7 @@ The log is split by topic so a task loads only what it needs. **Load this index 
 
 | File | Holds | Size |
 |---|---|---|
-| [scope-process.md](scope-process.md) | scope cuts, doc layout, owners, build dates, milestones, the post-event backlog, the demo object and data release, ID reservations | 7 D, 10 Q, 13 KB |
+| [scope-process.md](scope-process.md) | scope cuts, doc layout, owners, build dates, milestones, the post-event backlog, the demo object and data release, ID reservations | 8 D, 12 Q, 21 KB |
 | [contract.md](contract.md) | the data contract, object types, the endpoint list (D-16), schemas and generated types, saved assets, `overrides`, card and fixture shapes, cached replies, the issue #93 card fields (Q-363), warm-start health and the demo preflight (Q-454) | 6 D, 19 Q, 22 KB |
 | [contract-tags.md](contract-tags.md) | provenance tags and badges, the honesty toggle, tier fallback, the policy for unverified constants (Q-110, Q-119), "which tag does X get" | 3 D, 12 Q, 19 KB |
 | [data-sources.md](data-sources.md) | the backend framework, external archives and adapters, name resolving, the read-through cache and offline mode, test targets, overlays and the composite backends | 4 D, 16 Q, 22 KB |
