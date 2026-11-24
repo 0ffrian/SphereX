@@ -1,0 +1,10 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it using the metadata in this file."
+type: software
+title: "Shift & Spectrum"
+# TODO: replace with the real author list (full names and ORCIDs, if any) once Atish confirms it on issue #200.
+authors:
+  - family-names: "TODO"
+    given-names: "TODO"
+license: BSD-3-Clause
+repository-code: "https://github.com/0ffrian/SphereX"
