@@ -71,15 +71,19 @@
 
 ## D-41 Project licence
 
-- **Decision (Proposed; Atish's choice per A22 HN-0, Kevin and Moon to confirm on the PR of issue #204):**
+- **Decision (Proposed; Atish's choice per A22 HN-0, one reviewer's approval on the PR of issue #204):**
   - **Code** (`backend/`, `frontend/`, `shared/`) is **BSD-3-Clause**: [LICENSE](../../LICENSE). So is everything not listed below.
   - **Documentation and mock-ups** (`docs/`, `mockup/`, the README files) are **CC-BY-4.0**.
   - **Data, fixtures, images derived from archive data and third-party parts keep the terms of their source.** The project licence does not relicense them. The agent definitions imported from VoltAgent stay MIT.
   - **GPL code is only ever an optional plugin the user installs**, never part of the code licensed here (the orbit fitter, R-37 in A22).
   - Each contributor keeps the copyright in their own commits.
   - [NOTICE.md](../../NOTICE.md) lists which part falls under which terms.
-- **Why:** the repository is public with no licence, so nobody else may legally reuse it or contribute to it. BSD-3-Clause is permissive and matches heliolinx (BSD-3), the linking route chosen in R-37. R-40's `CITATION.cff` needs the licence first.
-- **[verify]:** the NASA Space Apps 2026 participant terms on intellectual property are not checked yet. Check and cite them here before the PR merges (issue #204).
+- **Why:** the repository had no licence. The version submitted to Space Apps (14–15 Nov 2026) is distributed by NASA under Apache 2.0, the terms' default when no OSI licence is named. From this PR on, the repository is under the terms above. Contributors keep their copyright, so both can stand. BSD-3-Clause is permissive and matches heliolinx (BSD-3), the linking route chosen in R-37. R-40's `CITATION.cff` needs the licence first.
+- **Space Apps terms (checked 24 Nov 2026, by Atish):** [2026 NASA Space Apps Participant Terms and Conditions](https://www.spaceappschallenge.org/legal/), "Updated August 7, 2026". The text was copied from the page in a browser, because the site's certificate chain fails on the team's machines.
+  - **Our own work** must be "freely available without restriction or is licensed as open source as defined by the Open Source Initiative (OSI)". "If you do not specify a specific OSI compliant license, NASA will distribute your original content under an Apache 2.0 license."
+  - **NASA's permission:** by submitting a Solution, you grant NASA permission to display, copy, combine, compile, distribute and disseminate it. Solutions for which you do not hold the copyright or other intellectual property rights are not accepted.
+  - **Third-party material** (data or code not from NASA or a partner space agency) must be freely and publicly available without restriction or, at a minimum, licensed as open source. "Any licenses applicable to your Solution Materials must be identified in the documentation that you submit with your Solution." Every source used must be cited.
+  - **Result:** BSD-3-Clause (and MIT for the imported VoltAgent agents) is OSI-approved, so it complies. The GPL rule above is the project's own compatibility choice (R-37), not a Space Apps requirement.
 - **Relates to:** R-37 and R-40 in [A22](../architecture/discovery-hunts.md), V35, issue #200 (`CITATION.cff`).
 
 ## D-42 `dev` is the development branch; `main` is frozen
