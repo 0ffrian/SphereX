@@ -4,9 +4,8 @@ The project licence is recorded in [D-41](docs/decisions/scope-process.md#d-41-p
 
 | Part | Licence |
 |---|---|
-| Source code (`backend/`, `frontend/`, `shared/`) | BSD-3-Clause ([LICENSE](LICENSE)) |
-| Documentation (`docs/`, the README files) | CC-BY-4.0 |
-| Mock-ups (`mockup/`) | CC-BY-4.0 |
+| Source code (`backend/`, `frontend/`, `shared/`) and the mock-ups (`mockup/`) | BSD-3-Clause ([LICENSE](LICENSE)) |
+| Documentation (`docs/`, the README files) | CC-BY-4.0 ([legal text](https://creativecommons.org/licenses/by/4.0/legalcode)) |
 | Data, fixtures and cached archive replies (for example under `backend/tests/fixtures/` and `backend/assets/`), and images derived from archive data | **Keep the terms of their source.** The licence above does not relicense them. Each source's own terms and acknowledgement text apply. |
 | Third-party libraries and code copied from other projects | **Keep their own licences.** |
 | The 26 agent definitions in `.claude/agents/` imported from VoltAgent (the files that name it as their source) | MIT, as imported. The licence text is in [.claude/THIRD_PARTY_LICENSES/voltagent-awesome-claude-code-subagents.txt](.claude/THIRD_PARTY_LICENSES/voltagent-awesome-claude-code-subagents.txt). |

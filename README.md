@@ -212,4 +212,4 @@ Under active development for NASA Space Apps 2026.
 
 ## Licence
 
-The code is released under the [BSD 3-Clause licence](LICENSE). Documentation and mock-ups are CC-BY-4.0. Data, fixtures and third-party parts keep the terms of their source, and GPL code is only ever an optional plugin you install yourself. [NOTICE.md](NOTICE.md) lists which part falls under which terms, and the decision is [D-41](docs/decisions/scope-process.md#d-41-project-licence).
+The code and the mock-ups are released under the [BSD 3-Clause licence](LICENSE). Documentation is [CC-BY-4.0](https://creativecommons.org/licenses/by/4.0/legalcode). Data, fixtures and third-party parts keep the terms of their source, and GPL code is only ever an optional plugin you install yourself. [NOTICE.md](NOTICE.md) lists which part falls under which terms, and the decision is [D-41](docs/decisions/scope-process.md#d-41-project-licence).
