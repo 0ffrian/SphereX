@@ -104,20 +104,20 @@
 
 - **Decision (Atish, 20 Nov 2026), amends D-29 and D-30:** the milestones M1 to M5 were closed on 20 Nov 2026. Work is tracked in the same GitHub project, "SphereX and PlanetX - NASA COMPETITION 2026", under these milestones, which follow the releases of [A22.12](../architecture/discovery-hunts.md#a2212-plan-tickets-and-owners):
 
-  | Milestone | Holds |
+  | Milestone (GitHub title) | Holds |
   |---|---|
-  | **R0** | Housekeeping and verification before the build: HN-0, the `V` checks, the library checks, the README and test-helper tickets |
-  | **R1a** | The release 1 minimum (A22.12, R-27): HN-1, HN-2, HN-3, HN-4b, HN-5, HN-6 |
-  | **R1b** | The rest of release 1 (R-8): HN-4, HN-7, HN-8, HN-9, HN-10 |
-  | **R2** | Release 2: HN-11 to HN-16, and the release 2 part of HN-4b (R-54) |
-  | **DR4** | HN-17 (H10, cross-match on Gaia DR4). Ships when Gaia DR4 is out |
+  | **R0 · Foundations and onboarding** | The licence, the `dev` branch, HN-0, onboarding docs and the first starter tickets; V6 and the library checks |
+  | **R1a · Hunts core (minimum)** | R-27's minimum, except HN-0 (in R0): HN-1, HN-2, HN-3, HN-4b (release 1 part), HN-5, HN-6 |
+  | **R1b · First validated hunts** | The rest of release 1 (R-8): HN-4, HN-7, HN-8, HN-9, HN-10, HN-11, HN-16 |
+  | **R2 · More hunts** | Release 2: HN-12, HN-13, HN-14, HN-15, and the release 2 part of HN-4b (R-54) |
+  | **DR4 · Gaia dark companions** | HN-17 (H10, cross-match on Gaia DR4). Ships when Gaia DR4 is out |
   | **Maintenance** | Standing. App fixes outside the hunts (for example #184, #185) |
 
   No milestone has a due date for now.
 - **Difficulty is a label, not a milestone:** `good first issue` is Level 1, `help wanted` is Level 2, and a ticket with neither is core work. Atish assigns every ticket (D-17).
 - **Unchanged:** the contents of the A22 releases. D-43 only names where each ticket is tracked.
 - **Why:** M1 to M5 were the event's independent tracks, due 8 to 15 Nov. The event build is done, and the Discovery hunts ship in releases that overlap, so the old names and due dates no longer describe the work.
-- **Open for Atish:** the A22.12 text does not define R1a and R1b. The split above follows "Release 1 minimum" (R1a) and issue #202 ("R1b: blocks HN-4"). Placing HN-11 and HN-16 in R2 is also proposed: A22.12 does not label them.
+- **Source:** the descriptions of these GitHub milestones, created by Atish on 20 Nov 2026, which name the tickets of R0, R1a, R1b and R2; A22.12 labels only HN-12 to HN-15 as release 2. Not every `V` check is in R0: #202 (V36) is in R1b, next to HN-4, which it blocks.
 - **Relates to:** D-14 (build dates), D-17 (owners), D-42 (`dev`), A22.12.
 
 ## Post-event backlog

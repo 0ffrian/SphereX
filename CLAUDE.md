@@ -76,7 +76,7 @@ Project agents live in `.claude/agents/` and skills in `.claude/skills/`. Agents
 
 ## Build schedule
 
-The team builds from 5 Nov 2026 (decisions D-14), setting aside the event rule against building before 14 Nov. Work is tracked in the GitHub project "SphereX and PlanetX - NASA COMPETITION 2026" under release milestones (D-43, which amends D-29 and D-30; M1–M5 are closed): **R0** (housekeeping and verification), **R1a** (the release 1 minimum: HN-1, HN-2, HN-3, HN-4b, HN-5, HN-6), **R1b** (the rest of release 1: HN-4, HN-7 to HN-10), **R2** (HN-11 to HN-16), **DR4** (HN-17, ships when Gaia DR4 is out) and **Maintenance** (standing, app fixes outside the hunts). No due dates for now. Difficulty is a label: `good first issue` is Level 1, `help wanted` is Level 2, no label is core work. Atish assigns every ticket.
+The team builds from 5 Nov 2026 (decisions D-14), setting aside the event rule against building before 14 Nov. Work is tracked in the GitHub project "SphereX and PlanetX - NASA COMPETITION 2026" under the release milestones **R0**, **R1a**, **R1b**, **R2**, **DR4** and **Maintenance** (D-43 lists what each holds; it amends D-29 and D-30, and M1–M5 are closed). No due dates for now. Difficulty is a label: `good first issue` is Level 1, `help wanted` is Level 2, no label is core work. Atish assigns every ticket.
 
 ## Layout
 

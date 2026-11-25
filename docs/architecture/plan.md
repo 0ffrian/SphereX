@@ -4,6 +4,8 @@
 
 ## A13 Plan to 14 Nov
 
+> **Superseded by D-43 (20 Nov 2026):** milestones M1 to M5 are closed and replaced by release milestones; see [D-43](../decisions/scope-process.md#d-43-release-milestones-replace-m1-to-m5). The board below is a 9 Nov snapshot.
+
 Status board as of **9 Nov 2026**, from GitHub (issues and merged PRs). Dates are targets, not promises. The team builds from 5 Nov and has set aside the event rule against building before 14 Nov (D-14). Work is tracked in the GitHub project "SphereX and PlanetX - NASA COMPETITION 2026" as milestones M1 to M5 (D-29, owners D-30). M1 to M4 build against their own fixtures; only M5 joins them. Numbers like #26 are issues; "PR #n" are pull requests.
 
 **What changed since the plan of 5 Nov:** the event build is desktop browser only on the Asus A15 (Q-132), so M3 becomes **"Sound"** (D-29 and D-30 carry the amendment; the rename on GitHub is pending) and phone testing moves after the event. The MVP demo is 433 Eros in the **Track** tool (Q-137, A19, Atish). **Area search** (Q-146, A16 to A18) joins M4 as tickets D1 to D3.

@@ -10,7 +10,7 @@ The log is split by topic so a task loads only what it needs. **Load this index 
 
 | File | Holds | Size |
 |---|---|---|
-| [scope-process.md](scope-process.md) | scope cuts, doc layout, owners, build dates, milestones, the post-event backlog, the demo object and data release, ID reservations | 9 D, 13 Q, 24 KB |
+| [scope-process.md](scope-process.md) | scope cuts, doc layout, owners, build dates, milestones, the post-event backlog, the demo object and data release, ID reservations | 9 D, 13 Q, 25 KB |
 | [contract.md](contract.md) | the data contract, object types, the endpoint list (D-16), schemas and generated types, saved assets, `overrides`, card and fixture shapes, cached replies, the issue #93 card fields (Q-363), warm-start health and the demo preflight (Q-454) | 6 D, 19 Q, 22 KB |
 | [contract-tags.md](contract-tags.md) | provenance tags and badges, the honesty toggle, tier fallback, the policy for unverified constants (Q-110, Q-119), "which tag does X get" | 3 D, 12 Q, 19 KB |
 | [data-sources.md](data-sources.md) | the backend framework, external archives and adapters, name resolving, the read-through cache and offline mode, test targets, overlays and the composite backends | 4 D, 16 Q, 22 KB |
@@ -101,7 +101,7 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | D-40 | Issue #93: engine speed, seeded patterns, physics corrections and new card fields | Decided (Atish, 11 Nov 2026); built except Q-361; Q-346 built by Q-385; performance waves Q-381 to Q-387 | [rendering-engines-tuning](rendering-engines-tuning.md#d-40-issue-93-engine-speed-seeded-patterns-physics-corrections-and-new-card-fields-decided-by-atish-11-nov-2026) |
 | D-41 | Project licence: BSD-3-Clause for code and mock-ups, CC-BY-4.0 for docs; data and third-party parts keep their terms (their licence table comes with #200); GPL only as an optional plugin the user installs | Decided (Atish, 24 Nov 2026, PR #212); Space Apps terms checked 24 Nov 2026 | [scope-process](scope-process.md#d-41-project-licence) |
 | D-42 | `dev` is the development branch: all work branches off `dev` and merges back into it by PR; `main` is frozen at `b7b4a1d6` and `dev` is the default branch | Decided (Atish, 20 Nov 2026); GitHub settings to apply | [scope-process](scope-process.md#d-42-dev-is-the-development-branch-main-is-frozen) |
-| D-43 | Release milestones R0, R1a, R1b, R2, DR4 and Maintenance replace M1 to M5; difficulty by label; Atish assigns every ticket | Decided (Atish, 20 Nov 2026); the R1a/R1b split and HN-11, HN-16 placement are proposed | [scope-process](scope-process.md#d-43-release-milestones-replace-m1-to-m5) |
+| D-43 | Release milestones R0, R1a, R1b, R2, DR4 and Maintenance replace M1 to M5; difficulty by label; Atish assigns every ticket | Decided (Atish, 20 Nov 2026) | [scope-process](scope-process.md#d-43-release-milestones-replace-m1-to-m5) |
 | Q-01 | Backend framework | Answered: D-15 | [data-sources](data-sources.md) |
 | Q-02 | Frontend hosting | Answered: D-24 | [platform-hosting](platform-hosting.md) |
 | Q-03 | Sliders on baked bodies | Answered: D-26 | [rendering-bodies](rendering-bodies.md) |
