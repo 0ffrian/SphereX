@@ -50,7 +50,7 @@
 
 - M1 to M4 do not depend on each other. Each builds against its own fixtures (recorded responses, sample cards and spectra). Only M5 joins them. Each milestone holds as few tickets as possible.
 - Open questions and **[verify]** items sit inside the ticket that needs them.
-- **Amended by:** Q-132 (M3 is renamed "Sound") and Q-187 (proposed: M4 also holds Track tickets T1, T2 and T4, A19.14). Area tickets D1 and D2 are in M4 and D3 in M5 ([A16.7](../architecture/moving-objects/area-plan.md#a167-tickets-and-plan)). Status board: [A13](../architecture/plan.md#a13-plan-to-14-nov).
+- **Amended by:** Q-132 (M3 is renamed "Sound") and Q-187 (proposed: M4 also holds Track tickets T1, T2 and T4, A19.14). Area tickets D1 and D2 are in M4 and D3 in M5 ([A16.7](../architecture/moving-objects/area-plan.md#a167-tickets-and-plan)). Status board: [A13](../architecture/plan.md#a13-plan-to-14-nov). **Amended by D-43** (20 Nov 2026): M1 to M5 are closed and replaced by release milestones.
 
 ## D-30 Milestone owners and dependencies
 
@@ -67,7 +67,7 @@
 - The milestone owner leads and signs off the milestone; ticket owners from D-17 still apply inside it.
 - Numbering: `#1`–`#17` below and in architecture spec §13 are GitHub **issue** numbers (one per ticket); PR numbers are written as "PR #n".
 - **Dependencies:** M1–M4 have no hard dependency on each other (D-29). Three soft links run across milestones: texture haptics (#11, M3) read the shared CPU field from #8 (M2); the Gemini layer (#14, M4) repaints the albedo from the baker's height map (#6, M2, D-07); physics sliders (#13, M4) need the viewer (#7, M2) to be seen. Each can be built against fixtures first. M5 depends on all of them. The map is in architecture spec §13.
-- **Amended by:** Q-132 (M3 is renamed "Sound"; its owner is unchanged). Track tickets: Q-187.
+- **Amended by:** Q-132 (M3 is renamed "Sound"; its owner is unchanged). Track tickets: Q-187. **Amended by D-43** (20 Nov 2026): the milestones this entry assigns owners to are closed; ticket owners are named by Atish (D-17).
 
 ## D-41 Project licence
 
@@ -99,6 +99,26 @@
 - **Why:** `main` keeps a known-good snapshot of the event build while the Discovery hunts work (A22) starts and new contributors join.
 - **GitHub settings (an admin, once):** create `dev` from `b7b4a1d6`; copy the `main` ruleset (id 27523962) to a `dev` ruleset; make `dev` the default branch; retarget open PRs.
 - **Relates to:** Q-484 (code owners and the merge gate), D-17 (owners).
+
+## D-43 Release milestones replace M1 to M5
+
+- **Decision (Atish, 20 Nov 2026), amends D-29 and D-30:** the milestones M1 to M5 were closed on 20 Nov 2026. Work is tracked in the same GitHub project, "SphereX and PlanetX - NASA COMPETITION 2026", under these milestones, which follow the releases of [A22.12](../architecture/discovery-hunts.md#a2212-plan-tickets-and-owners):
+
+  | Milestone | Holds |
+  |---|---|
+  | **R0** | Housekeeping and verification before the build: HN-0, the `V` checks, the library checks, the README and test-helper tickets |
+  | **R1a** | The release 1 minimum (A22.12, R-27): HN-1, HN-2, HN-3, HN-4b, HN-5, HN-6 |
+  | **R1b** | The rest of release 1 (R-8): HN-4, HN-7, HN-8, HN-9, HN-10 |
+  | **R2** | Release 2: HN-11 to HN-16, and the release 2 part of HN-4b (R-54) |
+  | **DR4** | HN-17 (H10, cross-match on Gaia DR4). Ships when Gaia DR4 is out |
+  | **Maintenance** | Standing. App fixes outside the hunts (for example #184, #185) |
+
+  No milestone has a due date for now.
+- **Difficulty is a label, not a milestone:** `good first issue` is Level 1, `help wanted` is Level 2, and a ticket with neither is core work. Atish assigns every ticket (D-17).
+- **Unchanged:** the contents of the A22 releases. D-43 only names where each ticket is tracked.
+- **Why:** M1 to M5 were the event's independent tracks, due 8 to 15 Nov. The event build is done, and the Discovery hunts ship in releases that overlap, so the old names and due dates no longer describe the work.
+- **Open for Atish:** the A22.12 text does not define R1a and R1b. The split above follows "Release 1 minimum" (R1a) and issue #202 ("R1b: blocks HN-4"). Placing HN-11 and HN-16 in R2 is also proposed: A22.12 does not label them.
+- **Relates to:** D-14 (build dates), D-17 (owners), D-42 (`dev`), A22.12.
 
 ## Post-event backlog
 
