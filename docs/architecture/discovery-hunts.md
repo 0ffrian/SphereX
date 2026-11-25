@@ -1227,7 +1227,7 @@ The first draft's research (17 Nov 2026) was at the level of search results and 
 | V9 | Euclid DR1 | Resolved and moot (H6 removed) |
 | V10 | Broker APIs | Partly resolved: Lasair token and limits, ALeRCE public. Region query endpoints open. |
 | V11 | NOIRLab: DECam cutouts and the Source Catalog; proprietary period | Open (release 2) |
-| V12 | Horizons quantities for tail angles and position uncertainty | Open |
+| V12 | Horizons quantities for tail angles and position uncertainty | Resolved (checked 25 Nov 2026): quantity 27 gives the two angles, quantities 36 to 38 the 3σ uncertainty; codes, columns, units and the query are in [A3.4](data-sources.md#a34-jpl-horizons) |
 | V27 | Rubin data rights for users in Mauritius | Open (images not used either way) |
 | V28 | ZTF-3 end date (31 Dec 2026) and what follows | Open |
 
