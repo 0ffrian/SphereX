@@ -343,7 +343,7 @@ Sources this spec adds to [A3](data-sources.md) (to move there when the spec is 
 | **Pan-STARRS, VHS, UKIDSS** | Visible and near-infrared catalogues. | MAST, ESO, WSA | H2 (reject ordinary stars), H7 (hosts) | Not researched in detail **[verify]** |
 | **IRAS 100 µm (IRIS or SFD dust maps)** | Galactic dust emission behind each H9 candidate. | IRSA (IRIS), or the SFD map through `dustmaps` | H9 (dust screen, R-46) | Decided (R-46); product and licence **[verify]** |
 | **Minor Planet Center** | Orbit file (MPCORB), ADES submission. | MPC downloads and submission service | H4, H5, H11 | Since Aug 2025 archive submitters must be verified and get a program code per observatory code ([newsletters Jul](https://www.minorplanetcenter.net/media/newsletters/MPC_Newsletter_Jul2025.pdf) and [Oct 2025](https://minorplanetcenter.net/media/newsletters/MPC_Newsletter_Oct2025.pdf); [program-codes policy](https://www.minorplanetcenter.net/mpcops/documentation/program-codes-policy/)). SPHEREx is not on the [SARC archive list](https://docs.minorplanetcenter.net/mpc-ops-docs/data-and-services/sarc/) and has no observatory code: ask (R-12) |
-| **JPL Horizons, SkyBoT** | Positions of known objects seen from SPHEREx (`500@-163182`, Q-138) or from the ground; Sun and velocity position angles. | As built | H4, H5 | Tested (as built) |
+| **JPL Horizons, SkyBoT** | Positions of known objects seen from SPHEREx (`500@-163182`, Q-138) or from the ground; Sun and velocity position angles. | As built | H4, H5 | Tested (as built); position angles: Tested 25 Nov 2026 (quantity 27, [A3.4](data-sources.md#a34-jpl-horizons)); not requested by the adapter yet |
 | **AAVSO VSX, ASAS-SN, Chen et al. 2020** | Known variable stars. The Chen et al. ZTF catalogue (781,602 periodic variables) is downloadable and can be shipped as a local cross-match table. | VSX query service; VizieR; Zenodo | H1, H7 | Documented ([Chen et al. 2020](https://arxiv.org/abs/2005.08662)); VSX API terms **[verify]** |
 | **Transient Name Server** | Public object list. | TNS | H7 | API key and terms for a public tool **[verify]** |
 | **TOI list, ExoFOP, NASA Exoplanet Archive** | Known planets and candidates. | Public tables (adapter exists for the archive) | H3 | Documented |
@@ -835,7 +835,7 @@ Rocks at V 19 to 22 will mostly be invisible in single frames. Stages A1 to A3 a
 
 **At home.** Cutouts of a few hundred KB each; profile work on the CPU.
 
-**Open.** NOIRLab cutout access and limits; the exact Horizons quantities for the two angles; cutout size.
+**Open.** NOIRLab cutout access and limits; cutout size. **Resolved (V12, checked 25 Nov 2026):** the two predicted angles are Horizons quantity 27 ([A3.4](data-sources.md#a34-jpl-horizons)).
 
 #### A22.9.6 H6 Gravitational lenses: removed
 
