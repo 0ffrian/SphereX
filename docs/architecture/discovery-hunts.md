@@ -535,7 +535,7 @@ How to read them:
 - **Most accurate** is the best published method. **At home** is what we run on a gaming PC and what that costs in accuracy.
 - **Starting values** are first settings, all **Proposed**. They are tuned on the injection tests and controls ([A22.10](#a2210-calibration-and-proof)) and fixed per hunt version. None is a measured result.
 - **Published accuracy** is from the cited paper, not from our code. Ours is measured before a hunt returns candidates.
-- Catalogue column names and table names are as remembered from the archives' documentation and are all **[verify]** against the live schema in the ticket that builds the adapter (the rule against inventing fields). The CatWISE2020, AllWISE and 2MASS names recorded in [A3.3.1](irsa-catalogues.md#a331-irsa-tables-and-columns-catwise2020-allwise-and-2mass) were checked against the live schema (V6).
+- The CatWISE2020, AllWISE and 2MASS names recorded in [A3.3.1](irsa-catalogues.md#a331-irsa-tables-and-columns-catwise2020-allwise-and-2mass) were checked against the live schema (V6). The other catalogue column names and table names are as remembered from the archives' documentation and are **[verify]** against the live schema in the ticket that builds the adapter (the rule against inventing fields).
 
 #### A22.9.1 H1 Variable and eclipsing stars
 
@@ -664,7 +664,7 @@ flowchart LR
 
 **At home.** CatWISE averages about 46,000 sources per square degree (about 4 million rows for 86 deg² without cuts); with the cuts in the query, a few MB; images are fetched for tens of survivors; the network is small enough for a CPU.
 
-**Open.** unWISE epoch range and cutout access; the template library's licence; the SPHEREx depth for a moving point source; table and column names for VHS and UKIDSS. **Resolved (V6, checked 25 Nov 2026):** the CatWISE2020 and 2MASS names ([A3.3.1](irsa-catalogues.md#a331-irsa-tables-and-columns-catwise2020-allwise-and-2mass)).
+**Open.** unWISE epoch range and cutout access; the template library's licence; the SPHEREx depth for a moving point source; table and column names for VHS and UKIDSS. **Resolved (V6, checked 25–26 Nov 2026):** the CatWISE2020 and 2MASS names ([A3.3.1](irsa-catalogues.md#a331-irsa-tables-and-columns-catwise2020-allwise-and-2mass)).
 
 #### A22.9.3 H3 Single transits and strange dimmers (release 2)
 
@@ -1223,7 +1223,7 @@ The first draft's research (17 Nov 2026) was at the level of search results and 
 | V3 | SPHEREx release facts | Resolved (checked 24 Nov 2026); see [A3.1](data-sources.md#a31-spherex-irsa) |
 | V4 | ZTF sizes and limits | Partly resolved: DR24 on 22 Jan 2026, HATS copy on 26 May 2026; API cones at most 10′, HATS above about 1,000 light curves. Patch sizes to measure. |
 | V5 | TESS per-patch sizes; FFI cadence for H11 | Open: real MAST calls |
-| V6 | IRSA table and column names for CatWISE2020, AllWISE, 2MASS | Resolved (checked 25 Nov 2026); see [A3.3.1](irsa-catalogues.md#a331-irsa-tables-and-columns-catwise2020-allwise-and-2mass) |
+| V6 | IRSA table and column names for CatWISE2020, AllWISE, 2MASS | Resolved (checked 25–26 Nov 2026); see [A3.3.1](irsa-catalogues.md#a331-irsa-tables-and-columns-catwise2020-allwise-and-2mass) |
 | V7 | unWISE epoch coverage and cutout access | Open |
 | V8 | Gaia DR4 access | Partly resolved: orbit tables by TAP (2.7 GB); epoch astrometry by DataLink; `bh_two_body_orbit` ships. Release-day check open. |
 | V9 | Euclid DR1 | Resolved and moot (H6 removed) |
