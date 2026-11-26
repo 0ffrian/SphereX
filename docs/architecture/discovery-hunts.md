@@ -334,8 +334,8 @@ Sources this spec adds to [A3](data-sources.md) (to move there when the spec is 
 | **ATLAS** | Forced photometry at a position. | ATLAS forced-photometry server | H7 (history) | **[verify]** access terms |
 | **TESS** | Light curves: SPOC 2-minute and 20-second, TESS-SPOC and QLP (from full-frame images), TGLC (crowded fields). Pixel cutouts (TESScut) for candidates. TESS Input Catalog v8.2. Pixel 21″. | MAST (astroquery, lightkurve); AWS open-data copy | H3; confirmation for H1 | Product names Documented at MAST; per-patch size **[verify by a real query]** |
 | **Kepler / K2** | Long light curves where the patch overlaps. | MAST | H3 | Documented |
-| **WISE / NEOWISE** | CatWISE2020 (1.89 billion sources; W1 and W2; motions from 2010 to 2018). AllWISE (W1 to W4, 3.4, 4.6, 12 and 22 µm; W4 beam about 12″). unTimely catalogue and time-resolved unWISE coadds (about 16 epochs per band, to 2020). | IRSA TAP (tables `catwise_2020` and `allwise_p3as_psd`, checked 25 Nov 2026: [A3.3](data-sources.md#a33-wise--neowise)); unWISE cutout service (unwise.me) | H2, H9; masks for H4 | Documented ([Marocco et al. 2021](https://arxiv.org/abs/2012.13084), [Meisner et al. 2023](https://arxiv.org/abs/2209.14327)) |
-| **2MASS** | Point Source Catalog (J, H, Ks; 1998 to 2001). | IRSA TAP (table `fp_psc`, checked 25 Nov 2026: [A3.3](data-sources.md#a33-wise--neowise)) | H2 (long baseline), H9 | Documented |
+| **WISE / NEOWISE** | CatWISE2020 (1.89 billion sources; W1 and W2; motions from 2010 to 2018). AllWISE (W1 to W4, 3.4, 4.6, 12 and 22 µm; W4 beam about 12″). unTimely catalogue and time-resolved unWISE coadds (about 16 epochs per band, to 2020). | IRSA TAP (tables `catwise_2020` and `allwise_p3as_psd`, checked 25 Nov 2026: [A3.3.1](irsa-catalogues.md#a331-irsa-tables-and-columns-catwise2020-allwise-and-2mass)); unWISE cutout service (unwise.me) | H2, H9; masks for H4 | Documented ([Marocco et al. 2021](https://arxiv.org/abs/2012.13084), [Meisner et al. 2023](https://arxiv.org/abs/2209.14327)) |
+| **2MASS** | Point Source Catalog (J, H, Ks; 1998 to 2001). | IRSA TAP (table `fp_psc`, checked 25 Nov 2026: [A3.3.1](irsa-catalogues.md#a331-irsa-tables-and-columns-catwise2020-allwise-and-2mass)) | H2 (long baseline), H9 | Documented |
 | **Gaia DR3** | `gaia_source` (positions, motions, parallaxes, RUWE, radial velocity for brighter stars), variability tables (10.5 million variables), `nss_two_body_orbit`, Bailer-Jones distances (`external.gaiaedr3_distance`). | ESA Gaia archive, TAP/ADQL (adapter exists) | H8, H10 (testing); masks, neighbours and matches for all | Documented |
 | **Gaia DR4** | 66 months of data. `epoch_astrometry` (about 130 billion rows, 62 TB in all), `nss_two_body_orbit` (about 5.9 million rows), radial-velocity tables. | ESA Gaia archive: orbit tables by TAP (`nss_two_body_orbit` about 2.7 GB in all); epoch astrometry by **DataLink** per source; DPAC's `bh_two_body_orbit` | H10 | Due **2 Dec 2026, about 12:00 CET** ([ESA](https://www.cosmos.esa.int/web/gaia/data-release-4)) |
 | **Legacy Surveys DR10** | Catalogues. | NOIRLab Astro Data Lab | visible-light check for H2 | **[verify]** |
@@ -907,6 +907,8 @@ Removed by R-7. Euclid DR1 (12 Nov 2026) shipped 15,072 high-confidence candidat
 
 **Selection (Disk Detective's real cuts, [Kuchner et al. 2016](https://arxiv.org/abs/1607.05713)).** `w4snr` ≥ 10; W4 < W1 − 0.25 with the W1 − W4 excess significant at **5σ**; `w4rchi2` < 1.3; `w4nm` > 5; `na` = 0; `nb` = 1; exactly one 2MASS match within 3″; `cc_flags` clean in W1 and W4. RUWE below 1.4. All in the archive's query (R-6).
 
+**2MASS match radius [verify].** The column description of AllWISE `n_2mass` does not state its search radius ([A3.3.1](irsa-catalogues.md#a331-irsa-tables-and-columns-catwise2020-allwise-and-2mass)): the H9 ticket checks it before using it for "exactly one 2MASS match within 3″".
+
 **What we study.** Brightness by wavelength: the photosphere fitted to Gaia, 2MASS and SPHEREx below about 3 µm; the WISE excess at 12 and 22 µm; whether SPHEREx shows hot dust from 3 to 5 µm; whether the 3.3 µm feature of a galaxy is present. The 22 µm beam is about 12″ wide, so anything inside it can fake an excess.
 
 **Processing.**
@@ -1221,7 +1223,7 @@ The first draft's research (17 Nov 2026) was at the level of search results and 
 | V3 | SPHEREx release facts | Resolved (checked 24 Nov 2026); see [A3.1](data-sources.md#a31-spherex-irsa) |
 | V4 | ZTF sizes and limits | Partly resolved: DR24 on 22 Jan 2026, HATS copy on 26 May 2026; API cones at most 10′, HATS above about 1,000 light curves. Patch sizes to measure. |
 | V5 | TESS per-patch sizes; FFI cadence for H11 | Open: real MAST calls |
-| V6 | IRSA table and column names for CatWISE2020, AllWISE, 2MASS | Resolved (checked 25 Nov 2026); see [A3.3](data-sources.md#a33-wise--neowise) |
+| V6 | IRSA table and column names for CatWISE2020, AllWISE, 2MASS | Resolved (checked 25 Nov 2026); see [A3.3.1](irsa-catalogues.md#a331-irsa-tables-and-columns-catwise2020-allwise-and-2mass) |
 | V7 | unWISE epoch coverage and cutout access | Open |
 | V8 | Gaia DR4 access | Partly resolved: orbit tables by TAP (2.7 GB); epoch astrometry by DataLink; `bh_two_body_orbit` ships. Release-day check open. |
 | V9 | Euclid DR1 | Resolved and moot (H6 removed) |
@@ -1271,7 +1273,6 @@ The first draft's research (17 Nov 2026) was at the level of search results and 
 | V13 (MPC) | HN-11's ADES export and the MPC route in HN-16 |
 | V26 and the R-12 licences (Chen 2020, SPIFF, templates, network weights, the AAS template, orbit fitters) | any ticket that ships them |
 | V1 (single-frame depth) | HN-5's gate threshold |
-| ~~V6 (IRSA tables and columns)~~ (resolved 25 Nov 2026) | none; it no longer blocks the adapter tickets |
 | V2 (revisit pattern) | HN-12 |
 | V31 (H11 rate grid) | scheduling HN-15 |
 | V33 (linking criteria) | HN-12 |
