@@ -1037,7 +1037,7 @@ Synthetic objects are added to **real** data, the unchanged hunt is run, and the
 - **Version 1 is capped (R-22).** 3 to 4 expected-S/N bins and one second-axis bin per hunt where the physics allows, on the shipped reference fields only, about 1,000 injections per field per hunt; the cost of each table (machine hours, downloads) is recorded in it. Finer grids come with later versions.
 - **On the user's own patch (R-5, release 2 per R-22).** `POST .../inject` runs the same injection on the run's own data and writes a calibration table tied to the run. The plan shows its time and download before it starts. Every planted object carries A16.5's **Injected** badge wherever it is drawn (R-21) and never enters the run's rows. The bundle then carries the patch's own completeness, which is what a paper needs.
 
-- **A fitted curve, not bins (R-29).** Completeness is fitted as a monotone curve in log expected S/N (a logistic, or the gamma CDF Kepler used in MES (Burke & Catanzarite 2017, KSCI-19111-002; Christiansen et al. 2020, [arXiv:2010.04796](https://arxiv.org/abs/2010.04796); the functional form **[verify]**)) by binomial maximum likelihood, with a bootstrap band. The 3 to 4 bins of R-22 stay as a goodness-of-fit check, drawn as points. Injections are concentrated where the curve rises, not spread evenly. Point intervals: Wilson or the equal-tailed Jeffreys interval for n ≤ 40, with Jeffreys's boundary modification at k = 0 and k = n (L(0) = 0, U(n) = 1, the other limit kept at α/2; check §4.1 before implementing); Wilson, Jeffreys or Agresti-Coull above 40. Clopper-Pearson only where guaranteed minimum coverage is required, since it is otherwise "wastefully conservative" ([Brown, Cai & DasGupta 2001](https://doi.org/10.1214/ss/1009213286), §4; corrected in Atish's third review). The project's 200 per bin is a precision choice, not a validity floor. A 3-parameter curve needing about 150 to 300 injections in the transition is an estimate to confirm by a small simulation in HN-4.
+- **A fitted curve, not bins (R-29).** Completeness is fitted as a monotone curve in log expected S/N (a logistic, or the gamma CDF Kepler used in MES (Burke & Catanzarite 2017, KSCI-19111-002; Christiansen et al. 2020, [arXiv:2010.04796](https://arxiv.org/abs/2010.04796); the functional form **[verify]**)) by binomial maximum likelihood, with a bootstrap band. The 3 to 4 bins of R-22 stay as a goodness-of-fit check, drawn as points. Injections are concentrated where the curve rises, not spread evenly. Point intervals: Wilson or the equal-tailed Jeffreys interval for n ≤ 40, with Jeffreys's boundary modification at k = 0 and k = n (L(0) = 0, U(n) = 1, the other limit kept at α/2; check §4.1 before implementing); Wilson, Jeffreys or Agresti-Coull above 40. Clopper-Pearson only where guaranteed minimum coverage is required, since it is otherwise "wastefully conservative" ([Brown, Cai & DasGupta 2001](https://doi.org/10.1214/ss/1009213286), §4; corrected in Atish's third review). The project's 200 per bin is a precision choice, not a validity floor. A 3-parameter curve needs about 150 to 300 injections per curve (the total, 80% of them in the rise), simulated in [A22.14](#a2214-open-items-and-items-to-verify) V36.
 - **Stale gates show (R-34).** A gate re-runs whenever an upstream input changes (data release, detrending, thresholds, control seeds), not only per version; a hash of those inputs is part of its label, so a stale gate is visible on the card. While its gate is stale a Validated hunt shows as **Experimental, "gate out of date"** until the gate re-runs (R-53). Kepler re-ran injection on its final pipeline version for DR25.
 
 #### A22.10.3 Purity
@@ -1285,8 +1285,34 @@ The first draft's research (17 Nov 2026) was at the level of search results and 
 | V33 | THOR, ZTF, Pan-STARRS and NEOWISE linking criteria, read in full | Open: blocks HN-12 |
 | V34 | SPHEREx end-to-end astrometric accuracy: IRSA Explanatory Supplement section 4.2.2 and arXiv:2511.15823 in full | Open: blocks HN-5's error model |
 | V35 | The licences of the chosen orbit tools and their dependencies (checked 19 Nov: see R-37); the project licence is D-41 | Open: blocks any pin in HN-12 |
-| V36 | A simulation confirming 150 to 300 injections for a 3-parameter completeness curve | Open: blocks HN-4's table format |
+| V36 | A simulation confirming 150 to 300 injections for a 3-parameter completeness curve | Simulated (26 Nov 2026, #202; table below). **Proposed: 300 injections per curve.** No target band width is set, so the choice waits for review and still blocks HN-4's table format |
 | V37 | The sources marked [verify] in R-29 to R-49 | Partly resolved (Atish's third review, 20 Nov 2026): RO-Crate (Data Science 5(2):97–138), the Software Citation Principles (PeerJ CS 2:e86), Gross & Vitells (EPJC 70, 525), Benjamini & Hochberg (JRSS-B 57, 289), VanderPlas 2018 (ApJS 236, 16), ASSIST's licence (GPL-3), the IVOA ProvenanceDM v1.0 Recommendation (11 Apr 2020) and TESS's 200 s frames are confirmed. Still open: the gamma-CDF form in KSCI-19111-002 §3, Kuchner et al. 2016 on dust (full text), archive limits (R-42), ASCL eligibility (R-40). Blocks registering R-29 to R-49 (HN-0) |
+
+**V36 results (26 Nov 2026, #202).** Reproduced by `uv run python -m scripts.sim_injection_count` in `backend/` (fixed seed). Each row is 200 independent sets of injections, each fitted by binomial maximum likelihood and bootstrapped 1,000 times. A **band** is the width of the 16th to 84th percentile of the fitted curves, in completeness units, read at the true midpoint (half the plateau) and where the true completeness is 0.90. **Holds truth** is the share of sets whose band contains the true value (nominally 0.68).
+
+| True curve (x50, width, plateau) | Injections | Band at midpoint: median / 90th percentile | Holds truth | Band at 0.90: median / 90th percentile | Holds truth |
+|---|---|---|---|---|---|
+| spec example (1.02, 0.11, 0.94) | 150 | 0.136 / 0.179 | 0.70 | 0.079 / 0.100 | 0.64 |
+| spec example (1.02, 0.11, 0.94) | 200 | 0.112 / 0.146 | 0.73 | 0.067 / 0.081 | 0.65 |
+| spec example (1.02, 0.11, 0.94) | 300 | 0.091 / 0.111 | 0.65 | 0.054 / 0.064 | 0.70 |
+| spec example (1.02, 0.11, 0.94) | 500 | 0.069 / 0.082 | 0.66 | 0.043 / 0.049 | 0.64 |
+| steeper (1.02, 0.06, 0.94) | 150 | 0.132 / 0.177 | 0.67 | 0.078 / 0.098 | 0.69 |
+| steeper (1.02, 0.06, 0.94) | 200 | 0.112 / 0.143 | 0.66 | 0.066 / 0.080 | 0.66 |
+| steeper (1.02, 0.06, 0.94) | 300 | 0.091 / 0.111 | 0.72 | 0.054 / 0.063 | 0.69 |
+| steeper (1.02, 0.06, 0.94) | 500 | 0.070 / 0.081 | 0.63 | 0.042 / 0.048 | 0.62 |
+| shallower (1.02, 0.2, 0.94) | 150 | 0.133 / 0.179 | 0.71 | 0.081 / 0.099 | 0.65 |
+| shallower (1.02, 0.2, 0.94) | 200 | 0.112 / 0.142 | 0.68 | 0.068 / 0.082 | 0.67 |
+| shallower (1.02, 0.2, 0.94) | 300 | 0.090 / 0.116 | 0.69 | 0.054 / 0.065 | 0.68 |
+| shallower (1.02, 0.2, 0.94) | 500 | 0.069 / 0.079 | 0.67 | 0.041 / 0.047 | 0.63 |
+| higher plateau (1.02, 0.11, 0.99) | 150 | 0.129 / 0.167 | 0.62 | 0.068 / 0.085 | 0.62 |
+| higher plateau (1.02, 0.11, 0.99) | 200 | 0.108 / 0.129 | 0.69 | 0.060 / 0.073 | 0.66 |
+| higher plateau (1.02, 0.11, 0.99) | 300 | 0.088 / 0.102 | 0.70 | 0.049 / 0.057 | 0.69 |
+| higher plateau (1.02, 0.11, 0.99) | 500 | 0.067 / 0.075 | 0.66 | 0.038 / 0.044 | 0.66 |
+
+- **150 to 300 is a usable range; the upper end is Proposed.** At 300 the median band is 0.088 to 0.091 wide at the midpoint and 0.049 to 0.054 at 0.90, and nine sets in ten stay within 0.116 at the midpoint. At 150 the medians are 0.129 to 0.136 and 0.068 to 0.081, and the 90th percentile reaches 0.179. At 500 the medians are 0.067 to 0.070 and 0.038 to 0.043.
+- **N is the total per curve:** 80% uniform within 3 widths of the midpoint, 20% uniform from 3 to 6 widths above it.
+- **Assumed, for review:** "90% completeness" means a completeness of 0.90, not 90% of the plateau; the true curves are the A22.10.4 example (x50 and width in log10 of expected S/N) and three variants of it.
+- **Limit:** injections are placed using the true midpoint and width. A real calibration only has estimates of them, so its bands are likely wider.
 
 **Which [verify] item blocks which ticket** (none blocks approval of this proposal):
 
