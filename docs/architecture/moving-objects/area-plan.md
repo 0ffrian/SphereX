@@ -6,7 +6,7 @@ The end of [A16](area-search.md#a16-area-search): the tickets, the Day 0 gate an
 
 ### A16.7 Tickets and plan
 
-Three core Area tickets (D-29 "as few tickets as possible"): D1 and D2 in **M4 Extras**, D3 in **M5**, priority P2. Four **gated extras** (D4 to D7, [Q-203](../../decisions/moving-objects.md)) in **M4 Extras**, priority P3, behind the gate below. Track's tickets T1 to T4 are in [A19.14](track-contract.md#a1914-owners-tickets-and-tests) and [A20.15](track-ui.md#a2015-tests-and-tickets).
+Three core Area tickets (D-29 "as few tickets as possible"): D1 and D2 in **M4 Extras**, D3 in **M5**, priority P2. Four **gated extras** (D4 to D7, [Q-203](../../decisions/moving-objects.md)) in **M4 Extras**, priority P3, behind the gate below. Track's tickets T1 to T4 are in [A19.14](track-contract.md#a1914-owners-tickets-and-tests) and [A20.15](track-ui.md#a2015-tests-and-tickets). (M1 to M5 are the event milestones, closed on 20 Nov 2026 and replaced by release milestones, [D-43](../../decisions/scope-process.md#d-43-release-milestones-replace-m1-to-m5); the labels below are kept as history.)
 
 | Ticket | Owner | Checklist |
 |---|---|---|
