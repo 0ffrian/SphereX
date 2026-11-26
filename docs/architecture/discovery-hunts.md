@@ -1191,6 +1191,8 @@ Owners follow D-17 and are to be confirmed. Each search hunt ticket ships its ca
 | **HN-17** | H10 cross-match on Gaia DR4 | HN-1; DR4 | Kevin |
 | Later | Watch saved objects; sharing squares between PCs; replay with hunts | | |
 
+**Milestones (D-43).** Tickets are tracked under the release milestones R0, R1a, R1b, R2, DR4 and Maintenance. [D-43](../decisions/scope-process.md#d-43-release-milestones-replace-m1-to-m5) lists the tickets each one holds.
+
 **Order.** HN-5 comes before any search hunt is Validated: a tool whose first hunt misses every known asteroid has no standing to offer more. The export bundle (HN-4b) comes before the first hunt ships, because without it nothing is usable in research.
 
 ### A22.13 Tests
@@ -1284,7 +1286,7 @@ The first draft's research (17 Nov 2026) was at the level of search results and 
 
 ### A22.15 Decisions
 
-Each row below is registered as a `Q-` entry in [discovery-hunts](../decisions/discovery-hunts.md) (the Status column names its id), except R-29 to R-49, which wait for V37, and R-50, which is a note. R-1 to R-12 were **decided by Moon on 18 Nov 2026**, taking the recommendations made on Atish's twelve questions. R-13 to R-28 and the PD rows were **decided by Moon on 19 Nov 2026** on Atish's re-review (changes requested at 76eca86). R-29 to R-49 were **decided by Moon on 19 Nov 2026** from a literature review (arXiv, ADS, IVOA and archive documentation; abstracts and repository pages, not full texts, so sources not opened are marked [verify] and listed as V37). They are registered only once V37 is closed (HN-0). Atish's third review (20 Nov 2026) corrected the citations of R-29, R-39, R-44, R-46, R-47 and R-48, re-decided R-37, corrected the wording of R-3, R-14, R-16, R-18, R-24, R-39, R-40, R-42 and PD-3, and took R-51 to R-54. Atish confirmed the corrections and took these decisions as a code owner on 20 Nov 2026 (Q-484; Moon may still reopen any of them on the PR). The project licence stays a whole-team `D-` decision (HN-0).
+Each row below is registered as a `Q-` entry in [discovery-hunts](../decisions/discovery-hunts.md) (the Status column names its id), except R-29 to R-49, which wait for V37, and R-50, which is a note. D-43 is taken by issue #205 (release milestones), so these rows are Q-487 to Q-528 and the next free `D-` id is D-44. R-1 to R-12 were **decided by Moon on 18 Nov 2026**, taking the recommendations made on Atish's twelve questions. R-13 to R-28 and the PD rows were **decided by Moon on 19 Nov 2026** on Atish's re-review (changes requested at 76eca86). R-29 to R-49 were **decided by Moon on 19 Nov 2026** from a literature review (arXiv, ADS, IVOA and archive documentation; abstracts and repository pages, not full texts, so sources not opened are marked [verify] and listed as V37). They are registered only once V37 is closed (HN-0). Atish's third review (20 Nov 2026) corrected the citations of R-29, R-39, R-44, R-46, R-47 and R-48, re-decided R-37, corrected the wording of R-3, R-14, R-16, R-18, R-24, R-39, R-40, R-42 and PD-3, and took R-51 to R-54. Atish confirmed the corrections and took these decisions as a code owner on 20 Nov 2026 (Q-484; Moon may still reopen any of them on the PR). The project licence stays a whole-team `D-` decision (HN-0).
 
 | Ref | Decision | Status |
 |---|---|---|

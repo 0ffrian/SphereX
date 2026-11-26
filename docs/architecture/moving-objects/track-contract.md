@@ -80,7 +80,7 @@ Q-21's text still says `frames:truncated` past the cone cap; PR #53's entry, mer
 | OUTLIER-core rule in Stage 2 (A4.2) | Moon | **T4** |
 | Track screen; Track sound | Atish | T2, T3 ([A20.15](track-ui.md#a2015-tests-and-tickets)) |
 
-Milestone M4 Extras, priority P1 because Track is the MVP demo (**Proposed (Q-187)**). Tests (backend, offline on recorded answers): the path from the recorded Horizons replies; an over-limit 200 text answer is not cached; the interpolated marker against the TLIST positions within the stated bound; the Horizons gate never runs two calls at once; Eros gives 14 of 16 points, 13 flagged `outlier_core` **[verify]**; the star list's radii and the near-track filter; the ECSV round trip (tags in the metadata, refusal rows kept, no spin columns); `path:deferred` then a final path.
+Milestone M4 Extras, priority P1 because Track is the MVP demo (**Proposed (Q-187)**). Tests (backend, offline on recorded answers): the path from the recorded Horizons replies; an over-limit 200 text answer is not cached; the interpolated marker against the TLIST positions within the stated bound; the Horizons gate never runs two calls at once; Eros gives 14 of 16 points, 13 flagged `outlier_core` **[verify]**; the star list's radii and the near-track filter; the ECSV round trip (tags in the metadata, refusal rows kept, no spin columns); `path:deferred` then a final path. (M1 to M5 are the event milestones, closed on 20 Nov 2026 and replaced by release milestones, [D-43](../../decisions/scope-process.md#d-43-release-milestones-replace-m1-to-m5); the labels below are kept as history.)
 
 ### A19.15 Open items
 

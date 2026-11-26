@@ -133,6 +133,8 @@ Track's path sound (Q-134: one tick per exposure, wavelength to pitch, drawn x t
 | **T2 Track screen** (A20.1 to A20.14) | Atish | M4 Extras, P1 (**Proposed (Q-187)**) |
 | **T3 Track sound** (R8.9.2, A20.9) | Atish | M3 (renamed "Sound", Q-132) |
 
+(M1 to M5 are the event milestones, closed on 20 Nov 2026 and replaced by release milestones, [D-43](../../decisions/scope-process.md#d-43-release-milestones-replace-m1-to-m5); the labels below are kept as history.)
+
 | Layer | Tests |
 |---|---|
 | Unit | Interpolation between samples and the snap at exposures (`trackTime.ts`); slider and marker in sync; the hash `track=<id>`; Escape closes Track before any other surface (a focused text field keeps it, Q-170) |

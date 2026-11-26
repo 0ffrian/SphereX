@@ -76,7 +76,7 @@ Project agents live in `.claude/agents/` and skills in `.claude/skills/`. Agents
 
 ## Build schedule
 
-The team builds from 5 Nov 2026 (decisions D-14), setting aside the event rule against building before 14 Nov. Work is tracked in the GitHub project "SphereX and PlanetX - NASA COMPETITION 2026" as milestones M1–M5 (D-29). M1–M4 build against fixtures and do not depend on each other; only M5 integrates them.
+The team builds from 5 Nov 2026 (decisions D-14), setting aside the event rule against building before 14 Nov. Work is tracked in the GitHub project "SphereX and PlanetX - NASA COMPETITION 2026" under the release milestones **R0**, **R1a**, **R1b**, **R2**, **DR4** and **Maintenance** (D-43 lists what each holds; it amends D-29 and D-30, and M1–M5 are closed). No due dates for now. Difficulty is a label: `good first issue` is Level 1, `help wanted` is Level 2, no label is core work. Atish assigns every ticket.
 
 ## Layout
 
