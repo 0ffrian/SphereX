@@ -1283,8 +1283,34 @@ The first draft's research (17 Nov 2026) was at the level of search results and 
 | V33 | THOR, ZTF, Pan-STARRS and NEOWISE linking criteria, read in full | Open: blocks HN-12 |
 | V34 | SPHEREx end-to-end astrometric accuracy: IRSA Explanatory Supplement section 4.2.2 and arXiv:2511.15823 in full | Open: blocks HN-5's error model |
 | V35 | The licences of the chosen orbit tools and their dependencies (checked 19 Nov: see R-37); the project licence is D-41 | Open: blocks any pin in HN-12 |
-| V36 | A simulation confirming 150 to 300 injections for a 3-parameter completeness curve | Open: blocks HN-4's table format |
+| V36 | A simulation confirming 150 to 300 injections for a 3-parameter completeness curve | Simulated (26 Nov 2026, #202; table below). **Proposed: 300 injections per curve.** No target band width is set, so the choice waits for review and still blocks HN-4's table format |
 | V37 | The sources marked [verify] in R-29 to R-49 | Partly resolved (Atish's third review, 20 Nov 2026): RO-Crate (Data Science 5(2):97–138), the Software Citation Principles (PeerJ CS 2:e86), Gross & Vitells (EPJC 70, 525), Benjamini & Hochberg (JRSS-B 57, 289), VanderPlas 2018 (ApJS 236, 16), ASSIST's licence (GPL-3), the IVOA ProvenanceDM v1.0 Recommendation (11 Apr 2020) and TESS's 200 s frames are confirmed. Still open: the gamma-CDF form in KSCI-19111-002 §3, Kuchner et al. 2016 on dust (full text), archive limits (R-42), ASCL eligibility (R-40). Blocks registering R-29 to R-49 (HN-0) |
+
+**V36 results (26 Nov 2026, #202).** Reproduced by `uv run python -m scripts.sim_injection_count` in `backend/` (fixed seed). Each row is 200 independent sets of injections, each fitted by binomial maximum likelihood and bootstrapped 1,000 times. A **band** is the width of the 16th to 84th percentile of the fitted curves, in completeness units, read at the true midpoint (half the plateau) and where the true completeness is 0.90. **Holds truth** is the share of sets whose band contains the true value (nominally 0.68).
+
+| True curve (x50, width, plateau) | Injections | Band at midpoint: median / 90th percentile | Holds truth | Band at 0.90: median / 90th percentile | Holds truth |
+|---|---|---|---|---|---|
+| spec example (1.02, 0.11, 0.94) | 150 | 0.129 / 0.171 | 0.66 | 0.077 / 0.098 | 0.69 |
+| spec example (1.02, 0.11, 0.94) | 200 | 0.114 / 0.162 | 0.66 | 0.068 / 0.088 | 0.75 |
+| spec example (1.02, 0.11, 0.94) | 300 | 0.090 / 0.109 | 0.66 | 0.053 / 0.064 | 0.65 |
+| spec example (1.02, 0.11, 0.94) | 500 | 0.071 / 0.082 | 0.72 | 0.042 / 0.048 | 0.72 |
+| steeper (1.02, 0.06, 0.94) | 150 | 0.132 / 0.184 | 0.70 | 0.078 / 0.098 | 0.67 |
+| steeper (1.02, 0.06, 0.94) | 200 | 0.111 / 0.147 | 0.61 | 0.065 / 0.081 | 0.67 |
+| steeper (1.02, 0.06, 0.94) | 300 | 0.091 / 0.111 | 0.68 | 0.054 / 0.064 | 0.67 |
+| steeper (1.02, 0.06, 0.94) | 500 | 0.070 / 0.082 | 0.67 | 0.041 / 0.048 | 0.66 |
+| shallower (1.02, 0.2, 0.94) | 150 | 0.131 / 0.198 | 0.71 | 0.080 / 0.098 | 0.66 |
+| shallower (1.02, 0.2, 0.94) | 200 | 0.112 / 0.144 | 0.64 | 0.066 / 0.081 | 0.72 |
+| shallower (1.02, 0.2, 0.94) | 300 | 0.091 / 0.110 | 0.71 | 0.055 / 0.064 | 0.69 |
+| shallower (1.02, 0.2, 0.94) | 500 | 0.070 / 0.081 | 0.66 | 0.041 / 0.049 | 0.64 |
+| higher plateau (1.02, 0.11, 0.99) | 150 | 0.125 / 0.165 | 0.69 | 0.070 / 0.087 | 0.65 |
+| higher plateau (1.02, 0.11, 0.99) | 200 | 0.108 / 0.145 | 0.65 | 0.058 / 0.070 | 0.68 |
+| higher plateau (1.02, 0.11, 0.99) | 300 | 0.087 / 0.100 | 0.72 | 0.049 / 0.057 | 0.69 |
+| higher plateau (1.02, 0.11, 0.99) | 500 | 0.066 / 0.074 | 0.68 | 0.038 / 0.044 | 0.69 |
+
+- **150 to 300 is a usable range; the upper end is Proposed.** At 300 the median band is 0.087 to 0.091 wide at the midpoint and 0.049 to 0.055 at 0.90, and nine sets in ten stay within 0.111 at the midpoint. At 150 the medians are 0.125 to 0.132 and 0.070 to 0.080, and the 90th percentile reaches 0.198. At 500 the medians are 0.066 to 0.071 and 0.038 to 0.042.
+- **N is the total per curve:** 80% uniform within 3 widths of the midpoint, 20% uniform from 3 to 6 widths above it.
+- **Assumed, for review:** "90% completeness" means a completeness of 0.90, not 90% of the plateau; the true curves are the A22.10.4 example (x50 and width in log10 of expected S/N) and three variants of it.
+- **Limit:** injections are placed using the true midpoint and width. A real calibration only has estimates of them, so its bands are likely wider.
 
 **Which [verify] item blocks which ticket** (none blocks approval of this proposal):
 
