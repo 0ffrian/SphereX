@@ -83,6 +83,8 @@ def _log_likelihood(x: Array, y: Array, w: Array, theta: Array) -> Array:
 
 def _start(x: Array, y: Array, w: Array) -> Array:
     """Best point of a coarse grid for each row of weights; it never looks at the true curve."""
+    # Fixed starting widths spanning the true widths in CURVES (0.06 to 0.20); the fit itself may
+    # move anywhere inside WIDTH_BOUNDS, which is far wider on purpose.
     grid = np.array(
         [
             (x50, width, plateau)
@@ -162,7 +164,7 @@ def simulate(curve: Curve, n: int, repeats: int, bootstraps: int, seed: int = SE
     truth = np.array([curve.plateau / 2.0, TARGET])
     widths = np.empty((repeats, 2))
     holds = np.empty((repeats, 2))
-    key = [seed, round(curve.width * 1000), round(curve.plateau * 1000), n]
+    key = [seed, *(round(v * 1000) for v in (curve.x50, curve.width, curve.plateau)), n]
     for r in range(repeats):
         rng = np.random.default_rng([*key, r])
         x, y = draw(curve, n, rng)
