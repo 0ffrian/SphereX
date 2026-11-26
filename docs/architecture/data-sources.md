@@ -1,6 +1,6 @@
 # Data sources
 
-> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A3–A3.5 · **Implements:** [D-19, D-25, D-31](../decisions/data-sources.md), [Q-137](../decisions/scope-process.md), [Q-138, Q-141, Q-148](../decisions/moving-objects.md), [Q-21, Q-125, Q-126](../decisions/moving-frames.md), [Q-151, Q-152](../decisions/catalogue-values.md), [Q-378](../decisions/physics-fixes.md) · **Read with:** [object-sources.md](object-sources.md) (A3.6–A3.11, A3.13), [targets.md](targets.md) (A3.12), [pipeline.md](pipeline.md) (A4.1, A4.2)
+> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A3–A3.5 · **Implements:** [D-19, D-25, D-31](../decisions/data-sources.md), [Q-137](../decisions/scope-process.md), [Q-138, Q-141, Q-148](../decisions/moving-objects.md), [Q-21, Q-125, Q-126](../decisions/moving-frames.md), [Q-151, Q-152](../decisions/catalogue-values.md), [Q-378](../decisions/physics-fixes.md) · **Read with:** [object-sources.md](object-sources.md) (A3.6–A3.11, A3.13), [targets.md](targets.md) (A3.12), [irsa-catalogues.md](irsa-catalogues.md) (A3.3.1), [pipeline.md](pipeline.md) (A4.1, A4.2)
 
 ## A3 Data sources
 
@@ -9,6 +9,7 @@ Only the attributes listed are fetched. All checks below were run on 4 Nov 2026 
 | Sections | Sources | File |
 |---|---|---|
 | A3.1 to A3.5 | SPHEREx, Gaia, WISE, Horizons, SkyBoT (frames and positions) | this file |
+| A3.3.1 | IRSA table and column names for CatWISE2020, AllWISE, 2MASS | [irsa-catalogues.md](irsa-catalogues.md) |
 | A3.6 to A3.11 | SBDB, DAMIT, Exoplanet Archive, unused services, SIMBAD and shape models, sky background | [object-sources.md](object-sources.md) |
 | A3.12 | Test and demo targets, full-cache counts | [targets.md](targets.md) |
 | A3.13 | Literature registry (`literature.toml`) | [object-sources.md](object-sources.md#a313-literature-registry-literaturetoml) |
@@ -70,6 +71,8 @@ Only the attributes listed are fetched. All checks below were run on 4 Nov 2026 
 | Status | **Not confirmed** for diameter and albedo (IRSA TAP timed out twice). **Tested** 6 Nov 2026 for source positions (overlays, below). |
 | Use | Diameter and albedo. Take these through the JPL Small-Body Database for now. |
 | Source catalogue (overlays, issue #12) | "WISE/NEOWISE sources" are served from **CatWISE2020** (`catwise_2020` on IRSA TAP, sync, CSV), which combines WISE and NEOWISE epochs (Q-51). Checked live 6 Nov 2026 (`TAP_SCHEMA.columns`): `ra_pm`/`dec_pm` are positions at MJD 57170 from the PSF fit with motion; `pmra`/`pmdec` are apparent motions in arcsec/yr (relative, not absolute, noisy for faint sources); `w1mpro_pm` is the W1 profile-fit magnitude. A 0.03° cone answered in about 17 s. Columns: `source_name, ra_pm, dec_pm, pmra, pmdec, w1mpro_pm`; the cone is applied to `ra`/`dec`, brightest W1 first, at most 5000 rows (`overlay:wise:truncated`); a row without `ra_pm`/`dec_pm` is dropped. Whether `pmra` includes cos δ is **[verify]**. **CatWISE2020 has no rows within at least 3′ of R Draconis** (checked live 6 Nov 2026: a box and a cone both return 0, while AllWISE returns sources there), so that target shows no WISE markers (Q-51). AllWISE and the NEOWISE single-exposure table are not used. Used by [A4.9](overlays.md#a49-overlays-flag-mask-and-combine). |
+
+**IRSA tables and columns (checked 25–26 Nov 2026, #192):** the table and column names, units and ADQL for CatWISE2020, AllWISE and 2MASS are in [A3.3.1](irsa-catalogues.md#a331-irsa-tables-and-columns-catwise2020-allwise-and-2mass).
 
 ### A3.4 JPL Horizons
 

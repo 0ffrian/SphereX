@@ -26,6 +26,7 @@ Load only the fragment you need. Section numbers are prefixed with `A` ("archite
 |---|---|---|
 | [overview.md](overview.md) | A1–A2.1 | you need the scope (sky view, flipbook, Build it, Track, Area search), priority tiers and their status, the system diagram or the design principles |
 | [data-sources.md](data-sources.md) | A3–A3.5 | you call or adapt SPHEREx/IRSA, Gaia, WISE, Horizons or SkyBoT |
+| [irsa-catalogues.md](irsa-catalogues.md) | A3.3.1 | you need the IRSA table or column names for CatWISE2020, AllWISE or 2MASS |
 | [object-sources.md](object-sources.md) | A3.6–A3.11, A3.13 | you call or adapt SBDB, DAMIT, the Exoplanet Archive, SIMBAD, mission shape models, the IRSA HiPS sky background or the literature registry |
 | [targets.md](targets.md) | A3.12 | you pick or change test, demo or fixture targets (433 Eros is the MVP, Q-137), or the warm-start groups |
 | [pipeline.md](pipeline.md) | A4–A4.2 | you build stage 1 (find the object, frames, moving objects) or stage 2 (brightness and spectrum) |
@@ -70,6 +71,7 @@ Load only the fragment you need. Section numbers are prefixed with `A` ("archite
 | A3.1 | SPHEREx (IRSA) | [data-sources.md#a31-spherex-irsa](data-sources.md#a31-spherex-irsa) |
 | A3.2 | Gaia DR3 | [data-sources.md#a32-gaia-dr3](data-sources.md#a32-gaia-dr3) |
 | A3.3 | WISE / NEOWISE | [data-sources.md#a33-wise--neowise](data-sources.md#a33-wise--neowise) |
+| A3.3.1 | IRSA tables and columns: CatWISE2020, AllWISE and 2MASS | [irsa-catalogues.md#a331-irsa-tables-and-columns-catwise2020-allwise-and-2mass](irsa-catalogues.md#a331-irsa-tables-and-columns-catwise2020-allwise-and-2mass) |
 | A3.4 | JPL Horizons | [data-sources.md#a34-jpl-horizons](data-sources.md#a34-jpl-horizons) |
 | A3.5 | IMCCE SkyBoT | [data-sources.md#a35-imcce-skybot](data-sources.md#a35-imcce-skybot) |
 | A3.6 | JPL Small-Body Database | [object-sources.md#a36-jpl-small-body-database](object-sources.md#a36-jpl-small-body-database) |
