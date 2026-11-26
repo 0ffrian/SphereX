@@ -50,7 +50,7 @@
 
 - M1 to M4 do not depend on each other. Each builds against its own fixtures (recorded responses, sample cards and spectra). Only M5 joins them. Each milestone holds as few tickets as possible.
 - Open questions and **[verify]** items sit inside the ticket that needs them.
-- **Amended by:** Q-132 (M3 is renamed "Sound") and Q-187 (proposed: M4 also holds Track tickets T1, T2 and T4, A19.14). Area tickets D1 and D2 are in M4 and D3 in M5 ([A16.7](../architecture/moving-objects/area-plan.md#a167-tickets-and-plan)). Status board: [A13](../architecture/plan.md#a13-plan-to-14-nov).
+- **Amended by:** **D-43 (M1 to M5 closed on 20 Nov 2026; release milestones replace them)**, Q-132 (M3 is renamed "Sound") and Q-187 (proposed: M4 also holds Track tickets T1, T2 and T4, A19.14). Area tickets D1 and D2 are in M4 and D3 in M5 ([A16.7](../architecture/moving-objects/area-plan.md#a167-tickets-and-plan)). Status board: [A13](../architecture/plan.md#a13-plan-to-14-nov).
 
 ## D-30 Milestone owners and dependencies
 
@@ -67,7 +67,7 @@
 - The milestone owner leads and signs off the milestone; ticket owners from D-17 still apply inside it.
 - Numbering: `#1`–`#17` below and in architecture spec §13 are GitHub **issue** numbers (one per ticket); PR numbers are written as "PR #n".
 - **Dependencies:** M1–M4 have no hard dependency on each other (D-29). Three soft links run across milestones: texture haptics (#11, M3) read the shared CPU field from #8 (M2); the Gemini layer (#14, M4) repaints the albedo from the baker's height map (#6, M2, D-07); physics sliders (#13, M4) need the viewer (#7, M2) to be seen. Each can be built against fixtures first. M5 depends on all of them. The map is in architecture spec §13.
-- **Amended by:** Q-132 (M3 is renamed "Sound"; its owner is unchanged). Track tickets: Q-187.
+- **Amended by:** **D-43 (the milestones this table owns are closed)**, Q-132 (M3 is renamed "Sound"; its owner is unchanged). Track tickets: Q-187.
 
 ## D-41 Project licence
 
@@ -99,6 +99,26 @@
 - **Why:** `main` keeps a known-good snapshot of the event build while the Discovery hunts work (A22) starts and new contributors join.
 - **GitHub settings (an admin, once):** create `dev` from `b7b4a1d6`; copy the `main` ruleset (id 27523962) to a `dev` ruleset; make `dev` the default branch; retarget open PRs.
 - **Relates to:** Q-484 (code owners and the merge gate), D-17 (owners).
+
+## D-43 Release milestones replace M1 to M5
+
+- **Decision (Atish, 20 Nov 2026; recorded 26 Nov 2026, issue #205):** the event milestones M1 to M5 of D-29 and D-30 were closed on 20 Nov 2026. Work is now tracked in the same GitHub project with **release milestones**, which follow the releases of [A22.12](../architecture/discovery-hunts.md#a2212-plan-tickets-and-owners):
+
+  | Milestone | Holds |
+  |---|---|
+  | **R0** Foundations and onboarding | HN-0 and the look-up tickets that unblock the build (libraries, licences, catalogue names, sources) |
+  | **R1a** | The release 1 minimum of R-27 without HN-0: HN-1, HN-2, HN-3, HN-4b, HN-5, HN-6 |
+  | **R1b** First validated hunts | The rest of release 1: HN-4, HN-7, HN-8, HN-9, HN-10, and the tickets that block them (for example V36) |
+  | **R2** | Release 2: HN-11 to HN-16 |
+  | **DR4** | HN-17 (H10 on Gaia DR4); ships when Gaia DR4 is out |
+  | **Maintenance** | Standing milestone for fixes to the app outside the hunts |
+
+- **No due dates for now.** A milestone is done when its tickets are closed, not on a date.
+- **Difficulty is a label, not a milestone:** `good first issue` (Level 1), `help wanted` (Level 2), no label (core). **Atish assigns every ticket.**
+- **Replaces:** the M1 to M5 table of D-29 and the milestone owners of D-30. D-29's rule that tickets are built against fixtures first stays (A22's HN-2 and HN-3 do it). Ticket owners still come from D-17 and [A22.12](../architecture/discovery-hunts.md#a2212-plan-tickets-and-owners).
+- **Assumption (the issue does not place them):** HN-11 and HN-16 sit in **R2** because A22.2 lists neither in release 1; Atish moves them if that is wrong.
+- **Does not change:** the contents of the A22 releases.
+- **Amends:** D-29, D-30. **Relates to:** D-42, D-17.
 
 ## Post-event backlog
 

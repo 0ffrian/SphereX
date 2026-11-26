@@ -1191,6 +1191,8 @@ Owners follow D-17 and are to be confirmed. Each search hunt ticket ships its ca
 | **HN-17** | H10 cross-match on Gaia DR4 | HN-1; DR4 | Kevin |
 | Later | Watch saved objects; sharing squares between PCs; replay with hunts | | |
 
+**Milestones (D-43).** Each ticket sits in one GitHub release milestone: **R0** HN-0; **R1a** HN-1, HN-2, HN-3, HN-4b, HN-5, HN-6 (the rest of R-27's release 1 minimum); **R1b** HN-4, HN-7, HN-8, HN-9, HN-10 (the rest of release 1); **R2** HN-11 to HN-16; **DR4** HN-17; **Maintenance** holds app fixes outside the hunts. HN-11 and HN-16 are placed in R2 because this section lists them in neither release; Atish moves them if that is wrong. There are no due dates, and Atish assigns every ticket.
+
 **Order.** HN-5 comes before any search hunt is Validated: a tool whose first hunt misses every known asteroid has no standing to offer more. The export bundle (HN-4b) comes before the first hunt ships, because without it nothing is usable in research.
 
 ### A22.13 Tests
