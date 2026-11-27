@@ -244,7 +244,7 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | Q-143 | Star overlays for moving objects | Answered (Moon, 9 Nov 2026): accepted; Discov… | [moving-objects](moving-objects.md) |
 | Q-144 | 3I/ATLAS extended-coma spectrum | Answered (Moon, 9 Nov 2026): show the apertur… | [moving-objects](moving-objects.md) |
 | Q-145 | Track export format | Open | [moving-objects](moving-objects.md) |
-| Q-146 | Area search: Known and Discovery | Answered (Moon, 9 Nov 2026); accepted by Atis… | [moving-objects](moving-objects.md) |
+| Q-146 | Area search: Known and Discovery | Answered (Moon, 9 Nov 2026); accepted by Atis…; amended by Q-490 and Q-501 | [moving-objects](moving-objects.md) |
 | Q-147 | Band-Hop Linker spec (first proposal) | Answered: re-scoped as Q-146 | [moving-objects](moving-objects.md) |
 | Q-148 | Pass length per sky position | Open | [moving-objects](moving-objects.md) |
 | Q-150 | Exoplanet card fields, ASSET_VERSION 6 | Proposed (needs a second team member); amended by Q-359, Q-363 | [exoplanets](exoplanets.md) |
@@ -301,7 +301,7 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | Q-200 | Honesty start state vs Build it raise | Open | [contract-tags](contract-tags.md) |
 | Q-201 | One tag for Horizons-derived values | Open | [contract-tags](contract-tags.md) |
 | Q-202 | Review of the Area search fixes (9 Nov 2026) | Proposed | [moving-objects-review](moving-objects-review.md) |
-| Q-203 | Four research checks join the event build as gated extras | Decided (Moon, 10 Nov 2026); owners and thresholds Proposed | [moving-objects](moving-objects.md) |
+| Q-203 | Four research checks join the event build as gated extras | Decided (Moon, 10 Nov 2026); owners and thresholds Proposed; amended by Q-520 | [moving-objects](moving-objects.md) |
 | Q-204 | PNG determinism across machines: chunks, not deflate bytes (`bake_demo_pack --check` and `bake_fixtures --check`) | Proposed (needs a second team member) | [demo-pack](demo-pack.md) |
 | Q-205 | Area search at the event: shown, precomputed (condition 4, the kill switch, amended by Q-406); D4 to D7 stay gated by Q-203 | Decided (Moon, 11 Nov 2026) | [scope-process](scope-process.md) |
 | Q-206 | Pre-built pack never hides a measured spectrum | Proposed (needs a second team member); amended by Q-369 | [demo-pack](demo-pack.md) |
@@ -491,7 +491,7 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | Q-466 | Known list: Detected (matched by a found-blind track) and Predicted rows, detected first, filter, paths on the sky | Decided (as built, #145) | [moving-objects](moving-objects.md) |
 | Q-467 | Provenance of a live area | Proposed | [moving-objects](moving-objects.md) |
 | Q-469 | Track it (on demand) and Build it from area results; placeholder build for an unexplained track (amends R7.6 for area tracks) | Decided (as built, #145) | [moving-objects](moving-objects.md) |
-| Q-470 | Scans: a region scanned square by square (split, order, limits, overlap, pause and stop) | Proposed | [moving-objects](moving-objects.md) |
+| Q-470 | Scans: a region scanned square by square (split, order, limits, overlap, pause and stop) | Proposed; amended by Q-504 and Q-505 | [moving-objects](moving-objects.md) |
 | Q-471 | Run records: storage, schema, replay timeline, merged results, restart rule | Proposed | [moving-objects](moving-objects.md) |
 | Q-472 | Scan UI: select a region, gridded screen, square-by-square scan, objects circled with trajectories, combined results | Decided (as built, #157) | [moving-objects](moving-objects.md) |
 | Q-473 | Runs menu and replay: runs list beside the readout, replay a run at 1× to 600× | Decided (as built, #158) | [moving-objects](moving-objects.md) |
@@ -499,7 +499,7 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | Q-475 | Spectrum check: physics and starting values | Proposed | [moving-objects](moving-objects.md) |
 | Q-476 | Spectrum check UI as built: choices where A18.7 and the mock-up are silent or differ; (6) Measured only hides the verdict in the list too, settled by D-21 | Proposed ((6) settled by D-21, 14 Nov 2026) | [moving-objects](moving-objects.md) |
 | Q-478 | Discovery gap analysis (14 Nov 2026): nine fixes on `fix/discovery-gaps`; open gaps (a) to (h), among them issue #143 and a real asteroid missed by the pair test | Proposed (14 Nov 2026) | [moving-objects](moving-objects.md) |
-| Q-479 | Scan and replay honesty as built (issue #170): Measured only hides known names too; the sky from `/results`; #169's fields read before #169 lands (null, never 0); flags before the length | Proposed (14 Nov 2026) | [moving-objects](moving-objects.md) |
+| Q-479 | Scan and replay honesty as built (issue #170): Measured only hides known names too; the sky from `/results`; #169's fields read before #169 lands (null, never 0); flags before the length | Proposed (14 Nov 2026); amended by Q-506 | [moving-objects](moving-objects.md) |
 | Q-480 | Runs count and list unchecked tracks (`unchecked`, null on older records; `unchecked_by`; `missing` per square; no found event) | Proposed (14 Nov 2026, issue #169) | [moving-objects](moving-objects.md) |
 | Q-481 | A scan whose every square failed ends `failed`; `squares_failed` in the totals | Proposed (14 Nov 2026, issue #169) | [moving-objects](moving-objects.md) |
 | Q-482 | Cutout second pass with a failure budget; spectra refilled in the worker; a stored area whose known-object check failed is rechecked (cooldown) | Proposed (14 Nov 2026, issue #169) | [moving-objects](moving-objects.md) |
@@ -508,43 +508,43 @@ Every entry, in ID order. Status is shortened; the row in the topic file is auth
 | Q-485 | Touch mode after the haptics cut (D-39): stays, changes or goes | Open | [shell-proposals](shell-proposals.md) |
 | Q-486 | Animate UI's licence (MIT + Commons Clause, not OSI-approved) vs the Space Apps terms in D-41; relates to D-38 | Open | [scope-process](scope-process.md) |
 | Q-487 | Discovery hunts R-0: Purpose | Decided (Moon, 18 Nov 2026) | [discovery-hunts](discovery-hunts.md) |
-| Q-488 | Discovery hunts R-1: SPHEREx is the characterisation layer, | Decided | [discovery-hunts](discovery-hunts.md) |
-| Q-489 | Discovery hunts R-2: Datasets | Decided | [discovery-hunts](discovery-hunts.md) |
-| Q-490 | Discovery hunts R-3: H4 candidates | Decided | [discovery-hunts](discovery-hunts.md) |
-| Q-491 | Discovery hunts R-4: Export first | Decided | [discovery-hunts](discovery-hunts.md) |
-| Q-492 | Discovery hunts R-5: Calibration | Decided | [discovery-hunts](discovery-hunts.md) |
-| Q-493 | Discovery hunts R-6: No silent caps | Decided | [discovery-hunts](discovery-hunts.md) |
-| Q-494 | Discovery hunts R-7: H6 lenses removed | Decided (settles PD-9, which asked whether lenses stay in "Good chance" or move to "Possible") | [discovery-hunts](discovery-hunts.md) |
-| Q-495 | Discovery hunts R-8: No learning mode | Decided (settles PD-7, which asked which hunts the picker ticks by default | [discovery-hunts](discovery-hunts.md) |
-| Q-496 | Discovery hunts R-9: Time estimate | Decided | [discovery-hunts](discovery-hunts.md) |
-| Q-497 | Discovery hunts R-10: Coverage | Decided (settles PD-8, which marked a square done when every ticked hunt had finished it) | [discovery-hunts](discovery-hunts.md) |
-| Q-498 | Discovery hunts R-11: Measured only | Decided | [discovery-hunts](discovery-hunts.md) |
-| Q-499 | Discovery hunts R-12: Ask first | Decided | [discovery-hunts](discovery-hunts.md) |
-| Q-500 | Discovery hunts R-13: Mock-up section 5 cut | Decided (19 Nov) | [discovery-hunts](discovery-hunts.md) |
-| Q-501 | Discovery hunts R-14: Pairs on the results card | Decided (19 Nov) | [discovery-hunts](discovery-hunts.md) |
-| Q-502 | Discovery hunts R-15: Gate labels | Decided (19 Nov) | [discovery-hunts](discovery-hunts.md) |
-| Q-503 | Discovery hunts R-16: H8's route to Validated | Decided (19 Nov) | [discovery-hunts](discovery-hunts.md) |
-| Q-504 | Discovery hunts R-17: Offline plan | Decided (19 Nov) | [discovery-hunts](discovery-hunts.md) |
-| Q-505 | Discovery hunts R-18: Pause with two lanes | Decided (19 Nov) | [discovery-hunts](discovery-hunts.md) |
-| Q-506 | Discovery hunts R-19: Bundle and Measured only | Decided (19 Nov) | [discovery-hunts](discovery-hunts.md) |
-| Q-507 | Discovery hunts R-20: H4 known-object match | Decided (19 Nov) | [discovery-hunts](discovery-hunts.md) |
-| Q-508 | Discovery hunts R-21: Injected badge | Decided (19 Nov) | [discovery-hunts](discovery-hunts.md) |
-| Q-509 | Discovery hunts R-22: Calibration cost cap for version 1 | Decided (19 Nov) | [discovery-hunts](discovery-hunts.md) |
-| Q-510 | Discovery hunts R-23: First H4 error model | Decided (19 Nov) | [discovery-hunts](discovery-hunts.md) |
-| Q-511 | Discovery hunts R-24: Multi-day linking, the orbit fit and stacking (stages D and E) move to release 2 | Decided (19 Nov) | [discovery-hunts](discovery-hunts.md) |
-| Q-512 | Discovery hunts R-25: Held-out years | Decided (19 Nov) | [discovery-hunts](discovery-hunts.md) |
-| Q-513 | Discovery hunts R-26: Download budget enforced before the run | Decided (19 Nov) | [discovery-hunts](discovery-hunts.md) |
-| Q-514 | Discovery hunts R-27: Release 1 minimum | Decided (19 Nov) | [discovery-hunts](discovery-hunts.md) |
-| Q-515 | Discovery hunts R-28: Hubble and JWST archives | Decided (19 Nov) | [discovery-hunts](discovery-hunts.md) |
+| Q-488 | Discovery hunts R-1: SPHEREx is the characterisation layer | Decided (Moon, 18 Nov 2026) | [discovery-hunts](discovery-hunts.md) |
+| Q-489 | Discovery hunts R-2: Datasets | Decided (Moon, 18 Nov 2026) | [discovery-hunts](discovery-hunts.md) |
+| Q-490 | Discovery hunts R-3: H4 candidates | Decided (Moon, 18 Nov 2026); wording corrected and confirmed by Atish (code owner), 20 Nov 2026 | [discovery-hunts](discovery-hunts.md) |
+| Q-491 | Discovery hunts R-4: Export first | Decided (Moon, 18 Nov 2026) | [discovery-hunts](discovery-hunts.md) |
+| Q-492 | Discovery hunts R-5: Calibration | Decided (Moon, 18 Nov 2026) | [discovery-hunts](discovery-hunts.md) |
+| Q-493 | Discovery hunts R-6: No silent caps | Decided (Moon, 18 Nov 2026) | [discovery-hunts](discovery-hunts.md) |
+| Q-494 | Discovery hunts R-7: H6 lenses removed | Decided (Moon, 18 Nov 2026); settles PD-9, which asked whether lenses stay in "Good chance" or move to "Possible" | [discovery-hunts](discovery-hunts.md) |
+| Q-495 | Discovery hunts R-8: No learning mode | Decided (Moon, 18 Nov 2026); settles PD-7, which asked which hunts the picker ticks by default | [discovery-hunts](discovery-hunts.md) |
+| Q-496 | Discovery hunts R-9: Time estimate | Decided (Moon, 18 Nov 2026) | [discovery-hunts](discovery-hunts.md) |
+| Q-497 | Discovery hunts R-10: Coverage | Decided (Moon, 18 Nov 2026); settles PD-8, which marked a square done when every ticked hunt had finished it | [discovery-hunts](discovery-hunts.md) |
+| Q-498 | Discovery hunts R-11: Measured only | Decided (Moon, 18 Nov 2026) | [discovery-hunts](discovery-hunts.md) |
+| Q-499 | Discovery hunts R-12: Ask first | Decided (Moon, 18 Nov 2026) | [discovery-hunts](discovery-hunts.md) |
+| Q-500 | Discovery hunts R-13: Mock-up section 5 cut | Decided (Moon, 19 Nov 2026) | [discovery-hunts](discovery-hunts.md) |
+| Q-501 | Discovery hunts R-14: Pairs on the results card | Decided (Moon, 19 Nov 2026) | [discovery-hunts](discovery-hunts.md) |
+| Q-502 | Discovery hunts R-15: Gate labels | Decided (Moon, 19 Nov 2026) | [discovery-hunts](discovery-hunts.md) |
+| Q-503 | Discovery hunts R-16: H8's route to Validated | Decided (Moon, 19 Nov 2026); wording corrected and confirmed by Atish (code owner), 20 Nov 2026 | [discovery-hunts](discovery-hunts.md) |
+| Q-504 | Discovery hunts R-17: Offline plan | Decided (Moon, 19 Nov 2026) | [discovery-hunts](discovery-hunts.md) |
+| Q-505 | Discovery hunts R-18: Pause with two lanes | Decided (Moon, 19 Nov 2026); wording corrected and confirmed by Atish (code owner), 20 Nov 2026 | [discovery-hunts](discovery-hunts.md) |
+| Q-506 | Discovery hunts R-19: Bundle and Measured only | Decided (Moon, 19 Nov 2026) | [discovery-hunts](discovery-hunts.md) |
+| Q-507 | Discovery hunts R-20: H4 known-object match | Decided (Moon, 19 Nov 2026) | [discovery-hunts](discovery-hunts.md) |
+| Q-508 | Discovery hunts R-21: Injected badge | Decided (Moon, 19 Nov 2026) | [discovery-hunts](discovery-hunts.md) |
+| Q-509 | Discovery hunts R-22: Calibration cost cap for version 1 | Decided (Moon, 19 Nov 2026) | [discovery-hunts](discovery-hunts.md) |
+| Q-510 | Discovery hunts R-23: First H4 error model | Decided (Moon, 19 Nov 2026) | [discovery-hunts](discovery-hunts.md) |
+| Q-511 | Discovery hunts R-24: Multi-day linking, the orbit fit and stacking (stages D and E) move to release 2 | Decided (Moon, 19 Nov 2026); wording corrected and confirmed by Atish (code owner), 20 Nov 2026 | [discovery-hunts](discovery-hunts.md) |
+| Q-512 | Discovery hunts R-25: Held-out years | Decided (Moon, 19 Nov 2026) | [discovery-hunts](discovery-hunts.md) |
+| Q-513 | Discovery hunts R-26: Download budget enforced before the run | Decided (Moon, 19 Nov 2026) | [discovery-hunts](discovery-hunts.md) |
+| Q-514 | Discovery hunts R-27: Release 1 minimum | Decided (Moon, 19 Nov 2026) | [discovery-hunts](discovery-hunts.md) |
+| Q-515 | Discovery hunts R-28: Hubble and JWST archives | Decided (Moon, 19 Nov 2026) | [discovery-hunts](discovery-hunts.md) |
 | Q-516 | Discovery hunts R-51: Second controls for R-31 | Decided (Atish, code owner, 20 Nov 2026) | [discovery-hunts](discovery-hunts.md) |
 | Q-517 | Discovery hunts R-52: Ambiguous pairs | Decided (Atish, code owner, 20 Nov 2026) | [discovery-hunts](discovery-hunts.md) |
 | Q-518 | Discovery hunts R-53: Stale gate | Decided (Atish, code owner, 20 Nov 2026) | [discovery-hunts](discovery-hunts.md) |
 | Q-519 | Discovery hunts R-54: Bundle release split | Decided (Atish, code owner, 20 Nov 2026) | [discovery-hunts](discovery-hunts.md) |
-| Q-520 | Discovery hunts PD-3: Rates on the row card | Decided (Moon, 19 Nov 2026) | [discovery-hunts](discovery-hunts.md) |
+| Q-520 | Discovery hunts PD-3: Rates on the row card | Decided (Moon, 19 Nov 2026); wording corrected and confirmed by Atish (code owner), 20 Nov 2026 | [discovery-hunts](discovery-hunts.md) |
 | Q-521 | Discovery hunts PD-5: Tag boundary | Decided (Moon, 19 Nov 2026) | [discovery-hunts](discovery-hunts.md) |
 | Q-522 | Discovery hunts PD-6: The selection label drops its time estimate once hunts exist | Decided (Moon, 19 Nov 2026) | [discovery-hunts](discovery-hunts.md) |
 | Q-523 | Discovery hunts PD-11: Contract | Decided (Moon, 19 Nov 2026) | [discovery-hunts](discovery-hunts.md) |
-| Q-524 | Discovery hunts PD-12: Two lanes | Decided (Moon, 19 Nov 2026) | [discovery-hunts](discovery-hunts.md) |
+| Q-524 | Discovery hunts PD-12: Two lanes | Decided (Moon, 19 Nov 2026); Kevin to confirm feasibility in HN-1 | [discovery-hunts](discovery-hunts.md) |
 | Q-525 | Discovery hunts PD-13: Wording | Decided (Moon, 19 Nov 2026) | [discovery-hunts](discovery-hunts.md) |
 | Q-526 | Discovery hunts PD-14: H4 first | Decided (Moon, 19 Nov 2026) | [discovery-hunts](discovery-hunts.md) |
 | Q-527 | Discovery hunts PD-15: Owners of the tickets in A22.12 | Decided (Moon, 19 Nov 2026), under D-17 | [discovery-hunts](discovery-hunts.md) |
