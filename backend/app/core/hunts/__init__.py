@@ -1,0 +1,1 @@
+"""Discovery hunts (A22)."""

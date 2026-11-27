@@ -522,6 +522,21 @@ export type RunId = string;
 export type RunSquareState = 'todo' | 'running' | 'done' | 'skipped' | 'failed';
 export type RunState = 'queued' | 'running' | 'paused' | 'done' | 'stopped' | 'failed';
 export type RunTime = AreaUtcTime | null;
+export type HuntId =
+  | 'variables'
+  | 'cold_worlds'
+  | 'asteroids'
+  | 'runaways'
+  | 'ir_excess'
+  | 'dimmers'
+  | 'active_asteroids'
+  | 'slow_movers'
+  | 'transients'
+  | 'dark_companions';
+/**
+ * GET /v1/hunts (A22.7.1, issue #221): the static register of the Discovery hunts.
+ */
+export type HuntRegister = HuntEntry[];
 
 /**
  * Bundle root: exists only so that every schema compiles into this one file.
@@ -544,6 +559,7 @@ export interface ContractSchemas {
   run: Run;
   runList: RunList;
   runResults: RunResults;
+  huntRegister: HuntRegister;
 }
 /**
  * What is known about one object (R3.2). Served by GET /v1/objects/{id}/card (D-16). Single source of the contract (D-18).
@@ -1719,6 +1735,32 @@ export interface RunResultsProvenance {
   merge: AreaProvenanceEntry;
   known_positions: AreaProvenanceEntry;
   track_positions: AreaProvenanceEntry;
+}
+export interface HuntEntry {
+  id: HuntId;
+  title: string;
+  summary: string;
+  kind: 'search' | 'characterisation' | 'context';
+  level: 'validated' | 'characterisation' | 'experimental' | 'context';
+  weight: 'light' | 'heavy';
+  version: string;
+  releases: string[];
+  routes: HuntRoute[];
+  availability: HuntAvailability;
+  calibration: HuntCalibrationRef | null;
+}
+export interface HuntRoute {
+  id: string;
+  url: string;
+  verified_at: string;
+}
+export interface HuntAvailability {
+  state: 'available' | 'disabled';
+  reason?: string;
+}
+export interface HuntCalibrationRef {
+  id: string;
+  measured_at: string;
 }
 
 export const TAGS: readonly Tag[] = [

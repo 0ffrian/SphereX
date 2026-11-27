@@ -95,6 +95,11 @@ MODELS: dict[str, type[BaseModel]] = {
 }
 
 
+# The hunt register's root is an array, so its generated type is an alias, not a model
+# (tests/test_hunt_register.py validates the reply against it).
+ALIAS_SCHEMAS = ["hunt-register"]
+
+
 def _tagged(node: Any) -> Iterator[dict[str, Any]]:
     """Every tagged value (TV) inside a card or params object."""
     if isinstance(node, list):
@@ -131,7 +136,7 @@ def _is_provenance_rule(case: dict[str, Any]) -> bool:
 
 
 def test_schemas_are_valid_draft7() -> None:
-    assert sorted(SCHEMAS) == sorted(MODELS)
+    assert sorted(SCHEMAS) == sorted([*MODELS, *ALIAS_SCHEMAS])
     for schema in SCHEMAS.values():
         jsonschema.Draft7Validator.check_schema(schema)
 

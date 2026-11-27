@@ -7,6 +7,7 @@ The data contract, shared by the backend and the frontend ([D-18](../docs/decisi
 - `schemas/object-card.schema.json`: ObjectCard and the types it uses: `Tag`, `ObjectType`, the tagged values ([rendering doc R3.1, R3.2](../docs/rendering/data-contract.md))
 - `schemas/render-params.schema.json`: RenderParams (R3.4), `VisibleMode` (D-23) and `HapticProfile` (R8.8). It refers to the card schema for the shared types
 - `schemas/area-*.schema.json`: the six Area search replies of [A17.8](../docs/architecture/moving-objects/area-contract.md#a178-endpoints) (issue #92, shape choices in [Q-208](../docs/decisions/moving-objects.md)); see [Area search](#area-search-schemas-and-fixtures) below
+- `schemas/hunt-register.schema.json`: the Discovery hunt register, `GET /v1/hunts` ([A22.7.1](../docs/architecture/discovery-hunts.md#a2271-endpoints); issue #221, [Q-529](../docs/decisions/discovery-hunts.md))
 - `schemas/track-path.schema.json`: the Track path reply `GET /v1/objects/{id}/path` ([A19.5](../docs/architecture/moving-objects/track.md#a195-path-endpoint), [A19.13](../docs/architecture/moving-objects/track-contract.md#a1913-contract); issue #74); see [Track](#track-fixture) below
 
 They are JSON Schema **draft-07**, the draft that both generators and both validators handle fully. `schemas/` is the single source: never edit the generated code. After changing a schema, run one command per side and commit the result:
