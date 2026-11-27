@@ -1,6 +1,6 @@
 # Data sources
 
-> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A3–A3.5 · **Implements:** [D-19, D-25, D-31](../decisions/data-sources.md), [Q-137](../decisions/scope-process.md), [Q-138, Q-141, Q-148](../decisions/moving-objects.md), [Q-21, Q-125, Q-126](../decisions/moving-frames.md), [Q-151, Q-152](../decisions/catalogue-values.md), [Q-378](../decisions/physics-fixes.md) · **Read with:** [object-sources.md](object-sources.md) (A3.6–A3.11, A3.13), [targets.md](targets.md) (A3.12), [pipeline.md](pipeline.md) (A4.1, A4.2)
+> **Part of:** Architecture spec ([index](README.md)) · **Sections:** A3–A3.5 · **Implements:** [D-19, D-25, D-31](../decisions/data-sources.md), [Q-137](../decisions/scope-process.md), [Q-138, Q-141, Q-148](../decisions/moving-objects.md), [Q-21, Q-125, Q-126](../decisions/moving-frames.md), [Q-151, Q-152](../decisions/catalogue-values.md), [Q-378](../decisions/physics-fixes.md) · **Read with:** [object-sources.md](object-sources.md) (A3.6–A3.11, A3.13), [targets.md](targets.md) (A3.12), [irsa-catalogues.md](irsa-catalogues.md) (A3.3.1), [pipeline.md](pipeline.md) (A4.1, A4.2)
 
 ## A3 Data sources
 
@@ -9,6 +9,7 @@ Only the attributes listed are fetched. All checks below were run on 4 Nov 2026 
 | Sections | Sources | File |
 |---|---|---|
 | A3.1 to A3.5 | SPHEREx, Gaia, WISE, Horizons, SkyBoT (frames and positions) | this file |
+| A3.3.1 | IRSA table and column names for CatWISE2020, AllWISE, 2MASS | [irsa-catalogues.md](irsa-catalogues.md) |
 | A3.6 to A3.11 | SBDB, DAMIT, Exoplanet Archive, unused services, SIMBAD and shape models, sky background | [object-sources.md](object-sources.md) |
 | A3.12 | Test and demo targets, full-cache counts | [targets.md](targets.md) |
 | A3.13 | Literature registry (`literature.toml`) | [object-sources.md](object-sources.md#a313-literature-registry-literaturetoml) |
@@ -71,6 +72,8 @@ Only the attributes listed are fetched. All checks below were run on 4 Nov 2026 
 | Use | Diameter and albedo. Take these through the JPL Small-Body Database for now. |
 | Source catalogue (overlays, issue #12) | "WISE/NEOWISE sources" are served from **CatWISE2020** (`catwise_2020` on IRSA TAP, sync, CSV), which combines WISE and NEOWISE epochs (Q-51). Checked live 6 Nov 2026 (`TAP_SCHEMA.columns`): `ra_pm`/`dec_pm` are positions at MJD 57170 from the PSF fit with motion; `pmra`/`pmdec` are apparent motions in arcsec/yr (relative, not absolute, noisy for faint sources); `w1mpro_pm` is the W1 profile-fit magnitude. A 0.03° cone answered in about 17 s. Columns: `source_name, ra_pm, dec_pm, pmra, pmdec, w1mpro_pm`; the cone is applied to `ra`/`dec`, brightest W1 first, at most 5000 rows (`overlay:wise:truncated`); a row without `ra_pm`/`dec_pm` is dropped. Whether `pmra` includes cos δ is **[verify]**. **CatWISE2020 has no rows within at least 3′ of R Draconis** (checked live 6 Nov 2026: a box and a cone both return 0, while AllWISE returns sources there), so that target shows no WISE markers (Q-51). AllWISE and the NEOWISE single-exposure table are not used. Used by [A4.9](overlays.md#a49-overlays-flag-mask-and-combine). |
 
+**IRSA tables and columns (checked 25–26 Nov 2026, #192):** the table and column names, units and ADQL for CatWISE2020, AllWISE and 2MASS are in [A3.3.1](irsa-catalogues.md#a331-irsa-tables-and-columns-catwise2020-allwise-and-2mass).
+
 ### A3.4 JPL Horizons
 
 | Item | Detail |
@@ -83,6 +86,20 @@ Only the attributes listed are fetched. All checks below were run on 4 Nov 2026 
 | Use | Position over time for any moving object. Also the phase angle used for lighting (rendering doc §5.1). |
 | Comets (issue #68, Q-151, amends Q-62) | **Tested 9 Nov 2026** (67P, SPK-ID 1000012). A comet seen on several apparitions has one orbit record per apparition, so `COMMAND='DES=1000012;'` answers with the small-body index table and no `$$SOE` block ("Horizons result has no ephemeris block"). The `CAP` flag (closest apparition) selects one record: `COMMAND='DES=1000012;CAP;'` returns the ephemeris (Horizons API documentation: `DES=141P;CAP`). Bare `CAP;` means "last apparition before the current date" (Horizons manual), so the backend sends `CAP<JD` with the whole JD of the requested epoch (`DES=1000012;CAP<2461358;`, Q-167). It also works for a comet with a single record (C/2025 N1). An asteroid has no apparitions and `CAP` finds no match (`DES=20000433;CAP;` fails), so the backend adds it only when SBDB `kind` starts with `c` (`horizons.command`). |
 | Lighting | **Tested 7 Nov 2026** (433 Eros). Observer ephemeris with `QUANTITIES='1,24'` and `CENTER='500@-163182'` (SPHEREx) adds the S-T-O phase angle; `EPHEM_TYPE=VECTORS`, `CENTER='500@10'`, `REF_PLANE=FRAME` gives the heliocentric ICRF vector, so the Sun direction is `-r/\|r\|`. Both are taken at the resolve epoch and the geocentre is the fallback if Horizons has no SPHEREx ephemeris (Q-62). Phase angle is tagged `measured` (R5.1), the Sun vector `derived`. The path is tagged `model_dependent` (Q-134, Q-141) although both come from the same orbit solution; one rule for Horizons-derived tags is still to decide (Q-62 item 4; conflict: [Q-201](../decisions/contract-tags.md)). |
+
+**Horizons quantities for tail angles and position uncertainty (checked 25 Nov 2026, #198; resolves V12 of [A22.14](discovery-hunts.md#a2214-open-items-and-items-to-verify)).** Codes and meanings come from the Horizons manual (Observer Table Quantities, ssd.jpl.nasa.gov/horizons/manual.html); the column names and units from one real reply for 433 Eros, seen from SPHEREx, on 20 Mar 2026. This records facts only: it chooses no cut for H4 or H5 and changes no adapter (`horizons.py` asks for `1`, `1,24` and `1,36`; never 27, 37 or 38).
+
+| Quantity | Columns in the reply | Unit and meaning |
+|---|---|---|
+| 27 | `PsAng`, `PsAMV` | deg. Position angle, counter-clockwise (east) from the reference-frame north pole, in the observer's plane of sky, of the extended Sun-to-target vector (`PsAng`, the anti-sunward direction, a gas tail) and of the negative heliocentric velocity vector (`PsAMV`, a dust tail). Small bodies only. |
+| 36 | `RA_3sigma`, `DEC_3sigma` | arcsec. Formal ±3σ around the nominal position. |
+| 37 | `SMAA_3sig`, `SMIA_3sig`, `Theta`, `Area_3sig` | arcsec, arcsec, deg, arcsec². Semi-major and semi-minor axes of the 3σ error ellipse in the plane of sky; `Theta` is clockwise from increasing RA, toward increasing Dec, to the major axis; area of the ellipse. |
+| 38 | `POS_3sigma` | arcsec. Root-sum-of-squares of the ellipse's two semi-axes: one circular radius that encloses the ellipse. |
+
+- **Query used (25 Nov 2026).** `https://ssd.jpl.nasa.gov/api/horizons.api` with `format=json`, `COMMAND='DES=20000433;'`, `OBJ_DATA='NO'`, `MAKE_EPHEM='YES'`, `EPHEM_TYPE='OBSERVER'`, `CENTER='500@-163182'`, `TLIST_TYPE='JD'`, `TIME_TYPE='UT'`, `TLIST='2461119.856750'` (answered as 2026-Mar-20 08:33:43.200 UT), `QUANTITIES='1,27,36,37,38'`, `ANG_FORMAT='DEG'`, `CSV_FORMAT='YES'`, `EXTRA_PREC='YES'`: the same parameters `_observer_params` in `horizons.py` builds.
+- **Reply.** Header: `Date__(UT)__HR:MN:SC.fff, , , R.A.___(ICRF), DEC____(ICRF), PsAng, PsAMV, RA_3sigma, DEC_3sigma, SMAA_3sig, SMIA_3sig, Theta, Area_3sig, POS_3sigma,`. Row: `2026-Mar-20 08:33:43.200, , , 90.748069927, 13.559122752, 90.069, 299.480, 0.014, 0.017, 0.019, 0.012, -62.036, 0.0007108, 0.022,`. Eros is very well determined: Eros's hundredths-of-an-arcsecond uncertainties aren't representative for H4's match radius.
+- **Traps.** Two empty flag columns follow the date, and every row ends with a comma. The values are ±3σ, not 1σ. Horizons says the uncertainties are formal: they assume random observation errors and can be optimistic far from the solution epoch or for objects with close planetary encounters. Horizons returns `n.a.` when a quantity isn't available (e.g. uncertainties for an object with no covariance **[verify]**). This matters for H4; `parse_sigma` already maps it to `None`.
+- These values are tagged `model_dependent` when used ([A19.9](moving-objects/track-contract.md#a199-export)).
 
 ### A3.5 IMCCE SkyBoT
 

@@ -8,7 +8,7 @@ Project: **Shift & Spectrum**, a public web tool for NASA Space Apps 2026 (Port 
 |---|---|
 | [docs/decisions/](docs/decisions/README.md) | **Wins over every other doc** where it states a decision. Load the index (`README.md`: every D-/Q- entry and its topic file), then only the topic files (`docs/decisions/<topic>.md`) that the task's routing row names. |
 | [docs/rendering/](docs/rendering/README.md) | Source of truth for how an object is **displayed**, how its **surface is generated**, and how it **sounds** (audio pairing, the flyover soundscape and weather, R13). Haptics were cut by D-39. Sections `R0`–`R13`. |
-| [docs/architecture/](docs/architecture/README.md) | Source of truth for everything else: data sources, pipeline, tiers, plan, risks. Sections `A1`–`A21` (Track and Area search A16–A20 in `moving-objects/`, app shell A21). Terms: [glossary](docs/architecture/glossary.md) (A15). |
+| [docs/architecture/](docs/architecture/README.md) | Source of truth for everything else: data sources, pipeline, tiers, plan, risks. Sections `A1`–`A22` (Track and Area search A16–A20 in `moving-objects/`, app shell A21, Discovery hunts A22). Terms: [glossary](docs/architecture/glossary.md) (A15). |
 | [docs/uml/](docs/uml/README.md) | Architecture diagrams (UML, Mermaid). Keep in sync when a spec changes. |
 | [docs/handover.md](docs/handover.md) | Background only (competition, data, early concepts). Not a spec. |
 | [docs/design-language.md](docs/design-language.md) | **Look and feel of every screen** (D-38): tokens, Inter, radii, controls (Animate UI), motion. Wins over the mock-up for looks. Load the `sx-design-language` skill before any UI work. |
@@ -81,7 +81,7 @@ The team builds from 5 Nov 2026 (decisions D-14), setting aside the event rule a
 ## Layout
 
 ```
-docs/       decisions/ (index + topic files), architecture/ (A1–A21; moving-objects/ holds A16–A20),
+docs/       decisions/ (index + topic files), architecture/ (A1–A22; moving-objects/ holds A16–A20),
             rendering/ (R0–R12), uml/
 mockup/     single-file HTML mock-ups, not the app
   spherex-ui.html       app shell and tools (three.js r128), incl. Area search (mock-up tool 5),

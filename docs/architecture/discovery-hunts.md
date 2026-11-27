@@ -5,7 +5,7 @@
 **Status: proposal, revised 20 Nov 2026, not built.** First written on 17 Nov 2026. Revised on 18, 19 and 20 Nov 2026 after Atish's reviews on PR #182 (the 20 Nov revision is Atish's third review, applied as corrections) (three comments: findings per hunt, credit routes checked one by one, sizes, calibration, twelve citations to correct). Moon took twelve decisions on the first review (R-1 to R-12) answered the rest on the re-review (R-13 to R-28, and the PD rows), and improved them from the literature (R-29 to R-49, with R-50 a process note; all in [A22.15](#a2215-decisions)) and changed the tool's purpose: **it is a scientific tool meant for research**, not an outreach tool. Three things are still needed before any code:
 
 1. **Moon approves the revised mock-up** (UI needs an approved mock-up before it is built).
-2. **The decisions in [A22.15](#a2215-decisions) get their `D-` and `Q-` rows** in `docs/decisions/`. This PR holds two files only (this spec and the mock-up), so the decision index, the section map in [README.md](README.md), the routing table in `docs/README.md` and the UML are **not** updated here. Run `/sx-spec-sync` after approval. Until then "A22" is a proposed number and nothing else in the docs links here.
+2. **The decisions in [A22.15](#a2215-decisions) get their `D-` and `Q-` rows** in `docs/decisions/`. **Done by HN-0 (issue #203, 26 Nov 2026) for R-0 to R-28, R-51 to R-54 and the PD rows:** they are Q-487 to Q-528 in [discovery-hunts](../decisions/discovery-hunts.md), and the section map in [README.md](README.md) and the routing table in `docs/README.md` now list A22. **Still to do:** R-29 to R-49 (they wait for V37, #195) and the UML (a component diagram and a sequence for a run with hunts).
 3. **Every item marked [verify]** is checked against the real service or paper ([A22.14](#a2214-open-items-and-items-to-verify)), and the outside contacts of R-12 are made.
 
 Labels follow the architecture spec: **Tested** (we ran it), **Documented** (a primary source says so), **To build**, **Proposed** (a choice waiting for a decision), **Decided (R-n)** (Moon, 18 Nov 2026), **[verify]** (seen only in a search result, a preprint or a secondary source, or not checked at all). *(estimate)* marks a reviewer's own arithmetic.
@@ -334,8 +334,8 @@ Sources this spec adds to [A3](data-sources.md) (to move there when the spec is 
 | **ATLAS** | Forced photometry at a position. | ATLAS forced-photometry server | H7 (history) | **[verify]** access terms |
 | **TESS** | Light curves: SPOC 2-minute and 20-second, TESS-SPOC and QLP (from full-frame images), TGLC (crowded fields). Pixel cutouts (TESScut) for candidates. TESS Input Catalog v8.2. Pixel 21″. | MAST (astroquery, lightkurve); AWS open-data copy | H3; confirmation for H1 | Product names Documented at MAST; per-patch size **[verify by a real query]** |
 | **Kepler / K2** | Long light curves where the patch overlaps. | MAST | H3 | Documented |
-| **WISE / NEOWISE** | CatWISE2020 (1.89 billion sources; W1 and W2; motions from 2010 to 2018). AllWISE (W1 to W4, 3.4, 4.6, 12 and 22 µm; W4 beam about 12″). unTimely catalogue and time-resolved unWISE coadds (about 16 epochs per band, to 2020). | IRSA TAP (table names **[verify]**: `catwise_2020`, `allwise_p3as_psd`); unWISE cutout service (unwise.me) | H2, H9; masks for H4 | Documented ([Marocco et al. 2021](https://arxiv.org/abs/2012.13084), [Meisner et al. 2023](https://arxiv.org/abs/2209.14327)) |
-| **2MASS** | Point Source Catalog (J, H, Ks; 1998 to 2001). | IRSA TAP (`fp_psc` **[verify]**) | H2 (long baseline), H9 | Documented |
+| **WISE / NEOWISE** | CatWISE2020 (1.89 billion sources; W1 and W2; motions from 2010 to 2018). AllWISE (W1 to W4, 3.4, 4.6, 12 and 22 µm; W4 beam about 12″). unTimely catalogue and time-resolved unWISE coadds (about 16 epochs per band, to 2020). | IRSA TAP (tables `catwise_2020` and `allwise_p3as_psd`, checked 25 Nov 2026: [A3.3.1](irsa-catalogues.md#a331-irsa-tables-and-columns-catwise2020-allwise-and-2mass)); unWISE cutout service (unwise.me) | H2, H9; masks for H4 | Documented ([Marocco et al. 2021](https://arxiv.org/abs/2012.13084), [Meisner et al. 2023](https://arxiv.org/abs/2209.14327)) |
+| **2MASS** | Point Source Catalog (J, H, Ks; 1998 to 2001). | IRSA TAP (table `fp_psc`, checked 25 Nov 2026: [A3.3.1](irsa-catalogues.md#a331-irsa-tables-and-columns-catwise2020-allwise-and-2mass)) | H2 (long baseline), H9 | Documented |
 | **Gaia DR3** | `gaia_source` (positions, motions, parallaxes, RUWE, radial velocity for brighter stars), variability tables (10.5 million variables), `nss_two_body_orbit`, Bailer-Jones distances (`external.gaiaedr3_distance`). | ESA Gaia archive, TAP/ADQL (adapter exists) | H8, H10 (testing); masks, neighbours and matches for all | Documented |
 | **Gaia DR4** | 66 months of data. `epoch_astrometry` (about 130 billion rows, 62 TB in all), `nss_two_body_orbit` (about 5.9 million rows), radial-velocity tables. | ESA Gaia archive: orbit tables by TAP (`nss_two_body_orbit` about 2.7 GB in all); epoch astrometry by **DataLink** per source; DPAC's `bh_two_body_orbit` | H10 | Due **2 Dec 2026, about 12:00 CET** ([ESA](https://www.cosmos.esa.int/web/gaia/data-release-4)) |
 | **Legacy Surveys DR10** | Catalogues. | NOIRLab Astro Data Lab | visible-light check for H2 | **[verify]** |
@@ -343,7 +343,7 @@ Sources this spec adds to [A3](data-sources.md) (to move there when the spec is 
 | **Pan-STARRS, VHS, UKIDSS** | Visible and near-infrared catalogues. | MAST, ESO, WSA | H2 (reject ordinary stars), H7 (hosts) | Not researched in detail **[verify]** |
 | **IRAS 100 µm (IRIS or SFD dust maps)** | Galactic dust emission behind each H9 candidate. | IRSA (IRIS), or the SFD map through `dustmaps` | H9 (dust screen, R-46) | Decided (R-46); product and licence **[verify]** |
 | **Minor Planet Center** | Orbit file (MPCORB), ADES submission. | MPC downloads and submission service | H4, H5, H11 | Since Aug 2025 archive submitters must be verified and get a program code per observatory code ([newsletters Jul](https://www.minorplanetcenter.net/media/newsletters/MPC_Newsletter_Jul2025.pdf) and [Oct 2025](https://minorplanetcenter.net/media/newsletters/MPC_Newsletter_Oct2025.pdf); [program-codes policy](https://www.minorplanetcenter.net/mpcops/documentation/program-codes-policy/)). SPHEREx is not on the [SARC archive list](https://docs.minorplanetcenter.net/mpc-ops-docs/data-and-services/sarc/) and has no observatory code: ask (R-12) |
-| **JPL Horizons, SkyBoT** | Positions of known objects seen from SPHEREx (`500@-163182`, Q-138) or from the ground; Sun and velocity position angles. | As built | H4, H5 | Tested (as built) |
+| **JPL Horizons, SkyBoT** | Positions of known objects seen from SPHEREx (`500@-163182`, Q-138) or from the ground; Sun and velocity position angles. | As built | H4, H5 | Tested (as built); position angles: Tested 25 Nov 2026 (quantity 27, [A3.4](data-sources.md#a34-jpl-horizons)); not requested by the adapter yet |
 | **AAVSO VSX, ASAS-SN, Chen et al. 2020** | Known variable stars. The Chen et al. ZTF catalogue (781,602 periodic variables) is downloadable and can be shipped as a local cross-match table. | VSX query service; VizieR; Zenodo | H1, H7 | Documented ([Chen et al. 2020](https://arxiv.org/abs/2005.08662)); VSX API terms **[verify]** |
 | **Transient Name Server** | Public object list. | TNS | H7 | API key and terms for a public tool **[verify]** |
 | **TOI list, ExoFOP, NASA Exoplanet Archive** | Known planets and candidates. | Public tables (adapter exists for the archive) | H3 | Documented |
@@ -535,7 +535,7 @@ How to read them:
 - **Most accurate** is the best published method. **At home** is what we run on a gaming PC and what that costs in accuracy.
 - **Starting values** are first settings, all **Proposed**. They are tuned on the injection tests and controls ([A22.10](#a2210-calibration-and-proof)) and fixed per hunt version. None is a measured result.
 - **Published accuracy** is from the cited paper, not from our code. Ours is measured before a hunt returns candidates.
-- Catalogue column names and table names are as remembered from the archives' documentation and are all **[verify]** against the live schema in the ticket that builds the adapter (the rule against inventing fields).
+- The CatWISE2020, AllWISE and 2MASS names recorded in [A3.3.1](irsa-catalogues.md#a331-irsa-tables-and-columns-catwise2020-allwise-and-2mass) were checked against the live schema (V6). The other catalogue column names and table names are as remembered from the archives' documentation and are **[verify]** against the live schema in the ticket that builds the adapter (the rule against inventing fields).
 
 #### A22.9.1 H1 Variable and eclipsing stars
 
@@ -664,7 +664,7 @@ flowchart LR
 
 **At home.** CatWISE averages about 46,000 sources per square degree (about 4 million rows for 86 deg² without cuts); with the cuts in the query, a few MB; images are fetched for tens of survivors; the network is small enough for a CPU.
 
-**Open.** unWISE epoch range and cutout access; the template library's licence; the SPHEREx depth for a moving point source; table and column names.
+**Open.** unWISE epoch range and cutout access; the template library's licence; the SPHEREx depth for a moving point source; table and column names for VHS and UKIDSS. **Resolved (V6, checked 25–26 Nov 2026):** the CatWISE2020 and 2MASS names ([A3.3.1](irsa-catalogues.md#a331-irsa-tables-and-columns-catwise2020-allwise-and-2mass)).
 
 #### A22.9.3 H3 Single transits and strange dimmers (release 2)
 
@@ -835,7 +835,7 @@ Rocks at V 19 to 22 will mostly be invisible in single frames. Stages A1 to A3 a
 
 **At home.** Cutouts of a few hundred KB each; profile work on the CPU.
 
-**Open.** NOIRLab cutout access and limits; the exact Horizons quantities for the two angles; cutout size.
+**Open.** NOIRLab cutout access and limits; cutout size. **Resolved (V12, checked 25 Nov 2026):** the two predicted angles are Horizons quantity 27 ([A3.4](data-sources.md#a34-jpl-horizons)).
 
 #### A22.9.6 H6 Gravitational lenses: removed
 
@@ -906,6 +906,8 @@ Removed by R-7. Euclid DR1 (12 Nov 2026) shipped 15,072 high-confidence candidat
 | Models | Stellar model atmospheres **[verify grid and licence]** | download once | the photosphere |
 
 **Selection (Disk Detective's real cuts, [Kuchner et al. 2016](https://arxiv.org/abs/1607.05713)).** `w4snr` ≥ 10; W4 < W1 − 0.25 with the W1 − W4 excess significant at **5σ**; `w4rchi2` < 1.3; `w4nm` > 5; `na` = 0; `nb` = 1; exactly one 2MASS match within 3″; `cc_flags` clean in W1 and W4. RUWE below 1.4. All in the archive's query (R-6).
+
+**2MASS match radius [verify].** The column description of AllWISE `n_2mass` does not state its search radius ([A3.3.1](irsa-catalogues.md#a331-irsa-tables-and-columns-catwise2020-allwise-and-2mass)): the H9 ticket checks it before using it for "exactly one 2MASS match within 3″".
 
 **What we study.** Brightness by wavelength: the photosphere fitted to Gaia, 2MASS and SPHEREx below about 3 µm; the WISE excess at 12 and 22 µm; whether SPHEREx shows hot dust from 3 to 5 µm; whether the 3.3 µm feature of a galaxy is present. The 22 µm beam is about 12″ wide, so anything inside it can fake an excess.
 
@@ -1035,7 +1037,7 @@ Synthetic objects are added to **real** data, the unchanged hunt is run, and the
 - **Version 1 is capped (R-22).** 3 to 4 expected-S/N bins and one second-axis bin per hunt where the physics allows, on the shipped reference fields only, about 1,000 injections per field per hunt; the cost of each table (machine hours, downloads) is recorded in it. Finer grids come with later versions.
 - **On the user's own patch (R-5, release 2 per R-22).** `POST .../inject` runs the same injection on the run's own data and writes a calibration table tied to the run. The plan shows its time and download before it starts. Every planted object carries A16.5's **Injected** badge wherever it is drawn (R-21) and never enters the run's rows. The bundle then carries the patch's own completeness, which is what a paper needs.
 
-- **A fitted curve, not bins (R-29).** Completeness is fitted as a monotone curve in log expected S/N (a logistic, or the gamma CDF Kepler used in MES (Burke & Catanzarite 2017, KSCI-19111-002; Christiansen et al. 2020, [arXiv:2010.04796](https://arxiv.org/abs/2010.04796); the functional form **[verify]**)) by binomial maximum likelihood, with a bootstrap band. The 3 to 4 bins of R-22 stay as a goodness-of-fit check, drawn as points. Injections are concentrated where the curve rises, not spread evenly. Point intervals: Wilson or the equal-tailed Jeffreys interval for n ≤ 40, with Jeffreys's boundary modification at k = 0 and k = n (L(0) = 0, U(n) = 1, the other limit kept at α/2; check §4.1 before implementing); Wilson, Jeffreys or Agresti-Coull above 40. Clopper-Pearson only where guaranteed minimum coverage is required, since it is otherwise "wastefully conservative" ([Brown, Cai & DasGupta 2001](https://doi.org/10.1214/ss/1009213286), §4; corrected in Atish's third review). The project's 200 per bin is a precision choice, not a validity floor. A 3-parameter curve needing about 150 to 300 injections in the transition is an estimate to confirm by a small simulation in HN-4.
+- **A fitted curve, not bins (R-29).** Completeness is fitted as a monotone curve in log expected S/N (a logistic, or the gamma CDF Kepler used in MES (Burke & Catanzarite 2017, KSCI-19111-002; Christiansen et al. 2020, [arXiv:2010.04796](https://arxiv.org/abs/2010.04796); the functional form **[verify]**)) by binomial maximum likelihood, with a bootstrap band. The 3 to 4 bins of R-22 stay as a goodness-of-fit check, drawn as points. Injections are concentrated where the curve rises, not spread evenly. Point intervals: Wilson or the equal-tailed Jeffreys interval for n ≤ 40, with Jeffreys's boundary modification at k = 0 and k = n (L(0) = 0, U(n) = 1, the other limit kept at α/2; check §4.1 before implementing); Wilson, Jeffreys or Agresti-Coull above 40. Clopper-Pearson only where guaranteed minimum coverage is required, since it is otherwise "wastefully conservative" ([Brown, Cai & DasGupta 2001](https://doi.org/10.1214/ss/1009213286), §4; corrected in Atish's third review). The project's 200 per bin is a precision choice, not a validity floor. A 3-parameter curve needs about 150 to 300 injections per curve (the total, 80% of them in the rise), simulated in [A22.14](#a2214-open-items-and-items-to-verify) V36.
 - **Stale gates show (R-34).** A gate re-runs whenever an upstream input changes (data release, detrending, thresholds, control seeds), not only per version; a hash of those inputs is part of its label, so a stale gate is visible on the card. While its gate is stale a Validated hunt shows as **Experimental, "gate out of date"** until the gate re-runs (R-53). Kepler re-ran injection on its final pipeline version for DR25.
 
 #### A22.10.3 Purity
@@ -1143,6 +1145,69 @@ Wall-clock time is set mostly by archive download speed and by sharing archives 
 
 Per the pinned-versions rule, every library below gets an exact version in `backend/pyproject.toml` in the ticket that first needs it, after checking its licence and that it supports Python 3.12. Listed so reviewers know what is coming: `astroquery` (archives), `lightkurve` or direct MAST calls (TESS), `wotan` and `transitleastsquares` (H3), `batman-package` (transit models), `scikit-learn` (H1 classifier), `galpy` and `gaiadr3-zeropoint` (H8), `sbpy` (H4, H5), `heliolinx` (H4 linking) and an orbit fitter chosen per R-37 after the licence decision (H4), `xgboost` (H2, R-44), `dustmaps` (H9, R-46), `pyvo` (asynchronous TAP, DataLink), an RO-Crate writer such as `rocrate` (release 2, R-39), `mocpy` (coverage), the IVOA VOTable writer in `astropy`, SPIFF (H2), `photutils` (forced photometry, profiles), a GPU array library (`cupy` or `torch`), `pyarrow` (Parquet). Each is **[verify]**: name, licence, maintained, version.
 
+**Library facts, batch A: archives and data (checked 25 Nov 2026, #193).** Read from each library's PyPI JSON record (`https://pypi.org/pypi/<name>/json`) and its source repository on 25 Nov 2026. "Maintained" means a stable release in the last 12 months (since 25 Nov 2025). "Wheels" means a wheel for CPython 3.12 on Windows (`win_amd64`) and Linux (`manylinux` x86-64) is on PyPI for that version. This records facts only; it adds nothing to `backend/pyproject.toml` and chooses nothing (each hunt ticket does both).
+
+| Library (PyPI name) | Licence (SPDX) | Copyleft? | Newest stable, released | Wheels 3.12 Win / Linux | Maintained? (last release) | Source |
+|---|---|---|---|---|---|---|
+| `astroquery` | [BSD-3-Clause](https://github.com/astropy/astroquery/blob/main/LICENSE.rst) | No | 0.4.11, 20 Sep 2025 | Yes / Yes (one pure-Python wheel) | **No by the 12-month rule** (14 months; the repository is active, last push 24 Nov 2026) | [astropy/astroquery](https://github.com/astropy/astroquery) |
+| `pyvo` | [BSD-3-Clause](https://pypi.org/project/pyvo/) | No | 1.10.0, 4 Nov 2026 | Yes / Yes (pure Python) | Yes (4 Nov 2026) | [astropy/pyvo](https://github.com/astropy/pyvo) |
+| `mocpy` | [BSD-3-Clause](https://github.com/cds-astro/mocpy/blob/master/LICENSE) | No | 0.21.0, 27 Oct 2026 | Yes / Yes (`cp310-abi3`) | Yes (27 Oct 2026) | [cds-astro/mocpy](https://github.com/cds-astro/mocpy) |
+| `pyarrow` | [Apache-2.0](https://pypi.org/project/pyarrow/) | No | 26.0.1, 3 Nov 2026 | Yes / Yes (`cp312`) | Yes (3 Nov 2026) | [apache/arrow](https://github.com/apache/arrow) |
+| `photutils` | [BSD-3-Clause](https://pypi.org/project/photutils/) | No | 3.1.1, 16 Oct 2026 | Yes / Yes (`cp312-abi3`) | Yes (16 Oct 2026) | [astropy/photutils](https://github.com/astropy/photutils) |
+| `lightkurve` | [MIT](https://github.com/lightkurve/lightkurve/blob/main/LICENSE) | No | 2.6.0, 16 Apr 2026 | Yes / Yes (one pure-Python wheel) | Yes (16 Apr 2026) | [lightkurve/lightkurve](https://github.com/lightkurve/lightkurve) |
+| `dustmaps` | [GPL-2.0-only **OR** BSD-2-Clause](https://github.com/gregreen/dustmaps) (dual: `LICENSE.GPL-2.0` and `LICENSE.BSD-2-Clause`) | **Dual: usable under the BSD-2 option. Its dependency `healpy` is GPL-2.0-only** | 1.0.14, 4 Mar 2025 | Yes / Yes (one pure-Python wheel) | **No** (20 months; the repository was pushed 22 Oct 2026) | [gregreen/dustmaps](https://github.com/gregreen/dustmaps) |
+
+**Constraints and flags for the hunt tickets (batch A).**
+
+- **Copyleft, D-41.** Nothing in this batch is GPL itself, but **`dustmaps` requires `healpy` (GPL-2.0-only, [COPYING](https://github.com/healpy/healpy/blob/main/COPYING))** on a plain install, so a default install of `dustmaps` pulls GPL code in. Under D-41 that makes the H9 dust correction an optional plugin, or it needs a route that avoids `healpy`; the H9 ticket decides. The BSD-2 option of `dustmaps` itself does not remove the `healpy` dependency.
+- **Weak copyleft.** `tqdm` (MPL-2.0 AND MIT, file-level copyleft) is pulled in by `lightkurve` and `dustmaps`; it is not GPL and is only a flag.
+- **Not maintained by the 12-month rule: `astroquery` and `dustmaps`.** Both repositories are active, but their last stable releases are older than 12 months. The ticket that pins either re-checks the release date first.
+- **Dependency chain.** `astroquery` requires `pyvo>=1.5`, so the two are pinned together. `lightkurve` requires `astroquery`, `scikit-learn`, `pandas<3`, `bokeh`, `s3fs` and `matplotlib`, a heavy install; its `fbpca` dependency is declared only as "BSD License" on PyPI, with no SPDX id.
+- **Python 3.12 floor.** `photutils` 3.x requires Python >=3.12 and `numpy>=2`, and `pyarrow` 26 requires >=3.11. Both fit a 3.12 backend; the pinned `numpy` must satisfy `photutils`.
+- **Install.** All seven are on PyPI; none needs installing from source.
+
+**Library facts, batch B: science methods (checked 25 Nov 2026, #194).** Read from each library's PyPI JSON record (`https://pypi.org/pypi/<name>/json`) and its source repository on 25 Nov 2026. "Maintained" means a stable release in the last 12 months (since 25 Nov 2025). "Wheels" means a wheel for CPython 3.12 on Windows (`win_amd64`) and Linux (`manylinux` x86-64) is on PyPI for that version. This records facts only; it adds nothing to `backend/pyproject.toml` and chooses nothing (each hunt ticket does both).
+
+| Library (PyPI name) | Licence (SPDX) | Copyleft? | Newest stable, released | Wheels 3.12 Win / Linux | Maintained? (last release) | Source |
+|---|---|---|---|---|---|---|
+| `wotan` | [MIT](https://github.com/hippke/wotan/blob/master/LICENSE) | No | 2.1.1, 18 Nov 2026 | Yes / Yes (one pure-Python wheel) | Yes (18 Nov 2026) | [hippke/wotan](https://github.com/hippke/wotan) |
+| `transitleastsquares` | [MIT](https://github.com/hippke/tls/blob/master/LICENSE) | No | 2.3.0, 12 Nov 2026 | Yes / Yes (one pure-Python wheel) | Yes (12 Nov 2026) | [hippke/tls](https://github.com/hippke/tls) |
+| `batman-package` | [**GPL-3.0**](https://github.com/lkreidberg/batman/blob/master/LICENSE.txt) | **Yes (GPL-3.0)** | 2.5.3, 5 May 2025 | Yes / Yes (`cp312`, `win_amd64` and `manylinux_2_17_x86_64`; no sdist on PyPI) | **No** by the 12-month rule (18 months) | [lkreidberg/batman](https://github.com/lkreidberg/batman) |
+| `scikit-learn` | [BSD-3-Clause](https://pypi.org/project/scikit-learn/) | No | 1.9.1, 10 Sep 2026 | Yes / Yes (`cp312`) | Yes (10 Sep 2026) | [scikit-learn/scikit-learn](https://github.com/scikit-learn/scikit-learn) |
+| `galpy` | [BSD-3-Clause](https://github.com/jobovy/galpy/blob/main/LICENSE) | No | 1.12.1, 2 Nov 2026 | Yes / Yes (`cp312`, Linux x86-64 only) | Yes (2 Nov 2026) | [jobovy/galpy](https://github.com/jobovy/galpy) |
+| `gaiadr3-zeropoint` | [**LGPL-3.0-or-later**](https://gitlab.com/icc-ub/public/gaiadr3_zeropoint/-/blob/master/LICENSE) | **Yes (weak copyleft, LGPL)** | 0.1.0, 10 Jan 2025 | Yes / Yes (one pure-Python wheel) | **No** (22 months) | [gitlab.com/icc-ub/public/gaiadr3_zeropoint](https://gitlab.com/icc-ub/public/gaiadr3_zeropoint) |
+| `sbpy` | [BSD-3-Clause](https://github.com/NASA-Planetary-Science/sbpy/blob/main/LICENSE.rst) | No | 0.6.0, 2 Dec 2025 | **No wheel on PyPI** (source distribution only; pure Python, no compiled extension, so it installs on both without a compiler) | Yes (2 Dec 2025, just inside the 12 months: **it falls outside them after 2 Dec 2026** unless a newer release appears; the repository was pushed 14 May 2026) | [NASA-Planetary-Science/sbpy](https://github.com/NASA-Planetary-Science/sbpy) |
+| `xgboost` | [Apache-2.0](https://pypi.org/project/xgboost/) | No | 3.4.1, 15 Aug 2026 | Yes / Yes (`py3-none-win_amd64` and `py3-none-manylinux_2_28_x86_64`) | Yes (15 Aug 2026) | [dmlc/xgboost](https://github.com/dmlc/xgboost) |
+
+**Constraints and flags for the hunt tickets (batch B).**
+
+- **Copyleft, D-41.** `batman-package` is **GPL-3.0**: under D-41 it may only be an optional plugin the user installs, never in the default install. The transit-model step that needs it (H3) must either be a plugin or use a permissive model; the H3 ticket decides. `gaiadr3-zeropoint` is **LGPL-3.0-or-later**, a weak copyleft licence: it is not GPL, but D-41 does not mention LGPL (it allows GPL only as an optional plugin), so whether LGPL in the default install is acceptable is open: the H8 ticket ([#228](https://github.com/0ffrian/SphereX/issues/228)) asks Atish and records the answer as a `Q-` entry.
+- **Not maintained by the 12-month rule: `batman-package` and `gaiadr3-zeropoint`.** Their last releases are 18 and 22 months old. The H8 ticket re-checks `gaiadr3-zeropoint` before pinning, and the H3 ticket re-checks `batman-package`.
+- **Dependency licences.** No dependency of `wotan`, `transitleastsquares`, `scikit-learn`, `galpy`, `sbpy` or `xgboost` is GPL or LGPL. `tqdm` (MPL-2.0 AND MIT, file-level copyleft) is pulled in by `transitleastsquares`. On Linux, `xgboost` 3.4.1 requires `nvidia-nccl-cu13`, whose licence PyPI does not declare (an NVIDIA binary, not an open licence); check it before pinning `xgboost` on a Linux server.
+- **Heavy dependency.** `wotan` and `transitleastsquares` both require `numba` (BSD-2-Clause), which pins a range of `numpy` versions; the H3 ticket pins `numba` and `numpy` together.
+- **Python 3.12.** `scikit-learn` 1.9 requires Python >=3.11 and `xgboost` 3.4 requires >=3.12. Both fit a 3.12 backend.
+- **Install.** All eight are on PyPI and none needs a compiler. Only `sbpy` builds from source: it has only a source distribution, which `pip` builds locally.
+
+**Library facts, batch C: GPU, linking, crates and SPIFF (checked 26 Nov 2026, #195).** Same method and 12-month rule as batch A (a release since 26 Nov 2025). Read from PyPI JSON records and the source repositories; the hosts `pytorch.org`, `download.pytorch.org`, `zenodo.org`, `doi.org` and `arxiv.org` could not be reached from the session, so the rows marked **open** need a second pass. Nothing is added to `backend/pyproject.toml`.
+
+| Library (PyPI name) | Licence (SPDX) | Copyleft? | Newest stable, released | Wheels 3.12 Win / Linux | Maintained? (last release) | Source |
+|---|---|---|---|---|---|---|
+| `cupy` | [MIT](https://pypi.org/pypi/cupy/json) (LICENSE file not read) | No | 14.2.0, 20 Aug 2026 | **No / No**: PyPI holds only a source archive that needs the CUDA toolkit and a compiler | Yes (20 Aug 2026) | [cupy/cupy](https://github.com/cupy/cupy) |
+| `cupy-cuda12x` and `cupy-cuda13x` (the prebuilt CuPy) | [MIT](https://pypi.org/pypi/cupy-cuda12x/json) | No | 14.2.0, 20 Aug 2026 | Yes / Yes (`cp312-win_amd64`, `cp312-manylinux2014_x86_64`) | Yes (20 Aug 2026) | same repository |
+| `torch` | PyPI lists a combined expression (Apache-2.0, BSD-2-Clause, BSD-3-Clause, BSL-1.0, ISC, MIT, Zlib); the [repository LICENSE](https://raw.githubusercontent.com/pytorch/pytorch/main/LICENSE) is BSD-style | No for torch; NVIDIA wheels on Linux: terms not read | 2.15.0, 28 Oct 2026 (Python >=3.11) | Yes / Yes on PyPI (`cp312` `win_amd64` and `manylinux_2_28_x86_64`); **CPU-only and per-CUDA builds: open** | Yes (28 Oct 2026) | [pytorch/pytorch](https://github.com/pytorch/pytorch) |
+| `heliolinx` | [BSD-3-Clause](https://github.com/heliolinx/heliolinx) (LICENSE in that repository, detected by GitHub; PyPI metadata agrees) | No | 0.0.2, 25 Mar 2024 (the only release) | **Linux only** (`cp312-manylinux_2_24_x86_64`); no Windows wheel, so Windows builds the sdist with pybind11 (in `requires_dist`) and a C++ compiler (the C++14 level is not checked) | **No by the release rule** (last PyPI release 25 Mar 2024; no GitHub releases), but the repository is active (commit 20 Nov 2026) | [heliolinx/heliolinx](https://github.com/heliolinx/heliolinx), the repository R-37 already cites. `lsst-dm/heliolinc2` has no detectable licence and was last pushed in April 2024; it is not the source |
+| `rocrate` | [Apache-2.0](https://pypi.org/pypi/rocrate/json) | No | 0.16.0, 6 Oct 2026 | Yes / Yes (one pure-Python wheel) | Yes (6 Oct 2026) | [ResearchObject/ro-crate-py](https://github.com/ResearchObject/ro-crate-py) |
+| SPIFF | [MIT](https://github.com/jgagneastro/SPIFF) (LICENSE detected by the GitHub API) | No | No tag or release | **Not on PyPI**: `pip install "spiff @ git+https://github.com/jgagneastro/SPIFF.git"` or a clone with `pip install -e .` | **No by the release rule** (no tag or release); last commit 16 Jul 2026 | [jgagneastro/SPIFF](https://github.com/jgagneastro/SPIFF) |
+
+**Constraints and flags for the hunt tickets (batch C).**
+
+- **Name traps.** PyPI `spiff` (0.1.5, 2014, licence "UNKNOWN") is an unrelated project; never pin it. PyPI `thor` is an HTTP library, not the asteroid THOR.
+- **CuPy.** `pip install cupy` builds from source. The wheel route is `cupy-cuda12x` or `cupy-cuda13x`; the H-ticket names the one it needs and keeps the NumPy path as the reference (PD-16).
+- **heliolinx fails the release rule and has no Windows wheel, but the repository is active.** HN-12 decides between installing it from git (or building the sdist on Windows) and choosing another linker (R-37). The release-rule failure is a risk to raise in the A14.1 risk register or in HN-12.
+- **torch on Linux** pulls `nvidia-cudnn-cu13`, `nvidia-nccl-cu13`, `nvidia-nvshmem-cu13`, `nvidia-cusparselt-cu13` and `cuda-toolkit` (NVIDIA terms not read). No GPL or LGPL was found in the dependencies read; the licences of `sympy`, `networkx`, `jinja2`, `fsspec`, `filelock` and `setuptools` were not checked, nor were `triton~=3.9.0` and `cuda-bindings`.
+- **rocrate** depends on `requests`, `arcp` (Apache-2.0), `jinja2`, `python-dateutil` and `click`; no copyleft in what was read.
+- **SPIFF** bundles `spherex_templates.joblib` and `spherex_bins.csv` and states no separate licence for them; `spiff-lv2` needs live IRSA and S3 access. Its templates' own licence is that of the Zenodo records: Chen 2020 and the SPIFF Spectrophotometry Library are both CC-BY-4.0 (V26).
+
 ### A22.12 Plan, tickets and owners
 
 Owners follow D-17 and are to be confirmed. Each search hunt ticket ships its calibration and purity tables in the same ticket, and the hunt becomes **Validated** when its gate passes (R-27). **Release 1 minimum (R-27):** HN-0, HN-1, HN-2, HN-3, HN-4b, HN-5 and HN-6 (the core, the bundle, the H4 audit and H8); the other tickets follow in the order of the table. **Said plainly:** the calibration harness (HN-4) is not in this minimum, so the release 1 **minimum** ships **no Validated search hunt** (H1 and H2 become Validated only once HN-4, HN-8 and HN-9 land, still within release 1 per R-8); H4 known rocks is Characterisation and H8 stays Experimental. R-31 to R-33 (two controls, separate controls, the maximum-statistic threshold) raise the calibration cost above R-22's estimate; HN-4 re-estimates it before it starts. R-34's automatic gate re-runs need an owner and a runner, to be named in HN-4.
@@ -1202,13 +1267,13 @@ The first draft's research (17 Nov 2026) was at the level of search results and 
 | V3 | SPHEREx release facts | Resolved (checked 24 Nov 2026); see [A3.1](data-sources.md#a31-spherex-irsa) |
 | V4 | ZTF sizes and limits | Partly resolved: DR24 on 22 Jan 2026, HATS copy on 26 May 2026; API cones at most 10′, HATS above about 1,000 light curves. Patch sizes to measure. |
 | V5 | TESS per-patch sizes; FFI cadence for H11 | Open: real MAST calls |
-| V6 | IRSA table and column names for CatWISE2020, AllWISE, 2MASS | Open (Disk Detective's flag names are now cited) |
+| V6 | IRSA table and column names for CatWISE2020, AllWISE, 2MASS | Resolved (checked 25–26 Nov 2026); see [A3.3.1](irsa-catalogues.md#a331-irsa-tables-and-columns-catwise2020-allwise-and-2mass) |
 | V7 | unWISE epoch coverage and cutout access | Open |
 | V8 | Gaia DR4 access | Partly resolved: orbit tables by TAP (2.7 GB); epoch astrometry by DataLink; `bh_two_body_orbit` ships. Release-day check open. |
 | V9 | Euclid DR1 | Resolved and moot (H6 removed) |
 | V10 | Broker APIs | Partly resolved: Lasair token and limits, ALeRCE public. Region query endpoints open. |
 | V11 | NOIRLab: DECam cutouts and the Source Catalog; proprietary period | Open (release 2) |
-| V12 | Horizons quantities for tail angles and position uncertainty | Open |
+| V12 | Horizons quantities for tail angles and position uncertainty | Resolved (checked 25 Nov 2026): quantity 27 gives the two angles, quantities 36 to 38 the 3σ uncertainty; codes, columns, units and the query are in [A3.4](data-sources.md#a34-jpl-horizons) |
 | V27 | Rubin data rights for users in Mauritius | Open (images not used either way) |
 | V28 | ZTF-3 end date (31 Dec 2026) and what follows | Open |
 
@@ -1221,7 +1286,7 @@ The first draft's research (17 Nov 2026) was at the level of search results and 
 | V15 | VSX | Resolved: account, moderated one by one, no bulk channel |
 | V16 | TNS | Resolved: Galactic novae to CBAT; H7 is context only |
 | V29 | ExoFOP | Resolved: published candidates only since 19 Aug 2026 |
-| V30 | RNAAS terms and the AAS template licence | Partly resolved: free, editor-reviewed, about 72 h; template licence open |
+| V30 | RNAAS terms and the AAS template licence | Partly resolved: free, editor-reviewed, about 72 h; the AASTeX 7 template is under LPPL-1.3c ([AASJournals/AASTeX7](https://github.com/AASJournals/AASTeX7), LICENSE file read, 26 Nov 2026); whether a BSD-3-Clause tool may bundle or adapt it is **open** (LPPL clause 6 not read; list it as a third-party licence under D-41 if bundled) |
 
 **Methods and figures**
 
@@ -1236,14 +1301,40 @@ The first draft's research (17 Nov 2026) was at the level of search results and 
 | V23 | Runaway thresholds, cluster catalogue, the 2025 search | Resolved: 25 km/s 2D or 30 to 40 km/s 3D; Hunt & Reffert 2023; Carballo-Bello et al. 2025 |
 | V24 | Gaia BH citations | Resolved: El-Badry et al. 2023; Andrews et al. 2022 |
 | V25 | ParSNIP figures | Resolved: 89% in five classes (Boone 2021); 82% is Aleo et al. 2023 (H7 no longer quotes either) |
-| V26 | Redistribution licences: Chen 2020, footprints, model grids, SPIFF and templates, network weights | Open (R-12) |
+| V26 | Redistribution licences: Chen 2020, footprints, model grids, SPIFF and templates, network weights | Partly resolved (26 Nov 2026): SPIFF code is MIT (GitHub licence API); Chen 2020 ([Zenodo 10.5281/zenodo.3886372](https://doi.org/10.5281/zenodo.3886372)) and the SPIFF Spectrophotometry Library ([Zenodo 19051216](https://zenodo.org/records/19051216), 25 Apr 2026) are both CC-BY-4.0 (checked 26 Nov 2026, per review of #232); the XGBoost weights of Kota et al. 2022 (R-44) have no published release that was found. **Open (R-12):** coverage footprints, model grids |
 | V31 | The rate grid for H11 and the TESS shift-and-stack precedents | Partly resolved: precedents corrected (R-48); the rate grid is open |
 | V32 | The orbit-fit library for H4 and the VOTable validator | Open: R-37 found no permissive orbit-fit route (the choice waits for the licence decision, V35); the FIELD rule is checked against the VOTable schemas, the validator run is open |
 | V33 | THOR, ZTF, Pan-STARRS and NEOWISE linking criteria, read in full | Open: blocks HN-12 |
 | V34 | SPHEREx end-to-end astrometric accuracy: IRSA Explanatory Supplement section 4.2.2 and arXiv:2511.15823 in full | Open: blocks HN-5's error model |
-| V35 | The licences of the chosen orbit tools and their dependencies (checked 19 Nov: see R-37); the project licence is D-41 | Open: blocks any pin in HN-12 |
-| V36 | A simulation confirming 150 to 300 injections for a 3-parameter completeness curve | Open: blocks HN-4's table format |
+| V35 | The licences of the chosen orbit tools and their dependencies (checked 19 Nov: see R-37); the project licence is D-41 | Partly resolved (26 Nov 2026, PyPI records and repositories). MIT or BSD themselves: `adam-core` 0.8.0 (MIT), `layup` 1.1.0 (MIT), THOR ([moeyensj/thor](https://github.com/moeyensj/thor), BSD-3-Clause; the B612 fork was last pushed in 2021 and is not the source), `heliolinx` (BSD-3-Clause). **GPL, so optional plugin only under D-41:** `adam-assist` 0.7.0 (GPLv3), `assist` 1.2.3 (GPL-3.0-or-later), `rebound` 5.2.3 (GPL-3.0-only), `sorcha` 1.2.1 (GPLv3 for five files, otherwise dual GPLv3 and BSD), Find_Orb (GPL-2.0), OpenOrb `pyoorb` 1.3.0 (GPL-3.0). THOR and `layup` pull GPL through `adam-assist`, `assist` and `rebound`, so a default install of either is not D-41-clean. Open: licences of `jpl_eph`, `sat_code`, `lunar` and the `naif-*` and `jpl-debias` packages |
+| V36 | A simulation confirming 150 to 300 injections for a 3-parameter completeness curve | Simulated (26 Nov 2026, #202; table below). **Proposed: 300 injections per curve.** No target band width is set, so the choice waits for review and still blocks HN-4's table format |
 | V37 | The sources marked [verify] in R-29 to R-49 | Partly resolved (Atish's third review, 20 Nov 2026): RO-Crate (Data Science 5(2):97–138), the Software Citation Principles (PeerJ CS 2:e86), Gross & Vitells (EPJC 70, 525), Benjamini & Hochberg (JRSS-B 57, 289), VanderPlas 2018 (ApJS 236, 16), ASSIST's licence (GPL-3), the IVOA ProvenanceDM v1.0 Recommendation (11 Apr 2020) and TESS's 200 s frames are confirmed. Still open: the gamma-CDF form in KSCI-19111-002 §3, Kuchner et al. 2016 on dust (full text), archive limits (R-42), ASCL eligibility (R-40). Blocks registering R-29 to R-49 (HN-0) |
+
+**V36 results (26 Nov 2026, #202).** Reproduced by `uv run python -m scripts.sim_injection_count` in `backend/` (fixed seed). Each row is 200 independent sets of injections, each fitted by binomial maximum likelihood and bootstrapped 1,000 times. A **band** is the width of the 16th to 84th percentile of the fitted curves, in completeness units, read at the true midpoint (half the plateau) and where the true completeness is 0.90. **Holds truth** is the share of sets whose band contains the true value (nominally 0.68).
+
+| True curve (x50, width, plateau) | Injections | Band at midpoint: median / 90th percentile | Holds truth | Band at 0.90: median / 90th percentile | Holds truth |
+|---|---|---|---|---|---|
+| spec example (1.02, 0.11, 0.94) | 150 | 0.136 / 0.179 | 0.70 | 0.079 / 0.100 | 0.64 |
+| spec example (1.02, 0.11, 0.94) | 200 | 0.112 / 0.146 | 0.73 | 0.067 / 0.081 | 0.65 |
+| spec example (1.02, 0.11, 0.94) | 300 | 0.091 / 0.111 | 0.65 | 0.054 / 0.064 | 0.70 |
+| spec example (1.02, 0.11, 0.94) | 500 | 0.069 / 0.082 | 0.66 | 0.043 / 0.049 | 0.64 |
+| steeper (1.02, 0.06, 0.94) | 150 | 0.132 / 0.177 | 0.67 | 0.078 / 0.098 | 0.69 |
+| steeper (1.02, 0.06, 0.94) | 200 | 0.112 / 0.143 | 0.66 | 0.066 / 0.080 | 0.66 |
+| steeper (1.02, 0.06, 0.94) | 300 | 0.091 / 0.111 | 0.72 | 0.054 / 0.063 | 0.69 |
+| steeper (1.02, 0.06, 0.94) | 500 | 0.070 / 0.081 | 0.63 | 0.042 / 0.048 | 0.62 |
+| shallower (1.02, 0.2, 0.94) | 150 | 0.133 / 0.179 | 0.71 | 0.081 / 0.099 | 0.65 |
+| shallower (1.02, 0.2, 0.94) | 200 | 0.112 / 0.142 | 0.68 | 0.068 / 0.082 | 0.67 |
+| shallower (1.02, 0.2, 0.94) | 300 | 0.090 / 0.116 | 0.69 | 0.054 / 0.065 | 0.68 |
+| shallower (1.02, 0.2, 0.94) | 500 | 0.069 / 0.079 | 0.67 | 0.041 / 0.047 | 0.63 |
+| higher plateau (1.02, 0.11, 0.99) | 150 | 0.129 / 0.167 | 0.62 | 0.068 / 0.085 | 0.62 |
+| higher plateau (1.02, 0.11, 0.99) | 200 | 0.108 / 0.129 | 0.69 | 0.060 / 0.073 | 0.66 |
+| higher plateau (1.02, 0.11, 0.99) | 300 | 0.088 / 0.102 | 0.70 | 0.049 / 0.057 | 0.69 |
+| higher plateau (1.02, 0.11, 0.99) | 500 | 0.067 / 0.075 | 0.66 | 0.038 / 0.044 | 0.66 |
+
+- **150 to 300 is a usable range; the upper end is Proposed.** At 300 the median band is 0.088 to 0.091 wide at the midpoint and 0.049 to 0.054 at 0.90, and nine sets in ten stay within 0.116 at the midpoint. At 150 the medians are 0.129 to 0.136 and 0.068 to 0.081, and the 90th percentile reaches 0.179. At 500 the medians are 0.067 to 0.070 and 0.038 to 0.043.
+- **N is the total per curve:** 80% uniform within 3 widths of the midpoint, 20% uniform from 3 to 6 widths above it.
+- **Assumed, for review:** "90% completeness" means a completeness of 0.90, not 90% of the plateau; the true curves are the A22.10.4 example (x50 and width in log10 of expected S/N) and three variants of it.
+- **Limit:** injections are placed using the true midpoint and width. A real calibration only has estimates of them, so its bands are likely wider.
 
 **Which [verify] item blocks which ticket** (none blocks approval of this proposal):
 
@@ -1252,7 +1343,6 @@ The first draft's research (17 Nov 2026) was at the level of search results and 
 | V13 (MPC) | HN-11's ADES export and the MPC route in HN-16 |
 | V26 and the R-12 licences (Chen 2020, SPIFF, templates, network weights, the AAS template, orbit fitters) | any ticket that ships them |
 | V1 (single-frame depth) | HN-5's gate threshold |
-| V6 (IRSA tables and columns) | every adapter ticket |
 | V2 (revisit pattern) | HN-12 |
 | V31 (H11 rate grid) | scheduling HN-15 |
 | V33 (linking criteria) | HN-12 |
@@ -1265,39 +1355,39 @@ The first draft's research (17 Nov 2026) was at the level of search results and 
 
 ### A22.15 Decisions
 
-This PR may not touch `docs/decisions/`, so nothing here has an id yet. On approval each row becomes a `D-` or `Q-` entry (next free at the time of writing: **D-42** and **Q-485**; PR #183 reserves Q-484 and the project licence takes D-41; **since then D-42 and D-43 are taken, so HN-0 registers these rows from D-44**) in `docs/decisions/moving-objects.md` and the index. R-1 to R-12 were **decided by Moon on 18 Nov 2026**, taking the recommendations made on Atish's twelve questions. R-13 to R-28 and the PD rows were **decided by Moon on 19 Nov 2026** on Atish's re-review (changes requested at 76eca86). R-29 to R-49 were **decided by Moon on 19 Nov 2026** from a literature review (arXiv, ADS, IVOA and archive documentation; abstracts and repository pages, not full texts, so sources not opened are marked [verify] and listed as V37). They are registered only once V37 is closed (HN-0). Atish's third review (20 Nov 2026) corrected the citations of R-29, R-39, R-44, R-46, R-47 and R-48, re-decided R-37, corrected the wording of R-3, R-14, R-16, R-18, R-24, R-39, R-40, R-42 and PD-3, and took R-51 to R-54. Atish confirmed the corrections and took these decisions as a code owner on 20 Nov 2026 (Q-484; Moon may still reopen any of them on the PR). The project licence stays a whole-team `D-` decision (HN-0).
+Each row below is registered as a `Q-` entry in [discovery-hunts](../decisions/discovery-hunts.md) (the Status column names its id), except R-29 to R-49, which wait for V37, and R-50, which is a note. These rows are Q-487 to Q-528 (the next free Q ids on `dev`); the next free `D-` id is D-44. R-1 to R-12 were **decided by Moon on 18 Nov 2026**, taking the recommendations made on Atish's twelve questions. R-13 to R-28 and the PD rows were **decided by Moon on 19 Nov 2026** on Atish's re-review (changes requested at 76eca86). R-29 to R-49 were **decided by Moon on 19 Nov 2026** from a literature review (arXiv, ADS, IVOA and archive documentation; abstracts and repository pages, not full texts, so sources not opened are marked [verify] and listed as V37). They are registered only once V37 is closed (HN-0). Atish's third review (20 Nov 2026) corrected the citations of R-29, R-39, R-44, R-46, R-47 and R-48, re-decided R-37, corrected the wording of R-3, R-14, R-16, R-18, R-24, R-39, R-40, R-42 and PD-3, and took R-51 to R-54. Atish confirmed the corrections and took these decisions as a code owner on 20 Nov 2026 (Q-484; Moon may still reopen any of them on the PR). The project licence stays a whole-team `D-` decision (HN-0).
 
 | Ref | Decision | Status |
 |---|---|---|
-| R-0 | **Purpose:** a scientific tool meant for research. Outputs are tables usable in a paper: standard formats, provenance, completeness and purity, selection function, reproducibility. Supersedes PD-1 (the first draft's direction: an outreach tool for the public, students and amateurs) and PD-2 (the ten hunts grouped by an ordinary user's odds of a credited find). | Decided (Moon, 18 Nov 2026) |
-| R-1 | **SPHEREx is the characterisation layer,** not the discovery data. | Decided |
-| R-2 | **Datasets.** Release 1: SPHEREx DR1, CatWISE2020 and unWISE/unTimely, Gaia DR3 (DR4 after 2 Dec), ZTF DR24 light curves. Release 2: TESS full-frame-image shift-and-stack (H11), DECam archive and NOIRLab Source Catalog with multi-night linking (H4b). IASC dropped. | Decided |
-| R-3 | **H4 candidates** need detections on at least 2 nights, at least 3 tracklets, an orbit fit passing a χ² test against a calibrated astrometric error model, and a measured false-link rate. Anything less is `possible`. Amends Q-146 (3)'s "unexplained track (a lead)" and A16.5's "unexplained track" / "a lead for follow-up" wording; the card change is R-14. | Decided; wording corrected and confirmed by Atish (code owner), 20 Nov 2026 |
-| R-4 | **Export first.** Every hunt exports the reproducibility bundle (VOTable or ECSV with provenance, selection function and MOC, calibration, method text, citation file; ADES for H4). "Prepare a submission" only for verified routes that take outside data (VSX, Backyard Worlds, RNAAS drafts; the MPC once a code exists). Zooniverse routes dropped. No "Your credit" wording. A Zenodo DOI per tool release. | Decided |
-| R-5 | **Calibration** against expected signal-to-noise; completeness and purity as functions with intervals; purity from controls (and held-out data) separately from the gate; per-patch injection offered to the user. | Decided |
-| R-6 | **No silent caps.** A count query before the run; any limit is a stated selection criterion written into the output. Cuts always in the archive's query. | Decided |
-| R-7 | **H6 lenses removed.** | Decided (settles PD-9, which asked whether lenses stay in "Good chance" or move to "Possible") |
-| R-8 | **No learning mode.** H7 becomes a context layer; H9 becomes SPHEREx characterisation of excess candidates; H10 becomes a cross-match with Gaia DR4's own black-hole table plus our refit. Release 1: H1, H2, H4, H8, H9, and H7 as context; release 2: H3, H5, H11, H4b. Picker grouped by readiness (Validated, Characterisation, Experimental, Context). | Decided (settles PD-7, which asked which hunts the picker ticks by default: now Validated and Characterisation) |
-| R-9 | **Time estimate** = the heavy lane's total plus bandwidth contention, from measured per-unit costs. **One pause rule:** both lanes stop at their next unit boundary and the scan leaves the worker (Q-470 (7)). | Decided |
-| R-10 | **Coverage.** Squares for pixel hunts only; catalogue and light-curve hunts report coverage for the whole patch as a MOC, part of the selection function. | Decided (settles PD-8, which marked a square done when every ticked hunt had finished it) |
-| R-11 | **Measured only** hides statuses and totals that come from catalogue matches, as Q-479 (1); only measured detections and their counts show. | Decided |
-| R-12 | **Ask first:** the MPC (SPHEREx observatory code, archive program code, ADES spacecraft fields) before HN-11's ADES export and HN-16; the Gagné et al. team before H2's typing stage; and the licence of every table, model grid, code and network shipped. | Decided |
-| R-13 | **Mock-up section 5 cut** to a pointer to this spec; the data-path and per-hunt signal diagrams stay as a visual appendix. | Decided (19 Nov) |
-| R-14 | **Pairs on the results card** (amends Q-146 (3), A16.5 track wording and A18 as built, area-ui.md; Q-483 (4) itself already speaks of single-visit possibles): "unexplained pair · possible", listed in a visible section "Pairs: 1 night only (n)"; not hidden. | Decided (19 Nov) |
-| R-15 | **Gate labels:** "reference fields, once per version", "fixture, once per version" (H5, H8, H10), "every run" (H4). | Decided (19 Nov) |
-| R-16 | **H8's route to Validated:** expected S/N = peculiar speed / its uncertainty; controls = motions drawn from the local distribution, plus parallax and motion redrawn within their errors (the second per R-51). | Decided (19 Nov); wording corrected and confirmed by Atish (code owner), 20 Nov 2026 |
-| R-17 | **Offline plan** (amends Q-470 (8)): cached counts only; otherwise "Size not known offline", and only hunts with cached inputs run. | Decided (19 Nov) |
-| R-18 | **Pause with two lanes** (amends Q-470 (7)): refused only while every lane that still has work is on its last unit (a finished lane does not count). | Decided (19 Nov); wording corrected and confirmed by Atish (code owner), 20 Nov 2026 |
-| R-19 | **Bundle and Measured only** (amends Q-479 (7) for hunt bundles): the bundle is always complete, every column tagged; the export dialog says so. | Decided (19 Nov) |
-| R-20 | **H4 known-object match** keeps A16.5's `model_dependent` tag. | Decided (19 Nov) |
-| R-21 | **Injected badge** (A16.5) on every planted object, including per-patch injection. | Decided (19 Nov) |
-| R-22 | **Calibration cost cap for version 1:** 3 to 4 S/N bins, shipped reference fields only, about 1,000 injections per field per hunt, cost recorded in the table; per-patch injection in release 2 with its estimate in the plan. | Decided (19 Nov) |
-| R-23 | **First H4 error model:** A4 centroids of known rocks above S/N 10, cross-checked against Track's Eros fixtures. | Decided (19 Nov) |
-| R-24 | **Multi-day linking, the orbit fit and stacking (stages D and E) move to release 2** (V2 and fitter licences first). Release 1 H4: known rocks plus pairs. | Decided (19 Nov); wording corrected and confirmed by Atish (code owner), 20 Nov 2026 |
-| R-25 | **Held-out years** where possible, not required for Validated. | Decided (19 Nov) |
-| R-26 | **Download budget enforced before the run:** above 50 GB per hunt (a setting) the row needs a stated limit before Run is enabled. | Decided (19 Nov) |
-| R-27 | **Release 1 minimum:** HN-0, 1, 2, 3, 4b, 5, 6. A hunt's calibration ships in its own ticket; no separate "Validated" tickets. | Decided (19 Nov) |
-| R-28 | **Hubble and JWST archives** left out on purpose (small fields; Asteroid Hunters covers Hubble). | Decided (19 Nov) |
+| R-0 | **Purpose:** a scientific tool meant for research. Outputs are tables usable in a paper: standard formats, provenance, completeness and purity, selection function, reproducibility. Supersedes PD-1 (the first draft's direction: an outreach tool for the public, students and amateurs) and PD-2 (the ten hunts grouped by an ordinary user's odds of a credited find). | Decided (Moon, 18 Nov 2026); registered as Q-487 |
+| R-1 | **SPHEREx is the characterisation layer,** not the discovery data. | Decided; registered as Q-488 |
+| R-2 | **Datasets.** Release 1: SPHEREx DR1, CatWISE2020 and unWISE/unTimely, Gaia DR3 (DR4 after 2 Dec), ZTF DR24 light curves. Release 2: TESS full-frame-image shift-and-stack (H11), DECam archive and NOIRLab Source Catalog with multi-night linking (H4b). IASC dropped. | Decided; registered as Q-489 |
+| R-3 | **H4 candidates** need detections on at least 2 nights, at least 3 tracklets, an orbit fit passing a χ² test against a calibrated astrometric error model, and a measured false-link rate. Anything less is `possible`. Amends Q-146 (3)'s "unexplained track (a lead)" and A16.5's "unexplained track" / "a lead for follow-up" wording; the card change is R-14. | Decided; wording corrected and confirmed by Atish (code owner), 20 Nov 2026; registered as Q-490 |
+| R-4 | **Export first.** Every hunt exports the reproducibility bundle (VOTable or ECSV with provenance, selection function and MOC, calibration, method text, citation file; ADES for H4). "Prepare a submission" only for verified routes that take outside data (VSX, Backyard Worlds, RNAAS drafts; the MPC once a code exists). Zooniverse routes dropped. No "Your credit" wording. A Zenodo DOI per tool release. | Decided; registered as Q-491 |
+| R-5 | **Calibration** against expected signal-to-noise; completeness and purity as functions with intervals; purity from controls (and held-out data) separately from the gate; per-patch injection offered to the user. | Decided; registered as Q-492 |
+| R-6 | **No silent caps.** A count query before the run; any limit is a stated selection criterion written into the output. Cuts always in the archive's query. | Decided; registered as Q-493 |
+| R-7 | **H6 lenses removed.** | Decided (settles PD-9, which asked whether lenses stay in "Good chance" or move to "Possible"); registered as Q-494 |
+| R-8 | **No learning mode.** H7 becomes a context layer; H9 becomes SPHEREx characterisation of excess candidates; H10 becomes a cross-match with Gaia DR4's own black-hole table plus our refit. Release 1: H1, H2, H4, H8, H9, and H7 as context; release 2: H3, H5, H11, H4b. Picker grouped by readiness (Validated, Characterisation, Experimental, Context). | Decided (settles PD-7, which asked which hunts the picker ticks by default: now Validated and Characterisation); registered as Q-495 |
+| R-9 | **Time estimate** = the heavy lane's total plus bandwidth contention, from measured per-unit costs. **One pause rule:** both lanes stop at their next unit boundary and the scan leaves the worker (Q-470 (7)). | Decided; registered as Q-496 |
+| R-10 | **Coverage.** Squares for pixel hunts only; catalogue and light-curve hunts report coverage for the whole patch as a MOC, part of the selection function. | Decided (settles PD-8, which marked a square done when every ticked hunt had finished it); registered as Q-497 |
+| R-11 | **Measured only** hides statuses and totals that come from catalogue matches, as Q-479 (1); only measured detections and their counts show. | Decided; registered as Q-498 |
+| R-12 | **Ask first:** the MPC (SPHEREx observatory code, archive program code, ADES spacecraft fields) before HN-11's ADES export and HN-16; the Gagné et al. team before H2's typing stage; and the licence of every table, model grid, code and network shipped. | Decided; registered as Q-499 |
+| R-13 | **Mock-up section 5 cut** to a pointer to this spec; the data-path and per-hunt signal diagrams stay as a visual appendix. | Decided (19 Nov); registered as Q-500 |
+| R-14 | **Pairs on the results card** (amends Q-146 (3), A16.5 track wording and A18 as built, area-ui.md; Q-483 (4) itself already speaks of single-visit possibles): "unexplained pair · possible", listed in a visible section "Pairs: 1 night only (n)"; not hidden. | Decided (19 Nov); registered as Q-501 |
+| R-15 | **Gate labels:** "reference fields, once per version", "fixture, once per version" (H5, H8, H10), "every run" (H4). | Decided (19 Nov); registered as Q-502 |
+| R-16 | **H8's route to Validated:** expected S/N = peculiar speed / its uncertainty; controls = motions drawn from the local distribution, plus parallax and motion redrawn within their errors (the second per R-51). | Decided (19 Nov); wording corrected and confirmed by Atish (code owner), 20 Nov 2026; registered as Q-503 |
+| R-17 | **Offline plan** (amends Q-470 (8)): cached counts only; otherwise "Size not known offline", and only hunts with cached inputs run. | Decided (19 Nov); registered as Q-504 |
+| R-18 | **Pause with two lanes** (amends Q-470 (7)): refused only while every lane that still has work is on its last unit (a finished lane does not count). | Decided (19 Nov); wording corrected and confirmed by Atish (code owner), 20 Nov 2026; registered as Q-505 |
+| R-19 | **Bundle and Measured only** (amends Q-479 (7) for hunt bundles): the bundle is always complete, every column tagged; the export dialog says so. | Decided (19 Nov); registered as Q-506 |
+| R-20 | **H4 known-object match** keeps A16.5's `model_dependent` tag. | Decided (19 Nov); registered as Q-507 |
+| R-21 | **Injected badge** (A16.5) on every planted object, including per-patch injection. | Decided (19 Nov); registered as Q-508 |
+| R-22 | **Calibration cost cap for version 1:** 3 to 4 S/N bins, shipped reference fields only, about 1,000 injections per field per hunt, cost recorded in the table; per-patch injection in release 2 with its estimate in the plan. | Decided (19 Nov); registered as Q-509 |
+| R-23 | **First H4 error model:** A4 centroids of known rocks above S/N 10, cross-checked against Track's Eros fixtures. | Decided (19 Nov); registered as Q-510 |
+| R-24 | **Multi-day linking, the orbit fit and stacking (stages D and E) move to release 2** (V2 and fitter licences first). Release 1 H4: known rocks plus pairs. | Decided (19 Nov); wording corrected and confirmed by Atish (code owner), 20 Nov 2026; registered as Q-511 |
+| R-25 | **Held-out years** where possible, not required for Validated. | Decided (19 Nov); registered as Q-512 |
+| R-26 | **Download budget enforced before the run:** above 50 GB per hunt (a setting) the row needs a stated limit before Run is enabled. | Decided (19 Nov); registered as Q-513 |
+| R-27 | **Release 1 minimum:** HN-0, 1, 2, 3, 4b, 5, 6. A hunt's calibration ships in its own ticket; no separate "Validated" tickets. | Decided (19 Nov); registered as Q-514 |
+| R-28 | **Hubble and JWST archives** left out on purpose (small fields; Asteroid Hunters covers Hubble). | Decided (19 Nov); registered as Q-515 |
 | R-29 | **Completeness as a fitted curve** (refines R-22): monotone curve in log expected S/N by binomial likelihood with a bootstrap band; bins as a fit check; injections concentrated in the rise; Wilson or Jeffreys (with L(0) = 0 and U(n) = 1, the other limit kept at α/2) for n ≤ 40, Agresti-Coull also above 40; Clopper-Pearson only where guaranteed coverage is required (corrected 20 Nov from Brown, Cai & DasGupta §4). | Decided (19 Nov), from the literature; pending V37 |
 | R-30 | **Card value from the curve** (refines PD-3), "average over the reference fields", and none outside the injected range of any covariate. | Decided (19 Nov) |
 | R-31 | **Purity as a range** between at least two controls (refines R-5); block shuffles; injection before detrending; purity is not a row's FAP. | Decided (19 Nov) |
@@ -1320,19 +1410,19 @@ This PR may not touch `docs/decisions/`, so nothing here has an id yet. On appro
 | R-48 | **H11 precedents corrected:** Payne, Holman & Pál 2019; Rice & Laughlin 2020; two separate 3I/ATLAS papers (one published, one accepted). | Decided (19 Nov) |
 | R-49 | **PD-5 note:** measured statistics inherit the hunt's cuts. | Decided (19 Nov) |
 | R-50 | *Process note, not a decision; not registered as a `Q-` row:* the open questions from the research (V33 to V37) are resolved by reading the named sources and running the HN-4 simulation, each blocking its ticket (A22.14). | Note |
-| R-51 | **Second controls for R-31:** H2 stationary CatWISE sources with the same colours and magnitudes; H5 known inactive asteroids of similar brightness; H8 the same search with parallax and motion redrawn within their errors. A hunt with one control cannot be Validated. | Decided (Atish, code owner, 20 Nov 2026) |
-| R-52 | **Ambiguous pairs** (A17.4) are listed in the visible "Pairs: 1 night only (n)" section as "ambiguous pair · possible"; each possible carries a kind (`single_visit`, `pair`, `ambiguous_pair`) and "Show possible (n)" hides `single_visit` only (amends A18 as built). | Decided (Atish, code owner, 20 Nov 2026) |
-| R-53 | **Stale gate:** while its gate is stale (R-34) a Validated hunt shows as Experimental, "gate out of date", until the gate re-runs. | Decided (Atish, code owner, 20 Nov 2026) |
-| R-54 | **Bundle release split** (refines R-39, R-40): release 1 ships VOTable and ECSV with provenance tags, selection function, MOC, ADQL per cut, methods text, `provenance.json` and `cite.md`; the RO-Crate root, PROV export, DataLink and the ASCL entry come in release 2. | Decided (Atish, code owner, 20 Nov 2026) |
-| PD-3 | Rates on the row card: the value at the row's own expected signal-to-noise, with its interval. Amends A16.5 (area-search.md, "no single figure goes into a card"), Q-203 (1) and A16's "completeness only as the grid for the squares tested" **for that per-row value only**, and Q-203 (5) and A16.5's "for the square tested" because the value is an average over the reference fields, labelled as such (R-30); the ban stays for any overall catch rate, on a card, an announcement or the export headline. A18.11 to be amended to match at the sync. | Decided (Moon, 19 Nov 2026); wording corrected and confirmed by Atish (code owner), 20 Nov 2026 |
-| PD-5 | **Tag boundary.** A period, depth, motion or profile computed directly from measured points with its uncertainty is `measured`; anything needing a model or a catalogue parameter is `model_dependent`; classifier outputs are `derived`. Measured statistics still inherit the hunt's cuts (R-49). | Decided (Moon, 19 Nov 2026) |
-| PD-6 | The selection label drops its time estimate once hunts exist. | Decided (Moon, 19 Nov 2026) |
-| PD-11 | **Contract** of A22.7: `hunts` and `options` on `POST /v1/scans` defaulting to `["asteroids"]`; rows, ids after the merge, `rows_ready`; `seed` and `software`; the bundle and inject routes. Extends Q-470 and Q-471. | Decided (Moon, 19 Nov 2026) |
-| PD-12 | **Two lanes** owned by the scan job, with per-archive limits shared by both. Extends Q-470 (6). | Decided (Moon, 19 Nov 2026); Kevin to confirm feasibility in HN-1 |
-| PD-13 | **Wording** of A22.3.6. Extends A16.5. | Decided (Moon, 19 Nov 2026) |
-| PD-14 | **H4 first:** the audit and the every-run gate before any search hunt is Validated. | Decided (Moon, 19 Nov 2026) |
-| PD-15 | Owners of the tickets in A22.12. | Decided (Moon, 19 Nov 2026), under D-17; `app/sky/HuntMarkers.tsx` under Moon confirmed, as it is outside `app/sky/area/` (Q-406 (7)) |
-| PD-16 | **Determinism** on the CPU path only; the GPU path is tested for agreement within a tolerance; stored results name the path. Amends the determinism rule for GPU work. | Decided (Moon, 19 Nov 2026) |
+| R-51 | **Second controls for R-31:** H2 stationary CatWISE sources with the same colours and magnitudes; H5 known inactive asteroids of similar brightness; H8 the same search with parallax and motion redrawn within their errors. A hunt with one control cannot be Validated. | Decided (Atish, code owner, 20 Nov 2026); registered as Q-516 |
+| R-52 | **Ambiguous pairs** (A17.4) are listed in the visible "Pairs: 1 night only (n)" section as "ambiguous pair · possible"; each possible carries a kind (`single_visit`, `pair`, `ambiguous_pair`) and "Show possible (n)" hides `single_visit` only (amends A18 as built). | Decided (Atish, code owner, 20 Nov 2026); registered as Q-517 |
+| R-53 | **Stale gate:** while its gate is stale (R-34) a Validated hunt shows as Experimental, "gate out of date", until the gate re-runs. | Decided (Atish, code owner, 20 Nov 2026); registered as Q-518 |
+| R-54 | **Bundle release split** (refines R-39, R-40): release 1 ships VOTable and ECSV with provenance tags, selection function, MOC, ADQL per cut, methods text, `provenance.json` and `cite.md`; the RO-Crate root, PROV export, DataLink and the ASCL entry come in release 2. | Decided (Atish, code owner, 20 Nov 2026); registered as Q-519 |
+| PD-3 | Rates on the row card: the value at the row's own expected signal-to-noise, with its interval. Amends A16.5 (area-search.md, "no single figure goes into a card"), Q-203 (1) and A16's "completeness only as the grid for the squares tested" **for that per-row value only**, and Q-203 (5) and A16.5's "for the square tested" because the value is an average over the reference fields, labelled as such (R-30); the ban stays for any overall catch rate, on a card, an announcement or the export headline. A18.11 to be amended to match at the sync. | Decided (Moon, 19 Nov 2026); wording corrected and confirmed by Atish (code owner), 20 Nov 2026; registered as Q-520 |
+| PD-5 | **Tag boundary.** A period, depth, motion or profile computed directly from measured points with its uncertainty is `measured`; anything needing a model or a catalogue parameter is `model_dependent`; classifier outputs are `derived`. Measured statistics still inherit the hunt's cuts (R-49). | Decided (Moon, 19 Nov 2026); registered as Q-521 |
+| PD-6 | The selection label drops its time estimate once hunts exist. | Decided (Moon, 19 Nov 2026); registered as Q-522 |
+| PD-11 | **Contract** of A22.7: `hunts` and `options` on `POST /v1/scans` defaulting to `["asteroids"]`; rows, ids after the merge, `rows_ready`; `seed` and `software`; the bundle and inject routes. Extends Q-470 and Q-471. | Decided (Moon, 19 Nov 2026); registered as Q-523 |
+| PD-12 | **Two lanes** owned by the scan job, with per-archive limits shared by both. Extends Q-470 (6). | Decided (Moon, 19 Nov 2026); Kevin to confirm feasibility in HN-1; registered as Q-524 |
+| PD-13 | **Wording** of A22.3.6. Extends A16.5. | Decided (Moon, 19 Nov 2026); registered as Q-525 |
+| PD-14 | **H4 first:** the audit and the every-run gate before any search hunt is Validated. | Decided (Moon, 19 Nov 2026); registered as Q-526 |
+| PD-15 | Owners of the tickets in A22.12. | Decided (Moon, 19 Nov 2026), under D-17; `app/sky/HuntMarkers.tsx` under Moon confirmed, as it is outside `app/sky/area/` (Q-406 (7)); registered as Q-527 |
+| PD-16 | **Determinism** on the CPU path only; the GPU path is tested for agreement within a tolerance; stored results name the path. Amends the determinism rule for GPU work. | Decided (Moon, 19 Nov 2026); registered as Q-528 |
 
 ### A22.16 The mock-up file
 
