@@ -41,6 +41,7 @@ const ROOT = {
     'run',
     'runList',
     'runResults',
+    'huntRegister',
   ],
   properties: {
     card: { $ref: 'object-card.schema.json' },
@@ -60,6 +61,7 @@ const ROOT = {
     run: { $ref: 'run.schema.json' },
     runList: { $ref: 'run-list.schema.json' },
     runResults: { $ref: 'run-results.schema.json' },
+    huntRegister: { $ref: 'hunt-register.schema.json' },
   },
 };
 

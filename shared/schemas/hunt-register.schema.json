@@ -1,0 +1,173 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "hunt-register.schema.json",
+  "title": "HuntRegister",
+  "description": "GET /v1/hunts (A22.7.1, issue #221): the static register of the Discovery hunts.",
+  "type": "array",
+  "items": {
+    "$ref": "#/definitions/HuntEntry"
+  },
+  "definitions": {
+    "HuntId": {
+      "title": "HuntId",
+      "type": "string",
+      "enum": [
+        "variables",
+        "cold_worlds",
+        "asteroids",
+        "runaways",
+        "ir_excess",
+        "dimmers",
+        "active_asteroids",
+        "slow_movers",
+        "transients",
+        "dark_companions"
+      ]
+    },
+    "HuntRoute": {
+      "title": "HuntRoute",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "url", "verified_at"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "url": {
+          "type": "string",
+          "pattern": "^https://"
+        },
+        "verified_at": {
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+        }
+      }
+    },
+    "HuntAvailability": {
+      "title": "HuntAvailability",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state"],
+      "properties": {
+        "state": {
+          "type": "string",
+          "enum": ["available", "disabled"]
+        },
+        "reason": {
+          "type": "string",
+          "pattern": "^hunt:[a-z_]+:[a-z0-9_:]+$"
+        }
+      },
+      "if": {
+        "properties": {
+          "state": {
+            "const": "disabled"
+          }
+        }
+      },
+      "then": {
+        "required": ["reason"],
+        "properties": {
+          "reason": {
+            "type": "string"
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "reason": false
+        }
+      }
+    },
+    "HuntCalibrationRef": {
+      "title": "HuntCalibrationRef",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "measured_at"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "measured_at": {
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+        }
+      }
+    },
+    "HuntEntry": {
+      "title": "HuntEntry",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "title",
+        "summary",
+        "kind",
+        "level",
+        "weight",
+        "version",
+        "releases",
+        "routes",
+        "availability",
+        "calibration"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/HuntId"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "type": "string",
+          "enum": ["search", "characterisation", "context"]
+        },
+        "level": {
+          "type": "string",
+          "enum": ["validated", "characterisation", "experimental", "context"]
+        },
+        "weight": {
+          "type": "string",
+          "enum": ["light", "heavy"]
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+        },
+        "releases": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "routes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/HuntRoute"
+          }
+        },
+        "availability": {
+          "$ref": "#/definitions/HuntAvailability"
+        },
+        "calibration": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/HuntCalibrationRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    }
+  }
+}
