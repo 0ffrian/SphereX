@@ -107,17 +107,20 @@
   | Milestone (GitHub title) | Holds |
   |---|---|
   | **R0 · Foundations and onboarding** | The licence, the `dev` branch, HN-0, onboarding docs and the first starter tickets; V6 and the library checks |
-  | **R1a · Hunts core (minimum)** | R-27's minimum, except HN-0 (in R0): HN-1, HN-2, HN-3, HN-4b (release 1 part), HN-5, HN-6 |
+  | **R1a · Hunt engine and asteroid audit** (milestone #7) | R-27's minimum, first part: HN-1, HN-5 and the #143 follow-up |
+  | **R1a · Hunt picker and results cards** (milestone #12) | R-27's minimum, second part: HN-2, HN-3 |
+  | **R1a · Export bundle and runaway stars (H8)** (milestone #13) | R-27's minimum, third part: HN-4b (release 1 part), HN-6 |
   | **R1b · First validated hunts** | The rest of release 1 (R-8): HN-4, HN-7, HN-8, HN-9, HN-10, HN-11, HN-16 |
   | **R2 · More hunts** | Release 2: HN-12, HN-13, HN-14, HN-15, and the release 2 part of HN-4b (R-54) |
   | **DR4 · Gaia dark companions** | HN-17 (H10, cross-match on Gaia DR4). Ships when Gaia DR4 is out |
   | **Maintenance** | Standing. App fixes outside the hunts (for example #184, #185) |
+  | **Later · Saved objects and shared squares** (milestone #14) | Unscheduled and outside the working set; nothing in it is planned for a release yet |
 
-  No milestone has a due date for now.
-- **Difficulty is a label, not a milestone:** `good first issue` is Level 1, `help wanted` is Level 2, and a ticket with neither is core work. Atish assigns every ticket (D-17).
-- **Unchanged:** the contents of the A22 releases. D-43 only names where each ticket is tracked.
+  R1a is three GitHub milestones (#7, #12, #13) that together hold R-27's minimum, except HN-0 (in R0). No milestone has a due date for now.
+- **Difficulty is a label, not a milestone:** `good first issue` is Level 1, `help wanted` is Level 2, and a ticket with neither is core work. Atish assigns tickets; D-17 still sets area ownership and review.
+- **Unchanged:** the contents of the A22 releases. D-43 only names where each ticket is tracked. The old rule that milestones build against fixtures survives where A22.12 states it: HN-3 builds the frontend against the fixtures of HN-2, so HN-2 comes first.
 - **Why:** M1 to M5 were the event's independent tracks, due 8 to 15 Nov. The event build is done, and the Discovery hunts ship in releases that overlap, so the old names and due dates no longer describe the work.
-- **Source:** the descriptions of these GitHub milestones, created by Atish on 20 Nov 2026, which name the tickets of R0, R1a, R1b and R2; A22.12 labels only HN-12 to HN-15 as release 2. Not every `V` check is in R0: #202 (V36) is in R1b, next to HN-4, which it blocks.
+- **Source:** the descriptions of these GitHub milestones, created by Atish on 20 Nov 2026, which name the tickets of R0, R1a, R1b and R2; A22.12 labels only HN-12 to HN-15 as release 2. A22.12 and R-8 give HN-4 and HN-16 no release of their own; the milestone descriptions place them in R1b. Not every `V` check is in R0: #202 (V36) is in R1b, next to HN-4, which it blocks.
 - **Relates to:** D-14 (build dates), D-17 (owners), D-42 (`dev`), A22.12.
 
 ## Post-event backlog
