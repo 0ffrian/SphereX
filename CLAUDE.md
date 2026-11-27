@@ -8,7 +8,7 @@ Project: **Shift & Spectrum**, a public web tool for NASA Space Apps 2026 (Port 
 |---|---|
 | [docs/decisions/](docs/decisions/README.md) | **Wins over every other doc** where it states a decision. Load the index (`README.md`: every D-/Q- entry and its topic file), then only the topic files (`docs/decisions/<topic>.md`) that the task's routing row names. |
 | [docs/rendering/](docs/rendering/README.md) | Source of truth for how an object is **displayed**, how its **surface is generated**, and how it **sounds** (audio pairing, the flyover soundscape and weather, R13). Haptics were cut by D-39. Sections `R0`–`R13`. |
-| [docs/architecture/](docs/architecture/README.md) | Source of truth for everything else: data sources, pipeline, tiers, plan, risks. Sections `A1`–`A21` (Track and Area search A16–A20 in `moving-objects/`, app shell A21). Terms: [glossary](docs/architecture/glossary.md) (A15). |
+| [docs/architecture/](docs/architecture/README.md) | Source of truth for everything else: data sources, pipeline, tiers, plan, risks. Sections `A1`–`A22` (Track and Area search A16–A20 in `moving-objects/`, app shell A21, Discovery hunts A22). Terms: [glossary](docs/architecture/glossary.md) (A15). |
 | [docs/uml/](docs/uml/README.md) | Architecture diagrams (UML, Mermaid). Keep in sync when a spec changes. |
 | [docs/handover.md](docs/handover.md) | Background only (competition, data, early concepts). Not a spec. |
 | [docs/design-language.md](docs/design-language.md) | **Look and feel of every screen** (D-38): tokens, Inter, radii, controls (Animate UI), motion. Wins over the mock-up for looks. Load the `sx-design-language` skill before any UI work. |
@@ -76,12 +76,12 @@ Project agents live in `.claude/agents/` and skills in `.claude/skills/`. Agents
 
 ## Build schedule
 
-The team builds from 5 Nov 2026 (decisions D-14), setting aside the event rule against building before 14 Nov. Work is tracked in the GitHub project "SphereX and PlanetX - NASA COMPETITION 2026" as milestones M1–M5 (D-29). M1–M4 build against fixtures and do not depend on each other; only M5 integrates them.
+The team builds from 5 Nov 2026 (decisions D-14), setting aside the event rule against building before 14 Nov. Work is tracked in the GitHub project "SphereX and PlanetX - NASA COMPETITION 2026" under the release milestones **R0**, **R1a**, **R1b**, **R2**, **DR4** and **Maintenance** (D-43 lists what each holds; it amends D-29 and D-30, and M1–M5 are closed). No due dates for now. Difficulty is a label: `good first issue` is Level 1, `help wanted` is Level 2, no label is core work. Atish assigns every ticket.
 
 ## Layout
 
 ```
-docs/       decisions/ (index + topic files), architecture/ (A1–A21; moving-objects/ holds A16–A20),
+docs/       decisions/ (index + topic files), architecture/ (A1–A22; moving-objects/ holds A16–A20),
             rendering/ (R0–R12), uml/
 mockup/     single-file HTML mock-ups, not the app
   spherex-ui.html       app shell and tools (three.js r128), incl. Area search (mock-up tool 5),

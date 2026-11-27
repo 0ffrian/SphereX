@@ -58,6 +58,7 @@ Load only the fragment you need. Section numbers are prefixed with `A` ("archite
 | [sky-shell-surfaces.md](sky-shell-surfaces.md) | A21.5–A21.7 | you change the island, object panel or object card, sky interaction (drag, wheel, keys, clicks, picking), or the sky image and credit |
 | [sky-shell-behaviour.md](sky-shell-behaviour.md) | A21.8–A21.12 | you change the split pane (Build, Track), transport, search pill (the demo search list), keys and Escape, URL hash and history, or live regions |
 | [sky-shell-extend.md](sky-shell-extend.md) | A21.13 | you add a tool or a sky layer, or need the open conflicts between the shell as built and the Track and Area search specs |
+| [discovery-hunts.md](discovery-hunts.md) | A22–A22.16 | you build or change the Discovery hunts (the research tool for one patch: hunt register, runs and rows, export bundle, calibration, the H1 to H11 hunts); decisions in [discovery-hunts](../decisions/discovery-hunts.md) |
 
 ## Section map
 
@@ -208,3 +209,20 @@ Load only the fragment you need. Section numbers are prefixed with `A` ("archite
 | A21.11 | URL hash and history | [sky-shell-behaviour.md#a2111-url-hash-and-history](sky-shell-behaviour.md#a2111-url-hash-and-history) |
 | A21.12 | Live regions and accessibility | [sky-shell-behaviour.md#a2112-live-regions-and-accessibility](sky-shell-behaviour.md#a2112-live-regions-and-accessibility) |
 | A21.13 | Adding a tool or a sky layer | [sky-shell-extend.md#a2113-adding-a-tool-or-a-sky-layer](sky-shell-extend.md#a2113-adding-a-tool-or-a-sky-layer) |
+| A22 | Discovery hunts | [discovery-hunts.md#a22-discovery-hunts](discovery-hunts.md#a22-discovery-hunts) |
+| A22.1 | Why and who | [discovery-hunts.md#a221-why-and-who](discovery-hunts.md#a221-why-and-who) |
+| A22.2 | Scope | [discovery-hunts.md#a222-scope](discovery-hunts.md#a222-scope) |
+| A22.3 | Journey and UI | [discovery-hunts.md#a223-journey-and-ui](discovery-hunts.md#a223-journey-and-ui) |
+| A22.4 | Architecture | [discovery-hunts.md#a224-architecture](discovery-hunts.md#a224-architecture) |
+| A22.5 | Shared core | [discovery-hunts.md#a225-shared-core](discovery-hunts.md#a225-shared-core) |
+| A22.6 | Data sources | [discovery-hunts.md#a226-data-sources](discovery-hunts.md#a226-data-sources) |
+| A22.7 | Contract | [discovery-hunts.md#a227-contract](discovery-hunts.md#a227-contract) |
+| A22.8 | Results, provenance and honesty rules | [discovery-hunts.md#a228-results-provenance-and-honesty-rules](discovery-hunts.md#a228-results-provenance-and-honesty-rules) |
+| A22.9 | Hunt sheets | [discovery-hunts.md#a229-hunt-sheets](discovery-hunts.md#a229-hunt-sheets) |
+| A22.10 | Calibration and proof | [discovery-hunts.md#a2210-calibration-and-proof](discovery-hunts.md#a2210-calibration-and-proof) |
+| A22.11 | Running on a home gaming PC | [discovery-hunts.md#a2211-running-on-a-home-gaming-pc](discovery-hunts.md#a2211-running-on-a-home-gaming-pc) |
+| A22.12 | Plan, tickets and owners | [discovery-hunts.md#a2212-plan-tickets-and-owners](discovery-hunts.md#a2212-plan-tickets-and-owners) |
+| A22.13 | Tests | [discovery-hunts.md#a2213-tests](discovery-hunts.md#a2213-tests) |
+| A22.14 | Open items and items to verify | [discovery-hunts.md#a2214-open-items-and-items-to-verify](discovery-hunts.md#a2214-open-items-and-items-to-verify) |
+| A22.15 | Decisions | [discovery-hunts.md#a2215-decisions](discovery-hunts.md#a2215-decisions) |
+| A22.16 | The mock-up file | [discovery-hunts.md#a2216-the-mock-up-file](discovery-hunts.md#a2216-the-mock-up-file) |
