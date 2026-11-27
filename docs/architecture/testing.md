@@ -28,6 +28,6 @@
 | Track (A19) | Path, frame list, masks, spectrum hop by hop, export, labels; e2e on the recorded Eros fixtures | A19 ([moving-objects/track.md](moving-objects/track.md)) | to add | To build (Atish) |
 | Area search (A16 to A18) | Discovery determinism (A17.10), UI tests (A18.10), e2e on the real cache (D3) | [A18.10](moving-objects/area-ui.md) | to add | To build (D1 to D3) |
 | Hardware (event) | Run the real app on the Asus A15 from the offline cache, record frame times in Chrome (R5.5), check the sound output and the A15's GPU | #16 (to re-scope to the A15, Q-132) | no | To do (M5) |
-| Milestones | M1 to M4 each build against their own fixtures (recorded responses, sample cards and spectra), so they do not depend on each other (D-29) | | | Rule |
+| Milestones | M1 to M4 (closed, D-43) each built against their own fixtures (recorded responses, sample cards and spectra), so they did not depend on each other (D-29). For the hunts, HN-3 builds against HN-2's fixtures (A22.12) | | | Rule (history, D-43) |
 
 **After the event** (Q-132): vibration on both Android phones (the faintest calibrated tick is felt, silent no-op on iPhone where audio takes over, the calibration value persists), the sound-to-vibration offset of the same event on both phones, and frame rates on the phones.

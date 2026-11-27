@@ -13,7 +13,7 @@ File a ticket for `$ARGUMENTS`. **Never create an issue before the author has ap
 - Work out what the ticket is for from the request, the conversation, a review's follow-up drafts, or the code.
 - Look for duplicates: `gh issue list -R 0ffrian/SphereX --state all --search "<keywords>"`. If one exists, say so and propose updating or linking it instead.
 - Find the relations: which open issues this one **blocks**, which ones **block it**, and its **parent** issue if it is part of a larger one. Check that each named issue exists (`gh issue view <n> -R 0ffrian/SphereX --json number,title,state`).
-- For a milestone, use its full title: `gh api repos/0ffrian/SphereX/milestones --jq '.[].title'` (e.g. "M3 · Haptics & sound", not "M3").
+- For a milestone, use its full title: `gh api repos/0ffrian/SphereX/milestones --jq '.[].title'` (e.g. "R1b · First validated hunts", not "R1b"; R1a has three milestones, so pick the one whose description holds the ticket).
 - Find the decision or spec IDs it touches (`docs/decisions/README.md`, the routing table in `docs/README.md`).
 
 ## 2. Draft and show it. Then stop.
